@@ -1,0 +1,7 @@
+# Twenty years with policy left alone.
+
+[scenario]
+model = ".."
+seed = 20261113
+steps = 240
+preset = "central"

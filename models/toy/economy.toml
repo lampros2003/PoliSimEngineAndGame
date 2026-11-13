@@ -1,0 +1,315 @@
+# The toy economy's parameters, policy levers and equations.
+#
+# Within a step every formula sees: this step's value of anything computed in the same
+# or an earlier phase, the start-of-step balance of every account, and prev(x) for last
+# step's value of x. Flows are posted to the accounts at the end of the step.
+
+# ================================================================= parameters
+
+[param.propensity_income]
+type = "real"
+unit = "1"
+low = 0.70
+central = 0.80
+high = 0.90
+doc = "Share of this month's disposable income that households spend"
+
+[param.propensity_wealth]
+type = "real"
+unit = "1/month"
+value = 0.10
+doc = "Share of money holdings that households spend each month"
+
+[param.wage_share]
+type = "real"
+unit = "1"
+value = 0.60
+doc = "Wage bill firms aim for, as a share of last month's sales net of VAT"
+
+[param.labour_adjust]
+type = "real"
+unit = "1"
+value = 0.50
+range = [0, 1]
+doc = "Fraction of the gap to the desired wage bill that firms close each month"
+
+[param.separation_rate]
+type = "real"
+unit = "1"
+value = 0.02
+range = [0, 1]
+doc = "Chance per month that an employed household loses its job for unrelated reasons"
+
+[param.payout_rate]
+type = "real"
+unit = "1/month"
+value = 0.50
+range = [0, 1]
+doc = "Share of firms' money paid out to shareholders each month"
+
+[param.higher_threshold]
+type = "money"
+unit = "GBP/month/household"
+value = 4000
+doc = "Monthly income above which the higher rate applies"
+
+# ================================================================= policy levers
+
+[lever.gov_purchases]
+type = "money"
+unit = "GBP/month"
+default = 1_490_000_000
+range = [0, 10_000_000_000]
+doc = "Government purchases from firms"
+
+[lever.benefit_rate]
+type = "money"
+unit = "GBP/month/household"
+default = 800
+range = [0, 5000]
+doc = "Benefit paid to each household without work"
+
+[lever.personal_allowance]
+type = "money"
+unit = "GBP/month/household"
+default = 1000
+range = [0, 4000]
+doc = "Monthly income free of income tax"
+
+[lever.basic_rate]
+type = "real"
+unit = "1"
+default = 0.20
+range = [0, 1]
+doc = "Income tax rate between the allowance and the higher threshold"
+
+[lever.higher_rate]
+type = "real"
+unit = "1"
+default = 0.40
+range = [0, 1]
+doc = "Income tax rate above the higher threshold"
+
+[lever.vat_rate]
+type = "real"
+unit = "1"
+default = 0.20
+range = [0, 1]
+doc = "Value added tax on household consumption"
+
+[table.income_tax_bands]
+kind = "marginal"
+unit = "GBP/month/household"
+bands = [
+  { from = "personal_allowance", rate = "basic_rate" },
+  { from = "higher_threshold", rate = "higher_rate" },
+]
+
+# ================================================================= phase: labour
+# Firms aim for a wage bill proportional to last month's net sales and hire or lay off
+# at random to get there. `employed` changes in this phase, so later phases see the new
+# status while these formulas see the old one.
+
+[var.wage_bill_start]
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "wsum(household, select(employed, wage, 0))"
+doc = "Wage bill if nobody changed status this month"
+
+[var.idle_wage_pool]
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "wsum(household, select(employed, 0, wage))"
+doc = "Wages of the households currently without work"
+
+[var.wage_bill_desired]
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(wage_share * prev(net_sales))"
+
+[var.wage_bill_target]
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(wage_bill_start + labour_adjust * (wage_bill_desired - wage_bill_start))"
+
+[var.leave_prob]
+type = "real"
+unit = "1"
+phase = "labour"
+range = [0, 1]
+expr = "clamp(1.0 - safe_div(wage_bill_target, wage_bill_start, 1.0), separation_rate, 1.0)"
+doc = "Chance that an employed household is out of work this month"
+
+[var.hire_prob]
+type = "real"
+unit = "1"
+phase = "labour"
+range = [0, 1]
+expr = "clamp(safe_div(wage_bill_target - (1.0 - leave_prob) * wage_bill_start, idle_wage_pool, 0.0), 0.0, 1.0)"
+doc = "Chance that a household without work is hired this month"
+
+[state.employed]
+entity = "household"
+type = "bool"
+phase = "labour"
+initial = { column = "employed0" }
+next = "select(employed, not (rand(separation) < leave_prob), rand(hiring) < hire_prob)"
+
+# ================================================================= phase: income
+
+[flow.wages]
+from = "firms"
+to = "households"
+phase = "income"
+expr = "select(employed, wage, 0)"
+
+[var.dividend_pool]
+type = "money"
+unit = "GBP/month"
+phase = "income"
+expr = "round(payout_rate * max(firm_money, 0))"
+
+[var.total_equity]
+type = "int"
+unit = "share"
+phase = "income"
+expr = "wsum(household, equity_units)"
+
+[flow.dividends]
+from = "firms"
+to = "households"
+phase = "income"
+expr = "muldiv(equity_units, dividend_pool, total_equity)"
+doc = "Rounded down per household; the few pence left over stay with firms"
+
+[flow.benefits]
+from = "government"
+to = "households"
+phase = "income"
+expr = "select(employed, 0, benefit_rate)"
+
+[var.market_income]
+entity = "household"
+type = "money"
+unit = "GBP/month/household"
+phase = "income"
+expr = "wages + dividends"
+
+[flow.income_tax]
+from = "households"
+to = "government"
+phase = "income"
+expr = "marginal(market_income, income_tax_bands)"
+
+[var.disposable_income]
+entity = "household"
+type = "money"
+unit = "GBP/month/household"
+phase = "income"
+expr = "market_income + benefits - income_tax"
+
+# ================================================================= phase: spending
+
+[flow.consumption]
+from = "households"
+to = "firms"
+phase = "spending"
+expr = "min(round(propensity_income * disposable_income + propensity_wealth * hh_money), disposable_income + per_step(hh_money))"
+doc = "Spending including VAT, never more than the household can pay"
+
+# ================================================================= phase: firms
+
+[var.consumption_total]
+type = "money"
+unit = "GBP/month"
+phase = "firms"
+expr = "wsum(household, consumption)"
+
+[flow.vat]
+from = "firms"
+to = "government"
+phase = "firms"
+expr = "round(vat_rate / (1.0 + vat_rate) * consumption_total)"
+
+[flow.gov_spending]
+from = "government"
+to = "firms"
+phase = "firms"
+expr = "gov_purchases"
+
+[var.net_sales]
+type = "money"
+unit = "GBP/month"
+phase = "firms"
+initial = 4_300_000_000
+expr = "consumption_total - vat + gov_spending"
+doc = "Firms' revenue net of VAT. Next month's hiring responds to it."
+
+[var.wage_bill]
+type = "money"
+unit = "GBP/month"
+phase = "firms"
+expr = "wsum(household, wages)"
+
+[var.firm_profit]
+type = "money"
+unit = "GBP/month"
+phase = "firms"
+expr = "net_sales - wage_bill"
+
+[var.gdp]
+type = "money"
+unit = "GBP/month"
+phase = "firms"
+expr = "consumption_total + gov_spending"
+doc = "Expenditure measure at market prices"
+
+# ================================================================= phase: government
+
+[var.income_tax_total]
+type = "money"
+unit = "GBP/month"
+phase = "government"
+expr = "wsum(household, income_tax)"
+
+[var.benefits_total]
+type = "money"
+unit = "GBP/month"
+phase = "government"
+expr = "wsum(household, benefits)"
+
+[var.gov_balance]
+type = "money"
+unit = "GBP/month"
+phase = "government"
+expr = "income_tax_total + vat - gov_spending - benefits_total"
+doc = "Surplus when positive, deficit when negative"
+
+[var.disposable_income_total]
+type = "money"
+unit = "GBP/month"
+phase = "government"
+expr = "wsum(household, disposable_income)"
+
+[var.households_total]
+type = "int"
+unit = "household"
+phase = "government"
+expr = "wcount(household, true)"
+
+[var.unemployed]
+type = "int"
+unit = "household"
+phase = "government"
+expr = "wcount(household, not employed)"
+
+[var.unemployment_rate]
+type = "real"
+unit = "1"
+phase = "government"
+range = [0, 1]
+expr = "unemployed / households_total"
