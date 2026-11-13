@@ -91,7 +91,9 @@ so the issuer's balance is the negative of everything the other sectors hold.
   record. Record `i` stands for `weight[i]` identical real units, so its own balance
   moves by `amount[i]` and the other sector's account moves by the sum of
   `weight[i] * amount[i]`. Weights are positive whole numbers, so the sum is exact.
-- All flows of a step are posted together after the last phase.
+- All flows of a step are posted together after the last phase, in the order the model
+  declares them. A flow's total, and every balance after each flow is applied, must fit
+  in 64 bits.
 
 ## 5. Identities checked every step
 
@@ -162,7 +164,25 @@ earlier it stops the cheaper the fix.
 
 ## 11. Not in v0
 
-Saves and command logs; mods and patches; threads; lags longer than one step; moving
-averages; dimensions other than one entity (regions, industries); native operators
-(cohort ageing, alignment, seat allocation); transcendental functions. Each is planned;
-none is needed by the toy model.
+Command logs; mods and patches; threads; lags longer than one step; moving averages;
+dimensions other than one entity (regions, industries); native operators (cohort ageing,
+alignment, seat allocation); transcendental functions. Each is planned; none is needed by
+the toy model. Snapshot saves exist and are described in [save format 0](04-save-format-v0.md).
+
+## 12. Two implementations
+
+| | Oracle (`oracle/`) | Engine (`crates/core/`) |
+|---|---|---|
+| Language | Python | Rust |
+| Purpose | defines the behaviour | runs the game |
+| Formulas | closures, one record at a time | register bytecode, a block of records at a time |
+| Speed at 1,000 households | about 17 ms per step | about 0.2 ms per step |
+
+They are held together by three tests. `conformance/cases.tsv` lists formulas with the
+result the oracle gives for each, and both sides check every line. The engine must
+reproduce the oracle's recorded hash on every step of the toy baseline. And
+`tools/diff_engine.py` generates random scenarios, runs both, and compares their output
+byte for byte, including the scenarios that fail.
+
+When the two disagree, the oracle is right unless this document says otherwise, and the
+fix goes into the engine. When the contract itself changes, the oracle changes first.
