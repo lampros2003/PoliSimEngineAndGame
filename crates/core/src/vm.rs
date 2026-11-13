@@ -149,7 +149,7 @@ fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {
             }
             AggKind::SumReal => {
                 for (w, v) in w.iter().zip(&regs.f[r][..len]) {
-                    real = real + *w as f64 * *v;
+                    real += *w as f64 * *v;
                 }
             }
             AggKind::Count => {
@@ -191,7 +191,7 @@ pub fn marginal_amount(x: i64, lows: &[i64], rates: &[f64]) -> Check<i64> {
             part = 0;
         }
         let Ok(part) = i64::try_from(part) else { return overflow() };
-        acc = acc + rates[k] * part as f64;
+        acc += rates[k] * part as f64;
     }
     real_to_int(acc, Rounding::Round)
 }
@@ -205,7 +205,7 @@ pub fn real_to_int(x: f64, mode: Rounding) -> Check<i64> {
         Rounding::Ceil => x.ceil(),
     };
     // Also false for not-a-number.
-    if r >= -TWO_POW_63 && r < TWO_POW_63 {
+    if (-TWO_POW_63..TWO_POW_63).contains(&r) {
         Ok(r as i64)
     } else {
         Err("conversion to a whole number of a value that is not finite or does not fit in 64 bits".to_string())
@@ -251,7 +251,15 @@ fn compare<T: PartialOrd>(cmp: Cmp, x: T, y: T) -> bool {
     }
 }
 
-fn run_block(prog: &Program, cx: &EvalCtx, entity: Option<usize>, start: usize, len: usize, regs: &mut Regs, prepared: &Prepared) -> Check<()> {
+fn run_block(
+    prog: &Program,
+    cx: &EvalCtx,
+    entity: Option<usize>,
+    start: usize,
+    len: usize,
+    regs: &mut Regs,
+    prepared: &Prepared,
+) -> Check<()> {
     let end = start + len;
     for op in &prog.ops {
         match *op {

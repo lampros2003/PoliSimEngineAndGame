@@ -263,7 +263,11 @@ impl<'a> Builder<'a> {
                 arg_count(fname, args, 3)?;
                 let (ty, unit, r) = self.numeric_group(fname, args, ctx)?;
                 let d = self.reg(ty);
-                self.ops.push(if ty == Ty::Int { Op::ClampI(d, r[0], r[1], r[2]) } else { Op::ClampF(d, r[0], r[1], r[2]) });
+                self.ops.push(if ty == Ty::Int {
+                    Op::ClampI(d, r[0], r[1], r[2])
+                } else {
+                    Op::ClampF(d, r[0], r[1], r[2])
+                });
                 Ok(Built { ty, unit, reg: d })
             }
             "abs" => {
@@ -497,7 +501,14 @@ impl Builder<'_> {
 /// `ctx` is `None` for a national formula or the index of the entity for a per-record
 /// one. A whole-number result may feed a real target; a real result never feeds a
 /// whole-number target without an explicit `round`, `floor` or `ceil`.
-pub fn compile_formula(model: &Model, src: &str, ctx: Option<usize>, want_ty: Ty, want_unit: &Unit, label: &str) -> Result<Compiled> {
+pub fn compile_formula(
+    model: &Model,
+    src: &str,
+    ctx: Option<usize>,
+    want_ty: Ty,
+    want_unit: &Unit,
+    label: &str,
+) -> Result<Compiled> {
     let mut deps = BTreeSet::new();
     let mut lagged = BTreeSet::new();
     let outcome = (|| -> Check<(Program, Option<Unit>)> {
@@ -508,7 +519,8 @@ pub fn compile_formula(model: &Model, src: &str, ctx: Option<usize>, want_ty: Ty
             let reg = builder.as_real(&built);
             built = Built { ty: Ty::Real, unit: built.unit, reg };
         } else if built.ty != want_ty {
-            let hint = if want_ty == Ty::Int && built.ty == Ty::Real { " (use round(), floor() or ceil())" } else { "" };
+            let hint =
+                if want_ty == Ty::Int && built.ty == Ty::Real { " (use round(), floor() or ceil())" } else { "" };
             return Err(format!("expected a {} value but the formula gives {}{hint}", want_ty.name(), built.ty.name()));
         }
         if want_ty != Ty::Bool {
@@ -518,7 +530,9 @@ pub fn compile_formula(model: &Model, src: &str, ctx: Option<usize>, want_ty: Ty
         Ok((prog, built.unit))
     })();
     match outcome {
-        Ok((prog, unit)) => Ok(Compiled { prog, deps: deps.into_iter().collect(), lagged: lagged.into_iter().collect(), unit }),
+        Ok((prog, unit)) => {
+            Ok(Compiled { prog, deps: deps.into_iter().collect(), lagged: lagged.into_iter().collect(), unit })
+        }
         Err(message) => Err(Error::Formula(format!("{label}: {message}\n    formula: {src}"))),
     }
 }

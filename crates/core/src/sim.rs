@@ -98,6 +98,14 @@ fn int_column(column: &Col) -> &[i64] {
     }
 }
 
+pub(crate) fn type_of(value: &Val) -> Ty {
+    match value {
+        Val::I(_) => Ty::Int,
+        Val::F(_) => Ty::Real,
+        Val::B(_) => Ty::Bool,
+    }
+}
+
 fn fits(value: i128, name: &str) -> Result<i64> {
     i64::try_from(value).map_err(|_| Error::Sim(format!("{name}: value does not fit in 64 bits")))
 }
@@ -114,12 +122,29 @@ fn schedule(commands: Vec<(u64, String, Value)>) -> BTreeMap<u64, Vec<(String, V
     map
 }
 
+/// Where parameter values come from: a scenario's preset and overrides, or a save file.
+pub(crate) enum Params {
+    Scenario { preset: String, overrides: Vec<(String, Value)> },
+    Resolved(Vec<(String, Val)>),
+}
+
 impl Simulation {
     pub fn new(model: Arc<Model>, config: RunConfig) -> Result<Simulation> {
+        let params = Params::Scenario { preset: config.preset, overrides: config.params };
+        Simulation::build(model, config.seed, params, config.levers, config.commands)
+    }
+
+    pub(crate) fn build(
+        model: Arc<Model>,
+        seed: u64,
+        params: Params,
+        levers: Vec<(String, Value)>,
+        commands: Vec<(u64, String, Value)>,
+    ) -> Result<Simulation> {
         let count = model.symbols.len();
         let mut simulation = Simulation {
             model: Arc::clone(&model),
-            seed: config.seed,
+            seed,
             step: 0,
             scal: vec![Val::I(0); count],
             cols: vec![Col::I(Vec::new()); count],
@@ -129,7 +154,7 @@ impl Simulation {
             plan: Vec::new(),
             lagged: vec![false; count],
             hashed: Vec::new(),
-            commands: schedule(config.commands),
+            commands: schedule(commands),
             flow_totals: vec![0; model.flows.len()],
             row_names: Vec::new(),
             row_sources: Vec::new(),
@@ -138,15 +163,30 @@ impl Simulation {
         let minor = m.minor;
 
         // ---- parameters, levers, data columns
-        let mut overrides = config.params;
+        let (preset, mut overrides, mut resolved) = match params {
+            Params::Scenario { preset, overrides } => (preset, overrides, None),
+            Params::Resolved(values) => (String::new(), Vec::new(), Some(values)),
+        };
         for (id, d) in m.symbols.iter().enumerate() {
             match d.kind {
                 Kind::Param => {
                     let what = format!("param {}", d.name);
+                    if let Some(values) = &mut resolved {
+                        let value = match values
+                            .iter()
+                            .position(|(name, _)| *name == d.name)
+                            .map(|i| values.remove(i).1)
+                        {
+                            Some(value) if type_of(&value) == d.ty => value,
+                            _ => return model_err(format!("{what}: missing from the save file or of the wrong type")),
+                        };
+                        simulation.store(id, Computed::One(value))?;
+                        continue;
+                    }
                     let given = overrides.iter().position(|(name, _)| *name == d.name).map(|i| overrides.remove(i).1);
-                    let raw = match given.as_ref().or_else(|| d.spec.get("value")).or_else(|| d.spec.get(&config.preset)) {
+                    let raw = match given.as_ref().or_else(|| d.spec.get("value")).or_else(|| d.spec.get(&preset)) {
                         Some(raw) => raw,
-                        None => return model_err(format!("{what}: no 'value' and no {:?} preset", config.preset)),
+                        None => return model_err(format!("{what}: no 'value' and no {preset:?} preset")),
                     };
                     let value = convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?;
                     simulation.store(id, Computed::One(value))?;
@@ -164,9 +204,13 @@ impl Simulation {
             let names: Vec<&str> = overrides.iter().map(|(n, _)| n.as_str()).collect();
             return model_err(format!("unknown parameter(s): {}", names.join(", ")));
         }
-        let mut lever_overrides = config.levers;
+        if resolved.is_some_and(|left| !left.is_empty()) {
+            return model_err("the save file has parameters this model does not declare");
+        }
+        let mut lever_overrides = levers;
         for d in m.symbols.iter().filter(|d| d.kind == Kind::Lever) {
-            let given = lever_overrides.iter().position(|(name, _)| *name == d.name).map(|i| lever_overrides.remove(i).1);
+            let given =
+                lever_overrides.iter().position(|(name, _)| *name == d.name).map(|i| lever_overrides.remove(i).1);
             let raw = given.or_else(|| d.initial.clone()).expect("levers have a default");
             simulation.set_lever(&d.name, &raw)?;
         }
@@ -213,7 +257,11 @@ impl Simulation {
             let d = &m.symbols[id];
             if matches!(d.kind, Kind::Var | Kind::Flow) {
                 if d.initial.is_none() {
-                    return model_err(format!("{} {} is read through prev() and needs 'initial'", d.kind.name(), d.name));
+                    return model_err(format!(
+                        "{} {} is read through prev() and needs 'initial'",
+                        d.kind.name(),
+                        d.name
+                    ));
                 }
                 let value = simulation.initial(d)?;
                 simulation.store(id, value)?;
@@ -222,7 +270,9 @@ impl Simulation {
         simulation.remember();
 
         simulation.hashed = (0..count)
-            .filter(|id| matches!(m.symbols[*id].kind, Kind::Lever | Kind::Account | Kind::State) || simulation.lagged[*id])
+            .filter(|id| {
+                matches!(m.symbols[*id].kind, Kind::Lever | Kind::Account | Kind::State) || simulation.lagged[*id]
+            })
             .collect();
         simulation.hashed.sort_by(|a, b| m.symbols[*a].name.cmp(&m.symbols[*b].name));
 
@@ -286,7 +336,9 @@ impl Simulation {
     /// Type-level and declared-range checks, then the value becomes current.
     fn store(&mut self, id: usize, value: Computed) -> Result<()> {
         let d = &self.model.symbols[id];
-        let fail = |shown: String| -> Result<()> { sim_err(format!("{} {}: {shown} is outside its declared range", d.kind.name(), d.name)) };
+        let fail = |shown: String| -> Result<()> {
+            sim_err(format!("{} {}: {shown} is outside its declared range", d.kind.name(), d.name))
+        };
         let not_finite = || -> Result<()> { sim_err(format!("{} {}: value is not finite", d.kind.name(), d.name)) };
         let (lo, hi) = d.range.unwrap_or((f64::NEG_INFINITY, f64::INFINITY));
         let ranged = d.range.is_some();
@@ -341,6 +393,25 @@ impl Simulation {
             total = total.checked_add(*w as i128 * *v as i128).ok_or_else(too_large)?;
         }
         Ok(total)
+    }
+
+    /// Checks that `raw` is a legal setting for the lever `name` without applying it.
+    /// Returns the value as it would be stored.
+    pub fn check_lever(&self, name: &str, raw: &Value) -> Result<Val> {
+        let d = match self.model.sym(name) {
+            Some(d) if d.kind == Kind::Lever => d,
+            _ => return model_err(format!("{name:?} is not a lever")),
+        };
+        let value = convert(Raw::Toml(raw), d.ty, d.money, self.model.minor, &format!("lever {name}"))?;
+        let as_real = match value {
+            Val::I(v) => v as f64,
+            Val::F(v) => v,
+            Val::B(v) => v as u8 as f64,
+        };
+        if !as_real.is_finite() || d.range.is_some_and(|(lo, hi)| !(lo <= as_real && as_real <= hi)) {
+            return sim_err(format!("lever {name}: the value is outside its declared range"));
+        }
+        Ok(value)
     }
 
     fn set_lever(&mut self, name: &str, raw: &Value) -> Result<()> {
@@ -515,7 +586,8 @@ impl Simulation {
             totals.push(total);
         }
         for (index, instrument) in m.instruments.iter().enumerate() {
-            let sum: i128 = m.accounts.iter().zip(&totals).filter(|(a, _)| a.instrument == index).map(|(_, t)| *t).sum();
+            let sum: i128 =
+                m.accounts.iter().zip(&totals).filter(|(a, _)| a.instrument == index).map(|(_, t)| *t).sum();
             if sum != 0 {
                 return sim_err(format!("instrument {}: balances sum to {sum}, not zero", instrument.name));
             }
@@ -580,25 +652,44 @@ impl Simulation {
         }
     }
 
-    /// Symbols in the state hash, in hash order.
-    pub(crate) fn hashed_symbols(&self) -> &[usize] {
-        &self.hashed
+    /// Current parameter values, in declaration order.
+    pub(crate) fn params(&self) -> Vec<(&str, Val)> {
+        let symbols = self.model.symbols.iter().enumerate();
+        symbols.filter(|(_, d)| d.kind == Kind::Param).map(|(id, d)| (d.name.as_str(), self.scal[id])).collect()
     }
 
-    pub(crate) fn value_of(&self, id: usize) -> Computed {
-        match self.model.symbols[id].entity {
+    /// The persistent state: every hashed symbol with its value(s), in hash order.
+    pub(crate) fn persistent(&self) -> Vec<(&str, Computed)> {
+        let value = |id: usize| match self.model.symbols[id].entity {
             None => Computed::One(self.scal[id]),
             Some(_) => Computed::Each(self.cols[id].clone()),
-        }
+        };
+        self.hashed.iter().map(|id| (self.model.symbols[*id].name.as_str(), value(*id))).collect()
     }
 
-    /// Overwrites persistent state from a save. `values` is parallel to `hashed_symbols`.
-    pub(crate) fn restore(&mut self, steps_done: u64, values: Vec<Computed>) -> Result<()> {
+    /// Overwrites the persistent state from a save. `values` must list the hashed symbols
+    /// in hash order with the right type and shape.
+    pub(crate) fn restore(&mut self, steps_done: u64, values: Vec<(String, Computed)>) -> Result<()> {
         let hashed = self.hashed.clone();
         if values.len() != hashed.len() {
-            return model_err("save file does not match this model's state");
+            return model_err("the save file does not match this model's state");
         }
-        for (id, value) in hashed.into_iter().zip(values) {
+        for (id, (name, value)) in hashed.into_iter().zip(values) {
+            let d = &self.model.symbols[id];
+            let fits_declaration = match (&value, d.entity) {
+                (Computed::One(v), None) => type_of(v) == d.ty,
+                (Computed::Each(column), Some(entity)) => {
+                    column.len() == self.model.entities[entity].len()
+                        && matches!(
+                            (column, d.ty),
+                            (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool)
+                        )
+                }
+                _ => false,
+            };
+            if name != d.name || !fits_declaration {
+                return model_err(format!("the save file does not match this model at {:?}", d.name));
+            }
             self.store(id, value)?;
         }
         self.step = steps_done;
@@ -675,7 +766,9 @@ fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
     let mut phases = Vec::with_capacity(m.phases.len());
     for p in 0..m.phases.len() {
         let in_phase = |kinds: &[Kind]| -> Vec<usize> {
-            (0..m.symbols.len()).filter(|id| kinds.contains(&m.symbols[*id].kind) && m.symbols[*id].phase == Some(p)).collect()
+            (0..m.symbols.len())
+                .filter(|id| kinds.contains(&m.symbols[*id].kind) && m.symbols[*id].phase == Some(p))
+                .collect()
         };
         let members = in_phase(&[Kind::Var, Kind::Flow]);
         let states = in_phase(&[Kind::State]);
@@ -697,7 +790,8 @@ fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
         let mut order: Vec<usize> = Vec::with_capacity(members.len());
         let mut remaining = members.clone();
         while !remaining.is_empty() {
-            let ready = remaining.iter().position(|id| deps[*id].iter().all(|u| order.contains(u) || !members.contains(u)));
+            let ready =
+                remaining.iter().position(|id| deps[*id].iter().all(|u| order.contains(u) || !members.contains(u)));
             let Some(position) = ready else {
                 let names: Vec<&str> = remaining.iter().map(|id| m.symbols[*id].name.as_str()).collect();
                 return model_err(format!("circular dependency in phase {}: {}", m.phases[p], names.join(", ")));

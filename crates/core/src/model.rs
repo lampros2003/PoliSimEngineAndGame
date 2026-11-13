@@ -17,8 +17,23 @@ use crate::units::{self, Unit};
 
 /// Function names of the formula language. With the five keywords they are reserved.
 pub const FUNCTIONS: [&str; 17] = [
-    "abs", "ceil", "clamp", "floor", "marginal", "max", "min", "muldiv", "per_step", "prev", "rand", "round",
-    "safe_div", "select", "times_step", "wcount", "wsum",
+    "abs",
+    "ceil",
+    "clamp",
+    "floor",
+    "marginal",
+    "max",
+    "min",
+    "muldiv",
+    "per_step",
+    "prev",
+    "rand",
+    "round",
+    "safe_div",
+    "select",
+    "times_step",
+    "wcount",
+    "wsum",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
 const SECTIONS: [&str; 12] =
@@ -377,11 +392,13 @@ fn parse_csv(text: &str) -> Vec<Vec<String>> {
 
 fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>, String)> {
     let what = format!("entity {name}");
-    let (Some(data), Some(id), Some(weight)) = (text_of(spec, "data"), text_of(spec, "id"), text_of(spec, "weight")) else {
+    let (Some(data), Some(id), Some(weight)) = (text_of(spec, "data"), text_of(spec, "id"), text_of(spec, "weight"))
+    else {
         return model_err(format!("{what}: needs 'data', 'id' and 'weight'"));
     };
     let path = root.join(data);
-    let bytes = std::fs::read(&path).map_err(|e| Error::Model(format!("{what}: cannot read {}: {e}", path.display())))?;
+    let bytes =
+        std::fs::read(&path).map_err(|e| Error::Model(format!("{what}: cannot read {}: {e}", path.display())))?;
     let text = std::str::from_utf8(&bytes).map_err(|_| Error::Model(format!("{what}: {data} is not UTF-8")))?;
     let mut rows = parse_csv(text);
     if rows.len() < 2 {
@@ -391,7 +408,12 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
     let mut raw: Vec<Vec<String>> = vec![Vec::with_capacity(rows.len()); header.len()];
     for (line, row) in rows.into_iter().enumerate() {
         if row.len() != header.len() {
-            return model_err(format!("{what}: row {} of {data} has {} fields, expected {}", line + 2, row.len(), header.len()));
+            return model_err(format!(
+                "{what}: row {} of {data} has {} fields, expected {}",
+                line + 2,
+                row.len(),
+                header.len()
+            ));
         }
         for (column, cell) in raw.iter_mut().zip(row) {
             column.push(cell);
@@ -404,10 +426,15 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
         }
     }
     let whole = |column: &str, label: &str| -> Result<Vec<i64>> {
-        entity.column(column).unwrap().iter().map(|cell| match convert(Raw::Text(cell), Ty::Int, false, 1, label)? {
-            Val::I(v) => Ok(v),
-            _ => unreachable!("whole-number conversion"),
-        }).collect()
+        entity
+            .column(column)
+            .unwrap()
+            .iter()
+            .map(|cell| match convert(Raw::Text(cell), Ty::Int, false, 1, label)? {
+                Val::I(v) => Ok(v),
+                _ => unreachable!("whole-number conversion"),
+            })
+            .collect()
     };
     let ids = whole(id, &format!("{what} id"))?;
     let weights = whole(weight, &format!("{what} weight"))?;
@@ -626,8 +653,14 @@ pub fn load_model(path: &Path) -> Result<Model> {
     let mut taken: Vec<String> = table_index.keys().cloned().collect();
     taken.extend(streams.iter().map(|(n, _)| n.clone()));
     taken.extend(entity_index.keys().cloned());
-    let mut loader =
-        Loader { minor, phases: phases.clone(), symbols: Vec::new(), sym_index: HashMap::new(), taken, entity_index: entity_index.clone() };
+    let mut loader = Loader {
+        minor,
+        phases: phases.clone(),
+        symbols: Vec::new(),
+        sym_index: HashMap::new(),
+        taken,
+        entity_index: entity_index.clone(),
+    };
 
     for (ent_name, ent_spec) in &merged[section("entity")] {
         let entity = entity_index[ent_name];
@@ -641,8 +674,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
             }
             let unit = loader.unit_or_one(spec, &what, ty)?;
             loader.declare(Decl {
-                name: name.clone(), kind: Kind::Column, ty, unit, money, entity: Some(entity), phase: None, expr: None,
-                initial: None, range: None, spec: spec.clone(),
+                name: name.clone(),
+                kind: Kind::Column,
+                ty,
+                unit,
+                money,
+                entity: Some(entity),
+                phase: None,
+                expr: None,
+                initial: None,
+                range: None,
+                spec: spec.clone(),
             })?;
         }
     }
@@ -653,8 +695,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let (ty, money) = type_of(spec, &what)?;
         let unit = loader.unit_or_one(spec, &what, ty)?;
         loader.declare(Decl {
-            name: name.clone(), kind: Kind::Param, ty, unit, money, entity: None, phase: None, expr: None, initial: None,
-            range: range_of(spec, money, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::Param,
+            ty,
+            unit,
+            money,
+            entity: None,
+            phase: None,
+            expr: None,
+            initial: None,
+            range: range_of(spec, money, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
     }
 
@@ -665,8 +716,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let Some(default) = spec.get("default") else { return model_err(format!("{what}: missing 'default'")) };
         let unit = loader.unit_or_one(spec, &what, ty)?;
         loader.declare(Decl {
-            name: name.clone(), kind: Kind::Lever, ty, unit, money, entity: None, phase: None, expr: None,
-            initial: Some(default.clone()), range: range_of(spec, money, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::Lever,
+            ty,
+            unit,
+            money,
+            entity: None,
+            phase: None,
+            expr: None,
+            initial: Some(default.clone()),
+            range: range_of(spec, money, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
     }
 
@@ -677,9 +737,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let Some(expr) = spec.get("expr") else { return model_err(format!("{what}: missing 'expr'")) };
         let unit = loader.unit_or_one(spec, &what, ty)?;
         loader.declare(Decl {
-            name: name.clone(), kind: Kind::Var, ty, unit, money, entity: loader.entity_of(spec, &what)?,
-            phase: loader.phase_of(spec, &what)?, expr: Some(formula_text(expr)), initial: spec.get("initial").cloned(),
-            range: range_of(spec, money, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::Var,
+            ty,
+            unit,
+            money,
+            entity: loader.entity_of(spec, &what)?,
+            phase: loader.phase_of(spec, &what)?,
+            expr: Some(formula_text(expr)),
+            initial: spec.get("initial").cloned(),
+            range: range_of(spec, money, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
     }
 
@@ -692,9 +760,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
         };
         let unit = loader.unit_or_one(spec, &what, ty)?;
         loader.declare(Decl {
-            name: name.clone(), kind: Kind::State, ty, unit, money, entity: loader.entity_of(spec, &what)?,
-            phase: loader.phase_of(spec, &what)?, expr: Some(formula_text(next)), initial: Some(initial.clone()),
-            range: range_of(spec, money, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::State,
+            ty,
+            unit,
+            money,
+            entity: loader.entity_of(spec, &what)?,
+            phase: loader.phase_of(spec, &what)?,
+            expr: Some(formula_text(next)),
+            initial: Some(initial.clone()),
+            range: range_of(spec, money, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
     }
 
@@ -709,7 +785,10 @@ pub fn load_model(path: &Path) -> Result<Model> {
             return model_err(format!("{what}: needs a declared 'sector' and 'instrument'"));
         };
         if accounts.iter().any(|a| a.sector == sector && a.instrument == instrument) {
-            return model_err(format!("{what}: sector {} already has an account in {}", sector_names[sector], raw_instruments[instrument].name));
+            return model_err(format!(
+                "{what}: sector {} already has an account in {}",
+                sector_names[sector], raw_instruments[instrument].name
+            ));
         }
         let is_issuer = raw_instruments[instrument].issuer == sector;
         if is_issuer == spec.contains_key("initial") {
@@ -721,8 +800,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
             unit = units::div(&Some(unit), &Some(Unit::base(&entities[entity].name)));
         }
         let sym = loader.declare(Decl {
-            name: name.clone(), kind: Kind::Account, ty: Ty::Int, unit, money: true, entity, phase: None, expr: None,
-            initial: spec.get("initial").cloned(), range: range_of(spec, true, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::Account,
+            ty: Ty::Int,
+            unit,
+            money: true,
+            entity,
+            phase: None,
+            expr: None,
+            initial: spec.get("initial").cloned(),
+            range: range_of(spec, true, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
         accounts.push(Account { sym, sector, instrument });
     }
@@ -753,7 +841,9 @@ pub fn load_model(path: &Path) -> Result<Model> {
             return model_err(format!("{what}: both sectors need an account in {}", raw_instruments[instrument].name));
         };
         let entity = match (sectors[src].entity, sectors[dst].entity) {
-            (Some(_), Some(_)) => return model_err(format!("{what}: flows between two per-record sectors are not in format 0")),
+            (Some(_), Some(_)) => {
+                return model_err(format!("{what}: flows between two per-record sectors are not in format 0"));
+            }
             (a, b) => a.or(b),
         };
         let mut unit = units::div(&Some(raw_instruments[instrument].unit.clone()), &Some(step_unit.clone()));
@@ -765,9 +855,17 @@ pub fn load_model(path: &Path) -> Result<Model> {
         }
         let Some(expr) = spec.get("expr") else { return model_err(format!("{what}: missing 'expr'")) };
         let sym = loader.declare(Decl {
-            name: name.clone(), kind: Kind::Flow, ty: Ty::Int, unit, money: true, entity,
-            phase: loader.phase_of(spec, &what)?, expr: Some(formula_text(expr)), initial: spec.get("initial").cloned(),
-            range: range_of(spec, true, loader.minor, &what)?, spec: spec.clone(),
+            name: name.clone(),
+            kind: Kind::Flow,
+            ty: Ty::Int,
+            unit,
+            money: true,
+            entity,
+            phase: loader.phase_of(spec, &what)?,
+            expr: Some(formula_text(expr)),
+            initial: spec.get("initial").cloned(),
+            range: range_of(spec, true, loader.minor, &what)?,
+            spec: spec.clone(),
         })?;
         flows.push(Flow { sym, src_account, dst_account });
     }
@@ -775,12 +873,20 @@ pub fn load_model(path: &Path) -> Result<Model> {
     let mut instruments = Vec::new();
     for (index, raw) in raw_instruments.iter().enumerate() {
         let Some(issuer_account) = account_of(&accounts, raw.issuer, index) else {
-            return model_err(format!("instrument {}: the issuer {} needs an account", raw.name, sector_names[raw.issuer]));
+            return model_err(format!(
+                "instrument {}: the issuer {} needs an account",
+                raw.name, sector_names[raw.issuer]
+            ));
         };
         if sectors[raw.issuer].entity.is_some() {
             return model_err(format!("instrument {}: the issuer cannot be a per-record sector", raw.name));
         }
-        instruments.push(Instrument { name: raw.name.clone(), unit: raw.unit.clone(), issuer: raw.issuer, issuer_account });
+        instruments.push(Instrument {
+            name: raw.name.clone(),
+            unit: raw.unit.clone(),
+            issuer: raw.issuer,
+            issuer_account,
+        });
     }
 
     Ok(Model {
@@ -828,15 +934,23 @@ pub struct Scenario {
     /// (step, lever, value) in file order. Applied before that step runs; for one lever
     /// in one step the last entry wins.
     pub commands: Vec<(u64, String, Value)>,
+    /// Columns an interactive session shows after each step (`[play] watch`). Not part
+    /// of the run: the oracle ignores it.
+    pub watch: Vec<String>,
 }
 
 pub fn load_scenario(path: &Path) -> Result<Scenario> {
-    let text = std::fs::read_to_string(path).map_err(|e| Error::Model(format!("cannot read {}: {e}", path.display())))?;
+    let text =
+        std::fs::read_to_string(path).map_err(|e| Error::Model(format!("cannot read {}: {e}", path.display())))?;
     let doc = text.parse::<Toml>().map_err(|e| Error::Model(format!("{}: {e}", path.display())))?;
-    let Some(Value::Table(head)) = doc.get("scenario") else { return model_err("scenario file needs a [scenario] table") };
-    let (Some(model_path), Some(seed), Some(steps)) =
-        (text_of(head, "model"), head.get("seed").and_then(Value::as_integer), head.get("steps").and_then(Value::as_integer))
-    else {
+    let Some(Value::Table(head)) = doc.get("scenario") else {
+        return model_err("scenario file needs a [scenario] table");
+    };
+    let (Some(model_path), Some(seed), Some(steps)) = (
+        text_of(head, "model"),
+        head.get("seed").and_then(Value::as_integer),
+        head.get("steps").and_then(Value::as_integer),
+    ) else {
         return model_err("[scenario] needs model, seed and steps");
     };
     let pairs = |key: &str| -> Vec<(String, Value)> {
@@ -849,7 +963,8 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
     if let Some(Value::Array(items)) = doc.get("command") {
         for item in items {
             let item = table_of(item, "command")?;
-            let (Some(step), Some(Value::Table(set))) = (item.get("step").and_then(Value::as_integer), item.get("set")) else {
+            let (Some(step), Some(Value::Table(set))) = (item.get("step").and_then(Value::as_integer), item.get("set"))
+            else {
                 return model_err("each [[command]] needs 'step' and 'set'");
             };
             if step < 0 {
@@ -870,5 +985,9 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
         params: pairs("params"),
         levers: pairs("levers"),
         commands,
+        watch: match doc.get("play").and_then(|p| p.get("watch")) {
+            Some(Value::Array(items)) => items.iter().filter_map(|v| v.as_str().map(str::to_string)).collect(),
+            _ => Vec::new(),
+        },
     })
 }

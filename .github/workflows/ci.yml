@@ -23,8 +23,36 @@ jobs:
         working-directory: oracle
         run: python -m unittest discover -s tests
 
+  engine:
+    # The engine must match the oracle: recorded hashes, the conformance corpus, save and
+    # resume, and random scenarios run through both and compared byte for byte.
+    name: Engine against the oracle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
+      - name: Tests
+        run: cargo test --release --workspace
+      - name: Build the runner
+        run: cargo build --release
+      - name: Random scenarios through oracle and engine
+        run: python tools/diff_engine.py --count 150
+
   bench-self-check:
-    # Builds the benchmark and runs its checks: the three rule-set variants must agree
+    # Builds the S0 benchmark and runs its checks: the three rule-set variants must agree
     # with each other, and the random generator must agree with the oracle.
     name: Benchmark self-check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

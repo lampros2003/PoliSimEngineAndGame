@@ -60,5 +60,11 @@ fn engine_reproduces_every_recorded_case() {
             mismatches.push(format!("line {}: {formula:?}\n    oracle {want}\n    engine {got}", number + 1));
         }
     }
-    assert!(mismatches.is_empty(), "{} of {} cases differ:\n{}", mismatches.len(), lines.len(), mismatches[..mismatches.len().min(12)].join("\n"));
+    assert!(
+        mismatches.is_empty(),
+        "{} of {} cases differ:\n{}",
+        mismatches.len(),
+        lines.len(),
+        mismatches[..mismatches.len().min(12)].join("\n")
+    );
 }

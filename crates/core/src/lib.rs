@@ -21,6 +21,7 @@ pub mod model;
 pub mod program;
 pub mod pyfmt;
 pub mod rng;
+pub mod save;
 pub mod sim;
 pub mod syntax;
 pub mod units;
@@ -30,6 +31,8 @@ pub use error::{Error, Result};
 pub use model::{Model, Scenario, load_model, load_scenario};
 pub use program::{Col, Ty, Val};
 pub use sim::{Computed, Row, RunConfig, Simulation};
+/// A raw value as written in a model or scenario file, before it is given a type.
+pub use toml::Value as RawValue;
 
 /// Engine version, recorded in save files.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

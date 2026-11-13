@@ -9,3 +9,6 @@ publish.workspace = true
 [dependencies]
 sha2 = "0.11"
 toml = { version = "1", default-features = false, features = ["parse", "preserve_order", "serde", "std"] }
+
+[dev-dependencies]
+toml = { version = "1", default-features = false, features = ["parse", "preserve_order", "serde", "std"] }

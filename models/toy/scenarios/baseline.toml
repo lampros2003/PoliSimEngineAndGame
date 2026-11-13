@@ -5,3 +5,7 @@ model = ".."
 seed = 20261113
 steps = 240
 preset = "central"
+
+# Shown after each step by `polisim play`. Not part of the run.
+[play]
+watch = ["gdp", "unemployment_rate", "gov_balance", "consumption_total", "hh_money.total"]
