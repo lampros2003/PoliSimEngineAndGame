@@ -1,0 +1,14 @@
+[package]
+name = "polisim-s0-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Stage S0 micro-benchmarks: population passes and the tax-benefit kernel"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
+panic = "abort"
