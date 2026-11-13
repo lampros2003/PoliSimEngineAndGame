@@ -11,7 +11,7 @@ import argparse
 import csv
 import sys
 
-from . import from_scenario, load_scenario
+from . import SimError, from_scenario, load_scenario
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,17 +29,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.seed is not None:
         scenario.seed = args.seed
     sim = from_scenario(scenario)
-    rows = sim.run(args.steps if args.steps is not None else scenario.steps)
+    rows, failure = [], None
+    try:
+        for _ in range(args.steps if args.steps is not None else scenario.steps):
+            rows.append(sim.step())
+    except SimError as exc:
+        failure = exc
 
+    # On a run-time error the rows completed so far are still written, then the exit code is 2.
     handle = open(args.out, "w", newline="", encoding="utf-8") if args.out else sys.stdout
     try:
-        fields = args.columns.split(",") if args.columns else list(rows[0])
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
+        if rows:
+            fields = args.columns.split(",") if args.columns else list(rows[0])
+            writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
     finally:
         if args.out:
             handle.close()
+    if failure is not None:
+        print(f"error: {failure}", file=sys.stderr)
+        return 2
     if args.out:
         print(f"{scenario.name}: {len(rows)} steps, model {scenario.model.model_hash[:12]}, "
               f"final state {rows[-1]['hash'][:12]}", file=sys.stderr)

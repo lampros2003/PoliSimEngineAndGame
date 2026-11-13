@@ -19,6 +19,7 @@ import struct
 
 from .expr import SimError, compile_formula
 from .model import Model, ModelError, Scenario, convert
+from .units import parse_unit
 
 
 class Runtime:
@@ -86,7 +87,8 @@ class Simulation:
         for instrument, info in m.instruments.items():
             held = sum(self._total(sym[name]) for (sector, ins), name in m.accounts.items()
                        if ins == instrument and sector != info["issuer"])
-            self._store(sym[m.accounts[(info["issuer"], instrument)]], -held)
+            issuer = m.accounts[(info["issuer"], instrument)]
+            self._store(sym[issuer], self._int64(-held, f"account {issuer}"))
 
         # ---- compile formulas and build the evaluation plan
         self.fn: dict[str, object] = {}
@@ -222,20 +224,22 @@ class Simulation:
                 if min(amounts) < 0:
                     raise SimError(f"flow {flow.name} is negative for at least one record")
                 total = sum(w * a for w, a in zip(m.entities[d.entity].weights, amounts))
+            self._int64(total, f"flow {flow.name}")
+            # Flows are applied in declaration order and every intermediate balance must fit.
             for account, sign in ((src, -1), (dst, 1)):
                 if sym[account].entity is None:
-                    scalars[account] += sign * total
+                    scalars[account] = self._int64(scalars[account] + sign * total, account)
                 else:
                     column = columns[account]
                     for i, amount in enumerate(amounts):
-                        column[i] += sign * amount
+                        column[i] = self._int64(column[i] + sign * amount, account)
                 net[account] += sign * total
             self.flow_totals[flow.name] = total
 
         for name, value in scalars.items():
-            self._store(sym[name], self._int64(value, name))
+            self._store(sym[name], value)
         for name, column in columns.items():
-            self._store(sym[name], [self._int64(v, name) for v in column])
+            self._store(sym[name], column)
 
         # Identities. They hold by construction here; the engine must reproduce them.
         for name in m.accounts.values():
@@ -274,6 +278,18 @@ class Simulation:
 
     def column(self, name: str) -> list:
         return list(self.rt.C[name])
+
+    def evaluate(self, src: str, entity: str | None = None, type: str = "real", unit: str = "1"):
+        """Evaluate a one-off formula against the current state: one value, or one per record.
+
+        `type` is "int", "real" or "bool". Nothing is stored and no range is checked, so a
+        real result may be an infinity or not-a-number. Random draws use the index of the
+        step that would run next.
+        """
+        fn, _, _ = compile_formula(src, self.model, self.rt, entity, type, parse_unit(unit), "evaluate")
+        if entity is None:
+            return fn(0)
+        return [fn(i) for i in range(len(self.model.entities[entity].ids))]
 
     def state_hash(self) -> str:
         """SHA-256 over everything needed to continue the run, in a fixed encoding.

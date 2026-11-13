@@ -1,0 +1,11 @@
+[package]
+name = "polisim-core"
+description = "PoliSim simulation engine: model loader, formula compiler, step loop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+sha2 = "0.11"
+toml = { version = "1", default-features = false, features = ["parse", "preserve_order", "serde", "std"] }

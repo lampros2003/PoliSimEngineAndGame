@@ -1,0 +1,196 @@
+# A model with no behaviour. It exists so that the oracle and the engine can evaluate the
+# same formulas against the same values (see conformance/cases.tsv). The values are chosen
+# to sit on the awkward edges: zeros of both signs, halves, the 64-bit limits, a
+# subnormal, an entity id above 32 bits and a large weight.
+
+[model]
+id = "conformance"
+format = 0
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["only"]
+
+[entity.rec]
+data = "recs.csv"
+id = "id"
+weight = "weight"
+
+[entity.rec.columns.ci1]
+type = "int"
+unit = "1"
+
+[entity.rec.columns.ci2]
+type = "int"
+unit = "1"
+
+[entity.rec.columns.cf1]
+type = "real"
+unit = "1"
+
+[entity.rec.columns.cf2]
+type = "real"
+unit = "1"
+
+[entity.rec.columns.cb1]
+type = "bool"
+
+[entity.rec.columns.cm]
+type = "money"
+unit = "GBP/month/rec"
+
+[param.i0]
+type = "int"
+unit = "1"
+value = 0
+
+[param.i1]
+type = "int"
+unit = "1"
+value = 1
+
+[param.i2]
+type = "int"
+unit = "1"
+value = 7
+
+[param.i3]
+type = "int"
+unit = "1"
+value = -13
+
+[param.i4]
+type = "int"
+unit = "1"
+value = 1000003
+
+[param.ibig]
+type = "int"
+unit = "1"
+value = 4611686018427387904
+
+[param.imax]
+type = "int"
+unit = "1"
+value = 9223372036854775807
+
+[param.imin]
+type = "int"
+unit = "1"
+value = -9223372036854775808
+
+[param.t1]
+type = "int"
+unit = "1"
+value = 10
+
+[param.t2]
+type = "int"
+unit = "1"
+value = 100
+
+[param.r0]
+type = "real"
+unit = "1"
+value = 0.0
+
+[param.r1]
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.r2]
+type = "real"
+unit = "1"
+value = -2.5
+
+[param.r3]
+type = "real"
+unit = "1"
+value = 1e-9
+
+[param.r4]
+type = "real"
+unit = "1"
+value = 3.75e12
+
+[param.rbig]
+type = "real"
+unit = "1"
+value = 1e300
+
+[param.rtiny]
+type = "real"
+unit = "1"
+value = 5e-324
+
+[param.rate1]
+type = "real"
+unit = "1"
+value = 0.1
+
+[param.rate2]
+type = "real"
+unit = "1"
+value = 0.25
+
+[param.bt]
+type = "bool"
+value = true
+
+[param.bf]
+type = "bool"
+value = false
+
+[param.m1]
+type = "money"
+unit = "GBP/month"
+value = 1234.56
+
+[param.m2]
+type = "money"
+unit = "GBP"
+value = 99.99
+
+[param.k]
+type = "real"
+unit = "1/month"
+value = 0.1
+
+[param.allow]
+type = "money"
+unit = "GBP/month/rec"
+value = 1000
+
+[lever.lv]
+type = "real"
+unit = "1"
+default = 0.25
+range = [0, 1]
+
+[table.tb]
+kind = "marginal"
+unit = "1"
+bands = [
+  { from = "t1", rate = "rate1" },
+  { from = "t2", rate = "rate2" },
+]
+
+[table.tm]
+kind = "marginal"
+unit = "GBP/month/rec"
+bands = [
+  { from = "allow", rate = "rate1" },
+  { from = "allow * 4", rate = "rate2 + lv" },
+]
+
+[stream.s1]
+
+[stream.s2]
+
+[var.counter]
+type = "int"
+unit = "1"
+phase = "only"
+initial = 5
+expr = "prev(counter) + i1"
