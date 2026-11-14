@@ -468,7 +468,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f"# opening.{k} = {val}")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
-    detail = ("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml") if people else ()
+    detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "situations.toml")
+              if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
     if people:

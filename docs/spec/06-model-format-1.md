@@ -306,6 +306,36 @@ case the chain is followed to an element. Keep the entries for as long as old sa
 should load. Formulas never see old names. The section is accepted in format 0 models
 too; the oracle checks it as the engine does, though it has no saves.
 
+## Situations (stage S7.3)
+
+A situation is a condition the player is told about when it begins and ends, such as a
+recession. It is declared with its own section and becomes a true/false `state` of the
+same name, which formulas can read like any other:
+
+```toml
+[situation.recession]
+label = "Recession"
+doc = "Output is falling"
+start = "output_growth < -0.005"
+end = "output_growth > 0.005"
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `start` | A true/false formula: the situation comes on when it holds | required |
+| `end` | A true/false formula: once on, it goes off when this holds. The gap between `start` and `end` keeps it from flickering | `not (start)`: off as soon as `start` no longer holds |
+| `good` | `true` for a situation the player wants (a budget surplus) | `false` |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its state is updated in | the last phase |
+
+So `[situation.x]` is exactly `[state.x]` with `type = "bool"`, `unit = "1"`,
+`initial = false` and `next = "select(x, not (<end>), <start>)"` (or `next = "<start>"`
+without an end), plus `situation = "good"` or `"bad"`, which the catalogue passes on so a
+client can show it. The oracle and the engine expand it the same way, after mods are
+applied (a mod may add situations); the shared cases are in
+`conformance/situation_cases.toml`. Any other key is an error. The section is accepted in
+format 0 models too.
+
 ## Load-time checks
 
 Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot

@@ -325,6 +325,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("player", e.player);
         d.set("group", e.group.as_str());
         d.set("leaning", e.leaning.as_str());
+        d.set("situation", e.situation.as_str());
         d.set("dims", &strings(&e.dims));
         d.set("inputs", &strings(&e.inputs));
         d.set("lagged_inputs", &strings(&e.lagged_inputs));

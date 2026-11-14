@@ -24,6 +24,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 |---|---|
 | Top bar | The month just finished; buttons to advance one month, a quarter or a year; **Amounts a year** (amounts at an annual rate, as the public finances are published, or per month); Save, Load, Reload model, Help |
 | Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP and the government's poll rating, each with last month's change, a **Chart** and a **Why** button |
+| Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus), each since the month it began. A new one is announced when it begins |
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
 | Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry. Each group's change on last month, with a bar |
 | Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, and the months to the next election |
@@ -95,7 +96,8 @@ carries on with the previous version.
   scaled by each region's 2024 relative rate.
 - The industries share out output and jobs but do not feed back into prices or the
   economy's demand.
-- No events or situations yet (a recession, a debt crisis): they come next in stage S7.
+- Situations are reported, but have no effects of their own: a recession hurts through
+  incomes and jobs, as it does in the model's economy.
 - The households are synthetic, built from published tables only, not survey records.
 - The build is not signed and runs inside the Godot engine executable, not as a
   standalone program.

@@ -43,6 +43,8 @@ pub struct Entry {
     pub group: String,
     /// Format 1 (S5.4): "left" or "right" for a lever whose changes are bills, else "".
     pub leaning: String,
+    /// Stage S7.3: "good" or "bad" for a situation, else "".
+    pub situation: String,
     /// Format 1: the value's dimensions, by name.
     pub dims: Vec<String>,
     /// Stage S6.1: what this value's formula reads this step, and through `prev()`; for an
@@ -158,6 +160,7 @@ impl Catalogue {
                 player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
                 group: text("group").unwrap_or_default(),
                 leaning: text("leaning").unwrap_or_default(),
+                situation: if d.kind == Kind::State { text("situation").unwrap_or_default() } else { String::new() },
                 dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
                 inputs: Vec::new(),
                 lagged_inputs: Vec::new(),

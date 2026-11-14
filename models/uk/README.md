@@ -13,6 +13,7 @@ A monthly stock-flow model of the UK economy and public finances in model format
 | `industries.toml`, `industries/`, `data/industry_jobs.csv` | The 15 industries: the Leontief inverse and the shares that turn spending into output; jobs and pay per employee job by industry, from 2024's workforce jobs (stage S6.4, below) | `tools/uk/jobs.py`, `tools/uk/calibrate.py` |
 | `households.toml`, `households/` | 20,000 synthetic households and the 2024-25 tax and benefit rules (`households/README.md`) | `tools/uk/households.py`, `tools/uk/make_rules.py`, `tools/uk/calibrate.py` |
 | `trade.toml`, `trade/`, `data/trade_partners.csv` | Trade by partner (the EU, the United States, China, the rest), a barrier lever for each, and customs duties (stage S6.3) | `tools/uk/trade.py`, `tools/uk/calibrate.py` |
+| `situations.toml` | The situations the player is told about (stage S7.3, below) | `tools/uk/template/situations.toml`, copied by `tools/uk/calibrate.py` |
 | `SENSITIVITY.md` | Which uncertain parameters matter: low, central and high presets screened one at a time and by elementary effects | `tools/uk/screen.py` |
 | `politics.toml`, `politics/` | The voters: 600 voter types from the households, and how they choose between nine blocs (`politics/README.md`) | `tools/uk/voters.py`, `tools/uk/calibrate.py` |
 | `data/elections/` | The 2024 general election by constituency and Census 2021 by constituency (`data/elections/ELECTIONS.md`) | `tools/uk/elections.py` |
@@ -166,6 +167,25 @@ cohort table above, times the base year's share living in households), and peopl
 (the economy's employment). So the households age with the population, and when
 employment falls, households without work count for more: Universal Credit rises and
 income tax falls with it. Their pay follows the economy's pay per worker.
+
+## Situations (stage S7.3)
+
+`situations.toml` names seven conditions the player is told about when they begin and
+end, each with a start and an end so it does not flicker:
+
+| Situation | On when | Off when |
+|---|---|---|
+| Recession | output at 2024 prices, smoothed over about a quarter, falls at more than 0.5% a year | it grows at more than 0.5% |
+| Strong growth (good) | it grows at more than 3% a year | below 2.5% |
+| High unemployment | above 6% | below 5.5% |
+| High inflation | above 5% a year | below 4% |
+| Debt above a year's output | net debt above 100% of GDP | below 98% |
+| Budget surplus (good) | receipts above spending | below |
+| No majority | the governing blocs hold fewer than 326 seats | 326 or more |
+
+With policy unchanged, debt passes 100% of GDP in the 18th month and nothing else comes on
+in five years. Cutting purchases of goods and services by a quarter brings a recession at
+once and high unemployment from the sixth month, both over within two years.
 
 ## Known weaknesses
 

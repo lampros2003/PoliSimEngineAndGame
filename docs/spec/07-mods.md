@@ -29,7 +29,7 @@ mods/wealth_tax/
 ## What a mod's files hold
 
 The sections a model file may hold, except that a mod may add only to `[dim]`, `[param]`,
-`[lever]`, `[var]`, `[state]`, `[flow]`, `[account]` and `[renamed]`, plus one of its own,
+`[lever]`, `[var]`, `[state]`, `[flow]`, `[account]`, `[renamed]` and `[situation]`, plus one of its own,
 `[patch]`:
 
 - **Adding.** Each element (and each dimension, and each old name in `[renamed]`) is named

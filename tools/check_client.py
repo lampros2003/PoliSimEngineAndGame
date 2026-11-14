@@ -71,6 +71,16 @@ def main() -> int:
             print("res://tests/reload_run.gd failed", file=sys.stderr)
             return 1
         print(reload.stdout.strip().splitlines()[-1])
+        # Stage S7.3: a recession brought on, announced and shown.
+        situations = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/situations_check.gd",
+             "--", "--scenario=models/uk/scenarios/2025.toml"],
+            capture_output=True, text=True, timeout=900)
+        if situations.returncode != 0:
+            print(situations.stdout.strip()[-2000:], situations.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/situations_check.gd failed", file=sys.stderr)
+            return 1
+        print(situations.stdout.strip().splitlines()[-1])
         # Stage S7.1: the start screen, with the example mod chosen.
         start = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/start_screen.gd"],

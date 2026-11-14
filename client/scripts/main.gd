@@ -53,6 +53,10 @@ var _load: Button
 var _reload: Button
 var _per_year: Button
 var _headline: HBoxContainer
+## Stage S7.3: the model's situations (catalogue entries), and which were on when last seen.
+var situations: Array = []
+var _situations_on := {}
+var _situation_strip: HFlowContainer
 var _cards := {}  # key -> {value, change}
 var budget: BudgetPanel
 var breakdown: BreakdownPanel
@@ -211,6 +215,12 @@ func _build_layout() -> void:
 	_headline = HBoxContainer.new()
 	_headline.add_theme_constant_override("separation", 12)
 	page.add_child(_headline)
+	_situation_strip = HFlowContainer.new()
+	_situation_strip.name = "situations"
+	_situation_strip.add_theme_constant_override("h_separation", 8)
+	_situation_strip.add_theme_constant_override("v_separation", 6)
+	_situation_strip.visible = false
+	page.add_child(_situation_strip)
 
 	var split := HSplitContainer.new()
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -322,6 +332,14 @@ func _model_changed() -> void:
 	levers.build(lever_entries)
 	levers.set_legislature(bool(catalogue.get("legislature", false)))
 	_build_headline()
+	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
+	# opened, loaded or reloaded).
+	situations.clear()
+	_situations_on.clear()
+	for entry in catalogue.get("entries", []):
+		if str(entry.get("situation", "")) != "":
+			situations.append(entry)
+			_situations_on[entry["name"]] = game.latest(str(entry["row"])) == true
 
 
 func _headline_keys() -> Array:
@@ -406,6 +424,7 @@ static func _negated(key: String, v: Variant) -> Variant:
 
 func _refresh() -> void:
 	var done := game.steps_done()
+	_show_situations()
 	if done == 0:
 		_date.text = "%s · start of term, %s" % [str(play.get("country", "")), fmt.month_name(0)]
 	else:
@@ -637,6 +656,70 @@ func _announce_election() -> void:
 		politics.election_report(func(name: String) -> Dictionary: return game.cells(name), not lost))
 
 
+## Stage S7.3: the situations in force, under the headline, each with the month it began.
+func _show_situations() -> void:
+	for child in _situation_strip.get_children():
+		_situation_strip.remove_child(child)
+		child.queue_free()
+	for entry in situations:
+		var row := str(entry["row"])
+		if game.latest(row) != true:
+			continue
+		var chip := PanelContainer.new()
+		chip.name = "situation_" + str(entry["name"])
+		var good := str(entry["situation"]) == "good"
+		var style := Palette.panel_style(Palette.PANEL_RAISED, 4, 6)
+		style.border_color = Palette.GOOD if good else Palette.BAD
+		style.set_border_width_all(2)
+		chip.add_theme_stylebox_override("panel", style)
+		chip.tooltip_text = str(entry.get("doc", ""))
+		var label := Label.new()
+		label.text = str(entry.get("label", entry["name"]))
+		var since := situation_onset(row)
+		if since >= 0:
+			label.text += " · since " + fmt.month_name(since)
+		label.add_theme_color_override("font_color", Palette.GOOD if good else Palette.BAD)
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
+		chip.add_child(label)
+		_situation_strip.add_child(chip)
+	_situation_strip.visible = _situation_strip.get_child_count() > 0
+
+
+## The step a situation that is on now last came on, from the history; -1 if unknown.
+func situation_onset(row: String) -> int:
+	var values: PackedFloat64Array = game.series(row)
+	var steps: PackedInt64Array = game.history_steps()
+	if values.is_empty() or values.size() != steps.size():
+		return -1
+	var i := values.size() - 1
+	while i > 0 and values[i - 1] >= 0.5:
+		i -= 1
+	return int(steps[i])
+
+
+## Stage S7.3: tells the player which situations began or ended since the last step.
+func _announce_situations() -> void:
+	var lines := PackedStringArray()
+	for entry in situations:
+		var name := str(entry["name"])
+		var now: bool = game.latest(str(entry["row"])) == true
+		var was: bool = _situations_on.get(name, false)
+		_situations_on[name] = now
+		var label := str(entry.get("label", name))
+		if now and not was:
+			var doc := str(entry.get("doc", ""))
+			lines.append("[b]%s[/b]%s" % [label, (": " + doc + ".") if doc != "" else "."])
+		elif was and not now:
+			lines.append("[b]%s[/b] is over." % label)
+	if lines.is_empty():
+		return
+	var note := "\n".join(lines)
+	if _message.visible:
+		_message_text.text += "\n" + note
+	else:
+		_show_message(note)
+
+
 ## Stage S5.4: says which bills the House of Commons voted down since the last message.
 func _announce_votes() -> void:
 	var changes := game.changes()
@@ -663,6 +746,7 @@ func _process(_delta: float) -> void:
 		match str(event["kind"]):
 			"stepped":
 				_announce_votes()
+				_announce_situations()
 				_announce_election()
 				if game.steps_done() >= term and not term_announced:
 					_announce_term.call_deferred()

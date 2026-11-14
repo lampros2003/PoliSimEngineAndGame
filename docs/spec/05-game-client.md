@@ -32,6 +32,15 @@ scenario has a save, opens it and loads the save, mods and all. The title bar na
 mods in play, and notes from loading them ([mods](07-mods.md)) are shown when the game
 starts.
 
+## Situations
+
+Stage S7.3. The model's situations ([model format 1](06-model-format-1.md#situations-stage-s73))
+that are on are shown in a strip under the headline, each with the month it began (from
+the history) and its `doc` as a tooltip, bordered red, or green for a good one. After each
+step the player is told which situations began, with their `doc`, and which are over,
+added to any other message of that step. Nothing is announced for a game just opened,
+loaded or reloaded.
+
 ## The scenario's `[play]` table
 
 Presentation settings. The engine ignores them and they never affect a run.
@@ -185,7 +194,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs twelve scripted sessions in Godot without a display and
+`tools/check_client.py` runs thirteen scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -193,6 +202,7 @@ compares them with the command-line runner or with published figures:
 | `tests/scripted_run.gd` | 60 months through the bridge with lever changes: the same state hash as the runner on every step |
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
+| `tests/situations_check.gd` | Stage S7.3: in `2025.toml`, no situation after a quiet first month; then, with purchases of goods and services cut to £20bn a month, a recession: announced, and on the strip as "Recession · since February 2025" |
 | `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/wealth_tax`) for the UK only; with it ticked, the game starts with the mod's lever in the policy panel, its name in the title bar, and, once the rate is set, a wealth tax line in the budget |
 | `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |

@@ -42,7 +42,7 @@ pub const FUNCTIONS: [&str; 23] = [
     "wsum_by",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 15] = [
+const SECTIONS: [&str; 16] = [
     "model",
     "legislature",
     "dim",
@@ -58,6 +58,7 @@ const SECTIONS: [&str; 15] = [
     "flow",
     "account",
     "renamed",
+    "situation",
 ];
 /// Format 1: the most cells one value may have.
 pub const MAX_CELLS: usize = 16_777_216;
@@ -879,7 +880,7 @@ pub fn read_mod(dir: &Path) -> Result<(ModInfo, Vec<String>, Vec<u8>)> {
 }
 
 /// The sections a mod's files may add to, besides `[patch]`.
-const MOD_SECTIONS: [&str; 8] = ["dim", "param", "lever", "var", "state", "flow", "account", "renamed"];
+const MOD_SECTIONS: [&str; 9] = ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation"];
 /// The kinds of element a `[patch.<kind>.<name>]` may change.
 const PATCH_KINDS: [&str; 6] = ["param", "lever", "var", "state", "flow", "account"];
 
@@ -1036,6 +1037,52 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
             }
         }
         mods.push(info);
+    }
+
+    // ---- stage S7.3: each situation is a true/false state that turns on and off.
+    let situations = std::mem::take(&mut merged[section("situation")]);
+    let last_phase = match merged[0].get("phases") {
+        Some(Value::Array(phases)) => phases.last().and_then(Value::as_str).unwrap_or_default().to_string(),
+        _ => String::new(),
+    };
+    for (name, spec) in situations {
+        let what = format!("situation {name}");
+        let Value::Table(spec) = spec else { return model_err(format!("{what} must be a table")) };
+        if let Some(key) =
+            spec.keys().find(|k| !["label", "doc", "start", "end", "good", "phase"].contains(&k.as_str()))
+        {
+            return model_err(format!("{what}: unknown key {key:?}"));
+        }
+        let Some(start) = text_of(&spec, "start") else {
+            return model_err(format!("{what}: needs 'start', the formula that turns it on"));
+        };
+        let next = match spec.get("end") {
+            None => start.to_string(),
+            Some(Value::String(end)) => format!("select({name}, not ({end}), {start})"),
+            Some(_) => return model_err(format!("{what}: 'end' must be a formula")),
+        };
+        let good = match spec.get("good") {
+            None => false,
+            Some(Value::Boolean(good)) => *good,
+            Some(_) => return model_err(format!("{what}: 'good' must be true or false")),
+        };
+        if merged[section("state")].contains_key(&name) {
+            return model_err(format!("state.{name} is declared twice"));
+        }
+        let mut state = Toml::new();
+        for key in ["label", "doc"] {
+            if let Some(v) = spec.get(key) {
+                state.insert(key.to_string(), v.clone());
+            }
+        }
+        state.insert("type".to_string(), Value::String("bool".to_string()));
+        state.insert("unit".to_string(), Value::String("1".to_string()));
+        let phase = spec.get("phase").cloned().unwrap_or(Value::String(last_phase.clone()));
+        state.insert("phase".to_string(), phase);
+        state.insert("initial".to_string(), Value::Boolean(false));
+        state.insert("next".to_string(), Value::String(next));
+        state.insert("situation".to_string(), Value::String(if good { "good" } else { "bad" }.to_string()));
+        merged[section("state")].insert(name, Value::Table(state));
     }
 
     let head = &merged[0];

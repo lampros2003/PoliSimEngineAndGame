@@ -1,0 +1,66 @@
+# The situations the player is told about (stage S7.3), model format 1. GENERATED: copied
+# from tools/uk/template/situations.toml by tools/uk/calibrate.py.
+#
+# Each situation turns on when its `start` holds and off when its `end` does; the gap
+# between the two keeps it from flickering on and off from month to month.
+
+[var.real_gdp_smoothed]
+label = "Output at 2024 prices, smoothed"
+doc = "Output at 2024 prices, averaged exponentially over about a quarter"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "select(prev(real_gdp_smoothed) > 0.0, prev(real_gdp_smoothed) + (real_gdp - prev(real_gdp_smoothed)) / 3.0, real_gdp)"
+# Read through prev(): nothing before the first month.
+initial = 0.0
+
+[var.output_growth]
+label = "Output growth, annual rate"
+doc = "This month's growth of output at 2024 prices, smoothed over about a quarter, at an annual rate"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(prev(real_gdp_smoothed) > 0.0, 12.0 * (real_gdp_smoothed / prev(real_gdp_smoothed) - 1.0), 0.0)"
+
+[situation.recession]
+label = "Recession"
+doc = "Output is falling"
+start = "output_growth < -0.005"
+end = "output_growth > 0.005"
+
+[situation.strong_growth]
+label = "Strong growth"
+doc = "Output is growing by more than 3% a year"
+good = true
+start = "output_growth > 0.03"
+end = "output_growth < 0.025"
+
+[situation.high_unemployment]
+label = "High unemployment"
+doc = "More than 6% of the labour force is out of work"
+start = "unemployment_rate > 0.06"
+end = "unemployment_rate < 0.055"
+
+[situation.high_inflation]
+label = "High inflation"
+doc = "Prices are rising by more than 5% a year"
+start = "inflation_annual > 0.05"
+end = "inflation_annual < 0.04"
+
+[situation.debt_above_output]
+label = "Debt above a year's output"
+doc = "Public sector net debt is more than 100% of GDP"
+start = "debt_to_gdp > 1.0"
+end = "debt_to_gdp < 0.98"
+
+[situation.budget_surplus]
+label = "Budget surplus"
+doc = "The government takes in more than it spends"
+good = true
+start = "budget_balance > 0"
+end = "budget_balance < 0"
+
+[situation.no_majority]
+label = "No majority"
+doc = "The governing blocs hold fewer than the 326 seats needed to govern alone, so a bill can fail"
+start = "government_seats < majority"

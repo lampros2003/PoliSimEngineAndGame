@@ -29,7 +29,7 @@ _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
 _SECTIONS = ("model", "legislature", "dim", "sector", "instrument", "entity", "stream", "table",
-             "param", "lever", "var", "state", "flow", "account", "renamed")
+             "param", "lever", "var", "state", "flow", "account", "renamed", "situation")
 MAX_CELLS = 16_777_216
 
 
@@ -257,7 +257,7 @@ class ModInfo:
 
 
 _MOD_ID = re.compile(r"[a-z][a-z0-9_]*\Z")
-_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed")
+_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation")
 _PATCH_KINDS = ("param", "lever", "var", "state", "flow", "account")
 
 
@@ -380,6 +380,41 @@ def _apply_mods(merged: dict[str, dict], mod_dirs, digest) -> tuple[list[ModInfo
     return mods, notes
 
 
+def _expand_situations(merged: dict[str, dict]) -> None:
+    """Stage S7.3: each situation becomes a true/false state that turns on when `start`
+    holds and, once on, off when `end` holds (or as soon as `start` no longer does)."""
+    phases = merged["model"].get("phases")
+    last_phase = phases[-1] if isinstance(phases, list) and phases and isinstance(phases[-1], str) else ""
+    situations = merged["situation"]
+    merged["situation"] = {}
+    for name, spec in situations.items():
+        what = f"situation {name}"
+        if not isinstance(spec, dict):
+            raise ModelError(f"{what} must be a table")
+        for key in spec:
+            if key not in ("label", "doc", "start", "end", "good", "phase"):
+                raise ModelError(f"{what}: unknown key {key!r}")
+        start = spec.get("start")
+        if not isinstance(start, str):
+            raise ModelError(f"{what}: needs 'start', the formula that turns it on")
+        end = spec.get("end")
+        if end is None:
+            nxt = start
+        elif isinstance(end, str):
+            nxt = f"select({name}, not ({end}), {start})"
+        else:
+            raise ModelError(f"{what}: 'end' must be a formula")
+        good = spec.get("good", False)
+        if not isinstance(good, bool):
+            raise ModelError(f"{what}: 'good' must be true or false")
+        if name in merged["state"]:
+            raise ModelError(f"state.{name} is declared twice")
+        state = {key: spec[key] for key in ("label", "doc") if key in spec}
+        state.update({"type": "bool", "unit": "1", "phase": spec.get("phase", last_phase), "initial": False,
+                      "next": nxt, "situation": "good" if good else "bad"})
+        merged["state"][name] = state
+
+
 def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
     """A model folder (or its model.toml), with mods applied in order (stage S7.1)."""
     path = Path(path)
@@ -409,6 +444,7 @@ def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
                     raise ModelError(f"{section}.{name} is declared twice")
                 merged[section][name] = spec
     applied, mod_notes = _apply_mods(merged, mods, digest)
+    _expand_situations(merged)
 
     head = merged["model"]
     fmt = head.get("format")
