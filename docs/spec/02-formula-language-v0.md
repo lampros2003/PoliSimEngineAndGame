@@ -70,6 +70,9 @@ accounts of its own entity, which take that record's value.
 | `clamp(x, lo, hi)` | number | `min(max(x, lo), hi)` |
 | `abs(x)` | number | magnitude; overflow is an error for the most negative whole number |
 | `exp(x)` | real | e to the power `x`, by the fixed algorithm below; `x` real or whole, unit 1 (added in stage S5.1) |
+| `ln(x)` | real | the natural logarithm, by the fixed algorithm below; `x` real or whole, unit 1; not-a-number below zero, minus infinity at zero (added in stage S10.6) |
+| `sqrt(x)` | real | the square root, correctly rounded (IEEE 754); `x` real or whole, unit 1; not-a-number below zero (added in stage S10.6) |
+| `pow(x, y)` | real | `x` to the power `y`, by the algorithm below; both real or whole, unit 1 (added in stage S10.6) |
 | `round(x)` | whole | nearest whole number, halves to the even neighbour |
 | `floor(x)`, `ceil(x)` | whole | toward minus / plus infinity |
 | `select(c, a, b)` | as `a`, `b` | `a` where `c` is true, else `b` |
@@ -118,6 +121,57 @@ The constants are the nearest doubles to 1/ln 2, ln 2 split into a high part wit
 trailing zeros and the rest, and 1/n! for n = 13 down to 0. Over the range the result is
 within 2 units in the last place of the true value (tested against the C library).
 
+### `ln(x)`
+
+As for `exp`: real arithmetic as in section 1 of the engine contract (each `+`, `-`, `*`,
+`/` rounded once, no fused multiply-add), a whole-number `x` first converted to a real.
+
+```
+if x is not a number or x < 0:  result is not-a-number
+if x is zero (either sign):     result is -infinity
+if x is +infinity:              result is +infinity
+(m, e) = the fraction and exponent of x: x = m * 2^e, 0.5 <= m < 1   (exact)
+if m < 0.7071067811865476:  m = m * 2, e = e - 1                       (exact)
+f = m - 1.0                                                            (exact)
+s = f / (2.0 + f)
+z = s * s
+w = z * z
+R = z * (L1 + w * (L3 + w * (L5 + w * L7))) + w * (L2 + w * (L4 + w * L6))
+h = 0.5 * f * f
+k = e as a real
+result is k * 0.6931471803691238 - ((h - (s * (h + R) + k * 1.9082149292705877e-10)) - f)
+```
+
+with L1 = 0.6666666666666735, L2 = 0.3999999999940942,
+L3 = 0.2857142874366239, L4 = 0.22222198432149784,
+L5 = 0.1818357216161805, L6 = 0.15313837699209373 and
+L7 = 0.14798198605116586, the coefficients of the widely used fdlibm logarithm, and
+ln 2 split in two as for `exp`. Over the range the result is within 1 unit in the last
+place of the true value (tested against the C library on two million values).
+
+### `pow(x, y)`
+
+```
+if y is not a number:                    result is not-a-number
+if y is whole and -1024 <= y <= 1024:     by repeated squaring:
+    n = |y|, r = 1.0, b = x
+    while n > 0:
+        if n is odd: r = r * b
+        n = n div 2
+        b = b * b
+    result is r if y >= 0, else 1.0 / r   (1.0 / 0 is an infinity of the zero's sign)
+otherwise:
+    if x is not a number or x < 0:  result is not-a-number
+    if x is zero:                   result is 0.0 if y > 0, else +infinity
+    if x is +infinity:              result is +infinity if y > 0, else 0.0
+    result is exp(y * ln(x))        (the fixed algorithms above)
+```
+
+So `pow(5, 2)` is exactly 25, a negative `x` has whole powers, and `pow(x, 0)` is 1 for any
+`x`. Otherwise the result is within about `|y * ln(x)|` units in the last place (the error
+of the product, which `exp` magnifies): the same bits everywhere, but not the closest
+double. For a square root write `sqrt`, which is.
+
 ### `marginal(x, table)`
 
 `x` is a whole number of money and must have the table's unit. With bands
@@ -136,7 +190,8 @@ Money below the first `from` is in no band. Thresholds that descend are an error
 
 ## Not in format 0
 
-Powers, logarithms, exponentials and square roots (they need the engine's own
-implementations to stay reproducible); lags longer than one step; moving averages;
-lookup tables with interpolation; sums over dimensions; quantiles. Each will be added
-when a model needs it, with a definition as exact as the ones above.
+Moving averages, lookup tables with interpolation and quantiles. Each will be added when
+a model needs it, with a definition as exact as the ones above. Since this list was
+written, `exp` (stage S5.1), `ln`, `sqrt` and `pow` (S10.6) have joined the language,
+format 1 has added sums over dimensions (`docs/spec/06-model-format-1.md`), and lags
+longer than one step are a section of their own (`[lag]`, S10.5).

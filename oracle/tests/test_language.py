@@ -387,3 +387,47 @@ class Exp(unittest.TestCase):
         self.assertAlmostEqual(s.value("exp(rate) / (1.0 + exp(rate))", "real"), 0.549833997312478, places=12)
         with self.assertRaises(Exception):
             s.value("exp(sales)", "real")  # money has a unit
+
+
+class LnSqrtPow(unittest.TestCase):
+    """Stage S10.6: ln, sqrt and pow by fixed algorithms (docs/spec/02-formula-language-v0.md)."""
+
+    def test_ln_within_two_units_in_the_last_place_of_the_c_library(self):
+        import math
+        import random
+        import struct
+
+        from polisim_oracle.expr import ln_fixed
+
+        def ulps(a: float, b: float) -> int:
+            return abs(struct.unpack("<q", struct.pack("<d", a))[0] - struct.unpack("<q", struct.pack("<d", b))[0])
+        rng = random.Random(106)
+        for _ in range(20000):
+            x = rng.choice([rng.uniform(0.5, 2.0), rng.uniform(0.999, 1.001), math.exp(rng.uniform(-744.0, 709.0)),
+                            rng.uniform(0.0, 1e9)])
+            if x > 0.0:
+                self.assertLessEqual(ulps(ln_fixed(x), math.log(x)), 2, x)
+
+    def test_limits(self):
+        import math
+
+        from polisim_oracle.expr import ln_fixed, pow_fixed, sqrt_fixed
+        self.assertEqual((ln_fixed(1.0), ln_fixed(2.0), ln_fixed(5e-324)), (0.0, math.log(2.0), -744.4400719213812))
+        self.assertEqual((ln_fixed(0.0), ln_fixed(math.inf)), (-math.inf, math.inf))
+        self.assertTrue(math.isnan(ln_fixed(-1.0)) and math.isnan(ln_fixed(math.nan)))
+        self.assertEqual(sqrt_fixed(2.0), math.sqrt(2.0))
+        self.assertTrue(math.isnan(sqrt_fixed(-1.0)))
+        self.assertEqual((pow_fixed(5.0, 2.0), pow_fixed(-2.0, 3.0), pow_fixed(-2.0, -2.0)), (25.0, -8.0, 0.25))
+        self.assertEqual((pow_fixed(math.nan, 0.0), pow_fixed(0.0, -1.0), pow_fixed(-0.0, -1.0)),
+                         (1.0, math.inf, -math.inf))
+        self.assertTrue(math.isnan(pow_fixed(-2.0, 2.5)) and math.isnan(pow_fixed(1.0, math.nan)))
+        self.assertEqual((pow_fixed(0.0, 0.5), pow_fixed(0.0, -0.5)), (0.0, math.inf))
+        self.assertEqual((pow_fixed(math.inf, 0.5), pow_fixed(math.inf, -0.5)), (math.inf, 0.0))
+
+    def test_in_a_formula(self):
+        s = Scope()
+        self.assertAlmostEqual(s.value("pow(1.0 + rate, 12)", "real"), 1.2 ** 12, places=12)
+        self.assertAlmostEqual(s.value("exp(ln(2.0) * 0.5) - sqrt(2.0)", "real"), 0.0, places=15)
+        for bad in ("ln(sales)", "sqrt(sales)", "pow(sales, 2)", "pow(2.0)"):
+            with self.assertRaises(Exception):
+                s.value(bad, "real")

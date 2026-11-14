@@ -292,6 +292,69 @@ def exp_fixed(x: float) -> float:
     return math.ldexp(p, k)
 
 
+_LN_COEFFICIENTS = (0.6666666666666735, 0.3999999999940942, 0.2857142874366239,
+                    0.22222198432149784, 0.1818357216161805, 0.15313837699209373,
+                    0.14798198605116586)
+
+
+def ln_fixed(x: float) -> float:
+    """The natural logarithm by the fixed algorithm of docs/spec/02-formula-language-v0.md
+    (stage S10.6): the same bits on every machine (only rounded + - * / and an exact split
+    of x into a fraction and a power of two)."""
+    if x != x or x < 0.0:
+        return math.nan
+    if x == 0.0:
+        return -math.inf
+    if x == math.inf:
+        return x
+    m, e = math.frexp(x)
+    if m < 0.7071067811865476:
+        m, e = m * 2.0, e - 1
+    f = m - 1.0
+    s = f / (2.0 + f)
+    z = s * s
+    w = z * z
+    lg1, lg2, lg3, lg4, lg5, lg6, lg7 = _LN_COEFFICIENTS
+    r = z * (lg1 + w * (lg3 + w * (lg5 + w * lg7))) + w * (lg2 + w * (lg4 + w * lg6))
+    half_square = 0.5 * f * f
+    k = float(e)
+    return k * 0.6931471803691238 - ((half_square - (s * (half_square + r) + k * 1.9082149292705877e-10)) - f)
+
+
+def sqrt_fixed(x: float) -> float:
+    """The square root, correctly rounded as IEEE 754 requires; not-a-number below zero."""
+    return math.nan if x < 0.0 else math.sqrt(x)
+
+
+def pow_fixed(x: float, y: float) -> float:
+    """x to the power y (stage S10.6), by docs/spec/02: for a whole y of at most 1,024 in
+    size, by repeated squaring (so pow(5, 2) is 25 and a negative x is allowed); otherwise
+    exp(y * ln(x)) by the fixed algorithms, with cases for zero, infinity and not-a-number."""
+    if y != y:
+        return math.nan
+    if y == math.floor(y) and abs(y) <= 1024.0:
+        n, r, b = int(abs(y)), 1.0, x
+        while n > 0:
+            if n % 2 == 1:
+                r = r * b
+            n //= 2
+            b = b * b
+        if y < 0.0:
+            if r == 0.0:
+                return math.copysign(math.inf, r)
+            r = 1.0 / r
+        return r
+    if x != x:
+        return math.nan
+    if x < 0.0:
+        return math.nan
+    if x == 0.0:
+        return 0.0 if y > 0.0 else math.inf
+    if x == math.inf:
+        return math.inf if y > 0.0 else 0.0
+    return exp_fixed(y * ln_fixed(x))
+
+
 class _Builder:
     """Turns a syntax tree into a closure while checking types and units.
 
@@ -717,6 +780,34 @@ class _Builder:
             U.unify(a.unit, U.ONE, "exp() argument")
         f = a.fn
         return Built("real", U.ONE, lambda i: exp_fixed(float(f(i))))
+
+    def _unitless_real(self, name: str, args, ctx):
+        """Stage S10.6: the arguments of ln, sqrt and pow: real or whole, unit 1, as reals."""
+        fns = []
+        for arg in args:
+            a = self._number(self.build(arg, ctx), f"{name}()")
+            if a.unit is not None:
+                U.unify(a.unit, U.ONE, f"{name}() argument")
+            fns.append(a.fn)
+        return [lambda i, f=f: float(f(i)) for f in fns]
+
+    def _fn_ln(self, args, ctx):
+        """S10.6: the natural logarithm, by the fixed algorithm of docs/spec/02 (ln_fixed)."""
+        self._args("ln", args, 1)
+        (f,) = self._unitless_real("ln", args, ctx)
+        return Built("real", U.ONE, lambda i: ln_fixed(f(i)))
+
+    def _fn_sqrt(self, args, ctx):
+        """S10.6: the square root, correctly rounded."""
+        self._args("sqrt", args, 1)
+        (f,) = self._unitless_real("sqrt", args, ctx)
+        return Built("real", U.ONE, lambda i: sqrt_fixed(f(i)))
+
+    def _fn_pow(self, args, ctx):
+        """S10.6: x to the power y, as exp(y * ln(x)) by the fixed algorithms."""
+        self._args("pow", args, 2)
+        fx, fy = self._unitless_real("pow", args, ctx)
+        return Built("real", U.ONE, lambda i: pow_fixed(fx(i), fy(i)))
 
     def _fn_abs(self, args, ctx):
         self._args("abs", args, 1)

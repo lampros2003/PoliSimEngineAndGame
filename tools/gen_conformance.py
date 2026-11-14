@@ -14,6 +14,7 @@ so regenerate it only on purpose, and expect the engine to be held to the new fi
 
 from __future__ import annotations
 
+import math
 import random
 import struct
 import sys
@@ -349,6 +350,104 @@ def exp_cases() -> list[tuple[str, str, str, str]]:
     return cases
 
 
+def power_cases() -> list[tuple[str, str, str, str]]:
+    """Stage S10.6: ln, sqrt and pow over their ranges, at their edges, inside formulas and
+    per record, and refused with a unit, the wrong count or a true/false value. Drawn from
+    their own generator, after exp's, so the cases before them do not change."""
+    rng = random.Random(106)
+    cases = [
+        ("-", "real", "1", "ln(1.0)"),
+        ("-", "real", "1", "ln(1)"),
+        ("-", "real", "1", "ln(2.0)"),
+        ("-", "real", "1", "ln(0.5)"),
+        ("-", "real", "1", "ln(10)"),
+        ("-", "real", "1", "ln(0.0)"),
+        ("-", "real", "1", "ln(-0.0)"),
+        ("-", "real", "1", "ln(-1.0)"),
+        ("-", "real", "1", "ln(1.0 / 0.0)"),
+        ("-", "real", "1", "ln(0.0 / 0.0)"),
+        ("-", "real", "1", "ln(5e-324)"),
+        ("-", "real", "1", "ln(2.2250738585072014e-308)"),
+        ("-", "real", "1", "ln(1.7976931348623157e308)"),
+        ("-", "real", "1", "ln(0.7071067811865476)"),
+        ("-", "real", "1", "ln(0.7071067811865475)"),
+        ("-", "real", "1", "ln(1.0000000000000002)"),
+        ("-", "real", "1", "ln(0.9999999999999999)"),
+        ("-", "real", "1", "ln(exp(rate1))"),
+        ("-", "real", "1", "exp(ln(r1))"),
+        ("-", "real", "1", "ln(imax)"),
+        ("-", "real", "1", "ln(rtiny)"),
+        ("-", "real", "1", "ln(rbig)"),
+        ("-", "real", "1", "sqrt(2.0)"),
+        ("-", "real", "1", "sqrt(4)"),
+        ("-", "real", "1", "sqrt(0.0)"),
+        ("-", "real", "1", "sqrt(-0.0)"),
+        ("-", "real", "1", "sqrt(-1.0)"),
+        ("-", "real", "1", "sqrt(1.0 / 0.0)"),
+        ("-", "real", "1", "sqrt(0.0 / 0.0)"),
+        ("-", "real", "1", "sqrt(5e-324)"),
+        ("-", "real", "1", "sqrt(imax)"),
+        ("-", "real", "1", "pow(2.0, 10.0)"),
+        ("-", "real", "1", "pow(2, 10)"),
+        ("-", "real", "1", "pow(2.0, 0.5)"),
+        ("-", "real", "1", "pow(1.05, 12)"),
+        ("-", "real", "1", "pow(10.0, -3)"),
+        ("-", "real", "1", "pow(-2.0, 0.0)"),
+        ("-", "real", "1", "pow(-2.0, 2.0)"),
+        ("-", "real", "1", "pow(0.0, 2.0)"),
+        ("-", "real", "1", "pow(0.0, -1.0)"),
+        ("-", "real", "1", "pow(0.0, 0.0)"),
+        ("-", "real", "1", "pow(1.0 / 0.0, 0.5)"),
+        ("-", "real", "1", "pow(1.0 / 0.0, -0.5)"),
+        ("-", "real", "1", "pow(0.0 / 0.0, 0.0)"),
+        ("-", "real", "1", "pow(1.0, 0.0 / 0.0)"),
+        ("-", "real", "1", "pow(2.0, 1100.0)"),
+        ("-", "real", "1", "pow(2.0, -1100.0)"),
+        ("-", "real", "1", "pow(rate1, rate2)"),
+        ("-", "real", "1", "pow(r1 * r1, 0.5) - abs(r1)"),
+        ("-", "int", "1", "round(pow(i2, 3))"),
+        ("-", "int", "1", "round(1.0 / 0.0 * ln(0.0))"),
+        ("-", "int", "1", "round(sqrt(-4.0))"),
+        ("-", "real", "1", "select(i2 > 0, ln(i2), 0.0)"),
+        ("-", "real", "1", "safe_div(ln(r1), sqrt(r2), 0.0)"),
+        ("rec", "real", "1", "ln(cf1 + 1.0)"),
+        ("rec", "real", "1", "sqrt(abs(cf2))"),
+        ("rec", "real", "1", "pow(1.0 + abs(cf1), cf2)"),
+        ("rec", "real", "1", "pow(ci1, 2)"),
+        ("rec", "int", "1", "round(ln(abs(ci2) + 1) * 1000.0)"),
+        ("-", "real", "1", "ln(m1)"),
+        ("-", "real", "1", "sqrt(m1)"),
+        ("-", "real", "1", "pow(m1, 2.0)"),
+        ("-", "real", "1", "pow(2.0, m1)"),
+        ("rec", "real", "1", "ln(cm)"),
+        ("-", "real", "1", "ln(true)"),
+        ("-", "real", "1", "sqrt(bt)"),
+        ("-", "real", "1", "pow(2.0, false)"),
+        ("-", "real", "1", "ln()"),
+        ("-", "real", "1", "ln(1.0, 2.0)"),
+        ("-", "real", "1", "sqrt(1.0, 2.0)"),
+        ("-", "real", "1", "pow(2.0)"),
+        ("-", "real", "1", "pow(1.0, 2.0, 3.0)"),
+        ("-", "int", "1", "ln(1.0)"),
+        ("-", "int", "1", "sqrt(4)"),
+        ("-", "int", "1", "pow(2, 2)"),
+        ("-", "real", "GBP/month", "pow(2.0, 2.0)"),
+    ]
+    for _ in range(200):
+        x = rng.choice([rng.uniform(0.0, 4.0), rng.uniform(0.999, 1.001), math.exp(rng.uniform(-744.0, 709.0)),
+                        rng.uniform(-1.0, 1e9), float(rng.randint(-5, 10**6))])
+        cases.append(("-", "real", "1", f"ln({x!r})"))
+    for _ in range(100):
+        x = rng.choice([rng.uniform(0.0, 4.0), math.exp(rng.uniform(-744.0, 709.0)), rng.uniform(-1.0, 1e9)])
+        cases.append(("-", "real", "1", f"sqrt({x!r})"))
+    for _ in range(200):
+        x = rng.choice([rng.uniform(0.0, 4.0), rng.uniform(0.5, 1.5), math.exp(rng.uniform(-50.0, 50.0)),
+                        rng.uniform(-1.0, 1.0), 0.0])
+        y = rng.choice([rng.uniform(-3.0, 3.0), float(rng.randint(-12, 12)), rng.uniform(-400.0, 400.0), 0.5])
+        cases.append(("-", "real", "1", f"pow({x!r}, {y!r})"))
+    return cases
+
+
 def warmed_up_simulation() -> Simulation:
     sim = Simulation(load_model(ROOT / "conformance" / "model"), seed=SEED)
     sim.run(WARM_UP_STEPS)
@@ -368,6 +467,7 @@ def main() -> None:
             cases.append((ctx, want, "1", formula))
 
     cases += exp_cases()
+    cases += power_cases()
 
     sim = warmed_up_simulation()
     counts = {"value": 0, "E:static": 0, "E:runtime": 0}

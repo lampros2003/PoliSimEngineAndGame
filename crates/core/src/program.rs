@@ -132,6 +132,11 @@ pub enum Op {
     AbsF(R, R),
     /// S5.1: `exp`, by the fixed algorithm of docs/spec/02 ([`exp_fixed`]).
     Exp(R, R),
+    /// S10.6: `ln`, `sqrt` and `pow`, by the fixed algorithms of docs/spec/02
+    /// ([`ln_fixed`], [`sqrt_fixed`], [`pow_fixed`]).
+    Ln(R, R),
+    Sqrt(R, R),
+    Pow(R, R, R),
     ToInt(Rounding, R, R),
     /// destination, condition, value if true, value if false
     SelI(R, R, R, R),
@@ -366,9 +371,95 @@ pub fn exp_fixed(x: f64) -> f64 {
     p * f64::from_bits(((k as i64 + 1023) as u64) << 52)
 }
 
+/// The natural logarithm by the fixed algorithm of docs/spec/02-formula-language-v0.md
+/// (stage S10.6): only rounded `+`, `-`, `*`, `/` (no fused multiply-add) and an exact split
+/// of `x` into a fraction and a power of two. A port of the oracle's `ln_fixed`.
+pub fn ln_fixed(x: f64) -> f64 {
+    const LG: [f64; 7] = [
+        0.6666666666666735,
+        0.3999999999940942,
+        0.2857142874366239,
+        0.22222198432149784,
+        0.1818357216161805,
+        0.15313837699209373,
+        0.14798198605116586,
+    ];
+    if x.is_nan() || x < 0.0 {
+        return f64::NAN;
+    }
+    if x == 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if x == f64::INFINITY {
+        return x;
+    }
+    let (mut m, mut e) = frexp(x);
+    // 1/sqrt(2), the double 0.7071067811865476 of the spec.
+    if m < std::f64::consts::FRAC_1_SQRT_2 {
+        m *= 2.0;
+        e -= 1;
+    }
+    let f = m - 1.0;
+    let s = f / (2.0 + f);
+    let z = s * s;
+    let w = z * z;
+    let r = z * (LG[0] + w * (LG[2] + w * (LG[4] + w * LG[6]))) + w * (LG[1] + w * (LG[3] + w * LG[5]));
+    let half_square = 0.5 * f * f;
+    let k = e as f64;
+    k * 0.6931471803691238 - ((half_square - (s * (half_square + r) + k * 1.9082149292705877e-10)) - f)
+}
+
+/// `x = m * 2^e` with `m` in [0.5, 1), for a finite positive `x`: exact, as Python's
+/// `math.frexp`. A subnormal `x` is first scaled by 2^54, which is exact.
+fn frexp(x: f64) -> (f64, i32) {
+    let (x, shift) = if x < f64::MIN_POSITIVE { (x * 18014398509481984.0, -54) } else { (x, 0) };
+    let bits = x.to_bits();
+    let e = ((bits >> 52) & 0x7ff) as i32 - 1022;
+    (f64::from_bits((bits & !(0x7ff << 52)) | (1022 << 52)), e + shift)
+}
+
+/// The square root, correctly rounded as IEEE 754 requires; not-a-number below zero.
+pub fn sqrt_fixed(x: f64) -> f64 {
+    if x < 0.0 { f64::NAN } else { x.sqrt() }
+}
+
+/// `x` to the power `y` (stage S10.6), by docs/spec/02: for a whole `y` of at most 1,024 in
+/// size, by repeated squaring (so `pow(5, 2)` is 25 and a negative `x` is allowed);
+/// otherwise `exp(y * ln(x))` by the fixed algorithms, with cases for zero, infinity and
+/// not-a-number. A port of the oracle's `pow_fixed`.
+pub fn pow_fixed(x: f64, y: f64) -> f64 {
+    if y.is_nan() {
+        return f64::NAN;
+    }
+    if y == y.floor() && y.abs() <= 1024.0 {
+        let (mut n, mut r, mut b) = (y.abs() as u32, 1.0, x);
+        while n > 0 {
+            if n % 2 == 1 {
+                r *= b;
+            }
+            n /= 2;
+            b *= b;
+        }
+        return if y < 0.0 { 1.0 / r } else { r };
+    }
+    if x.is_nan() {
+        return f64::NAN;
+    }
+    if x < 0.0 {
+        return f64::NAN;
+    }
+    if x == 0.0 {
+        return if y > 0.0 { 0.0 } else { f64::INFINITY };
+    }
+    if x == f64::INFINITY {
+        return if y > 0.0 { f64::INFINITY } else { 0.0 };
+    }
+    exp_fixed(y * ln_fixed(x))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::exp_fixed;
+    use super::{exp_fixed, ln_fixed, pow_fixed, sqrt_fixed};
 
     fn ulps(a: f64, b: f64) -> u64 {
         (a.to_bits() as i64 - b.to_bits() as i64).unsigned_abs()
@@ -387,5 +478,54 @@ mod tests {
         assert_eq!(exp_fixed(-708.5), 0.0);
         assert!(exp_fixed(f64::NAN).is_nan());
         assert_eq!(std::f64::consts::LOG2_E.to_bits(), 0x3FF7_1547_652B_82FE);
+    }
+
+    #[test]
+    fn ln_is_within_two_units_in_the_last_place() {
+        // Fixed sweeps against the platform's library: near 1, over [0.5, 2], and over the
+        // whole range by powers.
+        let mut x = 0.999;
+        while x < 1.001 {
+            assert!(ulps(ln_fixed(x), x.ln()) <= 2, "{x}");
+            x += 1.3e-7;
+        }
+        let mut x = 0.5;
+        while x < 2.0 {
+            assert!(ulps(ln_fixed(x), x.ln()) <= 2, "{x}");
+            x += 1.7e-5;
+        }
+        let mut p: f64 = -744.0;
+        while p < 709.0 {
+            let x = p.exp();
+            assert!(ulps(ln_fixed(x), x.ln()) <= 2, "{x}");
+            p += 0.0071;
+        }
+        assert_eq!(std::f64::consts::FRAC_1_SQRT_2.to_bits(), 0x3FE6_A09E_667F_3BCD);
+        assert_eq!(ln_fixed(1.0).to_bits(), 0.0f64.to_bits());
+        assert_eq!(ln_fixed(2.0), std::f64::consts::LN_2);
+        assert_eq!(ln_fixed(5e-324), -744.4400719213812);
+        assert_eq!(ln_fixed(0.0), f64::NEG_INFINITY);
+        assert_eq!(ln_fixed(f64::INFINITY), f64::INFINITY);
+        assert!(ln_fixed(-1.0).is_nan() && ln_fixed(f64::NAN).is_nan());
+    }
+
+    #[test]
+    fn sqrt_and_pow_at_their_edges() {
+        assert_eq!(sqrt_fixed(2.0), std::f64::consts::SQRT_2);
+        assert!(sqrt_fixed(-1.0).is_nan());
+        assert_eq!(sqrt_fixed(-0.0).to_bits(), (-0.0f64).to_bits());
+        assert_eq!(pow_fixed(2.0, 10.0), 1024.0);
+        assert_eq!((pow_fixed(5.0, 2.0), pow_fixed(-2.0, 3.0), pow_fixed(-2.0, -2.0)), (25.0, -8.0, 0.25));
+        assert_eq!((pow_fixed(-2.0, 0.0), pow_fixed(f64::NAN, 0.0)), (1.0, 1.0));
+        assert!(pow_fixed(-2.0, 2.5).is_nan());
+        assert_eq!(
+            (pow_fixed(0.0, 2.0), pow_fixed(0.0, -1.0), pow_fixed(-0.0, -1.0)),
+            (0.0, f64::INFINITY, f64::NEG_INFINITY)
+        );
+        assert_eq!((pow_fixed(0.0, 0.5), pow_fixed(0.0, -0.5)), (0.0, f64::INFINITY));
+        assert_eq!((pow_fixed(f64::INFINITY, 0.5), pow_fixed(f64::INFINITY, -0.5)), (f64::INFINITY, 0.0));
+        assert!(pow_fixed(f64::NAN, 0.5).is_nan() && pow_fixed(1.0, f64::NAN).is_nan());
+        assert_eq!(pow_fixed(2.0, 1025.0), exp_fixed(1025.0 * ln_fixed(2.0)));
+        assert_eq!(pow_fixed(1.05, 0.5), exp_fixed(0.5 * ln_fixed(1.05)));
     }
 }

@@ -151,6 +151,35 @@ so **Why** next to government purchases shows the strike's effect. The format, w
 rule, is in [`docs/spec/06-model-format-1.md`](spec/06-model-format-1.md#dilemmas-stage-s91);
 `models/valmora/scenarios/dock_strike.toml` opens Valmora with the mod.
 
+## Values from months back, and growth rates
+
+`prev(x)` gives a value as it was last month. For longer, a mod declares a lag:
+`mods/year_on_year` follows Valmora's output a year back and works out its growth over the
+year.
+
+```toml
+[lag.yoy_gdp_a_year_before]
+label = "Output a year before"
+of = "gdp"
+steps = 12
+initial = 0
+
+[var.yoy_growth]
+label = "Growth over the year"
+type = "real"
+unit = "1"
+phase = "government"
+expr = "select(yoy_gdp_a_year_before > 0, gdp / yoy_gdp_a_year_before - 1.0, 0.0)"
+```
+
+The loader turns the lag into twelve states, each passing its value on to the next, and a
+value that holds `gdp` as it was twelve months before (`initial` until then); **Why**
+shows it as output twelve months before. The rules are in
+[`docs/spec/06-model-format-1.md`](spec/06-model-format-1.md#lags-stage-s105). For rates
+and elasticities, formulas also have `ln`, `sqrt` and `pow` (as `pow(1.0 + rate, 12)`), each
+computed the same way on every machine
+([`docs/spec/02-formula-language-v0.md`](spec/02-formula-language-v0.md#functions)).
+
 ## Words in other languages
 
 A mod may bring its words in other languages: `text/fr.toml` in its folder, as

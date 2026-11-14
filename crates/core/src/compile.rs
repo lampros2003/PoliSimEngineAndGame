@@ -479,6 +479,26 @@ impl<'a> Builder<'a> {
                 self.ops.push(Op::Exp(d, x));
                 Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
             }
+            "ln" | "sqrt" | "pow" => {
+                // Stage S10.6: real or whole arguments of unit 1, taken as reals.
+                arg_count(fname, args, if fname == "pow" { 2 } else { 1 })?;
+                let mut regs = Vec::with_capacity(2);
+                for arg in args {
+                    let a = self.build(arg, ctx)?;
+                    number(&a, &format!("{fname}()"))?;
+                    if a.unit.is_some() {
+                        units::unify(&a.unit, &Some(Unit::one()), &format!("{fname}() argument"))?;
+                    }
+                    regs.push(self.as_real(&a));
+                }
+                let d = self.reg(Ty::Real);
+                self.ops.push(match fname {
+                    "ln" => Op::Ln(d, regs[0]),
+                    "sqrt" => Op::Sqrt(d, regs[0]),
+                    _ => Op::Pow(d, regs[0], regs[1]),
+                });
+                Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
+            }
             "abs" => {
                 arg_count(fname, args, 1)?;
                 let a = self.build(&args[0], ctx)?;
