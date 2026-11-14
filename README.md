@@ -98,9 +98,10 @@ python tools/diff_engine.py --count 200
 
 The roadmap is in `reports/PoliSim engine architecture pathways.md`.
 
-Stages S0 to S6 are done and S7 (content and public surface) is under way: `docs/PLAN.md`
-says where each stage stands, and `docs/S3-PLAN.md` to `docs/S7-PLAN.md` hold their
-milestones. The tables below are the first two stages' exit criteria.
+Stages S0 to S10 are done, except what waits for the owner (the Windows play test of S2
+and the business decisions of S7): `docs/PLAN.md` says where each stage stands, and
+`docs/S3-PLAN.md` to `docs/S10-PLAN.md` hold their milestones. The tables below are the
+first stages' exit criteria.
 
 **Stage S0 (specification, oracle, data gate)**
 
@@ -133,8 +134,10 @@ on a shared cloud machine (Intel Xeon at 2.1 GHz). Not yet measured on a laptop.
 | 1,000,000 | 153 |
 
 The oracle takes about 17 ms per step at 1,000 households. Each engine step includes
-posting, the identity checks and a SHA-256 hash of the state. Nothing has been optimised
-yet: no threads, no register reuse, no explicit SIMD.
+posting, the identity checks and a SHA-256 hash of the state. These timings are from stage
+S1, before any optimisation. Stage S10 (`docs/S10-PLAN.md`) added threads, register reuse
+and shared work computed once, with every result unchanged. The full UK model (20,000
+households, 600 voter types, 650 seats) now takes 17 to 20 ms a month on four threads.
 
 **Stage S2 (the playable shell)**
 
