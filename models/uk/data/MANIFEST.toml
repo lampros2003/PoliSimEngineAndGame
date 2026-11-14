@@ -190,6 +190,17 @@ release_date = ""
 retrieved = "2026-11-14T05:59:12Z"
 sha256 = "2dc90438e2f5a6fdf7bda92209c4353fc88dbdcf04df6d8766189e741e6f5999"
 
+[dataset.trade_partners]
+title = "UK total trade: all countries, seasonally adjusted, April to June 2026 release (2024 used)"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/nationalaccounts/balanceofpayments/datasets/uktotaltradeallcountriesseasonallyadjusted/apriltojune2026/tradequarterlyq226seasonallyadjusted.xlsx"
+page = "https://www.ons.gov.uk/economy/nationalaccounts/balanceofpayments/datasets/uktotaltradeallcountriesseasonallyadjusted"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T06:12:58Z"
+sha256 = "517f20b3c21877d780dde12bc71fc88264c7bb88efe6ed2d238aa37032eb5595"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"

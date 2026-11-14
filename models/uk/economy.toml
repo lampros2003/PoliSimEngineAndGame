@@ -166,7 +166,7 @@ label = "Exports"
 from = "rest_of_world"
 to = "firms"
 phase = "spending"
-expr = "round(exports_base * world_index * export_demand)"
+expr = "round(sum(exports_by_partner, partner))"
 
 [var.business_investment]
 label = "Business investment"
@@ -188,7 +188,7 @@ label = "Imports"
 from = "firms"
 to = "rest_of_world"
 phase = "spending"
-expr = "round(import_share * import_propensity * private_demand)"
+expr = "round(sum(imports_by_partner, partner))"
 
 [flow.vat]
 label = "VAT"

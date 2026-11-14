@@ -295,3 +295,35 @@ class Reproducibility(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Trade(unittest.TestCase):
+    """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
+
+    def test_partners_add_up_to_2024_trade(self):
+        with open(UK / "data" / "trade_partners.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        exports = sum(float(r["exports"]) for r in rows)
+        imports = sum(float(r["imports"]) for r in rows)
+        self.assertAlmostEqual(exports / published()["exports"], 1.0, delta=0.001)
+        self.assertAlmostEqual(imports / published()["imports"], 1.0, delta=0.001)
+        sim = Simulation(model(), seed=SEED)
+        sim.step()
+        by_partner = sim.column("exports_by_partner")
+        for r, value in zip(rows, by_partner):
+            self.assertAlmostEqual(value / (sum(by_partner)), float(r["exports"]) / exports, places=9)
+
+    def test_a_barrier_cuts_trade_with_that_partner_and_raises_duties(self):
+        base = Simulation(model(), seed=SEED)
+        base.step()
+        walled = Simulation(model(), seed=SEED, levers={"trade_barrier_china": 0.2})
+        row = walled.step()
+        china = model().dims["partner"].members.index("china")
+        # Exports to China fall by 40% (2 times the barrier); to the EU they do not change.
+        exports, exports_base = walled.column("exports_by_partner"), base.column("exports_by_partner")
+        self.assertAlmostEqual(exports[china] / exports_base[china], 0.6, places=9)
+        self.assertEqual(exports[0], exports_base[0])
+        # Imports scale with demand, which the barrier also moves: against the EU's, China's fall 40%.
+        imports, imports_base = walled.column("imports_by_partner"), base.column("imports_by_partner")
+        self.assertAlmostEqual((imports[china] / imports[0]) / (imports_base[china] / imports_base[0]), 0.6, places=9)
+        self.assertAlmostEqual(row["customs_duties"], round(0.2 * walled.column("imports_by_partner")[china]), delta=1)

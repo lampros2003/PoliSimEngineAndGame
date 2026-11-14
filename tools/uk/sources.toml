@@ -170,3 +170,13 @@ licence = "Open Government Licence v3.0"
 attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
 format = "table"
 file = "aps_regions.csv"
+
+[dataset.trade_partners]
+title = "UK total trade: all countries, seasonally adjusted, April to June 2026 release (2024 used)"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/nationalaccounts/balanceofpayments/datasets/uktotaltradeallcountriesseasonallyadjusted/apriltojune2026/tradequarterlyq226seasonallyadjusted.xlsx"
+page = "https://www.ons.gov.uk/economy/nationalaccounts/balanceofpayments/datasets/uktotaltradeallcountriesseasonallyadjusted"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_xlsx"
+file = "trade_partners.xlsx"
