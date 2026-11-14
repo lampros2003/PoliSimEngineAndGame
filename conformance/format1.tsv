@@ -1,3 +1,32 @@
+-	real	person	largest(population, region, sex, age)	40c7575c68a1e065
+-	real	person	smallest(population, region, sex, age)	408ca99218b5f188
+-	real	person	largest(population, age, sex, region)	40c7575c68a1e065
+-	real	person	sum(largest(population, age), region, sex)	40ee529942ac407c
+-	real	person	largest(sum(population, age), region, sex)	4121ae4b2e4968fa
+-	int	1	largest(coord(age), age)	100
+-	int	1	smallest(coord(age), age)	0
+-	int	1	smallest(100 - coord(age), age)	0
+-	int	person	largest(cohort_count, band)	4000
+-	int	person	smallest(cohort_count, band)	160
+-	real	1	largest(mortality, sex, age) - smallest(mortality, sex, age)	3fa550f6dfe829ec
+-	real	1	largest(0.0 / 0.0 + coord(age), age)	nan
+-	real	person	largest(population, region, sex, region)	E:static
+-	bool	1	largest(coord(age) > 3, age)	E:static
+-	real	person	largest(population)	E:static
+-	real	person	sum(sum_by(population, age, 16 + div(coord(age), 25), band), region, sex, band)	4146f33309e6f472
+-	real	person	sum(select(coord(band) == 17, sum_by(population, age, 16 + div(coord(age), 25), band), 0.0), region, sex, band)	412a71ac0031ffc8
+-	real	person	sum(select(coord(band) == 20, sum_by(population[region: south], age, 16 + div(coord(age), 25), band), 0.0), sex, band)	40a7b97862411180
+-	int	1	sum(sum_by(coord(age), age, 16 + div(coord(age), 25), band), band)	5050
+-	int	1	sum(select(coord(band) == 20, sum_by(coord(age), age, 16 + div(coord(age), 25), band), 0), band)	100
+-	int	1	sum(select(coord(band) == 19, sum_by(1, age, 16 + mod(coord(age), 5), band), 0), band)	20
+-	real	1	largest(sum_by(mortality, age, 16 + div(coord(age), 25), band), sex, band)	3fee921c40ed1eea
+-	real	person	sum(sum_by(population, age, coord(age), band), region, sex, band)	E:runtime
+-	real	person	sum_by(population, age, 16, band)	E:static
+-	real	person	sum(sum_by(population, region, 16, band), band, region)	E:static
+-	real	person	sum(sum_by(population, age, 16.0, band), region, sex, band)	E:static
+-	real	person	sum(sum_by(population, age, cohort_count[band: 16], band), region, sex, band)	E:static
+-	real	person	sum(sum_by(population[age: coord(band)], age, 16, band), region, sex, band)	E:static
+-	real	person	sum(sum_by(coord(age) > 3, age, 16, band), band)	E:static
 -	real	person	sum(population, region, sex, age)	4146f33309e6f470
 -	real	person	sum(population, age, sex, region)	4146f33309e6f47a
 -	real	person	sum(sum(population, age), region, sex)	4146f33309e6f473

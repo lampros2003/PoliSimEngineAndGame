@@ -167,20 +167,84 @@ expr = "select(income_memory > 0.0 and real_net_income > 0.0, real_net_income / 
 
 # ---- voter types
 
+[var.voter_type_of1]
+doc = "The voter type of the household's adult 1: region, age band, income quintile and work"
+type = "int"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "((region_code * 5 + voter_age_of[age: max(age1, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings1 > 0, 1, 0)"
+
+[var.adult_voter1]
+doc = "1 if the household's adult 1 is there and 18 or over, a person, else 0"
+type = "int"
+unit = "person/household"
+phase = "politics"
+entity = "household"
+expr = "select(adults >= 1 and age1 >= 18, person_each, 0)"
+
+[var.voter_type_of2]
+doc = "The voter type of the household's adult 2: region, age band, income quintile and work"
+type = "int"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "((region_code * 5 + voter_age_of[age: max(age2, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings2 > 0, 1, 0)"
+
+[var.adult_voter2]
+doc = "1 if the household's adult 2 is there and 18 or over, a person, else 0"
+type = "int"
+unit = "person/household"
+phase = "politics"
+entity = "household"
+expr = "select(adults >= 2 and age2 >= 18, person_each, 0)"
+
+[var.voter_type_of3]
+doc = "The voter type of the household's adult 3: region, age band, income quintile and work"
+type = "int"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "((region_code * 5 + voter_age_of[age: max(age3, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings3 > 0, 1, 0)"
+
+[var.adult_voter3]
+doc = "1 if the household's adult 3 is there and 18 or over, a person, else 0"
+type = "int"
+unit = "person/household"
+phase = "politics"
+entity = "household"
+expr = "select(adults >= 3 and age3 >= 18, person_each, 0)"
+
+[var.voter_type_of4]
+doc = "The voter type of the household's adult 4: region, age band, income quintile and work"
+type = "int"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "((region_code * 5 + voter_age_of[age: max(age4, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings4 > 0, 1, 0)"
+
+[var.adult_voter4]
+doc = "1 if the household's adult 4 is there and 18 or over, a person, else 0"
+type = "int"
+unit = "person/household"
+phase = "politics"
+entity = "household"
+expr = "select(adults >= 4 and age4 >= 18, person_each, 0)"
+
 [var.voters]
 label = "Adults aged 18 and over, by voter type"
 type = "int"
 unit = "person"
 phase = "politics"
 dims = ["voter_type"]
-expr = "wsum_by(household, select(adults >= 1 and age1 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age1, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings1 > 0, 1, 0)) + wsum_by(household, select(adults >= 2 and age2 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age2, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings2 > 0, 1, 0)) + wsum_by(household, select(adults >= 3 and age3 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age3, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings3 > 0, 1, 0)) + wsum_by(household, select(adults >= 4 and age4 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age4, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings4 > 0, 1, 0))"
+expr = "wsum_by(household, adult_voter1, voter_type, voter_type_of1) + wsum_by(household, adult_voter2, voter_type, voter_type_of2) + wsum_by(household, adult_voter3, voter_type, voter_type_of3) + wsum_by(household, adult_voter4, voter_type, voter_type_of4)"
 
 [var.voter_income_change]
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "safe_div(wsum_by(household, income_change * select(adults >= 1 and age1 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age1, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings1 > 0, 1, 0)) + wsum_by(household, income_change * select(adults >= 2 and age2 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age2, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings2 > 0, 1, 0)) + wsum_by(household, income_change * select(adults >= 3 and age3 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age3, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings3 > 0, 1, 0)) + wsum_by(household, income_change * select(adults >= 4 and age4 >= 18, person_each, 0), voter_type, ((region_code * 5 + voter_age_of[age: max(age4, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings4 > 0, 1, 0)), voters, 0.0)"
+expr = "safe_div(wsum_by(household, income_change * adult_voter1, voter_type, voter_type_of1) + wsum_by(household, income_change * adult_voter2, voter_type, voter_type_of2) + wsum_by(household, income_change * adult_voter3, voter_type, voter_type_of3) + wsum_by(household, income_change * adult_voter4, voter_type, voter_type_of4), voters, 0.0)"
 
 [var.fundamentals]
 label = "Inflation and time in office, on the government's utility"
@@ -330,7 +394,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["region", "bloc"]
-expr = "sum(select(type_region == coord(region), voters * choice[option: coord(bloc)], 0.0), voter_type) / sum(select(type_region == coord(region), voters * (1.0 - choice[option: abstain]), 0.0), voter_type)"
+expr = "sum_by(voters * choice[option: coord(bloc)], voter_type, type_region, region) / sum_by(voters * (1.0 - choice[option: abstain]), voter_type, type_region, region)"
 
 [var.government_support]
 label = "Government's poll rating"

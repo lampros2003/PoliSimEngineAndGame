@@ -8,7 +8,8 @@ use std::collections::BTreeSet;
 use crate::error::{Error, Result};
 use crate::model::{Kind, Model};
 use crate::program::{
-    Agg, AggBy, AggKind, Cmp, Compiled, Fixed, IndexUse, Op, Program, R, Rounding, Src, Sub, SubKind, TableUse, Ty,
+    Agg, AggBy, AggKind, Cmp, Compiled, Fixed, IndexUse, Op, Program, R, Rounding, Src, Sub, SubKind, SumBy, TableUse,
+    Ty,
 };
 use crate::syntax::{BinOp, Node, parse};
 use crate::units::{self, Unit};
@@ -555,6 +556,100 @@ impl<'a> Builder<'a> {
                 self.ops.push(Op::MulDiv(d, a.reg, b.reg, c.reg));
                 Ok(Built { ty: Ty::Int, unit: Some(unit), reg: d })
             }
+            "div" | "mod" => {
+                arg_count(fname, args, 2)?;
+                let a = self.build(&args[0], ctx)?;
+                let b = self.build(&args[1], ctx)?;
+                if !(a.ty == Ty::Int && b.ty == Ty::Int) {
+                    return Err(format!("{fname}() needs two whole numbers"));
+                }
+                let unit = if fname == "div" {
+                    Some(units::div(&a.unit, &b.unit))
+                } else {
+                    units::unify(&a.unit, &b.unit, "mod()")?
+                };
+                let d = self.reg(Ty::Int);
+                self.ops.push(if fname == "div" { Op::DivI(d, a.reg, b.reg) } else { Op::ModI(d, a.reg, b.reg) });
+                Ok(Built { ty: Ty::Int, unit, reg: d })
+            }
+            "sum_by" => {
+                arg_count(fname, args, 4)?;
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("sum_by() is not available in a per-{entity} formula"));
+                }
+                let d = self.dim_arg(&args[1], fname)?;
+                let t = self.dim_arg(&args[3], fname)?;
+                if !self.scope.contains(&t) {
+                    return Err(format!("sum_by(): {} is not in scope here", self.dim_name(t)));
+                }
+                if self.scope.contains(&d) {
+                    return Err(format!("sum_by(): {} is already in scope", self.dim_name(d)));
+                }
+                let outer_dims: Vec<usize> = self.scope.iter().copied().filter(|x| *x != t).collect();
+                let mut domain = outer_dims.clone();
+                domain.push(d);
+                let cells = self.model.cell_count(&domain);
+                let (ty, unit, prog) = self.sub_program(&args[0], domain.clone(), ctx, "sum_by()")?;
+                let mut keyed = Builder::new(self.model, self.deps, self.lagged);
+                keyed.scope = domain;
+                let key = keyed.build(&args[2], ctx)?;
+                if key.ty != Ty::Int {
+                    return Err("sum_by(): the key must be a whole number".to_string());
+                }
+                units::unify(&key.unit, &Some(Unit::one()), "sum_by() key")?;
+                let key = keyed.finish(&key)?;
+                // Each cell of the result without t, in row-major order: its index with t at 0.
+                let strides = self.strides(&self.scope);
+                let outer = self.model.cell_count(&outer_dims);
+                let mut bases = Vec::with_capacity(outer);
+                for c in 0..outer {
+                    let (mut rest, mut base) = (c, 0usize);
+                    for &x in outer_dims.iter().rev() {
+                        let size = self.model.dims[x].size();
+                        let at = self.scope.iter().position(|s| *s == x).expect("in scope");
+                        base += (rest % size) * strides[at];
+                        rest /= size;
+                    }
+                    bases.push(u32::try_from(base).map_err(|_| "sum_by(): too many cells".to_string())?);
+                }
+                let at = self.scope.iter().position(|s| *s == t).expect("in scope");
+                let by = SumBy {
+                    key,
+                    bases,
+                    stride: strides[at],
+                    size: self.model.dims[t].size(),
+                    first: self.model.dims[t].first.unwrap_or(0),
+                    dim: self.dim_name(t).to_string(),
+                    cells: self.model.cell_count(&self.scope),
+                };
+                let group = self.model.dims[d].size();
+                self.load_sub(ty, unit, Sub { kind: SubKind::SumBy { group }, cells, prog, by: Some(Box::new(by)) })
+            }
+            "largest" | "smallest" => {
+                if args.len() < 2 {
+                    return Err(format!("{fname}() takes a value and at least one dimension"));
+                }
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("{fname}() is not available in a per-{entity} formula"));
+                }
+                let mut over: Vec<usize> = Vec::new();
+                for node in &args[1..] {
+                    let d = self.dim_arg(node, fname)?;
+                    if self.scope.contains(&d) || over.contains(&d) {
+                        return Err(format!("{fname}(): {} is already in scope", self.dim_name(d)));
+                    }
+                    over.push(d);
+                }
+                let group = self.model.cell_count(&over);
+                let mut domain = self.scope.clone();
+                domain.extend(&over);
+                let cells = self.model.cell_count(&domain);
+                let (ty, unit, prog) = self.sub_program(&args[0], domain, ctx, &format!("{fname}()"))?;
+                let kind = if fname == "largest" { SubKind::Largest { group } } else { SubKind::Smallest { group } };
+                self.load_sub(ty, unit, Sub { kind, cells, prog, by: None })
+            }
             "per_step" | "times_step" => {
                 arg_count(fname, args, 1)?;
                 let a = self.build(&args[0], ctx)?;
@@ -635,7 +730,7 @@ impl<'a> Builder<'a> {
                 domain.extend(&summed);
                 let cells = self.model.cell_count(&domain);
                 let (ty, unit, prog) = self.sub_program(&args[0], domain, ctx, "sum()")?;
-                self.load_sub(ty, unit, Sub { kind: SubKind::Sum { group }, cells, prog })
+                self.load_sub(ty, unit, Sub { kind: SubKind::Sum { group }, cells, prog, by: None })
             }
             "wsum_by" | "wcount_by" => {
                 arg_count(fname, args, 4)?;
@@ -728,7 +823,7 @@ impl<'a> Builder<'a> {
                 let size = self.model.dims[dim].size();
                 let cells = self.model.cell_count(&self.scope);
                 let (ty, unit, prog) = self.sub_program(&args[0], self.scope.clone(), ctx, "cohort_shift()")?;
-                self.load_sub(ty, unit, Sub { kind: SubKind::Shift { stride, size }, cells, prog })
+                self.load_sub(ty, unit, Sub { kind: SubKind::Shift { stride, size }, cells, prog, by: None })
             }
             _ => Err(format!("unknown function {fname:?}")),
         }

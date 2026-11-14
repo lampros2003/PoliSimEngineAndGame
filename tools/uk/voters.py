@@ -248,13 +248,27 @@ def rules(seats: list[dict]) -> str:
     a = ASSUMPTIONS
 
     def slots(term: str) -> str:
-        parts = []
-        for i in range(1, ADULTS + 1):
-            key = (f"((region_code * 5 + voter_age_of[age: max(age{i}, 0)]) * 5 + quintile_of[decile: income_decile]) * 2"
-                   f" + select(earnings{i} > 0, 1, 0)")
-            parts.append(f"wsum_by(household, {term.format(i=i)}, voter_type, {key})")
-        return " + ".join(parts)
-    adult = "select(adults >= {i} and age{i} >= 18, person_each, 0)"
+        return " + ".join(f"wsum_by(household, {term.format(i=i)}, voter_type, voter_type_of{i})"
+                          for i in range(1, ADULTS + 1))
+    adult = "adult_voter{i}"
+    # Stage S10.3: each adult's voter type and count, once per household, for the sums
+    # over voter types to read.
+    slot_vars = "\n".join(f"""[var.voter_type_of{i}]
+doc = "The voter type of the household's adult {i}: region, age band, income quintile and work"
+type = "int"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "((region_code * 5 + voter_age_of[age: max(age{i}, 0)]) * 5 + quintile_of[decile: income_decile]) * 2 + select(earnings{i} > 0, 1, 0)"
+
+[var.adult_voter{i}]
+doc = "1 if the household's adult {i} is there and 18 or over, a person, else 0"
+type = "int"
+unit = "person/household"
+phase = "politics"
+entity = "household"
+expr = "select(adults >= {i} and age{i} >= 18, person_each, 0)"
+""" for i in range(1, ADULTS + 1))
     options = ", ".join(f'"{o}"' for o in OPTIONS)
     option_labels = ", ".join(f'"{x}"' for x in BLOC_LABELS + ["Would not vote"])
     blocs = ", ".join(f'"{b}"' for b in BLOCS)
@@ -434,6 +448,7 @@ expr = "select(income_memory > 0.0 and real_net_income > 0.0, real_net_income / 
 
 # ---- voter types
 
+{slot_vars}
 [var.voters]
 label = "Adults aged 18 and over, by voter type"
 type = "int"
@@ -597,7 +612,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["region", "bloc"]
-expr = "sum(select(type_region == coord(region), voters * choice[option: coord(bloc)], 0.0), voter_type) / sum(select(type_region == coord(region), voters * (1.0 - choice[option: abstain]), 0.0), voter_type)"
+expr = "sum_by(voters * choice[option: coord(bloc)], voter_type, type_region, region) / sum_by(voters * (1.0 - choice[option: abstain]), voter_type, type_region, region)"
 
 [var.government_support]
 label = "Government's poll rating"

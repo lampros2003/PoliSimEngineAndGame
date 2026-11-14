@@ -99,6 +99,8 @@ household can look up a rate by its region column: `rate_by_region[region: regio
 | `cohort_shift(x, d)` | as `x` | `x` moved one member up along `d`; below |
 | `wsum_by(entity, x, d, key)` | as `x` | `wsum` over the records whose `key` is the current cell's member of `d`; below |
 | `wcount_by(entity, c, d, key)` | whole | `wcount` over the records whose `key` is the current cell's member of `d` |
+| `largest(x, d1, ...)`, `smallest(x, d1, ...)` | as `x` | the largest (smallest) value of `x` over the named dimensions; below (stage S10.3) |
+| `sum_by(x, d, key, t)` | as `x` | for each member of `t`, `x` summed over the members of `d` whose `key` names it; below (stage S10.3) |
 
 **`sum`.** The named dimensions must not already be in scope; they are in scope inside
 `x`, along with the surrounding formula's. The terms are taken in row-major order of the
@@ -136,10 +138,28 @@ member of `d` is a run-time error. The unit is `unit(x) * entity` (`entity` for
 `wcount_by`). Writing `x` as a dimensioned var with `dims = [d]` gives the totals by
 member; their `sum` over `d` equals the `wsum` of all records, up to rounding of reals.
 
+**`largest` and `smallest`** (stage S10.3) take their dimensions as `sum` does and visit
+the same cells in the same order, keeping the first and then each later value that is
+greater (smaller) than the one kept, as `max` (`min`) does pair by pair: so a not-a-number
+first value is kept, and one later is passed over. `x` is a number; the result has its type
+and unit.
+
+**`sum_by(x, d, key, t)`** (stage S10.3) is the grouped sum over a dimension, as `wsum_by`
+is over records. `t` must be in scope and `d` must not; inside `x` and `key`, `d` is in
+scope and `t` is not. `key` is a whole number without a unit naming a member of `t` (a
+range's member, or a list's position). In the cell whose coordinate along `t` is `p`, the
+result is `x` summed over the members of `d` whose key is `p`, in ascending order of `d`,
+from whole 0 or real 0.0 as `sum` does. Every member's `x` and key are evaluated; a key
+that names no member of `t` is a run-time error. For a key `k`,
+`sum_by(x, d, k, t)` equals `sum(select(k == coord(t), x, 0), d)` for whole numbers, and
+for reals whenever no term is a negative zero, while evaluating `x` once for each member of
+`d` rather than once for each member of `d` and `t`: the UK's regional voting intention,
+summed over 600 voter types into twelve regions, does a twelfth of the work.
+
 ### Where the new functions work
 
-`sum`, `coord`, `cohort_shift`, `wsum_by` and `wcount_by` work in national and dimensioned
-formulas, not in record-level ones (a record reaches a dimensioned value only by indexing every dimension).
+`sum`, `coord`, `cohort_shift`, `wsum_by`, `wcount_by`, `largest`, `smallest` and `sum_by`
+work in national and dimensioned formulas, not in record-level ones (a record reaches a dimensioned value only by indexing every dimension).
 `rand` does not work in a dimensioned formula. The inner formula of `wsum` and `wcount`
 is a record's formula and sees no dimensions, even inside a dimensioned formula.
 
@@ -457,7 +477,8 @@ Dimensioned levers, flows and accounts (a regional budget is a dimensioned var s
 into a national flow); dimensions on record-level elements; random draws per cell; weights
 that are not whole numbers, and calibration methods other than the rake (such as
 exponential calibration, which needs `exp`); interpolation between members; reductions
-other than `sum` (means and shares are written with `sum` and `/`).
+other than `sum`, `largest`, `smallest` and `sum_by` (means and shares are written with
+`sum` and `/`).
 
 ## Test model
 

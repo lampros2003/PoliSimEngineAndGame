@@ -480,6 +480,91 @@ class _Builder:
             return acc
         return Built("real", inner.unit, fn_real)
 
+    def _fn_sum_by(self, args, ctx):
+        """S10.3: sum_by(x, d, key, t): for each member of t (in scope), x summed over the
+        cells of d whose key names that member (the member for a range, the position for a
+        list), in ascending order of d. x and key are read with d in scope and t not; both are
+        evaluated for every cell of d (strict evaluation), and a key that names no member of t
+        is an error."""
+        self._args("sum_by", args, 4)
+        if ctx is not None:
+            raise FormulaError(f"sum_by() is not available in a per-{ctx} formula")
+        D = self._dim(args[1], "sum_by")
+        T = self._dim(args[3], "sum_by")
+        if T.name not in self.in_scope:
+            raise FormulaError(f"sum_by(): {T.name} is not in scope here")
+        if D.name in self.in_scope:
+            raise FormulaError(f"sum_by(): {D.name} is already in scope")
+        saved = self.in_scope
+        self.in_scope = tuple(x for x in saved if x != T.name) + (D.name,)
+        try:
+            inner = self._number(self.build(args[0], ctx), "sum_by()")
+            key = self.build(args[2], ctx)
+        finally:
+            self.in_scope = saved
+        if key.type != "int":
+            raise FormulaError("sum_by(): the key must be a whole number")
+        if key.unit is not None:
+            U.unify(key.unit, U.ONE, "sum_by() key")
+        f, k, d, t, n = inner.fn, key.fn, D.name, T.name, D.size
+        first = T.first if T.kind == "range" else 0
+        whole = inner.type == "int"
+
+        def fn(i):
+            cell = {x: p for x, p in i.items() if x != t}
+            total = 0 if whole else 0.0
+            for j in range(n):
+                cell[d] = j
+                v, member = f(cell), k(cell)
+                pos = member - first
+                if not 0 <= pos < T.size:
+                    raise SimError(f"sum_by(): a key {member} is not a member of {t}")
+                if pos == i[t]:
+                    total = total + v
+            return checked(total) if whole else total
+        return Built(inner.type, inner.unit, fn)
+
+    def _fn_largest(self, args, ctx):
+        """S10.3: the largest value over the named dimensions, row-major in the order listed:
+        from the first cell, each later one taken if it is greater (as max())."""
+        return self._extreme("largest", args, ctx, lambda y, x: y > x)
+
+    def _fn_smallest(self, args, ctx):
+        """S10.3: the smallest value over the named dimensions (as min(), folded)."""
+        return self._extreme("smallest", args, ctx, lambda y, x: y < x)
+
+    def _extreme(self, fname, args, ctx, better):
+        if len(args) < 2:
+            raise FormulaError(f"{fname}() takes a value and at least one dimension")
+        if ctx is not None:
+            raise FormulaError(f"{fname}() is not available in a per-{ctx} formula")
+        dims: list[str] = []
+        for node in args[1:]:
+            D = self._dim(node, fname)
+            if D.name in self.in_scope or D.name in dims:
+                raise FormulaError(f"{fname}(): {D.name} is already in scope")
+            dims.append(D.name)
+        saved = self.in_scope
+        self.in_scope = saved + tuple(dims)
+        try:
+            inner = self._number(self.build(args[0], ctx), f"{fname}()")
+        finally:
+            self.in_scope = saved
+        combos = list(itertools.product(*[range(self.scope.dims[d].size) for d in dims]))
+        f = inner.fn
+
+        def fn(i):
+            base = dict(i) if isinstance(i, dict) else {}
+            best = None
+            for combo in combos:
+                for d, p in zip(dims, combo):
+                    base[d] = p
+                y = f(base)
+                if best is None or better(y, best):
+                    best = y
+            return best
+        return Built(inner.type, inner.unit, fn)
+
     def _fn_coord(self, args, ctx):
         self._args("coord", args, 1)
         D = self._dim(args[0], "coord")
@@ -704,6 +789,33 @@ class _Builder:
             if z <= 0:
                 raise SimError("muldiv(): the divisor must be positive")
             return checked((x * y) // z)
+        return Built("int", unit, fn)
+
+    def _fn_div(self, args, ctx):
+        """S10.3: div(a, b), whole numbers: a divided by b, rounded down; b must be positive."""
+        return self._whole_division("div", args, ctx)
+
+    def _fn_mod(self, args, ctx):
+        """S10.3: mod(a, b), whole numbers: what is left of a after div(a, b) times b, from 0
+        to b - 1; b must be positive and in a's unit."""
+        return self._whole_division("mod", args, ctx)
+
+    def _whole_division(self, fname, args, ctx):
+        self._args(fname, args, 2)
+        a, b = (self.build(x, ctx) for x in args)
+        if not (a.type == b.type == "int"):
+            raise FormulaError(f"{fname}() needs two whole numbers")
+        if fname == "div":
+            unit = U.div(a.unit, b.unit)
+        else:
+            unit = U.unify(a.unit, b.unit, "mod()")
+        fa, fb = a.fn, b.fn
+
+        def fn(i):
+            x, y = fa(i), fb(i)
+            if y <= 0:
+                raise SimError(f"{fname}(): the divisor must be positive")
+            return checked(x // y) if fname == "div" else x % y
         return Built("int", unit, fn)
 
     def _fn_per_step(self, args, ctx):

@@ -138,7 +138,13 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
     let mut subs = Vec::with_capacity(prog.subs.len());
     for sub in &prog.subs {
         let column = eval_cells(&sub.prog, sub.cells, cx)?;
-        subs.push(finish_sub(sub.kind, column)?);
+        subs.push(match (&sub.by, sub.kind) {
+            (Some(by), SubKind::SumBy { group }) => {
+                let keys = eval_cells(&by.key, sub.cells, cx)?;
+                finish_sum_by(column, keys, group, by)?
+            }
+            _ => finish_sub(sub.kind, column)?,
+        });
     }
     let mut aggs_by = Vec::with_capacity(prog.aggs_by.len());
     for agg in &prog.aggs_by {
@@ -271,6 +277,51 @@ pub fn eval_cells(prog: &Program, cells: usize, cx: &EvalCtx) -> Check<Col> {
     eval_all(prog, cx, None, cells, &prepared).map_err(|(_, e, _)| e)
 }
 
+/// Stage S10.3: `sum_by`. Each run of `group` cells goes, cell by cell in order, to the
+/// result's cell its key names; whole numbers are added exactly and checked once, reals one
+/// at a time from 0.0, so each result cell adds its terms in ascending order of the summed
+/// dimension.
+fn finish_sum_by(values: Col, keys: Col, group: usize, by: &crate::program::SumBy) -> Check<Col> {
+    let Col::I(keys) = keys else { return internal("a key that is not a whole number") };
+    let position = |k: i64| -> Check<usize> {
+        match k.checked_sub(by.first) {
+            Some(p) if (0..by.size as i64).contains(&p) => Ok(p as usize),
+            _ => Err(format!("sum_by(): a key {k} is not a member of {}", by.dim)),
+        }
+    };
+    match values {
+        Col::I(v) => {
+            let mut acc = vec![0i128; by.cells];
+            for (run, &base) in by.bases.iter().enumerate() {
+                for j in 0..group {
+                    let at = run * group + j;
+                    acc[base as usize + by.stride * position(keys[at])?] += v[at] as i128;
+                }
+            }
+            let mut out = Vec::with_capacity(by.cells);
+            for total in acc {
+                match i64::try_from(total) {
+                    Ok(t) => out.push(t),
+                    Err(_) => return overflow(),
+                }
+            }
+            Ok(Col::I(out))
+        }
+        Col::F(v) => {
+            let mut acc = vec![0.0f64; by.cells];
+            for (run, &base) in by.bases.iter().enumerate() {
+                for j in 0..group {
+                    let at = run * group + j;
+                    let cell = base as usize + by.stride * position(keys[at])?;
+                    acc[cell] += v[at];
+                }
+            }
+            Ok(Col::F(acc))
+        }
+        Col::B(_) => internal("sum_by of true/false values"),
+    }
+}
+
 /// `sum`: runs of `group` cells added one at a time from 0 (whole numbers exactly, only the
 /// total checked) or 0.0. `cohort_shift`: everything one member up along a dimension, the
 /// first member zero and the last keeping its own plus the one below.
@@ -301,6 +352,31 @@ fn finish_sub(kind: SubKind, column: Col) -> Check<Col> {
             )),
             Col::B(_) => internal("sum of true/false values"),
         },
+        SubKind::SumBy { .. } => internal("sum_by without its key"),
+        SubKind::Largest { group } | SubKind::Smallest { group } => {
+            let largest = matches!(kind, SubKind::Largest { .. });
+            match column {
+                Col::I(v) => Ok(Col::I(
+                    v.chunks(group)
+                        .map(|run| {
+                            run[1..].iter().fold(run[0], |best, &y| {
+                                if (largest && y > best) || (!largest && y < best) { y } else { best }
+                            })
+                        })
+                        .collect(),
+                )),
+                Col::F(v) => Ok(Col::F(
+                    v.chunks(group)
+                        .map(|run| {
+                            run[1..].iter().fold(run[0], |best, &y| {
+                                if (largest && y > best) || (!largest && y < best) { y } else { best }
+                            })
+                        })
+                        .collect(),
+                )),
+                Col::B(_) => internal("largest or smallest of true/false values"),
+            }
+        }
         SubKind::Shift { stride, size } => {
             let at = |c: usize| (c / stride) % size;
             match column {
@@ -869,6 +945,18 @@ fn run_block(
                     let quotient = (a[j] as i128 * b[j] as i128).div_euclid(c[j] as i128);
                     let Ok(quotient) = i64::try_from(quotient) else { return overflow() };
                     d[j] = quotient;
+                }
+            }
+            Op::DivI(d, a, b) | Op::ModI(d, a, b) => {
+                let div = matches!(op, Op::DivI(..));
+                let (d, a, b) = pick!(regs.i, len, d, a, b);
+                for j in 0..len {
+                    if b[j] <= 0 {
+                        let name = if div { "div" } else { "mod" };
+                        return Err(format!("{name}(): the divisor must be positive"));
+                    }
+                    // With a positive divisor floor division is Euclid's, and cannot overflow.
+                    d[j] = if div { a[j].div_euclid(b[j]) } else { a[j].rem_euclid(b[j]) };
                 }
             }
             Op::Marginal(d, x, k) => {

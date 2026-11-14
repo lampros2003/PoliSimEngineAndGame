@@ -141,6 +141,10 @@ pub enum Op {
     SafeDiv(R, R, R, R),
     /// destination, a, b, c: floor(a * b / c)
     MulDiv(R, R, R, R),
+    /// Stage S10.3: destination, a, b: floor(a / b), b positive
+    DivI(R, R, R),
+    /// Stage S10.3: destination, a, b: a - b * floor(a / b), b positive
+    ModI(R, R, R),
     /// destination, amount, index into the program's table uses
     Marginal(R, R, u16),
     /// destination, stream id, one draw per record (`true`) or the national draw
@@ -207,9 +211,28 @@ pub struct IndexUse {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SubKind {
     /// `sum`: each run of `group` consecutive cells becomes one cell.
-    Sum { group: usize },
+    Sum {
+        group: usize,
+    },
     /// `cohort_shift`: cells move one member up along a dimension with this stride and size.
-    Shift { stride: usize, size: usize },
+    Shift {
+        stride: usize,
+        size: usize,
+    },
+    /// Stage S10.3: `largest` and `smallest`: each run of `group` consecutive cells becomes its
+    /// largest (or smallest) cell, folding from the first as `max` (`min`) does.
+    Largest {
+        group: usize,
+    },
+    Smallest {
+        group: usize,
+    },
+    /// Stage S10.3: `sum_by`: the cells come in runs of `group` (one run for each cell of the
+    /// result with its target dimension left out); each is added to the result's cell that
+    /// its key names (see [`SumBy`]).
+    SumBy {
+        group: usize,
+    },
 }
 
 /// Format 1: a program evaluated over `cells` cells before the program that uses it.
@@ -218,6 +241,24 @@ pub struct Sub {
     pub kind: SubKind,
     pub cells: usize,
     pub prog: Program,
+    /// Stage S10.3: for `sum_by`, the key and where each run goes.
+    pub by: Option<Box<SumBy>>,
+}
+
+/// Stage S10.3: `sum_by(x, d, key, t)`. The sub-program and the key are evaluated over the
+/// result's dimensions without `t`, then `d`; run `r` (all of `d` for one cell) goes to the
+/// result's cells `bases[r] + stride * position`, the position being the key less `first`.
+#[derive(Clone, Debug)]
+pub struct SumBy {
+    pub key: Program,
+    pub bases: Vec<u32>,
+    pub stride: usize,
+    /// Members of `t`, its first member (0 for a list), and its name for errors.
+    pub size: usize,
+    pub first: i64,
+    pub dim: String,
+    /// Cells of the result.
+    pub cells: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -269,7 +310,7 @@ impl Program {
         self.ops.len()
             + self.aggs.iter().map(|a| a.prog.op_count()).sum::<usize>()
             + self.tables.iter().flat_map(|t| t.lows.iter().chain(&t.rates)).map(Program::op_count).sum::<usize>()
-            + self.subs.iter().map(|s| s.prog.op_count()).sum::<usize>()
+            + self.subs.iter().map(|s| s.prog.op_count() + s.by.as_ref().map_or(0, |b| b.key.op_count())).sum::<usize>()
             + self.aggs_by.iter().map(|a| a.value.op_count() + a.key.op_count()).sum::<usize>()
     }
 }

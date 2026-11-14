@@ -1630,7 +1630,7 @@ fn fixed_program(prog: &Program) -> bool {
     prog.aggs.is_empty()
         && prog.aggs_by.is_empty()
         && prog.tables.is_empty()
-        && prog.subs.iter().all(|s| fixed_program(&s.prog))
+        && prog.subs.iter().all(|s| fixed_program(&s.prog) && s.by.as_ref().is_none_or(|b| fixed_program(&b.key)))
         && !prog.ops.iter().any(|op| matches!(op, Op::Rand(..)))
 }
 

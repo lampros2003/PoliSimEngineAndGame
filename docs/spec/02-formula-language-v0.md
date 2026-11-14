@@ -75,6 +75,8 @@ accounts of its own entity, which take that record's value.
 | `select(c, a, b)` | as `a`, `b` | `a` where `c` is true, else `b` |
 | `safe_div(a, b, d)` | real | `d` where `b` is zero, else `real(a) / real(b)` |
 | `muldiv(a, b, c)` | whole | `floor(a * b / c)` computed exactly; `c` must be positive |
+| `div(a, b)` | whole | `floor(a / b)` for whole numbers; `b` must be positive (a run-time error otherwise); unit `unit(a) / unit(b)` (added in stage S10.3) |
+| `mod(a, b)` | whole | `a - b * div(a, b)`, from 0 to `b - 1`; `b` must be positive; `a` and `b` in one unit, the result's (added in stage S10.3) |
 | `marginal(x, table)` | whole | marginal-rate schedule, below |
 | `per_step(x)` | as `x` | same value; unit divided by the step unit (a stock made comparable with a flow) |
 | `times_step(x)` | as `x` | same value; unit multiplied by the step unit |
