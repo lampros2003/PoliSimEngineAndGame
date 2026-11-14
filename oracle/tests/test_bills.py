@@ -71,7 +71,7 @@ class UnitedKingdom(unittest.TestCase):
         rows = sim.run(3)
         self.assertTrue(rows[-1]["player_governs"])
         self.assertEqual([(v["lever"], v["for"], v["passed"]) for v in sim.votes],
-                         [("basic_rate", 324, False), ("personal_allowance", 620, True)])
+                         [("basic_rate", 323, False), ("personal_allowance", 620, True)])
 
     def test_the_majority_government_passes_its_bills(self):
         sim = Simulation(load_model(ROOT / "models" / "uk"), seed=2025, commands={0: {"basic_rate": 0.18}})

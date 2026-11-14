@@ -53,6 +53,19 @@ class Households(unittest.TestCase):
             self.assertLess(abs(share_hh / share_pop - 1), 0.02, region)
 
 
+class Employment(unittest.TestCase):
+    def test_people_in_work_by_region_follow_the_survey(self):
+        # Stage S6.2: each region's share of people in work is the Annual Population Survey's.
+        workers = {}
+        for r in rows():
+            n = sum(1 for i in range(1, 5) if float(r[f"earnings{i}"]) > 0)
+            workers[int(r["region_code"])] = workers.get(int(r["region_code"]), 0) + int(r["weight"]) * n
+        with open(ROOT / "models" / "uk" / "data" / "labour_regions.csv", newline="", encoding="utf-8") as handle:
+            survey = [int(r["employed"]) for r in csv.DictReader(handle)]
+        for code, employed in enumerate(survey):
+            self.assertLess(abs(workers[code] / sum(workers.values()) / (employed / sum(survey)) - 1), 0.001, code)
+
+
 class Rules(unittest.TestCase):
     """The 2024-25 tax and benefit rules on the households (milestone S4.2)."""
 

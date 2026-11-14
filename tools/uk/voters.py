@@ -174,6 +174,11 @@ def write(out_dir: Path, households: Path) -> tuple[str, float]:
     table("quintiles.csv", "decile,value", [f"{d},{(d - 1) // 2}" for d in range(1, 11)])
     table("governing.csv", "bloc,value", [f"{b},{str(b in ASSUMPTIONS['governing']).lower()}" for b in BLOCS])
     table("positions.csv", "bloc,value", [f"{b},{ASSUMPTIONS['position'][b]!r}" for b in BLOCS])
+    with open(ROOT / "models" / "uk" / "data" / "labour_regions.csv", newline="", encoding="utf-8") as handle:
+        labour = {r["region"]: (int(r["employed"]), int(r["unemployed"])) for r in csv.DictReader(handle)}
+    national = sum(u for _, u in labour.values()) / sum(e + u for e, u in labour.values())
+    table("regional_unemployment.csv", "region,value",
+          [f"{r},{labour[r][1] / sum(labour[r]) / national!r}" for r in REGIONS])
     seats = constituencies()
     table("constituencies.csv", "constituency,region,winner",
           [f"{c['code']},{REGIONS.index(c['region'])},{BLOCS.index(c['winner'])}" for c in seats])
@@ -337,14 +342,6 @@ phase = "politics"
 initial = {a["months_in_office"]}
 next = "select(election_now and government_changes, 1, months_in_office + 1)"
 
-[state.unemployment_at_election]
-doc = "Unemployment at the last election; the base month's stands in for July 2024's (-1 until it is known)"
-type = "real"
-unit = "1"
-phase = "politics"
-initial = -1.0
-next = "select(unemployment_at_election < 0.0 or election_now, unemployment_rate, unemployment_at_election)"
-
 [state.inflation_at_election]
 doc = "Inflation at the last election; the base month's stands in for July 2024's (-1 until it is known)"
 type = "real"
@@ -397,18 +394,53 @@ dims = ["voter_type"]
 expr = "safe_div({slots("income_change * " + adult)}, voters, 0.0)"
 
 [var.fundamentals]
-label = "The economy and time in office, on the government's utility"
+label = "Inflation and time in office, on the government's utility"
 type = "real"
 unit = "1"
 phase = "politics"
-expr = "select(unemployment_at_election < 0.0, 0.0, vote_unemployment_effect * (unemployment_rate - unemployment_at_election)) + select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0"
+expr = "select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0"
+
+# ---- unemployment by region (stage S6.2): the national rate times the region's relative
+# rate in the Annual Population Survey of 2024; voters weigh their own region's.
+
+[param.regional_unemployment_ratio]
+doc = "Each region's unemployment rate against the UK's, Annual Population Survey, 2024"
+type = "real"
+unit = "1"
+dims = ["region"]
+data = "politics/regional_unemployment.csv"
+
+[var.regional_unemployment]
+label = "Unemployment rate by region"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["region"]
+expr = "unemployment_rate * regional_unemployment_ratio"
+
+[state.regional_unemployment_at_election]
+doc = "Unemployment by region at the last election; the base month's stands in for July 2024's (-1 until it is known)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["region"]
+initial = -1.0
+next = "select(regional_unemployment_at_election < 0.0 or election_now, regional_unemployment, regional_unemployment_at_election)"
+
+[var.voter_fundamentals]
+doc = "The fundamentals for each voter type: inflation, time in office, and its own region's unemployment"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region]))"
 
 [var.utility]
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type", "option"]
-expr = "option_intercept[region: type_region] + option_age_effect[voter_age: type_age] + select(coord(option) < 9 and governing[bloc: min(coord(option), 8)], vote_income_effect * voter_income_change + fundamentals, 0.0)"
+expr = "option_intercept[region: type_region] + option_age_effect[voter_age: type_age] + select(coord(option) < 9 and governing[bloc: min(coord(option), 8)], vote_income_effect * voter_income_change + voter_fundamentals, 0.0)"
 
 [var.weight_of_option]
 type = "real"

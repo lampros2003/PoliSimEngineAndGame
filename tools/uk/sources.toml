@@ -158,3 +158,15 @@ licence = "Open Government Licence v3.0"
 attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
 format = "table"
 file = "census_work_pcon.json"
+
+# ---- Stage S6: depth
+
+[dataset.aps_regions]
+title = "Annual Population Survey: people aged 16 and over in employment and unemployed, by region, January to December 2024"
+publisher = "Office for National Statistics (Nomis)"
+url = "https://www.nomisweb.co.uk/api/v01/dataset/NM_170_1.data.csv?geography=TYPE480&c_sex=0&c_age=20&c_ecopuk11=2,12&measure=1&measures=20100&time=2024-12&select=geography_name,geography_code,c_ecopuk11_name,obs_value"
+page = "https://www.nomisweb.co.uk/datasets/apsnew"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "table"
+file = "aps_regions.csv"

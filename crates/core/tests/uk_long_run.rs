@@ -66,8 +66,8 @@ fn thirty_years_of_unchanged_policy_stay_in_range() {
 
 /// Stage S4.4: raked each month, the households still match the cohort table after ten
 /// years: people in households by region, sex and age band (the population times the base
-/// year's share in households), households by type, and people in work (the economy's
-/// employment).
+/// year's share in households), households by type, and people in work by region (the
+/// economy's employment, by each region's base share).
 #[test]
 fn after_ten_years_the_households_match_the_population() {
     use polisim_core::Col;
@@ -89,7 +89,7 @@ fn after_ten_years_the_households_match_the_population() {
     let band = |age: i64| [15, 24, 34, 49, 64, 74, 90].iter().position(|top| age <= *top).unwrap();
     let mut people = vec![0.0f64; 12 * 2 * 7];
     let mut types = vec![0.0f64; 10];
-    let mut workers = 0.0f64;
+    let mut workers = vec![0.0f64; 12];
     let sexes: Vec<Vec<i64>> = (1..=4).map(|i| ints(&format!("sex{i}"))).collect();
     let ages: Vec<Vec<i64>> = (1..=4).map(|i| ints(&format!("age{i}"))).collect();
     let earnings: Vec<Vec<i64>> = (1..=4).map(|i| ints(&format!("earnings{i}"))).collect();
@@ -102,7 +102,7 @@ fn after_ten_years_the_households_match_the_population() {
         for i in 0..adults[r] as usize {
             people[cell(sexes[i][r] as usize, band(ages[i][r]))] += weight;
             if earnings[i][r] > 0 {
-                workers += weight;
+                workers[region[r] as usize] += weight;
             }
         }
         for (column, sex, b) in &children {
@@ -114,10 +114,10 @@ fn after_ten_years_the_households_match_the_population() {
     };
     let people_error = worst(&people, &reals("people_in_households_target"));
     let type_error = worst(&types, &reals("households_by_type_target"));
-    let worker_error = worst(&[workers], &reals("workers_target"));
+    let worker_error = worst(&workers, &reals("workers_target"));
     assert!(people_error < 0.005, "people by region, sex and age band off by {people_error}");
     assert!(type_error < 0.005, "households by type off by {type_error}");
-    assert!(worker_error < 0.0001, "people in work off by {worker_error}");
+    assert!(worker_error < 0.0001, "people in work by region off by {worker_error}");
     // The targets are the cohort table's, and it has moved in ten years: weights have too.
     let base: f64 = sim.model().entities[0].weights.iter().map(|w| *w as f64).sum();
     let now: f64 = w.iter().map(|w| *w as f64).sum();

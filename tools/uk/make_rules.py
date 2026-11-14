@@ -218,7 +218,7 @@ def write_alignment(folder: Path, employment_base: float, source: Path | None = 
         records = list(csv.DictReader(handle))
     people: dict[tuple[int, int, int], float] = {}
     types = [0] * len(TYPES)
-    workers = 0
+    workers = [0] * len(REGIONS)
     for r in records:
         w, region = int(r["weight"]), int(r["region_code"])
         types[int(r["type"])] += w
@@ -226,7 +226,7 @@ def write_alignment(folder: Path, employment_base: float, source: Path | None = 
             if int(r["adults"]) >= i:
                 key = (region, int(r[f"sex{i}"]), band(int(r[f"age{i}"])))
                 people[key] = people.get(key, 0) + w
-                workers += w * (float(r[f"earnings{i}"]) > 0)
+                workers[region] += w * (float(r[f"earnings{i}"]) > 0)
         for column, sex, b in (("girls", 0, 0), ("boys", 1, 0), ("older_girls", 0, 1), ("older_boys", 1, 1)):
             key = (region, sex, b)
             people[key] = people.get(key, 0) + w * int(r[column])
@@ -244,7 +244,9 @@ def write_alignment(folder: Path, employment_base: float, source: Path | None = 
            for r in range(len(REGIONS)) for s in range(2) for b in range(len(AGE_BANDS))])
     write("household_types.csv", "household_type,value", [f"{t},{n}" for t, n in zip(TYPES, types)])
     write("age_bands.csv", "age,value", [f"{a},{band(a)}" for a in range(91)])
-    return {"people_base": float(sum(people.values())), "workers_share": workers / employment_base}
+    # Stage S6.2: people in work by region, as shares of the economy's employment.
+    write("workers_by_region.csv", "region,value", [f"{REGIONS[r]},{workers[r] / employment_base!r}" for r in range(len(REGIONS))])
+    return {"people_base": float(sum(people.values()))}
 
 
 def alignment_rules(values: dict[str, float]) -> str:
@@ -262,17 +264,13 @@ def alignment_rules(values: dict[str, float]) -> str:
 # ------------------------------------------------------------------ alignment (stage S4.4)
 # Each month from the second, the households' weights are raked so that they match
 # households by type, people in households by region, sex and age band (the cohort table,
-# times the base year's share living in households), and people in work (the economy's
-# employment, times the base month's ratio). People in work come last, so they match
-# exactly: the households' employment follows the economy.
+# times the base year's share living in households), and people in work by region (the
+# economy's employment, times each region's base share, stage S6.2). People in work come
+# last, so they match exactly: the households' employment follows the economy.
 
 [dim.age_band]
 members = [{members}]
 labels = [{labels}]
-
-[dim.nation]
-doc = "One member: the margin of the rake that is a national total"
-members = ["uk"]
 
 [param.person_each]
 doc = "One person per household: turns a count of people in a household into people"
@@ -306,10 +304,11 @@ unit = "person"
 value = {values["people_base"]!r}
 
 [param.workers_share]
-doc = "People in work in the households against the economy's employment, in the base month"
+doc = "People in work in the households of each region against the economy's employment, in the base month"
 type = "real"
 unit = "1"
-value = {values["workers_share"]!r}
+dims = ["region"]
+data = "households/workers_by_region.csv"
 
 [lever.align_households]
 label = "Keep the households in line with the population and employment"
@@ -342,11 +341,11 @@ dims = ["household_type"]
 expr = "households_by_type_base * sum(people_in_households_target, region, sex, age_band) / people_in_households_base"
 
 [var.workers_target]
-label = "People in work in the households"
+label = "People in work in the households, by region"
 type = "real"
 unit = "person"
 phase = "alignment"
-dims = ["nation"]
+dims = ["region"]
 expr = "workers_share * (private_employment + public_employment)"
 
 [state.household_weight]
@@ -374,7 +373,7 @@ slots = [
 
 [[state.household_weight.rake.margin]]
 target = "workers_target"
-slots = [{{ count = "({workers}) * person_each", at = ["0"] }}]
+slots = [{{ count = "({workers}) * person_each", at = ["region_code"] }}]
 
 [var.households_total]
 label = "Households"

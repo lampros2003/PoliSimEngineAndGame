@@ -59,13 +59,15 @@ three margins, in this order:
    49, 50 to 64, 65 to 74, 75 and over): the cohort table's people in each cell times the
    base year's share of them living in households (`alignment.csv`); four slots for the
    adults and four for children by sex, under 16 and 16 or 17;
-3. people in work: the economy's employment times the base month's ratio, so the
-   households' employment follows the economy's exactly.
+3. people in work by region: the economy's employment times each region's base share
+   (the Annual Population Survey's, 2024, `../data/labour_regions.csv`, which the
+   households are calibrated to from the start), so the households' employment follows
+   the economy's exactly, region by region.
 
 In the base month the targets equal the weighted records, so nothing moves until the
 population or employment does. Ten passes a month keep every margin close: after ten years
 people by region, sex and age band are within 0.08% of their targets, households by type
-within 0.15%, people in work within rounding (`crates/core/tests/uk_long_run.rs`). The
+within 0.15%, people in work in every region within 0.004% (`crates/core/tests/uk_long_run.rs`). The
 lever `align_households` (not offered to the player) turns it off.
 
 The records do not age: alignment changes how many households each record stands for,

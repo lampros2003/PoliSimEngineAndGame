@@ -179,6 +179,17 @@ release_date = ""
 retrieved = "2026-11-14T04:35:02Z"
 sha256 = "028dd925cc6c22e4eca9a61b191858dbabf582b112bad6584033b31b0bcd9868"
 
+[dataset.aps_regions]
+title = "Annual Population Survey: people aged 16 and over in employment and unemployed, by region, January to December 2024"
+publisher = "Office for National Statistics (Nomis)"
+url = "https://www.nomisweb.co.uk/api/v01/dataset/NM_170_1.data.csv?geography=TYPE480&c_sex=0&c_age=20&c_ecopuk11=2,12&measure=1&measures=20100&time=2024-12&select=geography_name,geography_code,c_ecopuk11_name,obs_value"
+page = "https://www.nomisweb.co.uk/datasets/apsnew"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T05:59:12Z"
+sha256 = "2dc90438e2f5a6fdf7bda92209c4353fc88dbdcf04df6d8766189e741e6f5999"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"

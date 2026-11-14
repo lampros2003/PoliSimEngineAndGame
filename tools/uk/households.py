@@ -18,7 +18,8 @@ type at the published mix, members' ages from the population, employment by an a
 age profile, employees' pay from ASHE's percentiles for their region and sex, scaled by
 their age group, and pensions for those over state pension age. The records are then
 weighted by exponential calibration (raking) so that the weighted households match the
-published people by region, sex and age band, households by type, and employment.
+published people by region, sex and age band, households by type, and employment by
+region (stage S6.2).
 
 Writes models/uk/households/households.csv (one row per household, its weight a whole
 number of households) and HOUSEHOLDS.md, which lists every target, its published value,
@@ -374,8 +375,13 @@ def main(argv: list[str] | None = None) -> int:
         targets[j] = (targets[j][0] * scale, targets[j][1])
     employment = float(next(r for r in csv.DictReader((DATA / "annual.csv").read_text(encoding="utf-8").splitlines())
                             if r["period"] == "2024")["employment"]) * 1000
-    index[("work",)] = len(targets)
-    targets.append((employment, "people in work"))
+    # Stage S6.2: people in work by region, the Annual Population Survey's shares of the
+    # national total (models/uk/data/labour_regions.csv, from tools/uk/regions.py).
+    regional = {r["region"]: int(r["employed"])
+                for r in csv.DictReader((DATA / "labour_regions.csv").read_text(encoding="utf-8").splitlines())}
+    for region in REGIONS:
+        index[("work", region)] = len(targets)
+        targets.append((employment * regional[region] / sum(regional.values()), f"people in work: {region}"))
     for r in records:
         x = {0: 1.0, index[("type", r["type"])]: 1.0}
         for p in r["people"]:
@@ -383,7 +389,8 @@ def main(argv: list[str] | None = None) -> int:
             j = index[("people", r["region"], p["sex"], band)]
             x[j] = x.get(j, 0.0) + 1.0
             if p["employee"] or p["self_employed"]:
-                x[index[("work",)]] = x.get(index[("work",)], 0.0) + 1.0
+                j = index[("work", r["region"])]
+                x[j] = x.get(j, 0.0) + 1.0
         # Overlapping targets (all households = the sum of the types) make the system
         # singular; drop the redundant all-households column from the records.
         x.pop(0)

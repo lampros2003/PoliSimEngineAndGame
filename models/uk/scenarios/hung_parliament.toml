@@ -1,7 +1,7 @@
 # A test of bills under the player (stage S5.4): an election in the second month, with time
 # in office weighing against the government, leaves the centre-left short of a majority,
 # leading a coalition with the liberal, green and nationalist blocs. The liberals stand to
-# its right, so a rise in the basic rate (a move to the left) has only 324 votes and fails.
+# its right, so a rise in the basic rate (a move to the left) has only 323 votes and fails.
 # Not a scenario to play.
 
 [scenario]

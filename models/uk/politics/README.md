@@ -19,7 +19,7 @@ Nine blocs, or not voting. For voter type `t` and option `o`:
 utility = intercept[region of t, o] + age effect[age band of t, o]
           + for the blocs in government:
               2.5 * (t's change in real household income)
-              - 6.0 * (unemployment rate - its level at the last election)
+              - 6.0 * (unemployment in t's region - its level at the last election)
               - 3.0 * (annual inflation - its level at the last election)
               - 0.025 * years in office
 share   = exp(utility) / sum over options of exp(utility)
@@ -85,4 +85,12 @@ governing bloc stands. It votes for its bills; every other bloc votes for a move
 left if it stands further left than the leader, and for a move to the right if further
 right. More than 325 seats pass a bill. With 411 seats of its own the government passes
 everything; in a hung parliament, a left-led government needs enough seats to its left to
-raise taxes (`scenarios/hung_parliament.toml`: 324 votes, one bloc too few).
+raise taxes (`scenarios/hung_parliament.toml`: 323 votes, one bloc too few).
+
+## Unemployment by region (stage S6.2)
+
+The model has one national labour market, so unemployment by region is the national rate
+times each region's relative rate in the 2024 Annual Population Survey
+(`regional_unemployment_ratio`: the North East's is about 1.2 times the UK's, Northern
+Ireland's about half). Voters weigh their own region's change since the last election, so
+a rise in unemployment costs the government more where unemployment is high.

@@ -1069,17 +1069,13 @@ expr = "wsum_by(household, net_income, region, region_code) / wcount_by(househol
 # ------------------------------------------------------------------ alignment (stage S4.4)
 # Each month from the second, the households' weights are raked so that they match
 # households by type, people in households by region, sex and age band (the cohort table,
-# times the base year's share living in households), and people in work (the economy's
-# employment, times the base month's ratio). People in work come last, so they match
-# exactly: the households' employment follows the economy.
+# times the base year's share living in households), and people in work by region (the
+# economy's employment, times each region's base share, stage S6.2). People in work come
+# last, so they match exactly: the households' employment follows the economy.
 
 [dim.age_band]
 members = ["under_16", "age_16_24", "age_25_34", "age_35_49", "age_50_64", "age_65_74", "age_75_plus"]
 labels = ["Under 16", "16 to 24", "25 to 34", "35 to 49", "50 to 64", "65 to 74", "75 and over"]
-
-[dim.nation]
-doc = "One member: the margin of the rake that is a national total"
-members = ["uk"]
 
 [param.person_each]
 doc = "One person per household: turns a count of people in a household into people"
@@ -1110,13 +1106,14 @@ data = "households/household_types.csv"
 [param.people_in_households_base]
 type = "real"
 unit = "person"
-value = 67361069.0
+value = 67360794.0
 
 [param.workers_share]
-doc = "People in work in the households against the economy's employment, in the base month"
+doc = "People in work in the households of each region against the economy's employment, in the base month"
 type = "real"
 unit = "1"
-value = 0.9999959545481587
+dims = ["region"]
+data = "households/workers_by_region.csv"
 
 [lever.align_households]
 label = "Keep the households in line with the population and employment"
@@ -1149,11 +1146,11 @@ dims = ["household_type"]
 expr = "households_by_type_base * sum(people_in_households_target, region, sex, age_band) / people_in_households_base"
 
 [var.workers_target]
-label = "People in work in the households"
+label = "People in work in the households, by region"
 type = "real"
 unit = "person"
 phase = "alignment"
-dims = ["nation"]
+dims = ["region"]
 expr = "workers_share * (private_employment + public_employment)"
 
 [state.household_weight]
@@ -1187,7 +1184,7 @@ slots = [
 
 [[state.household_weight.rake.margin]]
 target = "workers_target"
-slots = [{ count = "(select(earnings1 > 0, 1, 0) + select(earnings2 > 0, 1, 0) + select(earnings3 > 0, 1, 0) + select(earnings4 > 0, 1, 0)) * person_each", at = ["0"] }]
+slots = [{ count = "(select(earnings1 > 0, 1, 0) + select(earnings2 > 0, 1, 0) + select(earnings3 > 0, 1, 0) + select(earnings4 > 0, 1, 0)) * person_each", at = ["region_code"] }]
 
 [var.households_total]
 label = "Households"

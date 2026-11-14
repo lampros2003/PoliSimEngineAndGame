@@ -69,6 +69,19 @@ class BaseMonth(unittest.TestCase):
         self.assertEqual(sum(sim.column("voters")), adults)
 
 
+class Regions(unittest.TestCase):
+    def test_unemployment_by_region_keeps_the_surveys_differences(self):
+        # Stage S6.2: the national rate times each region's relative rate in the 2024 survey.
+        sim, row = first_month()
+        regional = sim.column("regional_unemployment")
+        with open(UK / "data" / "labour_regions.csv", newline="", encoding="utf-8") as handle:
+            survey = list(csv.DictReader(handle))
+        national = sum(int(r["unemployed"]) for r in survey) / sum(int(r["employed"]) + int(r["unemployed"]) for r in survey)
+        for r, rate in zip(survey, regional):
+            self.assertAlmostEqual(rate, row["unemployment_rate"] * float(r["unemployment_rate"]) / national, places=12)
+        self.assertGreater(regional[REGIONS.index("north_east")], regional[REGIONS.index("south_west")])
+
+
 class Response(unittest.TestCase):
     def test_a_tax_rise_costs_the_government_support(self):
         base, higher = run(3), run(3, basic_rate=0.25)

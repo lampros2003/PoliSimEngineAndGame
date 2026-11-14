@@ -7,7 +7,7 @@ Open Government Licence v3.0. No survey microdata are used.
 20,000 records; seed 20241; calibration converged in 7 Newton steps; weights rounded
 to whole households, which is the only source of the errors below.
 
-Largest error: 0.025%.
+Largest error: 0.028%.
 
 ## Assumptions
 
@@ -30,183 +30,194 @@ Largest error: 0.025%.
 
 | Target | Published | Records | Error % |
 |---|---:|---:|---:|
-| households, all | 28,607,000 | 28,607,096 | +0.000 |
-| households: one_under_65 | 4,126,000 | 4,125,979 | -0.001 |
-| households: one_65_plus | 4,307,000 | 4,307,073 | +0.002 |
-| households: unrelated_adults | 774,000 | 774,012 | +0.002 |
-| households: couple_no_children | 8,135,000 | 8,135,064 | +0.001 |
-| households: couple_one_or_two | 5,209,000 | 5,208,983 | -0.000 |
+| households, all | 28,607,000 | 28,606,876 | -0.000 |
+| households: one_under_65 | 4,126,000 | 4,125,975 | -0.001 |
+| households: one_65_plus | 4,307,000 | 4,307,044 | +0.001 |
+| households: unrelated_adults | 774,000 | 773,995 | -0.001 |
+| households: couple_no_children | 8,135,000 | 8,134,772 | -0.003 |
+| households: couple_one_or_two | 5,209,000 | 5,209,037 | +0.001 |
 | households: couple_three_plus | 963,000 | 963,002 | +0.000 |
-| households: couple_grown_children | 1,798,000 | 1,797,983 | -0.001 |
-| households: lone_parent | 1,881,000 | 1,881,002 | +0.000 |
-| households: lone_parent_grown | 1,160,000 | 1,160,001 | +0.000 |
-| households: multi_family | 254,000 | 253,997 | -0.001 |
-| people in households: north_east female 0-15 | 228,307 | 228,306 | -0.000 |
-| people in households: north_east female 16-24 | 139,885 | 139,882 | -0.002 |
-| people in households: north_east female 25-34 | 173,758 | 173,759 | +0.001 |
-| people in households: north_east female 35-49 | 252,823 | 252,817 | -0.002 |
-| people in households: north_east female 50-64 | 275,053 | 275,039 | -0.005 |
-| people in households: north_east female 65-74 | 153,446 | 153,444 | -0.001 |
-| people in households: north_east female 75-90 | 142,931 | 142,944 | +0.009 |
-| people in households: north_east male 0-15 | 241,370 | 241,362 | -0.003 |
-| people in households: north_east male 16-24 | 149,165 | 149,159 | -0.004 |
-| people in households: north_east male 25-34 | 169,837 | 169,830 | -0.004 |
-| people in households: north_east male 35-49 | 240,543 | 240,549 | +0.002 |
-| people in households: north_east male 50-64 | 260,815 | 260,788 | -0.010 |
-| people in households: north_east male 65-74 | 143,831 | 143,852 | +0.014 |
-| people in households: north_east male 75-90 | 111,312 | 111,319 | +0.006 |
-| people in households: north_west female 0-15 | 689,324 | 689,348 | +0.003 |
-| people in households: north_west female 16-24 | 394,326 | 394,317 | -0.002 |
-| people in households: north_west female 25-34 | 514,671 | 514,656 | -0.003 |
-| people in households: north_west female 35-49 | 732,309 | 732,303 | -0.001 |
-| people in households: north_west female 50-64 | 737,548 | 737,555 | +0.001 |
-| people in households: north_west female 65-74 | 377,626 | 377,674 | +0.013 |
-| people in households: north_west female 75-90 | 371,489 | 371,457 | -0.009 |
-| people in households: north_west male 0-15 | 723,698 | 723,679 | -0.003 |
-| people in households: north_west male 16-24 | 415,999 | 415,990 | -0.002 |
-| people in households: north_west male 25-34 | 504,184 | 504,177 | -0.001 |
-| people in households: north_west male 35-49 | 702,263 | 702,290 | +0.004 |
-| people in households: north_west male 50-64 | 714,436 | 714,432 | -0.001 |
-| people in households: north_west male 65-74 | 355,204 | 355,237 | +0.009 |
-| people in households: north_west male 75-90 | 289,545 | 289,585 | +0.014 |
-| people in households: yorkshire female 0-15 | 500,360 | 500,353 | -0.001 |
-| people in households: yorkshire female 16-24 | 293,299 | 293,304 | +0.002 |
-| people in households: yorkshire female 25-34 | 373,316 | 373,288 | -0.008 |
-| people in households: yorkshire female 35-49 | 530,200 | 530,201 | +0.000 |
-| people in households: yorkshire female 50-64 | 543,849 | 543,850 | +0.000 |
-| people in households: yorkshire female 65-74 | 282,499 | 282,514 | +0.005 |
-| people in households: yorkshire female 75-90 | 280,944 | 280,943 | -0.001 |
-| people in households: yorkshire male 0-15 | 523,973 | 523,969 | -0.001 |
-| people in households: yorkshire male 16-24 | 306,953 | 306,948 | -0.002 |
-| people in households: yorkshire male 25-34 | 359,968 | 359,948 | -0.005 |
-| people in households: yorkshire male 35-49 | 507,384 | 507,377 | -0.001 |
-| people in households: yorkshire male 50-64 | 526,581 | 526,591 | +0.002 |
-| people in households: yorkshire male 65-74 | 265,789 | 265,839 | +0.019 |
-| people in households: yorkshire male 75-90 | 219,290 | 219,283 | -0.003 |
-| people in households: east_midlands female 0-15 | 436,694 | 436,684 | -0.002 |
-| people in households: east_midlands female 16-24 | 252,483 | 252,489 | +0.002 |
+| households: couple_grown_children | 1,798,000 | 1,798,012 | +0.001 |
+| households: lone_parent | 1,881,000 | 1,881,013 | +0.001 |
+| households: lone_parent_grown | 1,160,000 | 1,160,024 | +0.002 |
+| households: multi_family | 254,000 | 254,002 | +0.001 |
+| people in households: north_east female 0-15 | 228,307 | 228,299 | -0.003 |
+| people in households: north_east female 16-24 | 139,885 | 139,884 | -0.001 |
+| people in households: north_east female 25-34 | 173,758 | 173,754 | -0.002 |
+| people in households: north_east female 35-49 | 252,823 | 252,807 | -0.006 |
+| people in households: north_east female 50-64 | 275,053 | 275,047 | -0.002 |
+| people in households: north_east female 65-74 | 153,446 | 153,457 | +0.007 |
+| people in households: north_east female 75-90 | 142,931 | 142,940 | +0.006 |
+| people in households: north_east male 0-15 | 241,370 | 241,369 | -0.001 |
+| people in households: north_east male 16-24 | 149,165 | 149,165 | +0.000 |
+| people in households: north_east male 25-34 | 169,837 | 169,831 | -0.004 |
+| people in households: north_east male 35-49 | 240,543 | 240,535 | -0.003 |
+| people in households: north_east male 50-64 | 260,815 | 260,805 | -0.004 |
+| people in households: north_east male 65-74 | 143,831 | 143,830 | -0.001 |
+| people in households: north_east male 75-90 | 111,312 | 111,308 | -0.004 |
+| people in households: north_west female 0-15 | 689,324 | 689,340 | +0.002 |
+| people in households: north_west female 16-24 | 394,326 | 394,330 | +0.001 |
+| people in households: north_west female 25-34 | 514,671 | 514,662 | -0.002 |
+| people in households: north_west female 35-49 | 732,309 | 732,309 | +0.000 |
+| people in households: north_west female 50-64 | 737,548 | 737,554 | +0.001 |
+| people in households: north_west female 65-74 | 377,626 | 377,653 | +0.007 |
+| people in households: north_west female 75-90 | 371,489 | 371,462 | -0.007 |
+| people in households: north_west male 0-15 | 723,698 | 723,700 | +0.000 |
+| people in households: north_west male 16-24 | 415,999 | 415,997 | -0.000 |
+| people in households: north_west male 25-34 | 504,184 | 504,184 | -0.000 |
+| people in households: north_west male 35-49 | 702,263 | 702,244 | -0.003 |
+| people in households: north_west male 50-64 | 714,436 | 714,423 | -0.002 |
+| people in households: north_west male 65-74 | 355,204 | 355,213 | +0.002 |
+| people in households: north_west male 75-90 | 289,545 | 289,463 | -0.028 |
+| people in households: yorkshire female 0-15 | 500,360 | 500,369 | +0.002 |
+| people in households: yorkshire female 16-24 | 293,299 | 293,297 | -0.001 |
+| people in households: yorkshire female 25-34 | 373,316 | 373,340 | +0.006 |
+| people in households: yorkshire female 35-49 | 530,200 | 530,191 | -0.002 |
+| people in households: yorkshire female 50-64 | 543,849 | 543,826 | -0.004 |
+| people in households: yorkshire female 65-74 | 282,499 | 282,509 | +0.004 |
+| people in households: yorkshire female 75-90 | 280,944 | 280,973 | +0.010 |
+| people in households: yorkshire male 0-15 | 523,973 | 523,994 | +0.004 |
+| people in households: yorkshire male 16-24 | 306,953 | 306,943 | -0.003 |
+| people in households: yorkshire male 25-34 | 359,968 | 359,986 | +0.005 |
+| people in households: yorkshire male 35-49 | 507,384 | 507,381 | -0.001 |
+| people in households: yorkshire male 50-64 | 526,581 | 526,549 | -0.006 |
+| people in households: yorkshire male 65-74 | 265,789 | 265,789 | +0.000 |
+| people in households: yorkshire male 75-90 | 219,290 | 219,289 | -0.000 |
+| people in households: east_midlands female 0-15 | 436,694 | 436,720 | +0.006 |
+| people in households: east_midlands female 16-24 | 252,483 | 252,495 | +0.005 |
 | people in households: east_midlands female 25-34 | 320,310 | 320,308 | -0.000 |
-| people in households: east_midlands female 35-49 | 475,601 | 475,632 | +0.007 |
-| people in households: east_midlands female 50-64 | 497,633 | 497,660 | +0.006 |
-| people in households: east_midlands female 65-74 | 256,498 | 256,530 | +0.013 |
-| people in households: east_midlands female 75-90 | 257,638 | 257,584 | -0.021 |
-| people in households: east_midlands male 0-15 | 457,436 | 457,449 | +0.003 |
-| people in households: east_midlands male 16-24 | 271,094 | 271,099 | +0.002 |
-| people in households: east_midlands male 25-34 | 309,796 | 309,787 | -0.003 |
-| people in households: east_midlands male 35-49 | 455,036 | 455,076 | +0.009 |
-| people in households: east_midlands male 50-64 | 482,888 | 482,916 | +0.006 |
-| people in households: east_midlands male 65-74 | 241,732 | 241,737 | +0.002 |
-| people in households: east_midlands male 75-90 | 206,395 | 206,344 | -0.025 |
-| people in households: west_midlands female 0-15 | 572,310 | 572,319 | +0.002 |
-| people in households: west_midlands female 16-24 | 308,545 | 308,546 | +0.000 |
-| people in households: west_midlands female 25-34 | 400,553 | 400,540 | -0.003 |
+| people in households: east_midlands female 35-49 | 475,601 | 475,620 | +0.004 |
+| people in households: east_midlands female 50-64 | 497,633 | 497,634 | +0.000 |
+| people in households: east_midlands female 65-74 | 256,498 | 256,495 | -0.001 |
+| people in households: east_midlands female 75-90 | 257,638 | 257,660 | +0.009 |
+| people in households: east_midlands male 0-15 | 457,436 | 457,456 | +0.004 |
+| people in households: east_midlands male 16-24 | 271,094 | 271,093 | -0.000 |
+| people in households: east_midlands male 25-34 | 309,796 | 309,799 | +0.001 |
+| people in households: east_midlands male 35-49 | 455,036 | 455,055 | +0.004 |
+| people in households: east_midlands male 50-64 | 482,888 | 482,879 | -0.002 |
+| people in households: east_midlands male 65-74 | 241,732 | 241,712 | -0.008 |
+| people in households: east_midlands male 75-90 | 206,395 | 206,412 | +0.008 |
+| people in households: west_midlands female 0-15 | 572,310 | 572,329 | +0.003 |
+| people in households: west_midlands female 16-24 | 308,545 | 308,534 | -0.003 |
+| people in households: west_midlands female 25-34 | 400,553 | 400,534 | -0.005 |
 | people in households: west_midlands female 35-49 | 586,208 | 586,213 | +0.001 |
-| people in households: west_midlands female 50-64 | 578,066 | 578,038 | -0.005 |
-| people in households: west_midlands female 65-74 | 293,873 | 293,901 | +0.010 |
-| people in households: west_midlands female 75-90 | 307,076 | 307,103 | +0.009 |
-| people in households: west_midlands male 0-15 | 600,427 | 600,449 | +0.004 |
-| people in households: west_midlands male 16-24 | 334,885 | 334,890 | +0.001 |
-| people in households: west_midlands male 25-34 | 395,226 | 395,223 | -0.001 |
-| people in households: west_midlands male 35-49 | 557,581 | 557,592 | +0.002 |
-| people in households: west_midlands male 50-64 | 564,075 | 564,072 | -0.000 |
-| people in households: west_midlands male 65-74 | 276,066 | 276,109 | +0.016 |
-| people in households: west_midlands male 75-90 | 239,784 | 239,783 | -0.000 |
-| people in households: east female 0-15 | 591,525 | 591,530 | +0.001 |
-| people in households: east female 16-24 | 281,970 | 281,971 | +0.000 |
-| people in households: east female 25-34 | 417,093 | 417,078 | -0.004 |
-| people in households: east female 35-49 | 653,843 | 653,873 | +0.005 |
-| people in households: east female 50-64 | 635,730 | 635,706 | -0.004 |
-| people in households: east female 65-74 | 326,583 | 326,582 | -0.000 |
-| people in households: east female 75-90 | 351,343 | 351,375 | +0.009 |
-| people in households: east male 0-15 | 620,073 | 620,057 | -0.003 |
-| people in households: east male 16-24 | 308,836 | 308,829 | -0.002 |
+| people in households: west_midlands female 50-64 | 578,066 | 578,013 | -0.009 |
+| people in households: west_midlands female 65-74 | 293,873 | 293,862 | -0.004 |
+| people in households: west_midlands female 75-90 | 307,076 | 307,126 | +0.016 |
+| people in households: west_midlands male 0-15 | 600,427 | 600,417 | -0.002 |
+| people in households: west_midlands male 16-24 | 334,885 | 334,881 | -0.001 |
+| people in households: west_midlands male 25-34 | 395,226 | 395,224 | -0.001 |
+| people in households: west_midlands male 35-49 | 557,581 | 557,597 | +0.003 |
+| people in households: west_midlands male 50-64 | 564,075 | 564,005 | -0.012 |
+| people in households: west_midlands male 65-74 | 276,066 | 276,086 | +0.007 |
+| people in households: west_midlands male 75-90 | 239,784 | 239,815 | +0.013 |
+| people in households: east female 0-15 | 591,525 | 591,552 | +0.005 |
+| people in households: east female 16-24 | 281,970 | 281,979 | +0.003 |
+| people in households: east female 25-34 | 417,093 | 417,093 | -0.000 |
+| people in households: east female 35-49 | 653,843 | 653,877 | +0.005 |
+| people in households: east female 50-64 | 635,730 | 635,729 | -0.000 |
+| people in households: east female 65-74 | 326,583 | 326,559 | -0.007 |
+| people in households: east female 75-90 | 351,343 | 351,353 | +0.003 |
+| people in households: east male 0-15 | 620,073 | 620,099 | +0.004 |
+| people in households: east male 16-24 | 308,836 | 308,834 | -0.001 |
 | people in households: east male 25-34 | 402,007 | 402,009 | +0.001 |
-| people in households: east male 35-49 | 615,827 | 615,849 | +0.004 |
-| people in households: east male 50-64 | 612,593 | 612,581 | -0.002 |
-| people in households: east male 65-74 | 301,368 | 301,357 | -0.004 |
-| people in households: east male 75-90 | 275,609 | 275,661 | +0.019 |
-| people in households: london female 0-15 | 814,820 | 814,809 | -0.001 |
-| people in households: london female 16-24 | 500,483 | 500,477 | -0.001 |
-| people in households: london female 25-34 | 846,307 | 846,293 | -0.002 |
-| people in households: london female 35-49 | 1,024,837 | 1,024,812 | -0.002 |
-| people in households: london female 50-64 | 779,641 | 779,660 | +0.002 |
-| people in households: london female 65-74 | 313,012 | 313,001 | -0.004 |
-| people in households: london female 75-90 | 277,211 | 277,236 | +0.009 |
-| people in households: london male 0-15 | 851,464 | 851,432 | -0.004 |
-| people in households: london male 16-24 | 502,440 | 502,436 | -0.001 |
-| people in households: london male 25-34 | 798,955 | 798,972 | +0.002 |
-| people in households: london male 35-49 | 935,361 | 935,330 | -0.003 |
-| people in households: london male 50-64 | 727,430 | 727,421 | -0.001 |
-| people in households: london male 65-74 | 277,759 | 277,814 | +0.020 |
-| people in households: london male 75-90 | 201,250 | 201,291 | +0.020 |
-| people in households: south_east female 0-15 | 853,743 | 853,724 | -0.002 |
-| people in households: south_east female 16-24 | 440,127 | 440,128 | +0.000 |
-| people in households: south_east female 25-34 | 593,919 | 593,908 | -0.002 |
-| people in households: south_east female 35-49 | 970,686 | 970,675 | -0.001 |
-| people in households: south_east female 50-64 | 941,706 | 941,633 | -0.008 |
+| people in households: east male 35-49 | 615,827 | 615,847 | +0.003 |
+| people in households: east male 50-64 | 612,593 | 612,607 | +0.002 |
+| people in households: east male 65-74 | 301,368 | 301,396 | +0.009 |
+| people in households: east male 75-90 | 275,609 | 275,611 | +0.001 |
+| people in households: london female 0-15 | 814,820 | 814,776 | -0.005 |
+| people in households: london female 16-24 | 500,483 | 500,472 | -0.002 |
+| people in households: london female 25-34 | 846,307 | 846,302 | -0.001 |
+| people in households: london female 35-49 | 1,024,837 | 1,024,837 | +0.000 |
+| people in households: london female 50-64 | 779,641 | 779,732 | +0.012 |
+| people in households: london female 65-74 | 313,012 | 313,023 | +0.003 |
+| people in households: london female 75-90 | 277,211 | 277,261 | +0.018 |
+| people in households: london male 0-15 | 851,464 | 851,466 | +0.000 |
+| people in households: london male 16-24 | 502,440 | 502,446 | +0.001 |
+| people in households: london male 25-34 | 798,955 | 798,945 | -0.001 |
+| people in households: london male 35-49 | 935,361 | 935,357 | -0.000 |
+| people in households: london male 50-64 | 727,430 | 727,477 | +0.006 |
+| people in households: london male 65-74 | 277,759 | 277,736 | -0.008 |
+| people in households: london male 75-90 | 201,250 | 201,260 | +0.005 |
+| people in households: south_east female 0-15 | 853,743 | 853,737 | -0.001 |
+| people in households: south_east female 16-24 | 440,127 | 440,103 | -0.006 |
+| people in households: south_east female 25-34 | 593,919 | 593,902 | -0.003 |
+| people in households: south_east female 35-49 | 970,686 | 970,639 | -0.005 |
+| people in households: south_east female 50-64 | 941,706 | 941,671 | -0.004 |
 | people in households: south_east female 65-74 | 474,723 | 474,710 | -0.003 |
-| people in households: south_east female 75-90 | 517,899 | 517,882 | -0.003 |
-| people in households: south_east male 0-15 | 897,422 | 897,429 | +0.001 |
-| people in households: south_east male 16-24 | 471,164 | 471,171 | +0.002 |
-| people in households: south_east male 25-34 | 564,442 | 564,437 | -0.001 |
-| people in households: south_east male 35-49 | 909,270 | 909,259 | -0.001 |
-| people in households: south_east male 50-64 | 905,688 | 905,644 | -0.005 |
-| people in households: south_east male 65-74 | 435,781 | 435,800 | +0.004 |
-| people in households: south_east male 75-90 | 397,950 | 397,916 | -0.008 |
-| people in households: south_west female 0-15 | 469,347 | 469,334 | -0.003 |
-| people in households: south_west female 16-24 | 283,761 | 283,743 | -0.007 |
-| people in households: south_west female 25-34 | 348,213 | 348,187 | -0.007 |
-| people in households: south_west female 35-49 | 534,328 | 534,309 | -0.004 |
-| people in households: south_west female 50-64 | 593,979 | 593,960 | -0.003 |
-| people in households: south_west female 65-74 | 333,150 | 333,138 | -0.004 |
-| people in households: south_west female 75-90 | 357,924 | 357,915 | -0.003 |
-| people in households: south_west male 0-15 | 492,436 | 492,429 | -0.001 |
-| people in households: south_west male 16-24 | 299,587 | 299,575 | -0.004 |
-| people in households: south_west male 25-34 | 343,212 | 343,198 | -0.004 |
-| people in households: south_west male 35-49 | 508,787 | 508,772 | -0.003 |
-| people in households: south_west male 50-64 | 564,418 | 564,382 | -0.006 |
-| people in households: south_west male 65-74 | 306,682 | 306,689 | +0.002 |
-| people in households: south_west male 75-90 | 284,441 | 284,456 | +0.005 |
-| people in households: wales female 0-15 | 261,436 | 261,437 | +0.000 |
-| people in households: wales female 16-24 | 153,002 | 153,011 | +0.006 |
-| people in households: wales female 25-34 | 197,388 | 197,388 | +0.000 |
-| people in households: wales female 35-49 | 287,971 | 287,958 | -0.004 |
-| people in households: wales female 50-64 | 323,756 | 323,781 | +0.008 |
-| people in households: wales female 65-74 | 178,765 | 178,773 | +0.004 |
-| people in households: wales female 75-90 | 176,411 | 176,420 | +0.005 |
-| people in households: wales male 0-15 | 274,599 | 274,616 | +0.006 |
-| people in households: wales male 16-24 | 165,470 | 165,474 | +0.002 |
-| people in households: wales male 25-34 | 192,259 | 192,266 | +0.003 |
-| people in households: wales male 35-49 | 272,741 | 272,739 | -0.001 |
-| people in households: wales male 50-64 | 305,049 | 305,064 | +0.005 |
-| people in households: wales male 65-74 | 167,111 | 167,113 | +0.001 |
-| people in households: wales male 75-90 | 140,452 | 140,469 | +0.012 |
-| people in households: scotland female 0-15 | 428,473 | 428,493 | +0.005 |
-| people in households: scotland female 16-24 | 278,691 | 278,692 | +0.000 |
-| people in households: scotland female 25-34 | 362,173 | 362,156 | -0.005 |
-| people in households: scotland female 35-49 | 524,167 | 524,192 | +0.005 |
-| people in households: scotland female 50-64 | 585,050 | 585,070 | +0.003 |
-| people in households: scotland female 65-74 | 312,803 | 312,817 | +0.004 |
-| people in households: scotland female 75-90 | 280,129 | 280,162 | +0.012 |
-| people in households: scotland male 0-15 | 451,410 | 451,402 | -0.002 |
-| people in households: scotland male 16-24 | 279,454 | 279,454 | -0.000 |
-| people in households: scotland male 25-34 | 346,681 | 346,680 | -0.000 |
-| people in households: scotland male 35-49 | 497,533 | 497,537 | +0.001 |
-| people in households: scotland male 50-64 | 547,825 | 547,842 | +0.003 |
-| people in households: scotland male 65-74 | 287,063 | 287,069 | +0.002 |
-| people in households: scotland male 75-90 | 211,482 | 211,488 | +0.003 |
+| people in households: south_east female 75-90 | 517,899 | 517,842 | -0.011 |
+| people in households: south_east male 0-15 | 897,422 | 897,370 | -0.006 |
+| people in households: south_east male 16-24 | 471,164 | 471,141 | -0.005 |
+| people in households: south_east male 25-34 | 564,442 | 564,461 | +0.003 |
+| people in households: south_east male 35-49 | 909,270 | 909,223 | -0.005 |
+| people in households: south_east male 50-64 | 905,688 | 905,631 | -0.006 |
+| people in households: south_east male 65-74 | 435,781 | 435,752 | -0.007 |
+| people in households: south_east male 75-90 | 397,950 | 397,888 | -0.016 |
+| people in households: south_west female 0-15 | 469,347 | 469,366 | +0.004 |
+| people in households: south_west female 16-24 | 283,761 | 283,745 | -0.006 |
+| people in households: south_west female 25-34 | 348,213 | 348,205 | -0.002 |
+| people in households: south_west female 35-49 | 534,328 | 534,324 | -0.001 |
+| people in households: south_west female 50-64 | 593,979 | 593,995 | +0.003 |
+| people in households: south_west female 65-74 | 333,150 | 333,168 | +0.005 |
+| people in households: south_west female 75-90 | 357,924 | 357,952 | +0.008 |
+| people in households: south_west male 0-15 | 492,436 | 492,434 | -0.000 |
+| people in households: south_west male 16-24 | 299,587 | 299,581 | -0.002 |
+| people in households: south_west male 25-34 | 343,212 | 343,210 | -0.001 |
+| people in households: south_west male 35-49 | 508,787 | 508,786 | -0.000 |
+| people in households: south_west male 50-64 | 564,418 | 564,447 | +0.005 |
+| people in households: south_west male 65-74 | 306,682 | 306,669 | -0.004 |
+| people in households: south_west male 75-90 | 284,441 | 284,469 | +0.010 |
+| people in households: wales female 0-15 | 261,436 | 261,440 | +0.002 |
+| people in households: wales female 16-24 | 153,002 | 153,002 | +0.000 |
+| people in households: wales female 25-34 | 197,388 | 197,394 | +0.003 |
+| people in households: wales female 35-49 | 287,971 | 287,970 | -0.000 |
+| people in households: wales female 50-64 | 323,756 | 323,741 | -0.005 |
+| people in households: wales female 65-74 | 178,765 | 178,771 | +0.003 |
+| people in households: wales female 75-90 | 176,411 | 176,384 | -0.015 |
+| people in households: wales male 0-15 | 274,599 | 274,597 | -0.001 |
+| people in households: wales male 16-24 | 165,470 | 165,472 | +0.001 |
+| people in households: wales male 25-34 | 192,259 | 192,261 | +0.001 |
+| people in households: wales male 35-49 | 272,741 | 272,733 | -0.003 |
+| people in households: wales male 50-64 | 305,049 | 305,044 | -0.001 |
+| people in households: wales male 65-74 | 167,111 | 167,110 | -0.000 |
+| people in households: wales male 75-90 | 140,452 | 140,437 | -0.010 |
+| people in households: scotland female 0-15 | 428,473 | 428,477 | +0.001 |
+| people in households: scotland female 16-24 | 278,691 | 278,690 | -0.001 |
+| people in households: scotland female 25-34 | 362,173 | 362,184 | +0.003 |
+| people in households: scotland female 35-49 | 524,167 | 524,183 | +0.003 |
+| people in households: scotland female 50-64 | 585,050 | 585,032 | -0.003 |
+| people in households: scotland female 65-74 | 312,803 | 312,796 | -0.002 |
+| people in households: scotland female 75-90 | 280,129 | 280,153 | +0.009 |
+| people in households: scotland male 0-15 | 451,410 | 451,406 | -0.001 |
+| people in households: scotland male 16-24 | 279,454 | 279,450 | -0.002 |
+| people in households: scotland male 25-34 | 346,681 | 346,687 | +0.002 |
+| people in households: scotland male 35-49 | 497,533 | 497,532 | -0.000 |
+| people in households: scotland male 50-64 | 547,825 | 547,817 | -0.001 |
+| people in households: scotland male 65-74 | 287,063 | 287,042 | -0.007 |
+| people in households: scotland male 75-90 | 211,482 | 211,512 | +0.014 |
 | people in households: northern_ireland female 0-15 | 184,186 | 184,182 | -0.002 |
-| people in households: northern_ireland female 16-24 | 91,246 | 91,244 | -0.002 |
+| people in households: northern_ireland female 16-24 | 91,246 | 91,241 | -0.006 |
 | people in households: northern_ireland female 25-34 | 117,343 | 117,333 | -0.009 |
-| people in households: northern_ireland female 35-49 | 190,423 | 190,403 | -0.010 |
-| people in households: northern_ireland female 50-64 | 188,641 | 188,649 | +0.004 |
-| people in households: northern_ireland female 65-74 | 93,168 | 93,174 | +0.006 |
-| people in households: northern_ireland female 75-90 | 86,232 | 86,227 | -0.006 |
-| people in households: northern_ireland male 0-15 | 193,226 | 193,220 | -0.003 |
-| people in households: northern_ireland male 16-24 | 98,277 | 98,276 | -0.001 |
-| people in households: northern_ireland male 25-34 | 117,355 | 117,347 | -0.007 |
-| people in households: northern_ireland male 35-49 | 179,330 | 179,311 | -0.011 |
-| people in households: northern_ireland male 50-64 | 180,900 | 180,910 | +0.005 |
-| people in households: northern_ireland male 65-74 | 88,826 | 88,828 | +0.002 |
-| people in households: northern_ireland male 75-90 | 66,338 | 66,326 | -0.019 |
-| people in work | 33,618,000 | 33,617,864 | -0.000 |
+| people in households: northern_ireland female 35-49 | 190,423 | 190,433 | +0.005 |
+| people in households: northern_ireland female 50-64 | 188,641 | 188,623 | -0.010 |
+| people in households: northern_ireland female 65-74 | 93,168 | 93,170 | +0.002 |
+| people in households: northern_ireland female 75-90 | 86,232 | 86,229 | -0.003 |
+| people in households: northern_ireland male 0-15 | 193,226 | 193,219 | -0.003 |
+| people in households: northern_ireland male 16-24 | 98,277 | 98,272 | -0.005 |
+| people in households: northern_ireland male 25-34 | 117,355 | 117,348 | -0.006 |
+| people in households: northern_ireland male 35-49 | 179,330 | 179,334 | +0.002 |
+| people in households: northern_ireland male 50-64 | 180,900 | 180,887 | -0.007 |
+| people in households: northern_ireland male 65-74 | 88,826 | 88,826 | +0.000 |
+| people in households: northern_ireland male 75-90 | 66,338 | 66,349 | +0.016 |
+| people in work: north_east | 1,217,152 | 1,217,131 | -0.002 |
+| people in work: north_west | 3,517,781 | 3,517,787 | +0.000 |
+| people in work: yorkshire | 2,642,876 | 2,642,862 | -0.001 |
+| people in work: east_midlands | 2,408,895 | 2,408,919 | +0.001 |
+| people in work: west_midlands | 2,885,021 | 2,884,911 | -0.004 |
+| people in work: east | 3,185,737 | 3,185,820 | +0.003 |
+| people in work: london | 4,966,669 | 4,966,746 | +0.002 |
+| people in work: south_east | 4,779,627 | 4,779,451 | -0.004 |
+| people in work: south_west | 2,857,368 | 2,857,379 | +0.000 |
+| people in work: wales | 1,491,133 | 1,491,107 | -0.002 |
+| people in work: scotland | 2,728,795 | 2,728,777 | -0.001 |
+| people in work: northern_ireland | 936,946 | 936,909 | -0.004 |
