@@ -177,6 +177,6 @@ roadmap; the notes here record what has changed since it was written.
 | Data licences not confirmed | S0 | Owner's check before S3; see the table above |
 | No benchmark on real hardware | S0 | Owner runs the bundled benchmark at M2.0 |
 | Python module not built | S1 | Built in S3, when calibration needs it |
-| No overflow checks in the S0 benchmark | S0 | The engine has them; re-measure with the engine when rule depth grows in S4 |
+| No overflow checks in the S0 benchmark | S0 | Done in S4.4: with overflow checks and the 2024-25 rules, 100,000 households take 68 ms a month (`models/uk/households/README.md`) |
 | Saves break when any model file changes | S1 | Acceptable until S7, which adds migration |
-| Engine timings are for shallow rules only | S1 | Re-measure at S4 |
+| Engine timings are for shallow rules only | S1 | Done in S4.4: the UK model with 20,000 households takes about 15 ms a month, with 100,000 about 68 ms, on a four-core server |

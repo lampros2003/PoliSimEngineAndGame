@@ -238,6 +238,28 @@ class Households(unittest.TestCase):
         self.assertGreater(cut[0]["disposable_income"], base[0]["disposable_income"])
         self.assertGreater(cut[1]["consumption"], base[1]["consumption"])
 
+    def test_the_base_month_keeps_the_base_weights(self):
+        with open(UK / "households" / "households.csv", newline="", encoding="utf-8") as handle:
+            base = sum(int(r["weight"]) for r in csv.DictReader(handle))
+        self.assertEqual(run()[0]["households_total"], base)
+
+    def test_people_in_work_follow_the_economys_employment(self):
+        # Stage S4.4: raked each month from the second, the households' workers are the
+        # economy's employment, to within rounding of the weights.
+        for row in run()[1:]:
+            self.assertLess(abs(row["workers_in_households"] / row["employment"] - 1), 1e-4, row["step"])
+
+    def test_households_grow_with_the_population(self):
+        rows = run()
+        households = rows[-1]["households_total"] / rows[0]["households_total"] - 1
+        people = rows[-1]["population_total"] / rows[0]["population_total"] - 1
+        self.assertGreater(households, 0)
+        self.assertLess(abs(households - people), 0.01)
+
+    def test_without_alignment_the_weights_stay(self):
+        rows = Simulation(model(), seed=SEED, levers={"align_households": False}).run(2)
+        self.assertEqual(rows[0]["households_total"], rows[1]["households_total"])
+
     def test_the_average_rate_levers_are_gone(self):
         names = set(model().symbols)
         self.assertNotIn("income_tax_rate", names)

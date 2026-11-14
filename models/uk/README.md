@@ -129,9 +129,14 @@ policy keeps their real value. The economy reads them back:
   benefits" lever holds the rest.
 
 So the player's tax levers are the real ones: the personal allowance, every rate and
-threshold, Child Benefit and Universal Credit amounts, grouped in the policy panel. The
-households' pay and employment do not yet follow the economy's employment (only its pay
-level), and their weights do not change: S4.4.
+threshold, Child Benefit and Universal Credit amounts, grouped in the policy panel.
+
+From the second month the households' weights are raked each month (stage S4.4) so that
+they match households by type, people in households by region, sex and age band (the
+cohort table above, times the base year's share living in households), and people in work
+(the economy's employment). So the households age with the population, and when
+employment falls, households without work count for more: Universal Credit rises and
+income tax falls with it. Their pay follows the economy's pay per worker.
 
 ## Known weaknesses
 

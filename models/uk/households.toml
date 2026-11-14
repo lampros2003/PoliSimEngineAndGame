@@ -3,7 +3,7 @@
 [entity.household]
 data = "households/households.csv"
 id = "id"
-weight = "weight"
+weight = { state = "household_weight" }
 
 [entity.household.columns.region_code]
 type = "int"
@@ -30,7 +30,32 @@ doc = "Decile of equivalised gross income in the base year, 1 to 10"
 type = "int"
 unit = "1"
 
+[entity.household.columns.girls]
+doc = "Girls under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.boys]
+doc = "Boys under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_girls]
+doc = "Girls aged 16 or 17"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_boys]
+doc = "Boys aged 16 or 17"
+type = "int"
+unit = "1"
+
 [entity.household.columns.age1]
+type = "int"
+unit = "1"
+
+[entity.household.columns.sex1]
+doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 
@@ -50,6 +75,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.sex2]
+doc = "0 for female, 1 for male, -1 for no such adult"
+type = "int"
+unit = "1"
+
 [entity.household.columns.earnings2]
 type = "money"
 unit = "GBP/year/household"
@@ -66,6 +96,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.sex3]
+doc = "0 for female, 1 for male, -1 for no such adult"
+type = "int"
+unit = "1"
+
 [entity.household.columns.earnings3]
 type = "money"
 unit = "GBP/year/household"
@@ -79,6 +114,11 @@ type = "bool"
 unit = "1"
 
 [entity.household.columns.age4]
+type = "int"
+unit = "1"
+
+[entity.household.columns.sex4]
+doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 
@@ -983,3 +1023,140 @@ unit = "GBP/month/household"
 phase = "income"
 dims = ["region"]
 expr = "wsum_by(household, net_income, region, region_code) / wcount_by(household, true, region, region_code)"
+
+# ------------------------------------------------------------------ alignment (stage S4.4)
+# Each month from the second, the households' weights are raked so that they match
+# households by type, people in households by region, sex and age band (the cohort table,
+# times the base year's share living in households), and people in work (the economy's
+# employment, times the base month's ratio). People in work come last, so they match
+# exactly: the households' employment follows the economy.
+
+[dim.age_band]
+members = ["under_16", "age_16_24", "age_25_34", "age_35_49", "age_50_64", "age_65_74", "age_75_plus"]
+labels = ["Under 16", "16 to 24", "25 to 34", "35 to 49", "50 to 64", "65 to 74", "75 and over"]
+
+[dim.nation]
+doc = "One member: the margin of the rake that is a national total"
+members = ["uk"]
+
+[param.person_each]
+doc = "One person per household: turns a count of people in a household into people"
+type = "int"
+unit = "person/household"
+value = 1
+
+[param.band_of_age]
+type = "int"
+unit = "1"
+dims = ["age"]
+data = "households/age_bands.csv"
+
+[param.in_households_share]
+doc = "People in households as a share of the population, by region, sex and age band, in the base year"
+type = "real"
+unit = "1"
+dims = ["region", "sex", "age_band"]
+data = "households/alignment.csv"
+
+[param.households_by_type_base]
+doc = "Households by type in the base year"
+type = "real"
+unit = "household"
+dims = ["household_type"]
+data = "households/household_types.csv"
+
+[param.people_in_households_base]
+type = "real"
+unit = "person"
+value = 67361069.0
+
+[param.workers_share]
+doc = "People in work in the households against the economy's employment, in the base month"
+type = "real"
+unit = "1"
+value = 0.9999959545481587
+
+[lever.align_households]
+label = "Keep the households in line with the population and employment"
+type = "bool"
+default = true
+player = false
+
+[state.alignment_months]
+doc = "Months run. The households are first realigned in the second month, so the base month is the base year's"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = 0
+next = "alignment_months + 1"
+
+[var.people_in_households_target]
+label = "People in households, by region, sex and age band"
+type = "real"
+unit = "person"
+phase = "alignment"
+dims = ["region", "sex", "age_band"]
+expr = "in_households_share * sum(select(band_of_age == coord(age_band), population, 0.0), age)"
+
+[var.households_by_type_target]
+label = "Households by type"
+type = "real"
+unit = "household"
+phase = "alignment"
+dims = ["household_type"]
+expr = "households_by_type_base * sum(people_in_households_target, region, sex, age_band) / people_in_households_base"
+
+[var.workers_target]
+label = "People in work in the households"
+type = "real"
+unit = "person"
+phase = "alignment"
+dims = ["nation"]
+expr = "workers_share * (private_employment + public_employment)"
+
+[state.household_weight]
+label = "Household weight"
+entity = "household"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = { column = "weight" }
+
+[state.household_weight.rake]
+when = "align_households and alignment_months >= 1"
+passes = 10
+
+[[state.household_weight.rake.margin]]
+target = "households_by_type_target"
+slots = [{ count = "1", at = ["type"] }]
+
+[[state.household_weight.rake.margin]]
+target = "people_in_households_target"
+slots = [
+  { count = "select(adults >= 1, person_each, 0)", at = ["region_code", "max(sex1, 0)", "band_of_age[age: max(age1, 0)]"] },
+  { count = "select(adults >= 2, person_each, 0)", at = ["region_code", "max(sex2, 0)", "band_of_age[age: max(age2, 0)]"] },
+  { count = "select(adults >= 3, person_each, 0)", at = ["region_code", "max(sex3, 0)", "band_of_age[age: max(age3, 0)]"] },
+  { count = "select(adults >= 4, person_each, 0)", at = ["region_code", "max(sex4, 0)", "band_of_age[age: max(age4, 0)]"] },
+  { count = "girls * person_each", at = ["region_code", "0", "0"] },
+  { count = "boys * person_each", at = ["region_code", "1", "0"] },
+  { count = "older_girls * person_each", at = ["region_code", "0", "1"] },
+  { count = "older_boys * person_each", at = ["region_code", "1", "1"] },
+]
+
+[[state.household_weight.rake.margin]]
+target = "workers_target"
+slots = [{ count = "(select(earnings1 > 0, 1, 0) + select(earnings2 > 0, 1, 0) + select(earnings3 > 0, 1, 0) + select(earnings4 > 0, 1, 0)) * person_each", at = ["0"] }]
+
+[var.households_total]
+label = "Households"
+type = "int"
+unit = "household"
+phase = "income"
+expr = "wcount(household, true)"
+
+[var.workers_in_households]
+label = "People in work, in the households"
+type = "int"
+unit = "person"
+phase = "income"
+expr = "wsum(household, (select(earnings1 > 0, 1, 0) + select(earnings2 > 0, 1, 0) + select(earnings3 > 0, 1, 0) + select(earnings4 > 0, 1, 0)) * person_each)"

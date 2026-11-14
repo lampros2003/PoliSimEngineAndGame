@@ -48,6 +48,37 @@ Deciles are fixed in the base year: a household keeps its decile when its income
 so the panel compares the same households before and after a policy. The client shows the
 three breakdowns in its "Who gains, who loses" panel (`docs/spec/05-game-client.md`).
 
+## Kept in line with the population and employment
+
+Inside the national model (`models/uk/households.toml`) the weights are a state, raked
+each month from the second (`docs/spec/06-model-format-1.md`, "Weights that change") to
+three margins, in this order:
+
+1. households by type: the base year's numbers, grown with people in households;
+2. people in households by region, sex and age band (under 16, 16 to 24, 25 to 34, 35 to
+   49, 50 to 64, 65 to 74, 75 and over): the cohort table's people in each cell times the
+   base year's share of them living in households (`alignment.csv`); four slots for the
+   adults and four for children by sex, under 16 and 16 or 17;
+3. people in work: the economy's employment times the base month's ratio, so the
+   households' employment follows the economy's exactly.
+
+In the base month the targets equal the weighted records, so nothing moves until the
+population or employment does. Ten passes a month keep every margin close: after ten years
+people by region, sex and age band are within 0.08% of their targets, households by type
+within 0.15%, people in work within rounding (`crates/core/tests/uk_long_run.rs`). The
+lever `align_households` (not offered to the player) turns it off.
+
+The records do not age: alignment changes how many households each record stands for,
+not the record. A household's decile is fixed in the base year.
+
+## How many households
+
+20,000. `python tools/uk/bench_households.py --records 100000` builds 100,000 the same way
+and times the UK model with them: 68 ms a month on a four-core 2.1 GHz server (13 ms for
+the rake, 54 ms for the rules), against S4.4's limit of 100 ms. The model stays at 20,000
+until the rules are complete (the roadmap's order), because the oracle, which every test
+compares the engine with, takes five times longer with 100,000.
+
 ## First month against published totals (a year)
 
 | | Households | Published | Note |
@@ -66,5 +97,6 @@ is the first two adults of a couple household, or the first adult otherwise. A f
 counts as born before April 2017 when the youngest child is seven or older. There are no
 rents, so no housing element; no savings or investment income; no disability benefits;
 everyone entitled to Universal Credit claims it. In the national model
-(`models/uk/households.toml`) the records' pay follows the economy's pay level and the
-thresholds rise with prices; their employment and weights do not change yet (S4.4).
+(`models/uk/households.toml`) the records' pay follows the economy's pay level, the
+thresholds rise with prices, and the weights follow the population and employment
+(above).

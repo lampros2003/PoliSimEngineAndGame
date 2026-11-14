@@ -45,7 +45,32 @@ doc = "Decile of equivalised gross income in the base year, 1 to 10"
 type = "int"
 unit = "1"
 
+[entity.household.columns.girls]
+doc = "Girls under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.boys]
+doc = "Boys under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_girls]
+doc = "Girls aged 16 or 17"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_boys]
+doc = "Boys aged 16 or 17"
+type = "int"
+unit = "1"
+
 [entity.household.columns.age1]
+type = "int"
+unit = "1"
+
+[entity.household.columns.sex1]
+doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 
@@ -65,6 +90,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.sex2]
+doc = "0 for female, 1 for male, -1 for no such adult"
+type = "int"
+unit = "1"
+
 [entity.household.columns.earnings2]
 type = "money"
 unit = "GBP/year/household"
@@ -81,6 +111,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.sex3]
+doc = "0 for female, 1 for male, -1 for no such adult"
+type = "int"
+unit = "1"
+
 [entity.household.columns.earnings3]
 type = "money"
 unit = "GBP/year/household"
@@ -94,6 +129,11 @@ type = "bool"
 unit = "1"
 
 [entity.household.columns.age4]
+type = "int"
+unit = "1"
+
+[entity.household.columns.sex4]
+doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 

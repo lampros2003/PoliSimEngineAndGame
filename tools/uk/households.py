@@ -1,6 +1,7 @@
 """Synthetic UK households (stage S4.1).
 
     python tools/uk/households.py            build models/uk/households/ from cached tables
+    python tools/uk/households.py --records 100000 --out DIR      a larger set elsewhere
 
 Builds 20,000 household records from published tables only (all ONS, Open Government
 Licence v3.0), which `python tools/uk/pipeline.py fetch households2025 ashe3 ashe6`
@@ -337,7 +338,14 @@ def solve(a, b):
     return out
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    global RECORDS, OUT
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--records", type=int, default=RECORDS)
+    parser.add_argument("--out", type=Path, default=OUT)
+    args = parser.parse_args(argv)
+    RECORDS, OUT = args.records, args.out
     pop, counts, people_in_households = load_targets()
     pay_region, pay_age = load_pay()
     rng = random.Random(SEED)
@@ -393,7 +401,7 @@ def main() -> int:
     columns = ["id", "weight", "region_code", "type", "adults", "children", "youngest_child"]
     columns += [f"{f}{i}" for i in range(1, 5) for f in ("age", "sex")]
     columns += [f"{f}{i}" for f in ("earnings", "self_employed", "pension") for i in range(1, 5)]
-    columns += ["income_decile"]
+    columns += ["income_decile", "girls", "boys", "older_girls", "older_boys"]
     deciles = income_deciles(records, whole)
     writer.writerow(columns)
     for r, w in zip(records, whole):
@@ -414,6 +422,11 @@ def main() -> int:
                 else:
                     cells.append(fmt.format(p[field]) if p else "0.00")
         cells.append(deciles[r["id"]])
+        # Children by sex, under 16 and 16 or 17 (the age bands of the targets above), so
+        # that the national model can keep the weights in line with the population.
+        children = r["people"][r["adults"]:]
+        for lo, hi, sex in ((0, 15, "female"), (0, 15, "male"), (16, 17, "female"), (16, 17, "male")):
+            cells.append(sum(1 for p in children if lo <= p["age"] <= hi and p["sex"] == sex))
         writer.writerow(cells)
     (OUT / "households.csv").write_text(buffer.getvalue(), encoding="utf-8", newline="\n")
 

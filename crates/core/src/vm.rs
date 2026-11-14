@@ -8,6 +8,7 @@
 use crate::model::Entity;
 use crate::program::{Agg, AggBy, AggKind, Cmp, Col, Op, Program, Rounding, Src, SubKind, Ty, Val};
 use crate::rng::uniform;
+use rayon::prelude::*;
 
 /// Records per block. Stage S0 measured 64 to 1,024 as equally good.
 pub const BLOCK: usize = 256;
@@ -281,6 +282,45 @@ pub fn eval_scalar(prog: &Program, cx: &EvalCtx) -> Check<Val> {
 pub fn eval_column(prog: &Program, entity: usize, cx: &EvalCtx) -> Check<Col> {
     let prepared = prepare(prog, cx)?;
     let count = cx.entities[entity].ids.len();
+    let task = BLOCK * TASK_BLOCKS;
+    if count <= task {
+        return eval_range(prog, cx, entity, 0, count, &prepared);
+    }
+    // Records are independent, so tasks of whole blocks run on several threads and give
+    // what one thread would; the parts are joined in record order, and the first error in
+    // record order is the one reported, as if the blocks had run one after another.
+    let starts: Vec<usize> = (0..count).step_by(task).collect();
+    let parts: Vec<Check<Col>> =
+        starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), &prepared)).collect();
+    let mut out = match prog.ty {
+        Ty::Int => Col::I(Vec::with_capacity(count)),
+        Ty::Real => Col::F(Vec::with_capacity(count)),
+        Ty::Bool => Col::B(Vec::with_capacity(count)),
+    };
+    for part in parts {
+        match (&mut out, part?) {
+            (Col::I(v), Col::I(p)) => v.extend_from_slice(&p),
+            (Col::F(v), Col::F(p)) => v.extend_from_slice(&p),
+            (Col::B(v), Col::B(p)) => v.extend_from_slice(&p),
+            _ => unreachable!("every part has the program's type"),
+        }
+    }
+    Ok(out)
+}
+
+/// Blocks per parallel task (4,096 records): smaller sets of records run on one thread.
+const TASK_BLOCKS: usize = 16;
+
+/// Records `start..end` of one entity, block after block.
+fn eval_range(
+    prog: &Program,
+    cx: &EvalCtx,
+    entity: usize,
+    start: usize,
+    end: usize,
+    prepared: &Prepared,
+) -> Check<Col> {
+    let count = end - start;
     let mut regs = Regs::new(prog, BLOCK.min(count.max(1)));
     let r = prog.result as usize;
     let mut out = match prog.ty {
@@ -288,16 +328,16 @@ pub fn eval_column(prog: &Program, entity: usize, cx: &EvalCtx) -> Check<Col> {
         Ty::Real => Col::F(Vec::with_capacity(count)),
         Ty::Bool => Col::B(Vec::with_capacity(count)),
     };
-    let mut start = 0;
-    while start < count {
-        let len = BLOCK.min(count - start);
-        run_block(prog, cx, Some(entity), start, len, &mut regs, &prepared)?;
+    let mut at = start;
+    while at < end {
+        let len = BLOCK.min(end - at);
+        run_block(prog, cx, Some(entity), at, len, &mut regs, prepared)?;
         match &mut out {
             Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
             Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
             Col::B(v) => v.extend_from_slice(&regs.b[r][..len]),
         }
-        start += len;
+        at += len;
     }
     Ok(out)
 }

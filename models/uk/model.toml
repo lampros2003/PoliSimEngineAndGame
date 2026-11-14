@@ -20,7 +20,7 @@ title = "United Kingdom"
 currency = "GBP"
 minor_units = 100
 step = "month"
-phases = ["labour", "income", "spending", "finance", "accounts"]
+phases = ["labour", "alignment", "income", "spending", "finance", "accounts"]
 files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml"]
 
 [sector.households]

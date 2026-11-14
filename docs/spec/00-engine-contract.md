@@ -139,6 +139,12 @@ The second rule forbids vectorised or threaded real sums. It is acceptable becau
 that matter are whole numbers. If profiling shows real sums matter, a fixed blocked order
 will replace it in a later format version.
 
+Since stage S4.4 the engine evaluates a record-level formula over large entities on
+several threads, each thread taking whole blocks of records; records are independent, so
+every value is what one thread would compute, the parts are joined in record order, and
+the error reported is the first in record order. Sums still run in record order on one
+thread.
+
 ## 9. State hash
 
 SHA-256 over the following bytes:

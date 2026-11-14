@@ -30,6 +30,7 @@ April 2017 when the youngest child is seven or older.
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +83,26 @@ unit = "1"
 
 [entity.household.columns.income_decile]
 doc = "Decile of equivalised gross income in the base year, 1 to 10"
+type = "int"
+unit = "1"
+
+[entity.household.columns.girls]
+doc = "Girls under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.boys]
+doc = "Boys under 16"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_girls]
+doc = "Girls aged 16 or 17"
+type = "int"
+unit = "1"
+
+[entity.household.columns.older_boys]
+doc = "Boys aged 16 or 17"
 type = "int"
 unit = "1"
 '''
@@ -160,7 +181,206 @@ doc = "{doc}"
     return out
 
 
-def build(integrated: bool, pay_base: str = "") -> tuple[str, str]:
+# The rake's age bands: those the households were calibrated to (tools/uk/households.py).
+AGE_BANDS = [("under_16", "Under 16", 0, 15), ("age_16_24", "16 to 24", 16, 24), ("age_25_34", "25 to 34", 25, 34),
+             ("age_35_49", "35 to 49", 35, 49), ("age_50_64", "50 to 64", 50, 64), ("age_65_74", "65 to 74", 65, 74),
+             ("age_75_plus", "75 and over", 75, 90)]
+REGIONS = ["north_east", "north_west", "yorkshire", "east_midlands", "west_midlands", "east", "london", "south_east",
+           "south_west", "wales", "scotland", "northern_ireland"]
+SEXES = ["female", "male"]
+TYPES = ["one_under_65", "one_65_plus", "unrelated_adults", "couple_no_children", "couple_one_or_two",
+         "couple_three_plus", "couple_grown_children", "lone_parent", "lone_parent_grown", "multi_family"]
+
+
+def band(age: int) -> int:
+    return next(k for k, (_, _, lo, hi) in enumerate(AGE_BANDS) if lo <= age <= hi)
+
+
+def write_alignment(folder: Path, employment_base: float, source: Path | None = None) -> dict[str, float]:
+    """Data for keeping the households in line with the population and employment (stage
+    S4.4), from the records and the mid-2024 population: people in households as a share of
+    everyone, by region, sex and age band; households by type; and people in work against
+    the economy's employment. In the base month the targets equal the weighted records, so
+    the households only move as the population and employment move."""
+    with open(source or OUT / "households.csv", newline="", encoding="utf-8") as handle:
+        records = list(csv.DictReader(handle))
+    people: dict[tuple[int, int, int], float] = {}
+    types = [0] * len(TYPES)
+    workers = 0
+    for r in records:
+        w, region = int(r["weight"]), int(r["region_code"])
+        types[int(r["type"])] += w
+        for i in range(1, ADULTS + 1):
+            if int(r["adults"]) >= i:
+                key = (region, int(r[f"sex{i}"]), band(int(r[f"age{i}"])))
+                people[key] = people.get(key, 0) + w
+                workers += w * (float(r[f"earnings{i}"]) > 0)
+        for column, sex, b in (("girls", 0, 0), ("boys", 1, 0), ("older_girls", 0, 1), ("older_boys", 1, 1)):
+            key = (region, sex, b)
+            people[key] = people.get(key, 0) + w * int(r[column])
+    population: dict[tuple[int, int, int], int] = {}
+    with open(ROOT / "models" / "uk" / "data" / "population.csv", newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            key = (REGIONS.index(row["region"]), SEXES.index(row["sex"]), band(int(row["age"])))
+            population[key] = population.get(key, 0) + int(row["people"])
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def write(name: str, header: str, lines: list[str]) -> None:
+        (folder / name).write_text(header + "\n" + "\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    write("alignment.csv", "region,sex,age_band,value",
+          [f"{REGIONS[r]},{SEXES[s]},{AGE_BANDS[b][0]},{people.get((r, s, b), 0) / population[(r, s, b)]!r}"
+           for r in range(len(REGIONS)) for s in range(2) for b in range(len(AGE_BANDS))])
+    write("household_types.csv", "household_type,value", [f"{t},{n}" for t, n in zip(TYPES, types)])
+    write("age_bands.csv", "age,value", [f"{a},{band(a)}" for a in range(91)])
+    return {"people_base": float(sum(people.values())), "workers_share": workers / employment_base}
+
+
+def alignment_rules(values: dict[str, float]) -> str:
+    """The rake that keeps the households in line with the population and employment."""
+    adults = ",\n".join(
+        f'  {{ count = "select(adults >= {i}, person_each, 0)", at = ["region_code", "max(sex{i}, 0)", '
+        f'"band_of_age[age: max(age{i}, 0)]"] }}' for i in range(1, ADULTS + 1))
+    children = ",\n".join(
+        f'  {{ count = "{c} * person_each", at = ["region_code", "{s}", "{b}"] }}'
+        for c, s, b in (("girls", 0, 0), ("boys", 1, 0), ("older_girls", 0, 1), ("older_boys", 1, 1)))
+    workers = " + ".join(f"select(earnings{i} > 0, 1, 0)" for i in range(1, ADULTS + 1))
+    members = ", ".join(f'"{b[0]}"' for b in AGE_BANDS)
+    labels = ", ".join(f'"{b[1]}"' for b in AGE_BANDS)
+    return f'''
+# ------------------------------------------------------------------ alignment (stage S4.4)
+# Each month from the second, the households' weights are raked so that they match
+# households by type, people in households by region, sex and age band (the cohort table,
+# times the base year's share living in households), and people in work (the economy's
+# employment, times the base month's ratio). People in work come last, so they match
+# exactly: the households' employment follows the economy.
+
+[dim.age_band]
+members = [{members}]
+labels = [{labels}]
+
+[dim.nation]
+doc = "One member: the margin of the rake that is a national total"
+members = ["uk"]
+
+[param.person_each]
+doc = "One person per household: turns a count of people in a household into people"
+type = "int"
+unit = "person/household"
+value = 1
+
+[param.band_of_age]
+type = "int"
+unit = "1"
+dims = ["age"]
+data = "households/age_bands.csv"
+
+[param.in_households_share]
+doc = "People in households as a share of the population, by region, sex and age band, in the base year"
+type = "real"
+unit = "1"
+dims = ["region", "sex", "age_band"]
+data = "households/alignment.csv"
+
+[param.households_by_type_base]
+doc = "Households by type in the base year"
+type = "real"
+unit = "household"
+dims = ["household_type"]
+data = "households/household_types.csv"
+
+[param.people_in_households_base]
+type = "real"
+unit = "person"
+value = {values["people_base"]!r}
+
+[param.workers_share]
+doc = "People in work in the households against the economy's employment, in the base month"
+type = "real"
+unit = "1"
+value = {values["workers_share"]!r}
+
+[lever.align_households]
+label = "Keep the households in line with the population and employment"
+type = "bool"
+default = true
+player = false
+
+[state.alignment_months]
+doc = "Months run. The households are first realigned in the second month, so the base month is the base year's"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = 0
+next = "alignment_months + 1"
+
+[var.people_in_households_target]
+label = "People in households, by region, sex and age band"
+type = "real"
+unit = "person"
+phase = "alignment"
+dims = ["region", "sex", "age_band"]
+expr = "in_households_share * sum(select(band_of_age == coord(age_band), population, 0.0), age)"
+
+[var.households_by_type_target]
+label = "Households by type"
+type = "real"
+unit = "household"
+phase = "alignment"
+dims = ["household_type"]
+expr = "households_by_type_base * sum(people_in_households_target, region, sex, age_band) / people_in_households_base"
+
+[var.workers_target]
+label = "People in work in the households"
+type = "real"
+unit = "person"
+phase = "alignment"
+dims = ["nation"]
+expr = "workers_share * (private_employment + public_employment)"
+
+[state.household_weight]
+label = "Household weight"
+entity = "household"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = {{ column = "weight" }}
+
+[state.household_weight.rake]
+when = "align_households and alignment_months >= 1"
+passes = 10
+
+[[state.household_weight.rake.margin]]
+target = "households_by_type_target"
+slots = [{{ count = "1", at = ["type"] }}]
+
+[[state.household_weight.rake.margin]]
+target = "people_in_households_target"
+slots = [
+{adults},
+{children},
+]
+
+[[state.household_weight.rake.margin]]
+target = "workers_target"
+slots = [{{ count = "({workers}) * person_each", at = ["0"] }}]
+
+[var.households_total]
+label = "Households"
+type = "int"
+unit = "household"
+phase = "income"
+expr = "wcount(household, true)"
+
+[var.workers_in_households]
+label = "People in work, in the households"
+type = "int"
+unit = "person"
+phase = "income"
+expr = "wsum(household, ({workers}) * person_each)"
+'''
+
+
+def build(integrated: bool, pay_base: str = "", alignment: dict[str, float] | None = None) -> tuple[str, str]:
     """The model file (standalone only) and the rules. Inside the UK model the rules run in
     its income phase, household pay is uprated by the national pay index and pensions by the
     trend index, and the region dimension and the model header come from the UK model."""
@@ -171,9 +391,16 @@ def build(integrated: bool, pay_base: str = "") -> tuple[str, str]:
         policy means thresholds and benefits keep their real value)."""
         return f"round({name} * price_index)" if integrated else name
     model = ENTITY.format(data="households/households.csv" if integrated else "households.csv")
+    if integrated and alignment is not None:
+        model = model.replace('weight = "weight"', 'weight = { state = "household_weight" }')
     for i in range(1, ADULTS + 1):
         model += f'''
 [entity.household.columns.age{i}]
+type = "int"
+unit = "1"
+
+[entity.household.columns.sex{i}]
+doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 '''
@@ -376,6 +603,8 @@ phase = "{tp}"
 dims = ["{dim}"]
 expr = "wsum_by(household, net_income, {dim}, {key}) / wcount_by(household, true, {dim}, {key})"
 '''
+    if integrated and alignment is not None:
+        rules += alignment_rules(alignment)
     return (None if integrated else MODEL + model), rules
 
 

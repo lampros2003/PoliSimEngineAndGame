@@ -286,7 +286,10 @@ def household_base() -> dict[str, float]:
             "benefits": row["child_benefit_total"] + row["universal_credit_total"]}
 
 
-def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | None = None) -> SimpleNamespace:
+def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | None = None,
+                households: Path | None = None) -> SimpleNamespace:
+    """Writes the UK model for a base year into `out_dir`. `households` is the folder whose
+    households.csv the model uses (default models/uk/households)."""
     a = a if a is not None else load_assumptions()
     v = derive(year, data, a)
     # The people, industries and households start from 2024 data, so only a 2024 base year
@@ -449,11 +452,12 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         if sys_path_tools not in sys.path:
             sys.path.insert(0, sys_path_tools)
         import make_rules
-        (out_dir / "households.toml").write_text(make_rules.build(True, opening["private_pay_per_worker"])[1],
-                                                 encoding="utf-8", newline="\n")
-        (out_dir / "households").mkdir(parents=True, exist_ok=True)
-        if (out_dir / "households").resolve() != (ROOT / "models" / "uk" / "households").resolve():
-            source = ROOT / "models" / "uk" / "households" / "households.csv"
+        source = (households or ROOT / "models" / "uk" / "households") / "households.csv"
+        alignment = make_rules.write_alignment(out_dir / "households",
+                                               float(v.private_employment + v.public_employment), source)
+        (out_dir / "households.toml").write_text(
+            make_rules.build(True, opening["private_pay_per_worker"], alignment)[1], encoding="utf-8", newline="\n")
+        if (out_dir / "households" / "households.csv").resolve() != source.resolve():
             (out_dir / "households" / "households.csv").write_bytes(source.read_bytes())
     fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income)" if people
                                 else "round(income_tax_rate * (wages + public_pay + benefits + other_income))")
@@ -479,8 +483,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--base-year", default=DEFAULT_BASE)
     parser.add_argument("--out", type=Path, default=ROOT / "models" / "uk")
+    parser.add_argument("--households", type=Path, help="folder of households.csv (default models/uk/households)")
     args = parser.parse_args()
-    v = write_model(args.base_year, args.out)
+    v = write_model(args.base_year, args.out, households=args.households)
     print(f"{v.year} accounts the first month reproduces (x12), £bn a year:")
     for label, value in [("Household consumption", v.consumption), ("Disposable income", v.disposable_income),
                          ("Public current receipts", v.receipts), ("Public net borrowing", v.borrowing),

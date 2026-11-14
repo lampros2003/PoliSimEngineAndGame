@@ -10,6 +10,7 @@
 //!
 //! After any error the simulation is in an undefined state and must be discarded.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -98,6 +99,15 @@ pub struct Simulation {
     rakes: Vec<Option<RakeProg>>,
 }
 
+/// A margin's pairs grouped by cell: cell `c` holds `records[offsets[c]..offsets[c + 1]]`
+/// with their counts, records ascending and slots in order within a record.
+#[derive(Clone)]
+struct Pairs {
+    offsets: Vec<usize>,
+    records: Vec<u32>,
+    counts: Vec<f64>,
+}
+
 /// Format 1 (S4.4): a compiled rake (docs/spec/06-model-format-1.md).
 struct RakeProg {
     when: Program,
@@ -107,6 +117,10 @@ struct RakeProg {
 
 struct MarginProg {
     target: usize,
+    /// Every slot formula reads only data columns and parameters (no `prev`, random draw
+    /// or aggregate), so its pairs are the same in every step: they are built once.
+    constant: bool,
+    cache: std::sync::OnceLock<Pairs>,
     /// (first member, size, stride) per dimension of the target.
     dims: Vec<(i64, usize, usize)>,
     cells: usize,
@@ -593,81 +607,36 @@ impl Simulation {
                     crate::pyfmt::float_repr(*x)
                 ));
             }
-            let mut counts = Vec::with_capacity(margin.slots.len());
-            let mut ats = Vec::with_capacity(margin.slots.len());
-            for (count_prog, at_progs) in &margin.slots {
-                let column = vm::eval_column(count_prog, entity, &cx).map_err(named)?;
-                let Col::F(column) = column else { unreachable!("counts are compiled as reals") };
-                counts.push(column);
-                let mut columns = Vec::with_capacity(at_progs.len());
-                for prog in at_progs {
-                    let Col::I(column) = vm::eval_column(prog, entity, &cx).map_err(named)? else {
-                        unreachable!("members are whole numbers")
-                    };
-                    columns.push(column);
+            let pairs: Cow<Pairs> = if margin.constant {
+                match margin.cache.get() {
+                    Some(pairs) => Cow::Borrowed(pairs),
+                    None => {
+                        let pairs = self.rake_pairs(margin, entity, count, &cx, &what)?;
+                        Cow::Borrowed(margin.cache.get_or_init(|| pairs))
+                    }
                 }
-                ats.push(columns);
-            }
-            let mut cell_of: Vec<(usize, usize, f64)> = Vec::new(); // (cell, record, count)
-            for r in 0..count {
-                for (slot, column) in counts.iter().enumerate() {
-                    let c = column[r];
-                    if !c.is_finite() || c < 0.0 {
-                        return sim_err(format!(
-                            "{what}: a record's count is {}, not a finite number of at least 0",
-                            crate::pyfmt::float_repr(c)
-                        ));
-                    }
-                    if c == 0.0 {
-                        continue;
-                    }
-                    let mut flat = 0usize;
-                    for (k, &(first, size, stride)) in margin.dims.iter().enumerate() {
-                        let v = ats[slot][k][r];
-                        let pos = v.checked_sub(first).filter(|p| (0..size as i64).contains(p));
-                        let Some(pos) = pos else {
-                            let dim = &self.model.dims[self.model.symbols[margin.target].dims[k]].name;
-                            return sim_err(format!("{what}: a record's member {v} is not in {dim}"));
-                        };
-                        flat += pos as usize * stride;
-                    }
-                    cell_of.push((flat, r, c));
-                }
-            }
-            // Group by cell, keeping the order within each cell (a stable counting sort).
-            let mut offsets = vec![0usize; margin.cells + 1];
-            for &(cell, _, _) in &cell_of {
-                offsets[cell + 1] += 1;
-            }
-            for k in 0..margin.cells {
-                offsets[k + 1] += offsets[k];
-            }
-            let mut fill = offsets.clone();
-            let mut records = vec![0usize; cell_of.len()];
-            let mut weights = vec![0.0f64; cell_of.len()];
-            for &(cell, r, c) in &cell_of {
-                records[fill[cell]] = r;
-                weights[fill[cell]] = c;
-                fill[cell] += 1;
-            }
-            prepared.push((target, offsets, records, weights));
+            } else {
+                Cow::Owned(self.rake_pairs(margin, entity, count, &cx, &what)?)
+            };
+            prepared.push((target, pairs));
         }
         let mut v: Vec<f64> = current.iter().map(|w| *w as f64).collect();
         for _ in 0..rake.passes {
-            for (target, offsets, records, counts) in &prepared {
+            for (target, pairs) in &prepared {
+                let Pairs { offsets, records, counts } = pairs.as_ref();
                 for cell in 0..target.len() {
                     let range = offsets[cell]..offsets[cell + 1];
                     let mut total = 0.0f64;
                     for k in range.clone() {
-                        total += v[records[k]] * counts[k];
+                        total += v[records[k] as usize] * counts[k];
                     }
                     let goal = target[cell];
                     if total > 0.0 && goal > 0.0 {
                         let f = goal / total;
-                        let mut last = usize::MAX;
+                        let mut last = u32::MAX;
                         for &r in &records[range] {
                             if r != last {
-                                v[r] *= f;
+                                v[r as usize] *= f;
                                 last = r;
                             }
                         }
@@ -687,6 +656,70 @@ impl Simulation {
             out.push((w as i64).max(1));
         }
         Ok(Computed::Each(Col::I(out)))
+    }
+
+    /// A margin's pairs: its slots' `count` and `at` evaluated for every record, checked,
+    /// and grouped by cell, records ascending and slots in order within a record.
+    fn rake_pairs(&self, margin: &MarginProg, entity: usize, count: usize, cx: &EvalCtx, what: &str) -> Result<Pairs> {
+        let named = |message: String| Error::Sim(format!("{what}: {message}"));
+        let mut counts = Vec::with_capacity(margin.slots.len());
+        let mut ats = Vec::with_capacity(margin.slots.len());
+        for (count_prog, at_progs) in &margin.slots {
+            let column = vm::eval_column(count_prog, entity, cx).map_err(named)?;
+            let Col::F(column) = column else { unreachable!("counts are compiled as reals") };
+            counts.push(column);
+            let mut columns = Vec::with_capacity(at_progs.len());
+            for prog in at_progs {
+                let Col::I(column) = vm::eval_column(prog, entity, cx).map_err(named)? else {
+                    unreachable!("members are whole numbers")
+                };
+                columns.push(column);
+            }
+            ats.push(columns);
+        }
+        let mut cell_of: Vec<(usize, usize, f64)> = Vec::new(); // (cell, record, count)
+        for r in 0..count {
+            for (slot, column) in counts.iter().enumerate() {
+                let c = column[r];
+                if !c.is_finite() || c < 0.0 {
+                    return sim_err(format!(
+                        "{what}: a record's count is {}, not a finite number of at least 0",
+                        crate::pyfmt::float_repr(c)
+                    ));
+                }
+                if c == 0.0 {
+                    continue;
+                }
+                let mut flat = 0usize;
+                for (k, &(first, size, stride)) in margin.dims.iter().enumerate() {
+                    let v = ats[slot][k][r];
+                    let pos = v.checked_sub(first).filter(|p| (0..size as i64).contains(p));
+                    let Some(pos) = pos else {
+                        let dim = &self.model.dims[self.model.symbols[margin.target].dims[k]].name;
+                        return sim_err(format!("{what}: a record's member {v} is not in {dim}"));
+                    };
+                    flat += pos as usize * stride;
+                }
+                cell_of.push((flat, r, c));
+            }
+        }
+        // Group by cell, keeping the order within each cell (a stable counting sort).
+        let mut offsets = vec![0usize; margin.cells + 1];
+        for &(cell, _, _) in &cell_of {
+            offsets[cell + 1] += 1;
+        }
+        for k in 0..margin.cells {
+            offsets[k + 1] += offsets[k];
+        }
+        let mut fill = offsets.clone();
+        let mut records = vec![0u32; cell_of.len()];
+        let mut weights = vec![0.0f64; cell_of.len()];
+        for &(cell, r, c) in &cell_of {
+            records[fill[cell]] = r as u32;
+            weights[fill[cell]] = c;
+            fill[cell] += 1;
+        }
+        Ok(Pairs { offsets, records, counts: weights })
     }
 
     fn compute(&self, id: usize) -> Result<Computed> {
@@ -1220,6 +1253,13 @@ fn compile_rake(m: &Model, d: &Decl) -> Result<(RakeProg, Vec<usize>, Vec<usize>
         dims.reverse();
         let per_record = crate::units::div(&Some(t.unit.clone()), &Some(Unit::base(&m.entities[entity].name)));
         let mut slots = Vec::with_capacity(margin.slots.len());
+        let mut constant = true;
+        let mut take = |c: crate::program::Compiled| {
+            constant &= c.lagged.is_empty()
+                && c.deps.iter().all(|d| matches!(m.symbols[*d].kind, Kind::Param | Kind::Column))
+                && fixed_program(&c.prog);
+            take(c)
+        };
         for slot in &margin.slots {
             let count = take(compile_formula(
                 m,
@@ -1237,10 +1277,21 @@ fn compile_rake(m: &Model, d: &Decl) -> Result<(RakeProg, Vec<usize>, Vec<usize>
             }
             slots.push((count, ats));
         }
-        margins.push(MarginProg { target, dims, cells: stride, slots });
+        margins.push(MarginProg { target, constant, cache: std::sync::OnceLock::new(), dims, cells: stride, slots });
     }
     deps.extend(margins.iter().map(|m| m.target));
     Ok((RakeProg { when, passes: rake.passes, margins }, deps.into_iter().collect(), lagged.into_iter().collect()))
+}
+
+/// A program whose result depends on nothing but what it names: no random draws, no
+/// aggregates over records (whose weights change), no tables.
+fn fixed_program(prog: &Program) -> bool {
+    use crate::program::Op;
+    prog.aggs.is_empty()
+        && prog.aggs_by.is_empty()
+        && prog.tables.is_empty()
+        && prog.subs.iter().all(|s| fixed_program(&s.prog))
+        && !prog.ops.iter().any(|op| matches!(op, Op::Rand(..)))
 }
 
 fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
