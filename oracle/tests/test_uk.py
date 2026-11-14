@@ -144,6 +144,21 @@ class Presets(unittest.TestCase):
         for preset in ("low", "central", "high"):
             self.assertEqual(len(run(3, preset)), 3)
 
+    def test_every_preset_reproduces_the_base_month(self):
+        # Stage S6.0: the presets differ in how the economy and the voters move, not in where
+        # they start: consumption, GDP, unemployment and the polls of the first month agree.
+        central = run(3, "central")[0]
+        for preset in ("low", "high"):
+            first = run(3, preset)[0]
+            for name in ("consumption", "gdp"):
+                self.assertLess(abs(first[name] / central[name] - 1), 1e-6, (preset, name))
+            for name in ("unemployment_rate", "government_support", "turnout"):
+                self.assertAlmostEqual(first[name], central[name], places=9, msg=(preset, name))
+
+    def test_the_presets_spread_the_outcomes(self):
+        # Higher world demand, productivity and labour force growth in the high preset.
+        self.assertLess(run(3, "low")[-1]["gdp"], run(3, "high")[-1]["gdp"])
+
 
 class Population(unittest.TestCase):
     """The people block (S3.6): ONS's mid-2024 population by region, sex and age, moved on

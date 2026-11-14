@@ -52,11 +52,12 @@ data = "politics/voter_types.csv"
 column = "voter_age"
 
 [param.option_intercept]
-doc = "Fitted so that the base month reproduces the 2024 general election in every region"
+doc = "Fitted, preset by preset, so that the base month reproduces the 2024 general election in every region"
 type = "real"
 unit = "1"
 dims = ["region", "option"]
 data = "politics/intercepts.csv"
+columns = { low = "low", central = "central", high = "high" }
 
 [param.option_age_effect]
 doc = "Assumed: turnout rises with age; the young lean centre-left and green, the old centre-right and populist right"
@@ -69,25 +70,33 @@ data = "politics/age_effects.csv"
 doc = "On the governing blocs' utility, per unit of proportional change in a voter type's real household income"
 type = "real"
 unit = "1"
-value = 2.5
+low = 1.25
+central = 2.5
+high = 3.75
 
 [param.vote_unemployment_effect]
 doc = "On the governing blocs' utility, per unit of unemployment rate above its level at the last election"
 type = "real"
 unit = "1"
-value = -6.0
+low = -3.0
+central = -6.0
+high = -9.0
 
 [param.vote_inflation_effect]
 doc = "On the governing blocs' utility, per unit of annual inflation above its level at the last election"
 type = "real"
 unit = "1"
-value = -3.0
+low = -1.5
+central = -3.0
+high = -4.5
 
 [param.vote_tenure_effect]
 doc = "On the governing blocs' utility, per year in office"
 type = "real"
 unit = "1"
-value = -0.025
+low = -0.0125
+central = -0.025
+high = -0.05
 
 [state.governing]
 label = "In government"

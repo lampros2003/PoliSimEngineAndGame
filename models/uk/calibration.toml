@@ -189,15 +189,17 @@ doc = "Inventories, valuables and the gap between the model's and the published 
 [param.spend_out_of_income]
 type = "real"
 unit = "1"
-low = 0.867188338629
+low = 0.921609160807
 central = 0.897188338629
-high = 0.927188338629
+high = 0.872767516451
 doc = "Share of disposable income households spend each month"
 
 [param.spend_out_of_savings]
 type = "real"
 unit = "1/month"
-value = 0.004
+low = 0.002
+central = 0.004
+high = 0.006
 doc = "Share of money holdings households spend each month"
 
 [param.bank_payout_ratio]
@@ -221,25 +223,33 @@ doc = "Share of new gilts bought abroad"
 [param.hiring_speed]
 type = "real"
 unit = "1"
-value = 0.25
+low = 0.15
+central = 0.25
+high = 0.4
 doc = "Share of the employment gap firms close each month"
 
 [param.labour_force_growth]
 type = "real"
 unit = "1"
-value = 0.000498630248
+low = 0.000249656907
+central = 0.000498630248
+high = 0.000746923923
 doc = "Monthly growth of the labour force"
 
 [param.productivity_growth]
 type = "real"
 unit = "1"
-value = 0.000829538114
+low = 0.000415714845
+central = 0.000829538114
+high = 0.001241487716
 doc = "Monthly growth of output per worker"
 
 [param.world_growth]
 type = "real"
 unit = "1"
-value = 0.002870898719
+low = 0.00205983627
+central = 0.002870898719
+high = 0.0036748094
 doc = "Monthly growth of world demand for exports, nominal"
 
 [param.inflation_target]
@@ -251,19 +261,25 @@ doc = "Monthly inflation at the natural rate of unemployment"
 [param.natural_unemployment]
 type = "real"
 unit = "1"
-value = 0.045
+low = 0.04
+central = 0.045
+high = 0.05
 doc = "Unemployment rate at which inflation is on target"
 
 [param.phillips_slope]
 type = "real"
 unit = "1"
-value = 0.041666666667
+low = 0.020833333333
+central = 0.041666666667
+high = 0.0625
 doc = "Monthly inflation added per point of unemployment below the natural rate"
 
 [param.wage_curve]
 type = "real"
 unit = "1"
-value = 0.083333333333
+low = 0.041666666667
+central = 0.083333333333
+high = 0.125
 doc = "Monthly growth of pay beyond prices and productivity per point of unemployment below the natural rate"
 
 [param.gilt_yield]
@@ -295,13 +311,17 @@ doc = "Firms' usual cash holdings, in months of sales (their 2024 ratio)"
 [param.loan_adjustment]
 type = "real"
 unit = "1"
-value = 1.0
+low = 0.5
+central = 1.0
+high = 1.0
 doc = "Share of firms' cash shortfall (or surplus) met by new borrowing (or repayment) each month"
 
 [param.payout_sensitivity]
 type = "real"
 unit = "1"
-value = 0.5
+low = 0.25
+central = 0.5
+high = 0.75
 doc = "How strongly firms' payouts respond to cash above or below its usual level"
 
 # Opening values (end of 2024), filled into model.toml and economy.toml

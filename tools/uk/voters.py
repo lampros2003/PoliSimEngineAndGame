@@ -63,10 +63,12 @@ ASSUMPTIONS = {
     # half a point to the government's share among it; a point of unemployment since the
     # last election takes off about a point and a half; a point of inflation above the last
     # election's, under a point; each year in office about half a point.
-    "income_effect": 2.5,  # per unit of proportional change in real household income
-    "unemployment_effect": -6.0,  # per unit of unemployment rate
-    "inflation_effect": -3.0,  # per unit of annual inflation
-    "tenure_effect": -0.025,  # per year in office
+    # Stage S6.0: { low, central, high } for the presets and screening; low is the weaker
+    # effect. The literature's estimates of economic voting vary by about half either way.
+    "income_effect": {"low": 1.25, "central": 2.5, "high": 3.75},  # per unit of change in real household income
+    "unemployment_effect": {"low": -3.0, "central": -6.0, "high": -9.0},  # per unit of unemployment rate
+    "inflation_effect": {"low": -1.5, "central": -3.0, "high": -4.5},  # per unit of annual inflation
+    "tenure_effect": {"low": -0.0125, "central": -0.025, "high": -0.05},  # per year in office
     "months_in_office": 6,  # the government took office in July 2024; the model starts in January 2025
     "governing": ["centre_left"],
     # Stage S5.3. Positions on a left (-1) to right (+1) axis, for forming governments and
@@ -116,13 +118,14 @@ def election_targets() -> list[list[float]]:
     return [[v / electorate[r] for v in votes[r]] + [1 - valid[r] / electorate[r]] for r in range(len(REGIONS))]
 
 
-def fit(voters: list[float], targets: list[list[float]]) -> tuple[list[list[float]], float]:
+def fit(voters: list[float], targets: list[list[float]], preset: str = "central") -> tuple[list[list[float]], float]:
     """Regional intercepts by iterative scaling, so that each region's predicted shares of
-    its adults equal its targets. Options with no votes in a region get -30 (a share of
-    about 1e-13). Returns the intercepts and the largest error left."""
+    its adults equal its targets under a preset's time-in-office effect. Options with no
+    votes in a region get -30 (a share of about 1e-13). Returns the intercepts and the
+    largest error left."""
     a = ASSUMPTIONS
     gov = [1.0 if b in a["governing"] else 0.0 for b in OPTIONS]
-    base = a["tenure_effect"] * a["months_in_office"] / 12  # the fundamentals in the base month
+    base = a["tenure_effect"][preset] * a["months_in_office"] / 12  # the fundamentals in the base month
     types = voter_types()
     alpha = [[(math.log(t) if t > 0 else -30.0) for t in targets[r]] for r in range(len(REGIONS))]
     worst = 1.0
@@ -155,14 +158,16 @@ def write(out_dir: Path, households: Path) -> tuple[str, float]:
     folder = out_dir / "politics"
     folder.mkdir(parents=True, exist_ok=True)
     voters = base_voters(households)
-    alpha, worst = fit(voters, election_targets())
+    fitted = {p: fit(voters, election_targets(), p) for p in ("low", "central", "high")}
+    worst = max(w for _, w in fitted.values())
 
     def table(name: str, header: str, lines: list[str]) -> None:
         (folder / name).write_text(header + "\n" + "\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     table("voter_types.csv", "voter_type,region,voter_age,quintile,in_work",
           [f"{t},{r},{a},{q},{w}" for t, (r, a, q, w) in enumerate(voter_types())])
-    table("intercepts.csv", "region,option,value",
-          [f"{REGIONS[r]},{o},{alpha[r][k]!r}" for r in range(len(REGIONS)) for k, o in enumerate(OPTIONS)])
+    table("intercepts.csv", "region,option,low,central,high",
+          [f"{REGIONS[r]},{o}," + ",".join(repr(fitted[p][0][r][k]) for p in ("low", "central", "high"))
+           for r in range(len(REGIONS)) for k, o in enumerate(OPTIONS)])
     table("age_effects.csv", "voter_age,option,value",
           [f"{AGES[g][0]},{o},{ASSUMPTIONS['age_effect'][o][g]!r}" for g in range(len(AGES)) for o in OPTIONS])
     table("voter_ages.csv", "age,value", [f"{age},{age_band(age)}" for age in range(91)])
@@ -269,11 +274,12 @@ data = "politics/voter_types.csv"
 column = "voter_age"
 
 [param.option_intercept]
-doc = "Fitted so that the base month reproduces the 2024 general election in every region"
+doc = "Fitted, preset by preset, so that the base month reproduces the 2024 general election in every region"
 type = "real"
 unit = "1"
 dims = ["region", "option"]
 data = "politics/intercepts.csv"
+columns = {{ low = "low", central = "central", high = "high" }}
 
 [param.option_age_effect]
 doc = "Assumed: turnout rises with age; the young lean centre-left and green, the old centre-right and populist right"
@@ -286,25 +292,33 @@ data = "politics/age_effects.csv"
 doc = "On the governing blocs' utility, per unit of proportional change in a voter type's real household income"
 type = "real"
 unit = "1"
-value = {a["income_effect"]!r}
+low = {a["income_effect"]["low"]!r}
+central = {a["income_effect"]["central"]!r}
+high = {a["income_effect"]["high"]!r}
 
 [param.vote_unemployment_effect]
 doc = "On the governing blocs' utility, per unit of unemployment rate above its level at the last election"
 type = "real"
 unit = "1"
-value = {a["unemployment_effect"]!r}
+low = {a["unemployment_effect"]["low"]!r}
+central = {a["unemployment_effect"]["central"]!r}
+high = {a["unemployment_effect"]["high"]!r}
 
 [param.vote_inflation_effect]
 doc = "On the governing blocs' utility, per unit of annual inflation above its level at the last election"
 type = "real"
 unit = "1"
-value = {a["inflation_effect"]!r}
+low = {a["inflation_effect"]["low"]!r}
+central = {a["inflation_effect"]["central"]!r}
+high = {a["inflation_effect"]["high"]!r}
 
 [param.vote_tenure_effect]
 doc = "On the governing blocs' utility, per year in office"
 type = "real"
 unit = "1"
-value = {a["tenure_effect"]!r}
+low = {a["tenure_effect"]["low"]!r}
+central = {a["tenure_effect"]["central"]!r}
+high = {a["tenure_effect"]["high"]!r}
 
 [state.governing]
 label = "In government"

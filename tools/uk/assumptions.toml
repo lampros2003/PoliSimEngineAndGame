@@ -18,27 +18,35 @@ firm_bank_loans = 500_000
 gilts_held_abroad = 0.27
 
 [behaviour]
+# Stage S6.0: a table { low, central, high } gives a parameter a range for the model's
+# presets and for sensitivity screening (tools/uk/screen.py). Central is the calibration;
+# low and high are judgements of a plausible range, stated with each, unless a source is
+# named. Every preset reproduces the base month.
+
 # Households spend this share of their money holdings each month on top of spending out
 # of income (about 5% a year): the wealth effect. The share of income spent is then
-# derived so that 2024 consumption is reproduced.
-spend_out_of_savings = 0.004
+# derived, preset by preset, so that 2024 consumption is reproduced. Range: 2.5% to 7.5%
+# a year.
+spend_out_of_savings = { low = 0.002, central = 0.004, high = 0.006 }
 # Speed at which firms close the gap between the employment they have and the employment
-# their sales justify, per month.
-hiring_speed = 0.25
-# Annual growth of the working-age labour force (about 0.6% a year recently).
-labour_force_growth_annual = 0.006
-# Annual trend growth of output per worker and of world demand for UK exports, nominal.
-productivity_growth_annual = 0.01
-world_demand_growth_annual = 0.035
+# their sales justify, per month. Range: half the gap closed in one to four months.
+hiring_speed = { low = 0.15, central = 0.25, high = 0.4 }
+# Annual growth of the working-age labour force (about 0.6% a year recently; ONS's
+# projections differ mostly in migration). Range: 0.3% to 0.9%.
+labour_force_growth_annual = { low = 0.003, central = 0.006, high = 0.009 }
+# Annual trend growth of output per worker (about 1% a year since 2008, 2% before) and of
+# world demand for UK exports, nominal. Ranges: 0.5% to 1.5%; 2.5% to 4.5%.
+productivity_growth_annual = { low = 0.005, central = 0.01, high = 0.015 }
+world_demand_growth_annual = { low = 0.025, central = 0.035, high = 0.045 }
 # Inflation when unemployment is at its natural rate, and how much one point of
 # unemployment below that rate adds to annual inflation.
 inflation_target_annual = 0.02
-natural_unemployment = 0.045
-phillips_slope = 0.5
+natural_unemployment = { low = 0.04, central = 0.045, high = 0.05 }
+phillips_slope = { low = 0.25, central = 0.5, high = 0.75 }
 # Pay grows faster than prices and productivity when unemployment is below its natural
 # rate, slower when above: this much a year per point of the gap. It is what stops
 # employment running ahead of (or behind) the labour force.
-wage_curve = 1.0
+wage_curve = { low = 0.5, central = 1.0, high = 1.5 }
 # The government pays this market rate on new gilts; the average rate on its debt moves
 # toward it as old gilts mature (average maturity about 14 years in the UK).
 gilt_yield = { low = 0.035, central = 0.042, high = 0.05 }
@@ -46,10 +54,10 @@ average_maturity_years = 14
 # Firms pay out more (dividends, self-employment income) when their cash is above its
 # usual share of sales and less when below. 1.0 means a 10% cash surplus raises payouts
 # by 10%.
-payout_sensitivity = 0.5
+payout_sensitivity = { low = 0.25, central = 0.5, high = 0.75 }
 # Firms borrow (or repay) this share of the gap between their cash and its usual level
 # each month. 1.0 keeps cash at its usual level, as a firm with a credit line would.
-loan_adjustment = 1.0
+loan_adjustment = { low = 0.5, central = 1.0, high = 1.0 }
 # Benefits that rise with unemployment, per unemployed person, £ a month (2024 prices).
 # The rest of social benefits (pensions above all) is set by policy, not by the cycle.
 benefit_per_unemployed = 450

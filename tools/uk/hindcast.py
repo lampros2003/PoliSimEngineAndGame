@@ -94,7 +94,7 @@ def run(model_dir: Path, behaviour: bool, follow_prices: bool) -> list[dict]:
     """One hindcast run; returns the monthly result rows from January 2005. With
     `follow_prices`, prices and private pay follow the published figures."""
     data = calibrate.load_data()
-    a = calibrate.load_assumptions()
+    a = calibrate.pick(calibrate.load_assumptions(), "central")
     model = load_model(model_dir)
     # Exogenous indices do not depend on anything the inputs change, so one plain run
     # gives the trend and world indices each month reads (their start-of-month values).

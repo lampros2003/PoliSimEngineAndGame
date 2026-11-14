@@ -286,12 +286,28 @@ def household_base() -> dict[str, float]:
             "benefits": row["child_benefit_total"] + row["universal_credit_total"]}
 
 
+PRESETS = ("low", "central", "high")
+
+
+def pick(a: dict, preset: str) -> dict:
+    """The assumptions with each behavioural range ({low, central, high}) at one preset;
+    the gilt yield keeps its table, which the model carries as presets."""
+    out = dict(a)
+    out["behaviour"] = {k: (v[preset] if isinstance(v, dict) and k != "gilt_yield" else v)
+                        for k, v in a["behaviour"].items()}
+    return out
+
+
 def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | None = None,
                 households: Path | None = None) -> SimpleNamespace:
     """Writes the UK model for a base year into `out_dir`. `households` is the folder whose
     households.csv the model uses (default models/uk/households)."""
-    a = a if a is not None else load_assumptions()
+    ranges = a if a is not None else load_assumptions()
+    a = pick(ranges, "central")
     v = derive(year, data, a)
+    # Stage S6.0: each preset derives its own share of income spent, so that every preset
+    # reproduces the base month.
+    by_preset = {p: derive(year, data, pick(ranges, p)) for p in PRESETS}
     # The people, industries and households start from 2024 data, so only a 2024 base year
     # has them.
     people = year == STOCKS_YEAR
@@ -400,32 +416,39 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
           doc="Household investment in dwellings as a share of disposable income")
     param("gdp_adjustment_share", r12(v.gdp_adjustment_share), "1",
           doc="Inventories, valuables and the gap between the model's and the published GDP, as a share of sales")
-    param("spend_out_of_income", {"low": r12(v.income_share - Fraction(3, 100)), "central": r12(v.income_share),
-                                  "high": r12(v.income_share + Fraction(3, 100))}, "1",
+    param("spend_out_of_income", {p: r12(by_preset[p].income_share) for p in PRESETS}, "1",
           doc="Share of disposable income households spend each month")
-    param("spend_out_of_savings", r12(v.wealth_share), "1/month", doc="Share of money holdings households spend each month")
+    param("spend_out_of_savings", {p: r12(by_preset[p].wealth_share) for p in PRESETS}, "1/month",
+          doc="Share of money holdings households spend each month")
     param("bank_payout_ratio", r12(v.payout_ratio), "1", doc="Share of gilt interest financial corporations pass on to households")
     param("exports_base", monthly(v.exports), "GBP/month", "money", "Exports in the first month")
     param("gilts_abroad_share", r12(v.abroad), "1", doc="Share of new gilts bought abroad")
-    param("hiring_speed", r12(be["hiring_speed"]), "1", doc="Share of the employment gap firms close each month")
-    param("labour_force_growth", r12(growth(be["labour_force_growth_annual"])), "1", doc="Monthly growth of the labour force")
-    param("productivity_growth", r12(growth(be["productivity_growth_annual"])), "1", doc="Monthly growth of output per worker")
-    param("world_growth", r12(growth(be["world_demand_growth_annual"])), "1", doc="Monthly growth of world demand for exports, nominal")
+
+    def ranged(name, convert=lambda x: x):
+        """A behavioural value, or its presets when the assumptions give a range."""
+        raw = ranges["behaviour"][name]
+        if isinstance(raw, dict):
+            return {p: r12(convert(raw[p])) for p in PRESETS}
+        return r12(convert(raw))
+    param("hiring_speed", ranged("hiring_speed"), "1", doc="Share of the employment gap firms close each month")
+    param("labour_force_growth", ranged("labour_force_growth_annual", growth), "1", doc="Monthly growth of the labour force")
+    param("productivity_growth", ranged("productivity_growth_annual", growth), "1", doc="Monthly growth of output per worker")
+    param("world_growth", ranged("world_demand_growth_annual", growth), "1", doc="Monthly growth of world demand for exports, nominal")
     param("inflation_target", r12(growth(be["inflation_target_annual"])), "1",
           doc="Monthly inflation at the natural rate of unemployment")
-    param("natural_unemployment", r12(be["natural_unemployment"]), "1", doc="Unemployment rate at which inflation is on target")
-    param("phillips_slope", r12(be["phillips_slope"] / MONTHS), "1",
+    param("natural_unemployment", ranged("natural_unemployment"), "1", doc="Unemployment rate at which inflation is on target")
+    param("phillips_slope", ranged("phillips_slope", lambda x: x / MONTHS), "1",
           doc="Monthly inflation added per point of unemployment below the natural rate")
-    param("wage_curve", r12(be["wage_curve"] / MONTHS), "1",
+    param("wage_curve", ranged("wage_curve", lambda x: x / MONTHS), "1",
           doc="Monthly growth of pay beyond prices and productivity per point of unemployment below the natural rate")
     param("gilt_yield", {k: r12(val) for k, val in be["gilt_yield"].items()}, "1", doc="Annual interest rate on newly issued gilts")
     param("maturity_months", r12(be["average_maturity_years"] * MONTHS), "1", doc="Average maturity of gilts, in months")
     param("interest_months", "12.0", "month", doc="Months over which an annual interest rate accrues")
     param("cash_target_months", r12(v.stocks["firm_deposits"] / (pd / MONTHS)), "month",
           doc=f"Firms' usual cash holdings, in months of sales (their {year} ratio)")
-    param("loan_adjustment", r12(be["loan_adjustment"]), "1",
+    param("loan_adjustment", ranged("loan_adjustment"), "1",
           doc="Share of firms' cash shortfall (or surplus) met by new borrowing (or repayment) each month")
-    param("payout_sensitivity", r12(be["payout_sensitivity"]), "1",
+    param("payout_sensitivity", ranged("payout_sensitivity"), "1",
           doc="How strongly firms' payouts respond to cash above or below its usual level")
 
     out.append(f"# Opening values (end of {year}), filled into model.toml and economy.toml")
