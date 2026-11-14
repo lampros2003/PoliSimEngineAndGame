@@ -72,7 +72,7 @@ enum EventData {
     Failed(String),
     Explained { name: String, result: Result<Box<Explanation>, String> },
     Saved { path: String, error: Option<String> },
-    Loaded { migration: Option<Migration>, error: Option<String> },
+    Loaded { migration: Option<Migration>, missing_mods: Vec<String>, error: Option<String> },
     Reloaded { reset: Vec<String>, error: Option<String> },
 }
 
@@ -107,6 +107,25 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
         failed: failed.clone(),
         cells,
     }
+}
+
+/// Stage S7.1: a scenario file as the start screen lists it, if it has a `[play] title`.
+fn scenario_entry(path: &std::path::Path) -> Option<VarDictionary> {
+    let doc: polisim_core::RawTable = std::fs::read_to_string(path).ok()?.parse().ok()?;
+    let play = doc.get("play")?.as_table()?;
+    let title = play.get("title")?.as_str()?;
+    let model = doc.get("scenario")?.as_table()?.get("model")?.as_str()?;
+    let manifest = path.parent()?.join(model).join("model.toml");
+    let head: polisim_core::RawTable = std::fs::read_to_string(manifest).ok()?.parse().ok()?;
+    let id = head.get("model")?.as_table()?.get("id")?.as_str()?;
+    let mut d = VarDictionary::new();
+    d.set("path", path.to_string_lossy().as_ref());
+    d.set("title", title);
+    d.set("country", play.get("country").and_then(|c| c.as_str()).unwrap_or(title));
+    d.set("start", play.get("start").and_then(|c| c.as_str()).unwrap_or(""));
+    d.set("summary", play.get("summary").and_then(|c| c.as_str()).unwrap_or(""));
+    d.set("model", id);
+    Some(d)
 }
 
 fn model_info(session: &Session) -> ModelInfo {
@@ -165,9 +184,15 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                         session = next;
                         failed = None;
                         let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
-                        Some(EventData::Loaded { migration: session.migration().cloned(), error: None })
+                        Some(EventData::Loaded {
+                            migration: session.migration().cloned(),
+                            missing_mods: session.missing_mods().to_vec(),
+                            error: None,
+                        })
                     }
-                    Err(message) => Some(EventData::Loaded { migration: None, error: Some(message) }),
+                    Err(message) => {
+                        Some(EventData::Loaded { migration: None, missing_mods: Vec::new(), error: Some(message) })
+                    }
                 }
             }
             Request::Reload => match session.reload() {
@@ -394,9 +419,10 @@ fn event_dict(event: EventData) -> VarDictionary {
             d.set("path", path.as_str());
             d.set("error", error.unwrap_or_default().as_str());
         }
-        EventData::Loaded { migration, error } => {
+        EventData::Loaded { migration, missing_mods, error } => {
             d.set("kind", "loaded");
             d.set("error", error.unwrap_or_default().as_str());
+            d.set("missing_mods", &strings(&missing_mods));
             // Stage S7.0: a save made with other model files, and what loading it did.
             d.set("migrated", migration.is_some());
             let m = migration.unwrap_or_default();
@@ -487,9 +513,17 @@ impl PoliSim {
     /// Starts a new game from a scenario file. Returns an error message, or "" on success.
     #[func]
     fn open(&mut self, scenario_path: GString) -> GString {
+        self.open_with_mods(scenario_path, PackedStringArray::new())
+    }
+
+    /// Stage S7.1: starts a game with mods the player chose (folders), after the scenario's
+    /// own. Returns "" or the reason it could not start.
+    #[func]
+    fn open_with_mods(&mut self, scenario_path: GString, mods: PackedStringArray) -> GString {
         self.close();
         let path = PathBuf::from(scenario_path.to_string());
-        let session = match Session::open(&path) {
+        let mods: Vec<PathBuf> = mods.as_slice().iter().map(|m| PathBuf::from(m.to_string())).collect();
+        let session = match Session::open_with_mods(&path, &mods) {
             Ok(s) => s,
             Err(e) => return e.to_string().as_str().into(),
         };
@@ -624,6 +658,89 @@ impl PoliSim {
     #[func]
     fn engine_version(&self) -> GString {
         polisim_core::VERSION.into()
+    }
+
+    /// Stage S7.1: the scenarios a player can start under `base`
+    /// (`base/models/*/scenarios/*.toml` with a `[play] title`), each as path, title,
+    /// country, start and the id of its model, ordered by path.
+    #[func]
+    fn scenarios(&self, base: GString) -> VarArray {
+        let mut found = Vec::new();
+        let models = PathBuf::from(base.to_string()).join("models");
+        for model in std::fs::read_dir(&models).into_iter().flatten().flatten() {
+            for file in std::fs::read_dir(model.path().join("scenarios")).into_iter().flatten().flatten() {
+                let path = file.path();
+                if path.extension().is_some_and(|e| e == "toml")
+                    && let Some(entry) = scenario_entry(&path)
+                {
+                    found.push((path, entry));
+                }
+            }
+        }
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        found.into_iter().map(|(_, entry)| entry.to_variant()).collect()
+    }
+
+    /// Stage S7.1: the mods in these folders (each mod a folder with `mod.toml`), as path,
+    /// id, name, version, description and model; a mod whose `mod.toml` cannot be read is
+    /// listed with its error.
+    #[func]
+    fn mods(&self, folders: PackedStringArray) -> VarArray {
+        let mut found = Vec::new();
+        for folder in folders.as_slice() {
+            for dir in std::fs::read_dir(folder.to_string()).into_iter().flatten().flatten() {
+                let dir = dir.path();
+                if !dir.join("mod.toml").is_file() {
+                    continue;
+                }
+                let mut d = VarDictionary::new();
+                d.set("path", dir.to_string_lossy().as_ref());
+                match polisim_core::read_mod(&dir) {
+                    Ok((info, _, _)) => {
+                        d.set("id", info.id.as_str());
+                        d.set("name", info.name.as_str());
+                        d.set("version", info.version.as_str());
+                        d.set("description", info.description.as_str());
+                        d.set("model", info.model.as_deref().unwrap_or(""));
+                        d.set("error", "");
+                    }
+                    Err(e) => {
+                        let name = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        d.set("id", name.as_str());
+                        d.set("name", name.as_str());
+                        d.set("error", e.to_string().as_str());
+                    }
+                }
+                found.push((dir, d));
+            }
+        }
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        found.into_iter().map(|(_, d)| d.to_variant()).collect()
+    }
+
+    /// Stage S7.1: the mods this game runs with, in order, as id, name, version and the
+    /// notes their loading made.
+    #[func]
+    fn active_mods(&self) -> VarArray {
+        let Some(model) = &self.model else { return VarArray::new() };
+        model
+            .mods
+            .iter()
+            .map(|m| {
+                let mut d = VarDictionary::new();
+                d.set("id", m.id.as_str());
+                d.set("name", m.name.as_str());
+                d.set("version", m.version.as_str());
+                d.to_variant()
+            })
+            .collect()
+    }
+
+    /// Stage S7.1: what loading the mods is worth telling the player.
+    #[func]
+    fn mod_notes(&self) -> PackedStringArray {
+        let Some(model) = &self.model else { return PackedStringArray::new() };
+        strings(&model.mod_notes)
     }
 
     #[func]

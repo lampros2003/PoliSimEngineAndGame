@@ -1,0 +1,11 @@
+# A test of the example mod (mods/wealth_tax): a 1% wealth tax from the first month.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 12
+preset = "central"
+mods = ["../../../mods/wealth_tax"]
+
+[levers]
+wealth_tax_rate = 0.01

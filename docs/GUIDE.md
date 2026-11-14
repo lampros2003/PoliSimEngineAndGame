@@ -7,14 +7,16 @@ from the published figures for 2024. The first general election is due in July 2
 office and the game is over.
 
 The test build also has Valmora, the small invented country the client was first built
-on: start it with `PoliSim Valmora.bat`.
+on, and an example mod, a wealth tax for the UK.
 
 ## Starting
 
 On Windows, unpack the download and run `PoliSim.bat`. Windows may warn that the
 publisher is unknown, because the build is not signed: choose "More info", then "Run
-anyway". The game opens at the start of January 2025. **Help** in the top bar repeats the
-essentials.
+anyway". The start screen offers the United Kingdom and Valmora, and the mods there are
+for the country you pick: tick any you want and choose **New game**, or **Continue saved
+game**. The UK opens at the start of January 2025. **Help** in the top bar repeats the
+essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 
 ## The screen
 
@@ -69,6 +71,14 @@ election, and how long the government has been in office.
 **Save** keeps one saved game, including its charts. **Load** returns to it. A game
 saved with older model files still loads: it carries on with the current model, and the
 game says what was carried over and what started again.
+
+## Mods
+
+A mod adds to the model or changes it: the example, "A wealth tax", adds a lever in its
+own group, a tax in the budget and a reaction among the richest voters. Mods live in the
+game's `mods` folder and in your own, which the start screen names. A saved game remembers
+its mods. To make one, see `docs/MODDING.md` in the repository: it builds the wealth tax
+step by step.
 
 ## Changing the model while playing
 

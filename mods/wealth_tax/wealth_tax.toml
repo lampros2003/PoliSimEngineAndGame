@@ -1,0 +1,47 @@
+# A wealth tax for the United Kingdom. Every name this mod adds starts with its id,
+# "wealth_tax_"; the [patch] tables change two of the model's own formulas.
+
+[lever.wealth_tax_rate]
+label = "Wealth tax rate"
+group = "Wealth tax"
+type = "real"
+unit = "1"
+default = 0.0
+range = [0.0, 0.05]
+leaning = "left"
+doc = "A yearly tax on households' savings above the threshold, as a share of them"
+
+[param.wealth_tax_share_above]
+doc = "The share of households' deposits held above the threshold (a judgement: savings are concentrated among the richest households)"
+type = "real"
+unit = "1"
+value = 0.4
+
+[param.wealth_tax_aversion]
+doc = "How strongly the richest fifth of voters hold the tax against the government: utility lost per unit of tax rate (a judgement: a 1% tax weighs about as much as a 2% fall in their income)"
+type = "real"
+unit = "1"
+value = 5.0
+
+[flow.wealth_tax_paid]
+label = "Wealth tax"
+from = "households"
+to = "government"
+phase = "spending"
+expr = "round(wealth_tax_rate / 12.0 * wealth_tax_share_above * per_step(household_money))"
+
+[var.wealth_tax_richest]
+doc = "1 for voter types in the richest fifth of households, 0 for the rest (voter types run by region, age band, income quintile and work, work fastest)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "select(floor(coord(voter_type) / 2.0) - 5.0 * floor(coord(voter_type) / 10.0) == 4.0, 1.0, 0.0)"
+
+# The tax is a public receipt, so the budget balance counts it.
+[patch.var.public_receipts]
+expr = "{base} + wealth_tax_paid"
+
+# The richest fifth think less of the government for it.
+[patch.var.voter_fundamentals]
+expr = "{base} - wealth_tax_aversion * wealth_tax_rate * wealth_tax_richest"

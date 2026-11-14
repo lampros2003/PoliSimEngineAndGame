@@ -8,7 +8,9 @@
 //! Session file, all integers little-endian, text as a `u16` length plus UTF-8:
 //!
 //! ```text
-//! "PSIMSESS"   format u32 (0)
+//! "PSIMSESS"   format u32 (3)
+//! mods         version 3: u32 count; each mod the player chose beyond the scenario's own,
+//!              as its folder (text)
 //! engine save  u64 length + bytes (see save.rs)
 //! commands     u32 count; step u64, lever text, raw value
 //! changes      u32 count; step u64, lever text, value
@@ -30,7 +32,7 @@ use toml::Value;
 use crate::describe::Catalogue;
 use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
-use crate::model::{Kind, Model, Scenario, load_model, load_scenario};
+use crate::model::{Kind, Model, Scenario, load_model_with_mods, load_scenario_with_mods};
 use crate::program::{Col, Val};
 use crate::save::Migration;
 use crate::sim::Simulation;
@@ -39,7 +41,7 @@ const MAGIC: &[u8; 8] = b"PSIMSESS";
 /// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them);
 /// 2 adds each policy change's vote in the legislature (S5.4; older games count every
 /// change as passed).
-const SAVE_VERSION: u32 = 2;
+const SAVE_VERSION: u32 = 3;
 
 /// A lever change that has taken effect.
 #[derive(Clone, Debug, PartialEq)]
@@ -123,16 +125,27 @@ pub struct Session {
     broken: bool,
     /// Stage S7.0: what loading the saved game into a changed model did, if it had changed.
     migration: Option<Migration>,
+    /// Stage S7.1: mods the player chose beyond the scenario's own, by folder.
+    extra_mods: Vec<PathBuf>,
+    /// Stage S7.1: mods a loaded game had that could not be found, by folder.
+    missing_mods: Vec<String>,
 }
 
 impl Session {
     /// Starts a new game from a scenario file.
     pub fn open(path: &Path) -> Result<Session> {
-        let scenario = load_scenario(path)?;
+        Session::open_with_mods(path, &[])
+    }
+
+    /// Stage S7.1: starts a new game with mods the player chose, after the scenario's own.
+    pub fn open_with_mods(path: &Path, mods: &[PathBuf]) -> Result<Session> {
+        let scenario = load_scenario_with_mods(path, mods)?;
         let model = Arc::new(scenario.model.clone());
         let mut sim = Simulation::new(Arc::clone(&model), scenario.config())?;
         sim.set_tracing(true);
-        Ok(Session::assemble(path, scenario, model, sim))
+        let mut session = Session::assemble(path, scenario, model, sim);
+        session.extra_mods = mods.to_vec();
+        Ok(session)
     }
 
     fn assemble(path: &Path, scenario: Scenario, model: Arc<Model>, sim: Simulation) -> Session {
@@ -153,6 +166,8 @@ impl Session {
             latest_cells: BTreeMap::new(),
             previous_cells: BTreeMap::new(),
             migration: None,
+            extra_mods: Vec::new(),
+            missing_mods: Vec::new(),
         };
         // Lever settings are known before any step.
         for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
@@ -171,6 +186,16 @@ impl Session {
     /// was carried across and what started again.
     pub fn migration(&self) -> Option<&Migration> {
         self.migration.as_ref()
+    }
+
+    /// Stage S7.1: the mods the player chose beyond the scenario's own.
+    pub fn extra_mods(&self) -> &[PathBuf] {
+        &self.extra_mods
+    }
+
+    /// Stage S7.1: mods a loaded game was played with that are no longer where they were.
+    pub fn missing_mods(&self) -> &[String] {
+        &self.missing_mods
     }
 
     pub fn scenario_path(&self) -> &Path {
@@ -315,7 +340,9 @@ impl Session {
         if self.broken {
             return sim_err("a step failed part-way and could not be undone; load a saved game");
         }
-        let model = Arc::new(load_model(&self.model.root)?);
+        // The same mods, read again too.
+        let mods: Vec<PathBuf> = self.model.mods.iter().map(|m| m.dir.clone()).collect();
+        let model = Arc::new(load_model_with_mods(&self.model.root, &mods)?);
         let (sim, reset) = self.sim.reload(Arc::clone(&model), &self.scenario.preset, self.scenario.params.clone())?;
         self.scenario.model = (*model).clone();
         self.catalogue = Catalogue::of(&model);
@@ -332,6 +359,11 @@ impl Session {
         let mut out = Vec::new();
         out.extend_from_slice(MAGIC);
         out.extend_from_slice(&SAVE_VERSION.to_le_bytes());
+        // Version 3: the mods the player chose.
+        out.extend_from_slice(&(self.extra_mods.len() as u32).to_le_bytes());
+        for dir in &self.extra_mods {
+            put_text(&mut out, &dir.to_string_lossy());
+        }
         let engine = self.sim.save();
         out.extend_from_slice(&(engine.len() as u64).to_le_bytes());
         out.extend_from_slice(&engine);
@@ -401,9 +433,20 @@ impl Session {
         if version > SAVE_VERSION {
             return model_err("this saved game was made by a newer version");
         }
+        let mut extra_mods = Vec::new();
+        let mut missing_mods = Vec::new();
+        for _ in 0..if version >= 3 { r.u32()? } else { 0 } {
+            let dir = PathBuf::from(r.text()?);
+            // A mod that is gone is left out: migration carries what still fits.
+            if dir.join("mod.toml").is_file() {
+                extra_mods.push(dir);
+            } else {
+                missing_mods.push(dir.to_string_lossy().into_owned());
+            }
+        }
         let length = usize::try_from(r.u64()?).map_err(|_| damaged())?;
         let engine = r.take(length)?;
-        let scenario = load_scenario(path)?;
+        let scenario = load_scenario_with_mods(path, &extra_mods)?;
         let model = Arc::new(scenario.model.clone());
         let (mut sim, migration) =
             Simulation::migrate(Arc::clone(&model), engine, &scenario.preset, scenario.params.clone())?;
@@ -498,6 +541,8 @@ impl Session {
             }
         }
         session.migration = migration;
+        session.extra_mods = extra_mods;
+        session.missing_mods = missing_mods;
         Ok(session)
     }
 }

@@ -33,11 +33,15 @@ pub mod vm;
 pub use describe::Catalogue;
 pub use error::{Error, Result};
 pub use explain::{Explanation, Num, Part};
-pub use model::{Model, Scenario, load_model, load_scenario};
+pub use model::{
+    ModInfo, Model, Scenario, load_model, load_model_with_mods, load_scenario, load_scenario_with_mods, read_mod,
+};
 pub use program::{Col, Ty, Val};
 pub use save::Migration;
 pub use session::Session;
 pub use sim::{Computed, Row, RunConfig, Simulation, Vote, check_lever};
+/// A parsed TOML document, for clients that read scenario files themselves.
+pub use toml::Table as RawTable;
 /// A raw value as written in a model or scenario file, before it is given a type.
 pub use toml::Value as RawValue;
 

@@ -134,6 +134,8 @@ class Model:
     dims: dict[str, Dim] = field(default_factory=dict)
     format: int = 0
     legislature: dict[str, str] | None = None  # format 1 (S5.4): seats, governing, position
+    mods: list[ModInfo] = field(default_factory=list)  # S7.1: the mods applied, in order
+    mod_notes: list[str] = field(default_factory=list)  # S7.1: e.g. an element two mods patch
     renamed: list[tuple[str, str]] = field(default_factory=list)  # S7.0: (old name, name now), sorted
 
     def cells(self, dims: tuple[str, ...]) -> list[dict[str, int]]:
@@ -243,7 +245,143 @@ def _read_entity(root: Path, name: str, spec: dict) -> Entity:
     return Entity(name, ids, weights, raw, state)
 
 
-def load_model(path: str | Path) -> Model:
+@dataclass
+class ModInfo:
+    """Stage S7.1: a mod, as its mod.toml describes it."""
+    id: str
+    name: str
+    version: str
+    description: str
+    model: str | None  # the id of the model it is for, if it names one
+    dir: Path
+
+
+_MOD_ID = re.compile(r"[a-z][a-z0-9_]*\Z")
+_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed")
+_PATCH_KINDS = ("param", "lever", "var", "state", "flow", "account")
+
+
+def read_mod(folder: str | Path) -> tuple[ModInfo, list[str], bytes]:
+    """Stage S7.1: a mod folder's mod.toml: its description, its files and the file's bytes."""
+    folder = Path(folder)
+    file = folder / "mod.toml"
+    try:
+        data = file.read_bytes()
+    except OSError as exc:
+        raise ModelError(f"cannot read {file}: {exc}") from None
+    try:
+        doc = tomllib.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ModelError(f"{file}: {exc}") from None
+    head = doc.get("mod")
+    if not isinstance(head, dict):
+        raise ModelError(f"{file}: needs a [mod] table")
+    if len(doc) != 1:
+        raise ModelError(f"{file}: only [mod] belongs here; elements go in the mod's files")
+    mod_id = head.get("id")
+    if not isinstance(mod_id, str) or not _MOD_ID.match(mod_id) or mod_id.endswith("_"):
+        raise ModelError(f"{file}: [mod] id must be a name of lower-case letters, digits and underscores")
+    files = head.get("files", [])
+    if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
+        raise ModelError(f"mod {mod_id}: files must be a list of file names")
+
+    def text(key, default):
+        value = head.get(key)
+        return value if isinstance(value, str) else default
+    model = head.get("model")
+    info = ModInfo(mod_id, text("name", mod_id), text("version", ""), text("description", ""),
+                   model if isinstance(model, str) else None, folder)
+    return info, files, data
+
+
+def _relative_name(path: str) -> str:
+    return "/".join(part for part in re.split(r"[/\\]", path) if part not in ("", "."))
+
+
+def _uses_data(spec) -> bool:
+    """Stage S7.1: whether an element's declaration reads a data file of its own."""
+    if not isinstance(spec, dict):
+        return False
+    initial = spec.get("initial")
+    return "data" in spec or (isinstance(initial, dict) and "data" in initial)
+
+
+def _apply_mods(merged: dict[str, dict], mod_dirs, digest) -> tuple[list[ModInfo], list[str]]:
+    """Stage S7.1: mods, in order. Each adds elements named after it and patches others."""
+    model_id = merged["model"].get("id", "")
+    mods: list[ModInfo] = []
+    notes: list[str] = []
+    patched_by: dict[tuple[str, str], str] = {}
+    for folder in mod_dirs:
+        info, files, data = read_mod(folder)
+        mod_id = info.id
+        if any(m.id == mod_id for m in mods):
+            raise ModelError(f"mod {mod_id} is listed twice")
+        if info.model is not None and info.model != model_id:
+            raise ModelError(f"mod {mod_id} is for the model {info.model!r}, not {model_id!r}")
+        digest.update(f"mod:{mod_id}/mod.toml".encode() + b"\0" + data + b"\0")
+        prefix = mod_id + "_"
+        patches = []
+        for file in files:
+            path = Path(folder) / file
+            what = f"mod {mod_id}, {_relative_name(file)}"
+            try:
+                data = path.read_bytes()
+            except OSError as exc:
+                raise ModelError(f"cannot read {path}: {exc}") from None
+            digest.update(f"mod:{mod_id}/{_relative_name(file)}".encode() + b"\0" + data + b"\0")
+            try:
+                doc = tomllib.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+                raise ModelError(f"{what}: {exc}") from None
+            for section, content in doc.items():
+                if not isinstance(content, dict):
+                    raise ModelError(f"{what}: [{section}] must be a table")
+                if section == "patch":
+                    for kind, elements in content.items():
+                        if kind not in _PATCH_KINDS:
+                            raise ModelError(f"{what}: [patch.{kind}] is not a kind of element a mod can patch")
+                        if not isinstance(elements, dict):
+                            raise ModelError(f"{what}: [patch.{kind}] must be a table")
+                        for element, spec in elements.items():
+                            if not isinstance(spec, dict):
+                                raise ModelError(f"{what}: patch.{kind}.{element} must be a table")
+                            patches.append((kind, element, spec))
+                    continue
+                if section not in _MOD_SECTIONS:
+                    raise ModelError(f"{what}: a mod cannot add to [{section}]")
+                for name, spec in content.items():
+                    if not name.startswith(prefix):
+                        raise ModelError(f"{what}: {section}.{name}: a mod's names start with {prefix!r}")
+                    if section != "renamed" and _uses_data(spec):
+                        raise ModelError(f"{what}: {section}.{name}: mods cannot bring data files yet")
+                    if name in merged[section]:
+                        raise ModelError(f"{what}: {section}.{name} is declared twice")
+                    merged[section][name] = spec
+        for kind, element, spec in patches:
+            what = f"mod {mod_id}: patch.{kind}.{element}"
+            target = merged[kind].get(element)
+            if not isinstance(target, dict):
+                raise ModelError(f"{what}: the model has no {kind} {element}")
+            if _uses_data(spec):
+                raise ModelError(f"{what}: mods cannot bring data files yet")
+            for key, value in spec.items():
+                if isinstance(value, str) and "{base}" in value:
+                    old = target.get(key)
+                    if not isinstance(old, str):
+                        raise ModelError(f"{what}: {key} has no earlier text for {{base}}")
+                    value = value.replace("{base}", f"({old})" if key in ("expr", "next") else old)
+                target[key] = value
+            earlier = patched_by.get((kind, element))
+            patched_by[(kind, element)] = mod_id
+            if earlier is not None and earlier != mod_id:
+                notes.append(f"{kind} {element} is patched by both {earlier} and {mod_id}; {mod_id} comes later")
+        mods.append(info)
+    return mods, notes
+
+
+def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
+    """A model folder (or its model.toml), with mods applied in order (stage S7.1)."""
     path = Path(path)
     manifest = path / "model.toml" if path.is_dir() else path
     root = manifest.parent
@@ -270,6 +408,7 @@ def load_model(path: str | Path) -> Model:
                 if name in merged[section]:
                     raise ModelError(f"{section}.{name} is declared twice")
                 merged[section][name] = spec
+    applied, mod_notes = _apply_mods(merged, mods, digest)
 
     head = merged["model"]
     fmt = head.get("format")
@@ -546,7 +685,7 @@ def load_model(path: str | Path) -> Model:
 
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
                  entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt, legislature,
-                 renamed)
+                 renamed=renamed, mods=applied, mod_notes=mod_notes)
 
 
 def _rake(spec, what: str) -> Rake:
@@ -674,13 +813,18 @@ class Scenario:
     commands: dict[int, dict]  # step -> {lever: raw value}, applied before that step runs
 
 
-def load_scenario(path: str | Path) -> Scenario:
+def load_scenario(path: str | Path, extra_mods: list[str | Path] = ()) -> Scenario:
+    """A scenario file; `extra_mods` come after the scenario's own `mods` (stage S7.1)."""
     path = Path(path)
     doc = tomllib.loads(path.read_text(encoding="utf-8"))
     head = doc["scenario"]
     commands: dict[int, dict] = {}
     for command in doc.get("command", []):
         commands.setdefault(int(command["step"]), {}).update(command["set"])
-    return Scenario(path.stem, load_model((path.parent / head["model"]).resolve()), int(head["seed"]),
+    mods = head.get("mods", [])
+    if not isinstance(mods, list) or not all(isinstance(m, str) for m in mods):
+        raise ModelError("[scenario] mods must be a list of folders")
+    mods = [path.parent / m for m in mods] + [Path(m) for m in extra_mods]
+    return Scenario(path.stem, load_model((path.parent / head["model"]).resolve(), mods), int(head["seed"]),
                     int(head["steps"]), head.get("preset", "central"), doc.get("params", {}),
                     doc.get("levers", {}), commands)

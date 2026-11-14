@@ -82,3 +82,19 @@ fn an_early_election_matches_the_oracles_recorded_hashes() {
         assert_eq!(pyfmt::hex(&row.hash), *want, "early election state hash differs from the oracle at step {step}");
     }
 }
+
+#[test]
+fn a_modded_uk_matches_the_oracles_recorded_hashes() {
+    // Stage S7.1: the UK with the example mod (mods/wealth_tax): an added lever, flow and
+    // value, and two patched formulas, loaded the same way by both.
+    let scenario = load_scenario(&root().join("models/uk/scenarios/wealth_tax.toml")).unwrap();
+    assert_eq!(scenario.model.mods.len(), 1);
+    let recorded = std::fs::read_to_string(root().join("models/uk/golden/wealth_tax.hashes.csv")).unwrap();
+    let golden: Vec<&str> = recorded.lines().skip(1).map(|line| line.split(',').nth(1).unwrap()).collect();
+    assert_eq!(golden.len(), 3);
+    let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
+    for (step, want) in golden.iter().enumerate() {
+        let row = sim.step().unwrap();
+        assert_eq!(pyfmt::hex(&row.hash), *want, "modded UK state hash differs from the oracle at step {step}");
+    }
+}

@@ -155,6 +155,7 @@ model = ".."            # path to the model folder, relative to this file
 seed = 20261113
 steps = 240
 preset = "central"      # which of low / central / high to use
+mods = []               # optional (stage S7.1): mod folders, relative to this file
 
 [params]                # optional overrides
 [levers]                # optional starting settings

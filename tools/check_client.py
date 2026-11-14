@@ -71,6 +71,15 @@ def main() -> int:
             print("res://tests/reload_run.gd failed", file=sys.stderr)
             return 1
         print(reload.stdout.strip().splitlines()[-1])
+        # Stage S7.1: the start screen, with the example mod chosen.
+        start = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/start_screen.gd"],
+            capture_output=True, text=True, timeout=900)
+        if start.returncode != 0:
+            print(start.stdout.strip()[-2000:], start.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/start_screen.gd failed", file=sys.stderr)
+            return 1
+        print(start.stdout.strip().splitlines()[-1])
         # Stage S7.0: a save outlives its model files (another copy of Valmora).
         problem = check_migration(args.godot, folder)
         if problem:

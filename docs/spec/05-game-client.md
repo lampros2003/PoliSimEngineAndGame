@@ -17,12 +17,28 @@ Related: [engine contract](00-engine-contract.md), [model format](01-model-forma
 | `crates/godot/` | Rust | The `PoliSim` class Godot sees; runs the session on its own thread |
 | `client/` | GDScript | The screen: `scripts/main.gd` and one script per panel |
 
+## Starting a game
+
+Stage S7.1. Started with `--scenario=PATH` (after `--` on Godot's command line, as the
+tests and the Valmora launcher do), the client opens that scenario, with the mods in
+`--mods=a,b` (folders) after the scenario's own. Without it, it shows the start screen
+(`client/scripts/start_screen.gd`): every scenario with a `[play] title` under the game's
+`models` folder, the one picked described by its `summary`; the mods for its model (a
+mod that names another model is not offered), from the game's `mods` folder and the
+player's own (`user://mods`, created if missing and named on the screen), each with a
+tick box and its description; a mod that cannot be read is shown with its error. **New
+game** starts the scenario with the ticked mods; **Continue saved game**, when the
+scenario has a save, opens it and loads the save, mods and all. The title bar names the
+mods in play, and notes from loading them ([mods](07-mods.md)) are shown when the game
+starts.
+
 ## The scenario's `[play]` table
 
 Presentation settings. The engine ignores them and they never affect a run.
 
 | Key | Meaning | Default |
 |---|---|---|
+| `title`, `summary` | Stage S7.1: the scenario's name and a sentence about it on the start screen, which lists only scenarios with a `title` | not listed |
 | `country` | Name shown in the title bar | the scenario's file name |
 | `currency_symbol` | Shown before money, with a space only if it ends in a letter (`£12.4bn`, `Cr 12.4bn`) | the model's currency code |
 | `amounts` | `"year"` to show flows (values whose unit is per step, such as `GBP/month`) at an annual rate, twelve times the month, as published accounts are; `"step"` to show them per step. The player can switch with the "Amounts a year" button; lever inputs follow the same choice | `"step"` |
@@ -144,6 +160,13 @@ dictionaries with a `kind` key. Everything the screen reads (`latest`, `previous
 from a mirror the worker refreshes after each request, so reading never waits for the
 simulation. No Godot object is touched off the main thread.
 
+Stage S7.1: `open_with_mods(scenario_path, mods)` opens a scenario with mods the player
+chose; `scenarios(base)` and `mods(folders)` list what the start screen offers, read
+without opening anything; `active_mods()` and `mod_notes()` describe the game in play; the
+`loaded` event adds `missing_mods`, and, when the save was made with other model files,
+`migrated` with what was `carried`, `reset`, `clamped`, `dropped` and `renamed` (stage
+S7.0).
+
 Stage S5.4: the catalogue says whether the model has a `legislature`, and each lever's
 `leaning`; `changes()` gives each policy change's vote (`passed`, `votes_for`, `seats`).
 The policy panel then says that changes are bills; a defeated bill is announced after
@@ -162,7 +185,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs eleven scripted sessions in Godot without a display and
+`tools/check_client.py` runs twelve scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -170,6 +193,7 @@ compares them with the command-line runner or with published figures:
 | `tests/scripted_run.gd` | 60 months through the bridge with lever changes: the same state hash as the runner on every step |
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
+| `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/wealth_tax`) for the UK only; with it ticked, the game starts with the mod's lever in the policy panel, its name in the title bar, and, once the rate is set, a wealth tax line in the budget |
 | `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
 | `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month the panel shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
@@ -179,7 +203,7 @@ compares them with the command-line runner or with published figures:
 
 `tests/screens.gd` saves screenshots of a scripted Valmora session (`--scenario=models/valmora/scenarios/term.toml`), and `tests/look.gd` one
 screenshot of any scenario (`--scenario`, `--months`, `--chart=a,b`, `--why=name`,
-`--tab=N`, `--breakdown=name`, `--shot=FILE`), for a person to look at; on a server they need `xvfb-run`. Godot's
+`--tab=N`, `--breakdown=name`, `--shot=FILE`; without `--scenario`, the start screen), for a person to look at; on a server they need `xvfb-run`. Godot's
 `--resolution 1440x2100` before `--path` gives a tall window that shows the whole left
 column.
 

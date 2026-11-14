@@ -9,6 +9,8 @@ preset = "central"
 
 # Presentation settings for the game client and `polisim play`. Not part of the run.
 [play]
+title = "Valmora (a test country)"
+summary = "A small invented country of eight million households, where the client was first built: an economy and a budget, with no parliament or elections."
 country = "Valmora"
 currency_symbol = "Cr"
 currency_name = "crowns"

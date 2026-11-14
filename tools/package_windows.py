@@ -40,7 +40,7 @@ Choose "More info", then "Run anyway".
 Contents
   PoliSim.bat     starts the game (the United Kingdom)
   PoliSim Valmora.bat  starts Valmora
-  game\\           the game project, the engine library and the models
+  game\\           the game project, the engine library, the models and the mods
   godot\\          the Godot 4.7.2 engine that runs it (official build)
   tools\\          polisim.exe, the command-line runner, and polisim-s0-bench.exe
 
@@ -69,6 +69,7 @@ def main() -> int:
     ignore = shutil.ignore_patterns("tests", "*.tmp")
     shutil.copytree(ROOT / "client", out / "game", ignore=ignore)
     shutil.copytree(ROOT / "models", out / "game" / "models")
+    shutil.copytree(ROOT / "mods", out / "game" / "mods")
     for exe in (ROOT / "target" / "release" / "polisim.exe", ROOT / "bench" / "s0" / "target" / "release" / "polisim-s0-bench.exe"):
         if exe.exists():
             shutil.copy2(exe, out / "tools" / exe.name)

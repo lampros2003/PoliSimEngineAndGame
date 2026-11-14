@@ -7,6 +7,9 @@ steps = 60
 preset = "central"
 
 [play]
+# Stage S7.1: listed on the start screen.
+title = "The United Kingdom, 2025"
+summary = "Govern the United Kingdom from January 2025, with 411 of the 650 seats in the Commons, through the general election due in July 2029."
 country = "United Kingdom"
 currency_symbol = "£"
 currency_name = "pounds"

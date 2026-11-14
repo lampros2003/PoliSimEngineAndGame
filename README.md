@@ -5,28 +5,35 @@ an economy and a population simulated in real units. This repository holds the s
 engine, the specification it implements, a reference implementation it is tested against,
 and the research behind the design.
 
-A first playable client exists: a Godot game in which you govern Valmora, an invented
-country of eight million households, for a five-year term, with a budget screen, policy
-levers, charts and a panel that explains why any figure changed. The economy behind it is
-still a small test model; the first real country, the United Kingdom, is the next stage.
+You govern the United Kingdom from January 2025: a monthly stock-flow model of the
+economy and public finances calibrated to 2024, 20,000 synthetic households under the
+2024-25 tax and benefit rules, 600 types of voter choosing between nine blocs, 650
+constituencies, a House of Commons that votes on your policy changes, and a general
+election in July 2029. The Godot client shows the budget, who gains and who loses, the
+polls and seats, and why any figure changed. Mods add to the model; saved games survive
+changes to it. `docs/GUIDE.md` is the player's guide; `docs/MODDING.md` shows how to make
+a mod.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
-| `docs/spec/` | The engine contract, model-file format 0, formula language 0, save format 0, and the toy model with its target patterns |
+| `docs/spec/` | The engine contract, model formats 0 and 1, the formula language, save formats, the game client, mods, and the toy model with its target patterns |
 | `crates/core/` | The engine (Rust): model loader, type and unit checker, bytecode compiler, block-wise interpreter, step loop, saves |
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |
 | `client/` | The Godot 4.7 game client (GDScript) and its scripted tests |
 | `oracle/` | The reference evaluator: a deliberately naive Python implementation of the contract. It defines the behaviour; the engine is tested against it |
+| `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`) |
+| `mods/` | Mods the game ships with: `wealth_tax`, the example in `docs/MODDING.md` |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
-| `models/valmora/` | The same economy scaled to an invented country; the default game |
+| `models/valmora/` | The same economy scaled to an invented country, where the client was first built |
 | `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |
+| `models/cohort/`, `models/raking/` | Test models for format 1: a population by region, sex and age; weights raked to targets |
 | `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
 | `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
-| `docs/PLAN.md` | The working plan: what is built next, how it is checked, and what the owner needs to do |
+| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S7-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
@@ -51,7 +58,7 @@ godot --path client
 **In a terminal**, with only a Rust toolchain (1.86 or later; the client's bridge needs 1.94):
 
 ```bash
-cargo run --release -p polisim-cli -- play models/valmora/scenarios/term.toml
+cargo run --release -p polisim-cli -- play models/uk/scenarios/2025.toml
 ```
 
 Then, for example: `step 12`, `set basic_rate 0.25`, `step 24`, `levers`, `help`.
@@ -90,6 +97,10 @@ python tools/diff_engine.py --count 200
 ## Where things stand
 
 The roadmap is in `reports/PoliSim engine architecture pathways.md`.
+
+Stages S0 to S6 are done and S7 (content and public surface) is under way: `docs/PLAN.md`
+says where each stage stands, and `docs/S3-PLAN.md` to `docs/S7-PLAN.md` hold their
+milestones. The tables below are the first two stages' exit criteria.
 
 **Stage S0 (specification, oracle, data gate)**
 

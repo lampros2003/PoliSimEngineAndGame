@@ -249,6 +249,11 @@ pub struct Flow {
 #[derive(Clone, Debug)]
 pub struct Model {
     pub root: PathBuf,
+    /// Stage S7.1: the mods applied on top of the model's own files, in order.
+    pub mods: Vec<ModInfo>,
+    /// Stage S7.1: what loading the mods is worth telling the player (an element patched
+    /// by two mods, for instance).
+    pub mod_notes: Vec<String>,
     pub id: String,
     pub currency: String,
     /// Minor units per major unit (100 pence per pound).
@@ -611,6 +616,13 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
 }
 
 /// A relative path as the oracle hashes it: forward slashes, no `.` components.
+/// Stage S7.1: whether an element's declaration reads a data file of its own.
+fn uses_data(spec: &Value) -> bool {
+    let Value::Table(spec) = spec else { return false };
+    spec.contains_key("data")
+        || matches!(spec.get("initial"), Some(Value::Table(initial)) if initial.contains_key("data"))
+}
+
 fn relative_name(path: &str) -> String {
     path.split(['/', '\\']).filter(|part| !part.is_empty() && *part != ".").collect::<Vec<_>>().join("/")
 }
@@ -811,8 +823,73 @@ impl Loader {
     }
 }
 
+/// Stage S7.1: a mod, as its `mod.toml` describes it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModInfo {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    /// The id of the model the mod is for, if it names one.
+    pub model: Option<String>,
+    /// The mod's folder.
+    pub dir: PathBuf,
+}
+
+/// Stage S7.1: reads a mod folder's `mod.toml`.
+pub fn read_mod(dir: &Path) -> Result<(ModInfo, Vec<String>, Vec<u8>)> {
+    let file = dir.join("mod.toml");
+    let bytes = std::fs::read(&file).map_err(|e| Error::Model(format!("cannot read {}: {e}", file.display())))?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| Error::Model(format!("{} is not UTF-8", file.display())))?;
+    let doc = text.parse::<Toml>().map_err(|e| Error::Model(format!("{}: {e}", file.display())))?;
+    let Some(Value::Table(head)) = doc.get("mod") else {
+        return model_err(format!("{}: needs a [mod] table", file.display()));
+    };
+    if doc.len() != 1 {
+        return model_err(format!("{}: only [mod] belongs here; elements go in the mod's files", file.display()));
+    }
+    let id = text_of(head, "id").unwrap_or_default().to_string();
+    let usable = id.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+        && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        && !id.ends_with('_');
+    if !usable {
+        return model_err(format!(
+            "{}: [mod] id must be a name of lower-case letters, digits and underscores",
+            file.display()
+        ));
+    }
+    let files = match head.get("files") {
+        Some(Value::Array(list)) => list
+            .iter()
+            .map(|f| f.as_str().map(str::to_string))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| Error::Model(format!("mod {id}: files must be a list of file names")))?,
+        None => Vec::new(),
+        _ => return model_err(format!("mod {id}: files must be a list of file names")),
+    };
+    let info = ModInfo {
+        name: text_of(head, "name").unwrap_or(&id).to_string(),
+        version: text_of(head, "version").unwrap_or("").to_string(),
+        description: text_of(head, "description").unwrap_or("").to_string(),
+        model: text_of(head, "model").map(str::to_string),
+        dir: dir.to_path_buf(),
+        id,
+    };
+    Ok((info, files, bytes))
+}
+
+/// The sections a mod's files may add to, besides `[patch]`.
+const MOD_SECTIONS: [&str; 8] = ["dim", "param", "lever", "var", "state", "flow", "account", "renamed"];
+/// The kinds of element a `[patch.<kind>.<name>]` may change.
+const PATCH_KINDS: [&str; 6] = ["param", "lever", "var", "state", "flow", "account"];
+
 /// Loads a model from a folder containing `model.toml`, or from the manifest itself.
 pub fn load_model(path: &Path) -> Result<Model> {
+    load_model_with_mods(path, &[])
+}
+
+/// Stage S7.1: loads a model with mods applied in order (each a folder with `mod.toml`).
+pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> {
     let manifest = if path.is_dir() { path.join("model.toml") } else { path.to_path_buf() };
     let root = manifest.parent().map(Path::to_path_buf).unwrap_or_default();
 
@@ -853,6 +930,112 @@ pub fn load_model(path: &Path) -> Result<Model> {
                 merged[index].insert(key, spec);
             }
         }
+    }
+
+    // ---- stage S7.1: mods, in order. Each adds elements named after it and patches others.
+    let model_id = merged[0].get("id").and_then(Value::as_str).unwrap_or_default().to_string();
+    let mut mods: Vec<ModInfo> = Vec::new();
+    let mut mod_notes = Vec::new();
+    let mut patched_by: HashMap<(String, String), String> = HashMap::new();
+    for dir in mod_dirs {
+        let (info, files, bytes) = read_mod(dir)?;
+        let id = info.id.clone();
+        if mods.iter().any(|m| m.id == id) {
+            return model_err(format!("mod {id} is listed twice"));
+        }
+        if info.model.as_ref().is_some_and(|m| *m != model_id) {
+            return model_err(format!(
+                "mod {id} is for the model {:?}, not {model_id:?}",
+                info.model.as_deref().unwrap()
+            ));
+        }
+        digest.update(format!("mod:{id}/mod.toml").as_bytes());
+        digest.update([0u8]);
+        digest.update(&bytes);
+        digest.update([0u8]);
+        let prefix = format!("{id}_");
+        let mut patches: Vec<(String, String, Toml)> = Vec::new();
+        for file in &files {
+            let path = dir.join(file);
+            let bytes =
+                std::fs::read(&path).map_err(|e| Error::Model(format!("cannot read {}: {e}", path.display())))?;
+            let what = format!("mod {id}, {}", relative_name(file));
+            digest.update(format!("mod:{id}/{}", relative_name(file)).as_bytes());
+            digest.update([0u8]);
+            digest.update(&bytes);
+            digest.update([0u8]);
+            let text = std::str::from_utf8(&bytes).map_err(|_| Error::Model(format!("{what} is not UTF-8")))?;
+            let doc = text.parse::<Toml>().map_err(|e| Error::Model(format!("{what}: {e}")))?;
+            for (name, content) in doc {
+                let Value::Table(content) = content else {
+                    return model_err(format!("{what}: [{name}] must be a table"));
+                };
+                if name == "patch" {
+                    for (kind, elements) in content {
+                        if !PATCH_KINDS.contains(&kind.as_str()) {
+                            return model_err(format!(
+                                "{what}: [patch.{kind}] is not a kind of element a mod can patch"
+                            ));
+                        }
+                        let Value::Table(elements) = elements else {
+                            return model_err(format!("{what}: [patch.{kind}] must be a table"));
+                        };
+                        for (element, spec) in elements {
+                            let Value::Table(spec) = spec else {
+                                return model_err(format!("{what}: patch.{kind}.{element} must be a table"));
+                            };
+                            patches.push((kind.clone(), element, spec));
+                        }
+                    }
+                    continue;
+                }
+                if !MOD_SECTIONS.contains(&name.as_str()) {
+                    return model_err(format!("{what}: a mod cannot add to [{name}]"));
+                }
+                let index = section(&name);
+                for (key, spec) in content {
+                    if !key.starts_with(&prefix) {
+                        return model_err(format!("{what}: {name}.{key}: a mod's names start with {prefix:?}"));
+                    }
+                    if name != "renamed" && uses_data(&spec) {
+                        return model_err(format!("{what}: {name}.{key}: mods cannot bring data files yet"));
+                    }
+                    if merged[index].contains_key(&key) {
+                        return model_err(format!("{what}: {name}.{key} is declared twice"));
+                    }
+                    merged[index].insert(key, spec);
+                }
+            }
+        }
+        for (kind, element, spec) in patches {
+            let what = format!("mod {id}: patch.{kind}.{element}");
+            let index = section(&kind);
+            let Some(Value::Table(target)) = merged[index].get_mut(&element) else {
+                return model_err(format!("{what}: the model has no {kind} {element}"));
+            };
+            if uses_data(&Value::Table(spec.clone())) {
+                return model_err(format!("{what}: mods cannot bring data files yet"));
+            }
+            for (key, value) in spec {
+                let value = match (&value, target.get(&key)) {
+                    (Value::String(new), Some(Value::String(old))) if new.contains("{base}") => {
+                        let base = if key == "expr" || key == "next" { format!("({old})") } else { old.clone() };
+                        Value::String(new.replace("{base}", &base))
+                    }
+                    (Value::String(new), _) if new.contains("{base}") => {
+                        return model_err(format!("{what}: {key} has no earlier text for {{base}}"));
+                    }
+                    _ => value,
+                };
+                target.insert(key, value);
+            }
+            if let Some(earlier) = patched_by.insert((kind.clone(), element.clone()), id.clone()) {
+                if earlier != id {
+                    mod_notes.push(format!("{kind} {element} is patched by both {earlier} and {id}; {id} comes later"));
+                }
+            }
+        }
+        mods.push(info);
     }
 
     let head = &merged[0];
@@ -1323,6 +1506,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
 
     Ok(Model {
         root,
+        mods,
+        mod_notes,
         id: id.to_string(),
         currency: currency.to_string(),
         minor,
@@ -1576,6 +1761,12 @@ pub struct Scenario {
 }
 
 pub fn load_scenario(path: &Path) -> Result<Scenario> {
+    load_scenario_with_mods(path, &[])
+}
+
+/// Stage S7.1: loads a scenario with further mods after its own (`[scenario] mods`), as a
+/// game client does when the player chooses them.
+pub fn load_scenario_with_mods(path: &Path, extra_mods: &[PathBuf]) -> Result<Scenario> {
     let text =
         std::fs::read_to_string(path).map_err(|e| Error::Model(format!("cannot read {}: {e}", path.display())))?;
     let doc = text.parse::<Toml>().map_err(|e| Error::Model(format!("{}: {e}", path.display())))?;
@@ -1612,9 +1803,20 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
         }
     }
     let base = path.parent().unwrap_or(Path::new("."));
+    let mut mods: Vec<PathBuf> = match head.get("mods") {
+        None => Vec::new(),
+        Some(Value::Array(list)) => {
+            list.iter()
+                .map(|m| m.as_str().map(|m| base.join(m)))
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| Error::Model("[scenario] mods must be a list of folders".to_string()))?
+        }
+        Some(_) => return model_err("[scenario] mods must be a list of folders"),
+    };
+    mods.extend(extra_mods.iter().cloned());
     Ok(Scenario {
         name: path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
-        model: load_model(&base.join(model_path))?,
+        model: load_model_with_mods(&base.join(model_path), &mods)?,
         seed: seed as u64,
         steps: steps.max(0) as u64,
         preset: text_of(head, "preset").unwrap_or("central").to_string(),

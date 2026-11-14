@@ -13,9 +13,8 @@ const LeverPanel := preload("res://scripts/lever_panel.gd")
 const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
 const PoliticsPanel := preload("res://scripts/politics_panel.gd")
+const StartScreen := preload("res://scripts/start_screen.gd")
 
-# The United Kingdom from January 2025; `--scenario=PATH` after `--` opens another.
-const DEFAULT_SCENARIO := "models/uk/scenarios/2025.toml"
 const MAX_SERIES := 4
 const HELP := """[b]How to play[/b]
 
@@ -69,14 +68,49 @@ var tabs: TabContainer
 var _message: PanelContainer
 var _message_text: RichTextLabel
 var _dialog: AcceptDialog
+## Stage S7.1: shown until a game starts, when the client starts without `--scenario`.
+var start_screen: StartScreen
+## True once a game has started.
+var started := false
 
 
 func _ready() -> void:
 	theme = Palette.make_theme()
 	_build_layout()
 	game = PoliSim.new()
-	scenario_path = find_file(_argument("scenario", DEFAULT_SCENARIO))
-	var error := game.open(scenario_path)
+	var given := _argument("scenario", "")
+	if given == "":
+		_show_start_screen()
+		return
+	var mods := PackedStringArray()
+	for name in _argument("mods", "").split(",", false):
+		mods.append(find_folder(name))
+	start(find_file(given), mods)
+
+
+## Stage S7.1: lists the scenarios and mods, and waits for the player's choice.
+func _show_start_screen() -> void:
+	start_screen = StartScreen.new()
+	start_screen.saves_folder = ProjectSettings.globalize_path("user://saves")
+	start_screen.user_mods = ProjectSettings.globalize_path("user://mods")
+	DirAccess.make_dir_recursive_absolute(start_screen.user_mods)
+	add_child(start_screen)
+	var base := find_folder("models").get_base_dir()
+	start_screen.fill(game.scenarios(base), game.mods(PackedStringArray([find_folder("mods"), start_screen.user_mods])))
+	start_screen.chosen.connect(func(path: String, mods: PackedStringArray, resume: bool) -> void:
+		start_screen.queue_free()
+		start_screen = null
+		start(path, mods)
+		if resume and started:
+			_load_game())
+	_set_controls(false)
+
+
+## Opens a scenario with the mods chosen beyond its own, and shows its screen.
+func start(path: String, mods := PackedStringArray()) -> void:
+	scenario_path = path
+	var error := game.open_with_mods(scenario_path, mods)
+	started = error == ""
 	if error != "":
 		_show_message("[b]Could not start the game[/b]\n%s\n\nScenario: %s" % [error, scenario_path], true)
 		_set_controls(false)
@@ -92,6 +126,9 @@ func _ready() -> void:
 	var country := str(play.get("country", game.scenario_name()))
 	if DisplayServer.get_name() != "headless":
 		get_window().title = "PoliSim — " + country
+	var notes: PackedStringArray = game.mod_notes()
+	if not notes.is_empty():
+		_show_message("[b]Mods[/b]: " + " ".join(notes))
 
 
 static func _argument(key: String, fallback: String) -> String:
@@ -99,6 +136,17 @@ static func _argument(key: String, fallback: String) -> String:
 		if arg.begins_with("--%s=" % key):
 			return arg.substr(key.length() + 3)
 	return fallback
+
+
+## A folder of the game, next to the client project or inside it (as for find_file).
+static func find_folder(relative: String) -> String:
+	if relative.is_absolute_path():
+		return relative
+	var base := ProjectSettings.globalize_path("res://")
+	for candidate in [base.path_join(relative), base.path_join("..").path_join(relative)]:
+		if DirAccess.dir_exists_absolute(candidate):
+			return candidate.simplify_path()
+	return base.path_join(relative)
 
 
 ## Finds a file shipped next to the project (packaged build) or one level up (repository).
@@ -362,6 +410,11 @@ func _refresh() -> void:
 		_date.text = "%s · start of term, %s" % [str(play.get("country", "")), fmt.month_name(0)]
 	else:
 		_date.text = "%s · %s · month %d of %d" % [str(play.get("country", "")), fmt.month_name(done - 1), done, term]
+	var modded := PackedStringArray()
+	for mod in game.active_mods():
+		modded.append(str(mod["name"]))
+	if not modded.is_empty():
+		_date.text += " · with " + ", ".join(modded)
 	for key in _cards:
 		var entry := _key_entry(key)
 		var card: Dictionary = _cards[key]
@@ -603,7 +656,7 @@ func _announce_votes() -> void:
 
 
 func _process(_delta: float) -> void:
-	if game == null:
+	if game == null or not started:
 		return
 	var events := game.poll()
 	for event in events:
@@ -637,8 +690,14 @@ func _process(_delta: float) -> void:
 					trace.trail.clear()
 					_model_changed()
 					_status.text = "loaded"
+					var note := ""
+					var missing: PackedStringArray = event.get("missing_mods", PackedStringArray())
+					if not missing.is_empty():
+						note = "[b]Mods this game was played with are missing[/b] and were left out: %s.\n" % ", ".join(missing)
 					if event.get("migrated", false):
-						_show_message(_migration_note(event))
+						note += _migration_note(event)
+					if note != "":
+						_show_message(note)
 			"reloaded":
 				if event["error"] != "":
 					_show_message("[b]The model files have a problem; the game carries on with the previous model.[/b]\n[code]%s[/code]" % event["error"], true)

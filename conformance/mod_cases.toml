@@ -1,0 +1,210 @@
+# Mods (docs/spec/07-mods.md, stage S7.1): cases that both the oracle
+# (oracle/tests/test_mods.py) and the engine (crates/core/tests/mods.rs) run.
+#
+# Each case writes the base model into a folder, and each of its `mods` into a folder of
+# its own (`toml` is the mod.toml; `files` the mod's other files, by name), loads the model
+# with the mods in order, then expects one of:
+#   ran      - the model loads and step 0 runs; `values` are national values after it,
+#              `notes` the number of notes the loader made, and `model_hash` the model's
+#              hash, which both sides must give;
+#   refused  - loading or starting the model fails.
+# Text in the cases uses \n for a line break.
+
+base = """
+[model]
+id = "modbase"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one"]
+
+[param.scale]
+type = "real"
+unit = "1"
+value = 100.0
+
+[lever.tax]
+type = "real"
+unit = "1"
+default = 0.2
+range = [0.0, 1.0]
+
+[var.revenue]
+label = "Revenue"
+type = "real"
+unit = "1"
+phase = "one"
+expr = "tax * scale"
+
+[state.count]
+type = "int"
+unit = "1"
+phase = "one"
+initial = 0
+next = "count + 1"
+"""
+
+[[case]]
+name = "no mods"
+expect = "ran"
+values = { revenue = 20.0, tax = 0.2 }
+notes = 0
+model_hash = "7b796deb87ceee7a12a5e6959a89a3fec6fc5f4f43fee835aeaeec98eb12b32f"
+
+[[case]]
+name = "a mod that adds a lever and a value"
+expect = "ran"
+values = { revenue = 20.0, extra_levy = 0.05, extra_total = 25.0 }
+notes = 0
+model_hash = "fe50a97e4df54e20a2541189a0b79330a5e9fdbe4578e3f3d03578840412ac7d"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nname = "An extra levy"\nversion = "1.0"\nmodel = "modbase"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[lever.extra_levy]\ntype = "real"\nunit = "1"\ndefault = 0.05\nrange = [0.0, 0.5]\n\n[var.extra_total]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "revenue + extra_levy * scale"' }
+
+[[case]]
+name = "a patch that adds to a formula"
+expect = "ran"
+values = { revenue = 21.0 }
+notes = 0
+model_hash = "0abf5cd41e8f34b153d734f9af069ccd309aec387c269ad737115c0c56d224c2"
+[[case.mods]]
+toml = '[mod]\nid = "plus"\nfiles = ["plus.toml"]'
+files = { "plus.toml" = '[patch.var.revenue]\nexpr = "{base} + 1.0"\nlabel = "{base}, plus one"' }
+
+[[case]]
+name = "a patch that changes a lever's default and a parameter's value"
+expect = "ran"
+values = { revenue = 60.0, tax = 0.3 }
+notes = 0
+model_hash = "986ac2161e82aafd370afb1a9384fb54d70d10894932642ccf1ef24734404e63"
+[[case.mods]]
+toml = '[mod]\nid = "dear"\nfiles = ["dear.toml"]'
+files = { "dear.toml" = '[patch.lever.tax]\ndefault = 0.3\n\n[patch.param.scale]\nvalue = 200.0' }
+
+[[case]]
+name = "two mods patch one formula: the later is applied to the earlier's"
+expect = "ran"
+values = { revenue = 42.0 }
+notes = 1
+model_hash = "46632af06fe3a93a292c1326351ccb8383ad53167b47afd99f537d2dcf1d4586"
+[[case.mods]]
+toml = '[mod]\nid = "first"\nfiles = ["a.toml"]'
+files = { "a.toml" = '[patch.var.revenue]\nexpr = "{base} + 1.0"' }
+[[case.mods]]
+toml = '[mod]\nid = "second"\nfiles = ["b.toml"]'
+files = { "b.toml" = '[patch.var.revenue]\nexpr = "{base} * 2.0"' }
+
+[[case]]
+name = "a mod with a dimension of its own"
+expect = "ran"
+values = { regions_total = 60.0 }
+notes = 0
+model_hash = "9b941146bb1a13a1cb7a0f0fc7bd96d49a03110c20d7f543c624d2d9321ec05a"
+[[case.mods]]
+toml = '[mod]\nid = "regions"\nfiles = ["regions.toml"]'
+files = { "regions.toml" = '[dim.regions_area]\nmembers = ["north", "south", "west"]\n\n[var.regions_revenue]\ntype = "real"\nunit = "1"\nphase = "one"\ndims = ["regions_area"]\nexpr = "revenue"\n\n[var.regions_total]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "sum(regions_revenue, regions_area)"' }
+
+[[case]]
+name = "a mod that renames one of its own values"
+expect = "ran"
+values = { extra_now = 1.0 }
+notes = 0
+model_hash = "7e74ec3be8191caecc5f6079db61c94aed55f098e26fd0d85e0cb23c577867d0"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[var.extra_now]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "1.0"\n\n[renamed]\nextra_then = "extra_now"' }
+
+[[case]]
+name = "a name without the mod's id"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[var.levy]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "1.0"' }
+
+[[case]]
+name = "a mod that declares one name twice"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["a.toml", "b.toml"]'
+files = { "a.toml" = '[var.extra_x]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "1.0"', "b.toml" = '[var.extra_x]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "2.0"' }
+
+[[case]]
+name = "a section a mod cannot add to"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[sector.extra_firms]\nlabel = "Firms"' }
+
+[[case]]
+name = "a patch of an element the model does not have"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[patch.var.spending]\nexpr = "1.0"' }
+
+[[case]]
+name = "a patch of a kind a mod cannot patch"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[patch.model.modbase]\nformat = 0' }
+
+[[case]]
+name = "a patch that breaks a formula"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[patch.var.revenue]\nexpr = "{base} + nothing_here"' }
+
+[[case]]
+name = "{base} where there was no text"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[patch.var.revenue]\ndoc = "{base} and more"' }
+
+[[case]]
+name = "a mod for another model"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nmodel = "elsewhere"\nfiles = []'
+files = {}
+
+[[case]]
+name = "the same mod twice"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = []'
+files = {}
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = []'
+files = {}
+
+[[case]]
+name = "a mod element with a data file"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["extra.toml"]'
+files = { "extra.toml" = '[dim.extra_area]\nmembers = ["a", "b"]\n\n[param.extra_rates]\ntype = "real"\nunit = "1"\ndims = ["extra_area"]\ndata = "rates.csv"' }
+
+[[case]]
+name = "a mod id with capitals"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "Extra"\nfiles = []'
+files = {}
+
+[[case]]
+name = "mod.toml with elements in it"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\n\n[var.extra_x]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "1.0"'
+files = {}
+
+[[case]]
+name = "a mod file that is missing"
+expect = "refused"
+[[case.mods]]
+toml = '[mod]\nid = "extra"\nfiles = ["missing.toml"]'
+files = {}
