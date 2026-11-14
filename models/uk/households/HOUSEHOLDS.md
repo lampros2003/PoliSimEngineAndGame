@@ -20,7 +20,8 @@ Largest error: 0.025%.
 - `state_pension_average_share`: 0.85
 - `private_pension_share`: 0.6
 - `private_pension_median`: 6000
-- `pay_tails`: (0.4, 1.9)
+- `pay_tails`: (0.4, 2.0)
+- `pareto_index`: 2.0
 - `communal_share_75_plus`: 0.05
 - `communal_share_16_24`: 0.04
 - `older_couple_share`: 0.5

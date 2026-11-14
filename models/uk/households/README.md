@@ -1,0 +1,52 @@
+# UK households, 2024-25 rules
+
+A model of the UK's 28.6 million households as 20,000 weighted records (stage S4 of
+`docs/PLAN.md`; plan in `docs/S4-PLAN.md`), with 2024-25 tax and benefit rules.
+
+| File | What it holds | Made by |
+|---|---|---|
+| `households.csv`, `HOUSEHOLDS.md` | The records and their calibration report (every target and its error, every assumption) | `python tools/uk/households.py` |
+| `model.toml`, `rules.toml` | The model: the records as the entity `household`, and the rules | `python tools/uk/make_rules.py` |
+| `scenarios/base.toml`, `golden/` | A three-month run and the oracle's state hashes, which the engine reproduces | by hand; the oracle |
+
+## The records
+
+Built from ONS tables only (no survey microdata): households by type (Families and
+households, 2024), employees' pay by region, sex and age group (ASHE 2024 percentiles), and
+the mid-2024 population. Each record has a region, a household type, up to four adults
+(age, sex, pay or self-employment profit, pension) and its children. Weights come from
+exponential calibration to 179 published totals, all met within 0.03%.
+
+Pay above the 99th percentile follows a Pareto tail (index 2, the 99th percentile at twice
+the 90th), chosen so that National Insurance, the one check that depends on pay alone,
+comes within 2% of the published total.
+
+## The rules
+
+Every rate and threshold is a lever, at its 2024-25 value from GOV.UK. Per adult: income
+tax (rest of the UK or Scotland, by region) on pay, profit and pensions after a personal
+allowance withdrawn above £100,000; employee and employer National Insurance; Class 4 on
+profit. Per household: Child Benefit less the High Income Child Benefit Charge; Universal
+Credit for working-age benefit units (standard allowance, child elements with the two-child
+limit, work allowance, 55% taper, pensions deducted in full).
+
+## First month against published totals (a year)
+
+| | Households | Published | Note |
+|---|---:|---:|---|
+| National Insurance | £176.2bn | £173.3bn (2024) | within 2% |
+| Income tax | £246.7bn | £310.1bn (2024) | the published total also taxes savings, dividends, property income and capital gains, which the records do not have yet |
+| Child Benefit, net of the charge | £14.2bn | | |
+| Universal Credit | £29.8bn | | no housing, disability or carer elements, and everyone entitled claims |
+| Pay | £1,279bn | | |
+| Pensions | £173bn | | |
+
+## Simplifications
+
+Weekly National Insurance thresholds are applied to annual pay (52 weeks). The benefit unit
+is the first two adults of a couple household, or the first adult otherwise. A first child
+counts as born before April 2017 when the youngest child is seven or older. There are no
+rents, so no housing element; no savings or investment income; no disability benefits;
+everyone entitled to Universal Credit claims it. The records do not change from month to
+month yet: households joining the national model (S4.3) and changing weights (S4.4) come
+next.

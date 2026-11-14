@@ -66,7 +66,12 @@ ASSUMPTIONS = {
     "state_pension_average_share": 0.85,  # of the full rate, across pensioners
     "private_pension_share": 0.6,  # pensioners with an occupational or personal pension
     "private_pension_median": 6_000,  # £ a year
-    "pay_tails": (0.4, 1.9),  # pay at the 1st and 99th percentiles, as multiples of the 10th and 90th
+    "pay_tails": (0.4, 2.0),  # pay at the 1st and 99th percentiles, as multiples of the 10th and 90th
+    # Above the 99th percentile pay follows a Pareto tail with this index (HMRC's survey of
+    # personal incomes puts the UK's top-income index near 2; with the 99th percentile at
+    # twice the 90th, the households' National Insurance comes within 2% of the published
+    # total, the check that depends on pay alone).
+    "pareto_index": 2.0,
     # People outside households (the population estimates include them): care homes and
     # other communal establishments for 75 and over, student halls for 16 to 24. The person
     # targets are then scaled to ONS's count of people in households (table 8).
@@ -165,7 +170,10 @@ def pay_at(u: float, points: list[float | None]) -> float:
     known = [(p / 100, v) for p, v in zip(PERCENTILES, points) if v]
     low_tail, high_tail = ASSUMPTIONS["pay_tails"]
     known = [(0.01, known[0][1] * low_tail)] + known + [(0.99, known[-1][1] * high_tail)]
-    u = min(max(u, 0.01), 0.99)
+    if u > 0.99:
+        u = min(u, 0.99995)
+        return known[-1][1] * (0.01 / (1 - u)) ** (1 / ASSUMPTIONS["pareto_index"])
+    u = max(u, 0.01)
     for (p0, v0), (p1, v1) in zip(known, known[1:]):
         if p0 <= u <= p1:
             return math.exp(math.log(v0) + (math.log(v1) - math.log(v0)) * (u - p0) / (p1 - p0))
