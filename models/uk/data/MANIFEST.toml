@@ -91,6 +91,17 @@ release_date = ""
 retrieved = "2026-11-14T02:48:33Z"
 sha256 = "cbc71edc1a46b75f3ecf6326f05501216c68fa2d648f54f231a4a82cea786846"
 
+[dataset.iot2023]
+title = "UK input-output analytical tables: product by product, 2023"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/nationalaccounts/supplyandusetables/datasets/ukinputoutputanalyticaltablesdetailed/2023/iot2023product.xlsx"
+page = "https://www.ons.gov.uk/economy/nationalaccounts/supplyandusetables/datasets/ukinputoutputanalyticaltablesdetailed"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T02:53:23Z"
+sha256 = "14d8f4bd2993f8f0cd5339b28056b419c0f5aee15c920ecb4903c78756e29a56"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"
