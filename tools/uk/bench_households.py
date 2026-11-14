@@ -40,7 +40,7 @@ def main() -> int:
         calibrate.write_model(calibrate.DEFAULT_BASE, model, households=model / "households")
         run = subprocess.run([str(args.engine), "run", str(model / "scenarios" / "2025.toml"), "--steps",
                               str(args.months), "--columns", "step", "--time"]
-                             + (["--profile", str(args.profile)] if args.profile else []), capture_output=True, text=True)
+                             + (["--profile", str(args.profile)] if args.profile else []), capture_output=True, encoding="utf-8")
         print(run.stderr.strip())
         return run.returncode
 

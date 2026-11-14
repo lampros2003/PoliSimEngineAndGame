@@ -70,7 +70,7 @@ def run(engine: Path, folder: Path, key: int, overrides: dict[str, object], mont
              'preset = "central"', "", "[params]"] + [f"{k} = {v!r}" for k, v in overrides.items()]
     scenario.write_text("\n".join(lines) + "\n", encoding="utf-8")
     columns = "step,gdp,unemployment_rate,budget_balance,debt_to_gdp,government_support,election_now,government_seats"
-    done = subprocess.run([str(engine), "run", str(scenario), "--columns", columns], capture_output=True, text=True)
+    done = subprocess.run([str(engine), "run", str(scenario), "--columns", columns], capture_output=True, encoding="utf-8")
     if done.returncode != 0:
         raise SystemExit(f"run {key} failed: {done.stderr.strip()[-500:]}")
     rows = list(csv.DictReader(io.StringIO(done.stdout)))

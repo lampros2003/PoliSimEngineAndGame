@@ -31,7 +31,7 @@ def main() -> int:
         runner = subprocess.run(
             [str(args.runner), "run", str(ROOT / "models" / "toy" / "scenarios" / "client_check.toml"),
              "--columns", "step,hash", "--out", str(runner_out)],
-            capture_output=True, text=True, timeout=600)
+            capture_output=True, encoding="utf-8", timeout=600)
         if runner.returncode != 0:
             print(runner.stderr.strip(), file=sys.stderr)
             return 1
@@ -43,7 +43,7 @@ def main() -> int:
             client = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
                  "--", f"--out={client_out}", *extra],
-                capture_output=True, text=True, timeout=900)
+                capture_output=True, encoding="utf-8", timeout=900)
             print(client.stdout.strip().splitlines()[-1] if client.stdout.strip() else "")
             if client.returncode != 0 or not client_out.exists():
                 print(client.stderr.strip()[-3000:], file=sys.stderr)
@@ -65,7 +65,7 @@ def main() -> int:
         reload = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/reload_run.gd",
              "--", f"--model-dir={copy}", f"--scenario={copy / 'scenarios' / 'term.toml'}"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if reload.returncode != 0:
             print(reload.stdout.strip()[-2000:], reload.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/reload_run.gd failed", file=sys.stderr)
@@ -75,7 +75,7 @@ def main() -> int:
         situations = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/situations_check.gd",
              "--", "--scenario=models/uk/scenarios/2025.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if situations.returncode != 0:
             print(situations.stdout.strip()[-2000:], situations.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/situations_check.gd failed", file=sys.stderr)
@@ -85,7 +85,7 @@ def main() -> int:
         dilemma = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/dilemma_check.gd",
              "--", "--scenario=models/valmora/scenarios/dock_strike.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if dilemma.returncode != 0:
             print(dilemma.stdout.strip()[-2000:], dilemma.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/dilemma_check.gd failed", file=sys.stderr)
@@ -95,7 +95,7 @@ def main() -> int:
         lag = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/lag_check.gd",
              "--", "--scenario=models/valmora/scenarios/year_on_year.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if lag.returncode != 0:
             print(lag.stdout.strip()[-2000:], lag.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/lag_check.gd failed", file=sys.stderr)
@@ -105,7 +105,7 @@ def main() -> int:
         language = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/language_check.gd",
              "--", f"--save={folder / 'french.psave'}"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if language.returncode != 0:
             print(language.stdout.strip()[-2000:], language.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/language_check.gd failed", file=sys.stderr)
@@ -114,7 +114,7 @@ def main() -> int:
         # Stage S7.1: the start screen, with the example mod chosen.
         start = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/start_screen.gd"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if start.returncode != 0:
             print(start.stdout.strip()[-2000:], start.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/start_screen.gd failed", file=sys.stderr)
@@ -128,7 +128,7 @@ def main() -> int:
         second = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/second_model.gd",
              "--", "--scenario=models/mini/scenarios/island.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if second.returncode != 0:
             print(second.stdout.strip()[-2000:], second.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/second_model.gd failed", file=sys.stderr)
@@ -138,7 +138,7 @@ def main() -> int:
         bill = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/bill_vote.gd",
              "--", "--scenario=models/uk/scenarios/hung_parliament.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if bill.returncode != 0:
             print(bill.stdout.strip()[-2000:], bill.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/bill_vote.gd failed", file=sys.stderr)
@@ -148,7 +148,7 @@ def main() -> int:
         walk = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/web_walk.gd",
              "--", "--scenario=models/uk/scenarios/2025.toml"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if walk.returncode != 0:
             print(walk.stdout.strip()[-2000:], walk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/web_walk.gd failed", file=sys.stderr)
@@ -159,7 +159,7 @@ def main() -> int:
             run = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/politics_check.gd",
                  "--", f"--scenario=models/uk/scenarios/{scenario}.toml", f"--expect={expect}"],
-                capture_output=True, text=True, timeout=900)
+                capture_output=True, encoding="utf-8", timeout=900)
             if run.returncode != 0:
                 print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
                 print(f"res://tests/politics_check.gd ({expect}) failed", file=sys.stderr)
@@ -170,7 +170,7 @@ def main() -> int:
         uk = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/budget_dump.gd",
              "--", "--scenario=models/uk/scenarios/2025.toml", f"--out={dump}", f"--breakdowns={breakdowns}"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if uk.returncode != 0 or not dump.exists():
             print(uk.stdout.strip()[-2000:], uk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
             print("res://tests/budget_dump.gd failed", file=sys.stderr)
@@ -210,7 +210,7 @@ def check_migration(godot: str, folder: Path) -> str:
         run = subprocess.run(
             [godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/migrate_check.gd",
              "--", f"--scenario={scenario}", f"--save={save}", f"--phase={phase}"],
-            capture_output=True, text=True, timeout=900)
+            capture_output=True, encoding="utf-8", timeout=900)
         if run.returncode != 0:
             return "\n".join([run.stdout.strip()[-2000:], run.stderr.strip()[-3000:],
                               f"res://tests/migrate_check.gd ({phase}) failed"])
@@ -262,7 +262,7 @@ def compare_uk_budget(text: str) -> list[str]:
     problems = []
     # Stage S9.0: the headline shows the NHS waiting list, whole, as the runner has it.
     out = subprocess.run([str(ROOT / "target" / "release" / EXE), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"),
-                          "--steps", "1", "--columns", "waiting_list"], capture_output=True, text=True, timeout=600)
+                          "--steps", "1", "--columns", "waiting_list"], capture_output=True, encoding="utf-8", timeout=600)
     want = int(out.stdout.splitlines()[1]) if out.returncode == 0 else None
     got = headline.get("waiting_list")
     if want is None or got is None or got.replace(",", "") != str(want):
@@ -324,7 +324,7 @@ def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
         return problems
     line = {(r["month"], r["breakdown"], r["group"]): r for r in rows}
     out = subprocess.run([str(runner), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"), "--steps", "1",
-                          "--columns", "net_income_average"], capture_output=True, text=True, timeout=600)
+                          "--columns", "net_income_average"], capture_output=True, encoding="utf-8", timeout=600)
     average = float(out.stdout.splitlines()[1]) * 12 / 100  # pence a month to pounds a year
     shown = parse_money(line[("1", "By region", "All households")]["now"])
     if abs(shown - average) > 0.5:
@@ -364,7 +364,7 @@ def check_uk_industries(line: dict, runner: Path) -> list[str]:
         if abs(shown - want) > 0.5:  # shown to the person
             problems.append(f"UK jobs by industry: {group} shows {shown:,.0f}, 2024 had {want:,.0f}")
     out = subprocess.run([str(runner), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"), "--steps", "1",
-                          "--columns", "pay_per_employee_job"], capture_output=True, text=True, timeout=600)
+                          "--columns", "pay_per_employee_job"], capture_output=True, encoding="utf-8", timeout=600)
     pay = float(out.stdout.splitlines()[1]) * 12 / 100
     shown = parse_money(line[("1", "Pay per employee job, by industry", "Pay per employee job")]["now"])
     if abs(shown - pay) > 0.5:

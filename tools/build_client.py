@@ -37,10 +37,10 @@ def main() -> int:
         # written by then, and the game runs normally. A second import with the cache in
         # place exits cleanly, so that one is the check.
         command = [args.godot, "--headless", "--path", str(ROOT / "client"), "--import"]
-        first = subprocess.run(command, capture_output=True, text=True, timeout=600)
+        first = subprocess.run(command, capture_output=True, encoding="utf-8", timeout=600)
         if first.returncode != 0:
             print(f"first import exited with {first.returncode}; importing again")
-        done = subprocess.run(command, capture_output=True, text=True, timeout=600)
+        done = subprocess.run(command, capture_output=True, encoding="utf-8", timeout=600)
         listed = ROOT / "client" / ".godot" / "extension_list.cfg"
         if done.returncode != 0 or not listed.exists():
             print(done.stdout[-2000:], done.stderr[-2000:], sep="\n", file=sys.stderr)
