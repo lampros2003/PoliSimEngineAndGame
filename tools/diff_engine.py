@@ -81,6 +81,8 @@ def lever_value(rng: random.Random, name: str):
         value = rng.choice([low - (high - low) * 0.1, high * 1.1 + 1])  # outside the declared range
     else:
         return rng.choice([True, "plenty", 0.123456789 if money else "0.2"])  # wrong kind of value
+    if money == "int":
+        return round(value)
     if money:
         return round(value, 2) if rng.random() < 0.5 else int(value)
     return value
@@ -90,12 +92,14 @@ def param_value(rng: random.Random, name: str):
     low, high, money = PARAMS[name]
     span = high - low
     value = rng.uniform(low - 0.05 * span, high + 0.05 * span)
+    if money == "int":
+        return round(value)
     return round(value, 2) if money else value
 
 
 def use_model(path: Path) -> None:
     """Point the generator at another model, taking its levers and parameters from its files."""
-    global MODEL, LEVERS, PARAMS, MAX_STEPS
+    global MODEL, LEVERS, PARAMS, MAX_STEPS, PICK_PARAMS, PICK_LEVERS
     MODEL, MAX_STEPS = path.resolve(), 120
     if MODEL == (ROOT / "models" / "toy").resolve():
         MAX_STEPS = 40
@@ -103,13 +107,16 @@ def use_model(path: Path) -> None:
     model = load_model(MODEL)
     LEVERS, PARAMS = {}, {}
     for decl in model.symbols.values():
+        if decl.kind == "lever" and decl.spec.get("dilemma"):
+            continue  # answered by a command while its dilemma is open, never set at the start
         if decl.kind == "lever" and decl.type == "bool":
             LEVERS[decl.name] = (decl.spec["default"], None, None, "bool")
             continue
         if decl.type == "bool" or decl.kind not in ("lever", "param"):
             continue
         spec = decl.spec
-        money = decl.money
+        # Whole numbers that are not money are drawn as whole numbers ("int").
+        money = "int" if decl.type == "int" and not decl.money else decl.money
         if decl.kind == "lever":
             default = spec["default"]
             low, high = spec.get("range", (min(0.5 * default, 1.5 * default), max(0.5 * default, 1.5 * default)))
@@ -122,9 +129,14 @@ def use_model(path: Path) -> None:
             if low == high:
                 low, high = low - 0.01, high + 0.01
             PARAMS[decl.name] = (low, high, money)
+    # A large model (the UK has hundreds of parameters) changes about three of each, so that a
+    # scenario is not almost always refused for one value out of range.
+    PICK_PARAMS = min(0.15, 3.0 / max(len(PARAMS), 1))
+    PICK_LEVERS = min(0.2, 3.0 / max(len(LEVERS), 1))
 
 
 MAX_STEPS = 40
+PICK_PARAMS, PICK_LEVERS = 0.15, 0.2
 
 
 def make_scenario(rng: random.Random) -> str:
@@ -132,12 +144,12 @@ def make_scenario(rng: random.Random) -> str:
     seed = rng.choice([rng.randrange(0, 1 << 63), rng.randrange(-(1 << 63), 0), rng.randrange(0, 100)])
     lines = ["[scenario]", f'model = "{MODEL.as_posix()}"', f"seed = {seed}", f"steps = {steps}",
              f'preset = "{rng.choice(["low", "central", "central", "high"])}"', ""]
-    params = {name: param_value(rng, name) for name in PARAMS if rng.random() < 0.15}
+    params = {name: param_value(rng, name) for name in PARAMS if rng.random() < PICK_PARAMS}
     if rng.random() < 0.02:
         params["no_such_parameter"] = 1
     if params:
         lines += ["[params]"] + [f"{k} = {toml_value(v)}" for k, v in params.items()] + [""]
-    levers = {name: lever_value(rng, name) for name in LEVERS if rng.random() < 0.2}
+    levers = {name: lever_value(rng, name) for name in LEVERS if rng.random() < PICK_LEVERS}
     if levers:
         lines += ["[levers]"] + [f"{k} = {toml_value(v)}" for k, v in levers.items()] + [""]
     for _ in range(rng.choice([0, 0, 1, 2, 3, 6]) if LEVERS else 0):
