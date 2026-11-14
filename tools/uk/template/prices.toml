@@ -1,0 +1,107 @@
+# Consumer prices (stage S9.3), model format 1. GENERATED: copied from
+# tools/uk/template/prices.toml by tools/uk/calibrate.py.
+#
+# The price level (price_index) is the GDP deflator: it follows the Phillips curve.
+# Consumer prices add to it what taxes on spending put on shop prices: a change in VAT from
+# the first month's, the carbon price and customs duties that firms pass on, and the carbon
+# price households pay on their own heating and driving. These reach prices over a few
+# months, households' real incomes are measured in consumer prices, voters weigh consumer
+# inflation, and private pay makes up part of the difference. In the first month every
+# rate is 2024's, the carbon price and the trade barriers are nil, and consumer prices are
+# the deflator, so the base month is unchanged.
+
+[param.vat_pass_through]
+doc = "The share of a change in VAT that reaches shop prices (a judgement: most of the 2008 cut and the 2010 and 2011 rises did)"
+type = "real"
+unit = "1"
+low = 0.6
+central = 0.9
+high = 1.0
+
+[param.cost_pass_through]
+doc = "The share of firms' carbon price and customs duties they pass on to consumers; the rest falls on profits (a judgement)"
+type = "real"
+unit = "1"
+low = 0.3
+central = 0.6
+high = 0.9
+
+[param.price_adjust_months]
+doc = "Months over which a tax on spending reaches shop prices (a judgement)"
+type = "real"
+unit = "1"
+low = 1.0
+central = 3.0
+high = 6.0
+
+[param.wage_catchup]
+doc = "The share of a rise in consumer prices above the deflator that private pay makes up (a judgement)"
+type = "real"
+unit = "1"
+low = 0.25
+central = 0.5
+high = 0.75
+
+[var.vat_factor]
+doc = "What VAT adds to the price of what households buy: one plus the VAT rate times the share of spending it falls on"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "1.0 + vat_rate * vat_base_share"
+
+[var.vat_factor_first]
+doc = "The VAT factor in the first month"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(prev(vat_factor_first) > 0.0, prev(vat_factor_first), vat_factor)"
+initial = 0.0
+
+[var.tax_wedge_target]
+label = "Taxes on spending, on shop prices: where they are heading"
+doc = "How much higher consumer prices would be, once adjusted, from VAT above its first month's, the carbon price and customs duties firms pass on, and the carbon price on households' own fuel"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "vat_pass_through * (vat_factor / vat_factor_first - 1.0) + cost_pass_through * (carbon_tax_firms + customs_duties) / private_demand + carbon_tax_households / consumption"
+
+[var.tax_wedge]
+label = "Taxes on spending, on shop prices"
+doc = "How much higher consumer prices are than the deflator because of taxes on spending, following their target over a few months"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "prev(tax_wedge) + (tax_wedge_target - prev(tax_wedge)) / price_adjust_months"
+initial = 0.0
+
+[var.price_wedge_growth]
+doc = "This month's change in the taxes on shop prices: consumer inflation above the deflator's"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "(1.0 + tax_wedge) / (1.0 + prev(tax_wedge)) - 1.0"
+
+[state.consumer_price_index]
+label = "Consumer prices (first month = 1)"
+doc = "The price of what households buy: the deflator, with what taxes on spending add"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "price_index * (1.0 + inflation) * (1.0 + tax_wedge)"
+
+[var.wedge_inflation_annual]
+doc = "Consumer inflation above the deflator's, at an annual rate, averaged over about a year"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "prev(wedge_inflation_annual) + (12.0 * price_wedge_growth - prev(wedge_inflation_annual)) / 12.0"
+initial = 0.0
+
+[var.consumer_inflation_annual]
+label = "Consumer price inflation"
+doc = "How fast consumer prices are rising, a year: the deflator's inflation and what taxes on spending add, averaged over about a year"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "inflation_annual + wedge_inflation_annual"

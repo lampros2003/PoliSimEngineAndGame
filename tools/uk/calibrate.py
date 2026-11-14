@@ -473,7 +473,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
-               "functions.toml", "emissions.toml", "nhs.toml", "situations.toml", "dilemmas.toml") if people else ())
+               "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml")
+              if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
     if people:
@@ -524,6 +525,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
                              else "round(import_share * import_propensity * private_demand)")
     # Customs duties (trade.toml) are public receipts too.
     fills["customs_receipts"] = " + customs_duties + carbon_tax_firms + carbon_tax_households" if people else ""
+    # Stage S9.3: private pay makes up part of consumer prices' rise above the deflator's.
+    fills["pay_catchup"] = " + wage_catchup * price_wedge_growth" if people else ""
     for name in ("model.toml", "economy.toml",
                  *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml", "functions.toml",
                                                   "emissions.toml", "nhs.toml"))):

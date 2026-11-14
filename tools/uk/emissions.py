@@ -169,7 +169,7 @@ doc = "Household spending in the first month, at its prices"
 type = "real"
 unit = "GBP/month"
 phase = "accounts"
-expr = "select(prev(consumption_first) > 0.0, prev(consumption_first), consumption / price_index)"
+expr = "select(prev(consumption_first) > 0.0, prev(consumption_first), consumption / consumer_price_index)"
 initial = 0.0
 
 [var.industry_emissions]
@@ -196,7 +196,7 @@ doc = "Greenhouse gases households emit themselves, heating homes and driving, a
 type = "real"
 unit = "tonne/month"
 phase = "accounts"
-expr = "household_emissions_2024 * (consumption / price_index) / consumption_first * emission_intensity"
+expr = "household_emissions_2024 * (consumption / consumer_price_index) / consumption_first * emission_intensity"
 initial = {households_monthly!r}
 
 [var.emissions]

@@ -210,7 +210,7 @@ type = "real"
 unit = "GBP/month/person"
 phase = "accounts"
 initial = {{opening.private_pay_per_worker}}
-next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock)"
+next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock{{pay_catchup}})"
 
 [state.trend_index]
 label = "Trend size of the economy ({{base_year}} = 1)"

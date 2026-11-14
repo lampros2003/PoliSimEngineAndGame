@@ -83,7 +83,8 @@ months each time.
    to its income, the voters' choice and the polls.
 5. **Set a carbon price of £100 a tonne** (Policy, Environment) and watch emissions by
    industry (Who gains, who loses) and the budget: about £48bn a year in revenue, and
-   emissions falling faster, though not yet on the path to net zero.
+   emissions falling faster, though not yet on the path to net zero. Shop prices rise
+   about 1% over the next few months, and voters feel it; so they do after a VAT rise.
 6. **Leave policy alone and advance to July 2029**, answering the questions as they come. Time in office wears the government
    down, but with an economy that holds up it keeps a majority. Then try the same with
    a slump of your own making.

@@ -21,7 +21,7 @@ currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "alignment", "income", "spending", "finance", "accounts", "politics"]
-files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "situations.toml", "dilemmas.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml"]
 
 [sector.households]
 label = "Households"
@@ -210,7 +210,7 @@ type = "real"
 unit = "GBP/month/person"
 phase = "accounts"
 initial = 350975.915680092
-next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock)"
+next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock + wage_catchup * price_wedge_growth)"
 
 [state.trend_index]
 label = "Trend size of the economy (2024 = 1)"

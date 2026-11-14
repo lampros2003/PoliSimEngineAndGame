@@ -243,13 +243,44 @@ output nearly doubled).
 A carbon price (the "Environment" group, pounds a tonne, a bill) speeds the fall, by 2% a
 year more at £100 a tonne (`carbon_price_response`, a judgement, presets 1% and 3%), and
 firms and households pay it to the government on the previous month's emissions, as
-public receipts: £100 a tonne raises about £48bn a year at first. It does not yet raise
-prices; it takes money from firms and households.
+public receipts: £100 a tonne raises about £48bn a year at first. Since stage S9.3 it
+also raises consumer prices (below): households pay their own share in full and firms pass
+on some of theirs.
 
 With unchanged policy emissions fall about 1.5% a year and move more than 5% above a
 straight path from 2024's to nothing in 2050 in the 16th month; at £100 a tonne they fall
 about 3.5% a year, still above the path, which falls by a twenty-sixth of 2024's each
 year.
+
+## Consumer prices (stage S9.3)
+
+The price level, `price_index`, is the GDP deflator and follows the Phillips curve.
+`prices.toml` adds consumer prices: the deflator times one plus a `tax_wedge`, what taxes
+on spending put on shop prices. The wedge heads for
+
+- the VAT pass-through share (`vat_pass_through`, 0.9, presets 0.6 and 1.0: most of the
+  2008 cut and the 2010 and 2011 rises reached prices) of the rise in what VAT adds to
+  prices since the first month (one plus the rate times the share of spending it falls on);
+- plus the share of firms' carbon price and customs duties they pass on
+  (`cost_pass_through`, 0.6, presets 0.3 and 0.9), over all private demand;
+- plus households' own carbon price, over their spending, in full;
+
+and gets there over about three months (`price_adjust_months`, presets 1 and 6). All of
+them are judgements. Consumer inflation (`consumer_inflation_annual`) is the deflator's
+plus the wedge's growth, averaged over about a year. Households' real incomes, on which
+voters judge the government, are their incomes over consumer prices, and voters weigh
+consumer inflation since the last election; household emissions follow spending at
+consumer prices; and private pay makes up half of consumer prices' rise above the
+deflator (`wage_catchup`, presets 0.25 and 0.75). In the first month every rate is
+2024's, so the wedge is nil and the base month is unchanged.
+
+A year after a 2.5-point VAT rise consumer prices are 1.3% above the deflator, consumer
+inflation is 0.4 points higher, and the government's poll rating is about a point lower
+than with unchanged policy; a £100 carbon price does much the same (1.2%) and cuts
+households' emissions 3% more; a 20% barrier on China adds 0.14%. The deflator itself does
+not rise: higher taxes on spending weigh on firms' sales, and the Phillips curve sees
+only unemployment, so a second round of inflation through wages and prices is not
+modelled.
 
 ## Situations (stage S7.3)
 
@@ -261,7 +292,7 @@ end, each with a start and an end so it does not flicker:
 | Recession | output at 2024 prices, smoothed over about a quarter, falls at more than 0.5% a year | it grows at more than 0.5% |
 | Strong growth (good) | it grows at more than 3% a year | below 2.5% |
 | High unemployment | above 6% | below 5.5% |
-| High inflation | above 5% a year | below 4% |
+| High inflation | consumer prices rising above 5% a year (S9.3) | below 4% |
 | Debt above a year's output | net debt above 100% of GDP | below 98% |
 | Budget surplus (good) | receipts above spending | below |
 | No majority | the governing blocs hold fewer than 326 seats | 326 or more |

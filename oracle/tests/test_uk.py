@@ -506,6 +506,45 @@ class WaitingList(unittest.TestCase):
         self.assertFalse(row["waiting_list_record"])
 
 
+class Prices(unittest.TestCase):
+    """Stage S9.3: taxes on spending reach consumer prices (models/uk/prices.toml): a VAT
+    rise by its pass-through share, the carbon price and customs duties by the share firms
+    pass on, households' own carbon price in full; real incomes and voters follow."""
+
+    def run_with(self, change: dict, months: int = 8) -> dict:
+        sim = Simulation(model(), seed=SEED, commands={1: change} if change else None)
+        rows = [sim.step() for _ in range(months)]
+        return rows[-1]
+
+    def test_the_base_month_has_consumer_prices_at_the_deflator(self):
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        self.assertEqual(row["tax_wedge"], 0.0)
+        self.assertEqual(row["consumer_price_index"], row["price_index"])
+        self.assertEqual(row["consumer_inflation_annual"], row["inflation_annual"])
+
+    def test_vat_and_the_carbon_price_reach_shop_prices(self):
+        p = {name: model().symbols[name].spec for name in ("vat_pass_through", "cost_pass_through", "vat_base_share")}
+        base_vat = model().symbols["vat_rate"].spec["default"]
+        share = p["vat_base_share"]["value"]
+        base, vat, carbon = self.run_with({}), self.run_with({"vat_rate": base_vat + 0.025}), \
+            self.run_with({"carbon_price": 100})
+        # VAT: its documented share of the rise in what VAT adds to prices, nearly all there
+        # after seven months of a three-month adjustment.
+        documented = p["vat_pass_through"]["central"] * ((1 + (base_vat + 0.025) * share) / (1 + base_vat * share) - 1)
+        self.assertAlmostEqual(vat["tax_wedge"] / documented, 1.0, delta=0.08)
+        # Consumer prices carry the wedge; the deflator does not.
+        self.assertAlmostEqual(vat["consumer_price_index"] / vat["price_index"] - 1, vat["tax_wedge"], delta=0.002)
+        # The carbon price: firms' share passed on, households' own in full.
+        documented = (p["cost_pass_through"]["central"] * carbon["carbon_tax_firms"] / carbon["private_demand"]
+                      + carbon["carbon_tax_households"] / carbon["consumption"])
+        self.assertAlmostEqual(carbon["tax_wedge"] / documented, 1.0, delta=0.1)
+        for row in (vat, carbon):
+            self.assertGreater(row["consumer_inflation_annual"], row["inflation_annual"])
+            # Dearer shopping costs the government votes.
+            self.assertLess(row["government_support"], base["government_support"] - 0.003)
+
+
 class Dilemmas(unittest.TestCase):
     """Stage S9.2: the UK's dilemmas (models/uk/dilemmas.toml). The engine's
     crates/core/tests/uk_dilemmas.rs gives every answer and checks what it changes."""

@@ -43,9 +43,9 @@ end = "unemployment_rate < 0.055"
 
 [situation.high_inflation]
 label = "High inflation"
-doc = "Prices are rising by more than 5% a year"
-start = "inflation_annual > 0.05"
-end = "inflation_annual < 0.04"
+doc = "Consumer prices are rising by more than 5% a year"
+start = "consumer_inflation_annual > 0.05"
+end = "consumer_inflation_annual < 0.04"
 
 [situation.debt_above_output]
 label = "Debt above a year's output"

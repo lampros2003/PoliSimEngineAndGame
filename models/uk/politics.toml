@@ -137,7 +137,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 initial = -1.0
-next = "select(inflation_at_election < -0.5 or election_now, inflation_annual, inflation_at_election)"
+next = "select(inflation_at_election < -0.5 or election_now, consumer_inflation_annual, inflation_at_election)"
 
 # ---- each household's change in real income, the pocketbook
 
@@ -146,7 +146,7 @@ type = "real"
 unit = "GBP/month/household"
 phase = "politics"
 entity = "household"
-expr = "net_income / price_index"
+expr = "net_income / consumer_price_index"
 
 [state.income_memory]
 doc = "Real net income, averaged over about a year (exponentially); 0 until the first month"
@@ -187,7 +187,7 @@ label = "Inflation and time in office, on the government's utility"
 type = "real"
 unit = "1"
 phase = "politics"
-expr = "select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0"
+expr = "select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (consumer_inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0"
 
 # ---- unemployment by region (stage S6.2): the national rate times the region's relative
 # rate in the Annual Population Survey of 2024; voters weigh their own region's.

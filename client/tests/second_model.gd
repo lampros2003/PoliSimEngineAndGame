@@ -23,6 +23,8 @@ func _initialize() -> void:
 	await _settle()
 	var before := int(main.game.latest("pensions.total"))
 	main.levers.type_value("pension", 1000.0)
+	# The change goes to the simulation thread first; the month buttons wait for it.
+	await _settle()
 	main.advance(1)
 	await _settle()
 	var after := int(main.game.latest("pensions.total"))

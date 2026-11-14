@@ -19,7 +19,7 @@ government = "government"
 # Amounts paid each month are shown at an annual rate, as the public finances are published.
 amounts = "year"
 headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "government_support", "waiting_list"]
-watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual", "waiting_list"]
+watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_inflation_annual", "waiting_list"]
 # "Who gains, who loses": net income per household by group, from the households; jobs and
 # pay by industry (stage S6.4).
 breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region",
