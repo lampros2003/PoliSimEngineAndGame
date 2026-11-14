@@ -58,6 +58,17 @@ release_date = ""
 retrieved = "2026-11-14T01:30:09Z"
 sha256 = "cdf24722052819069242ab8abf9e09e9754b9da28c1fab9220c8e9cb9b3c6314"
 
+[dataset.giltyield]
+title = "10 year nominal par yield on British government stock, monthly average (IUMAMNPY)"
+publisher = "Bank of England"
+url = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/1995&Dateto=31/Dec/2025&SeriesCodes=IUMAMNPY&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
+page = "https://www.bankofengland.co.uk/boeapps/database"
+licence = "Open Government Licence v3.0 (Bank of England Database)"
+attribution = "Contains Bank of England data licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T02:00:37Z"
+sha256 = "5161f3039b6f384d5194ee7f745c7e804635bfead7ada2d5ddce89dd15ab2ca9"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"
@@ -321,3 +332,21 @@ dataset = "bankrate"
 code = "IUMABEDR"
 unit = "percent"
 published_title = "Bank Rate, monthly average"
+
+[series.gilt_yield_10y]
+dataset = "giltyield"
+code = "IUMAMNPY"
+unit = "percent"
+published_title = "Bank Rate, monthly average"
+
+[series.gdp_real]
+dataset = "qna"
+code = "ABMI"
+unit = "GBP million"
+published_title = "Gross Domestic Product: chained volume measures: Seasonally adjusted \u00a3m"
+
+[series.gdp_deflator]
+dataset = "qna"
+code = "YBGB"
+unit = "index"
+published_title = "Gross domestic product at market prices:Implied deflator:SA"

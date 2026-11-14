@@ -244,6 +244,12 @@ unit = "1"
 value = 0.041666666667
 doc = "Monthly inflation added per point of unemployment below the natural rate"
 
+[param.wage_curve]
+type = "real"
+unit = "1"
+value = 0.083333333333
+doc = "Monthly growth of pay beyond prices and productivity per point of unemployment below the natural rate"
+
 [param.gilt_yield]
 type = "real"
 unit = "1"

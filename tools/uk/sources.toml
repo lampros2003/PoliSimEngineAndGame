@@ -46,3 +46,12 @@ page = "https://www.bankofengland.co.uk/boeapps/database"
 licence = "Open Government Licence v3.0 (Bank of England Database)"
 attribution = "Contains Bank of England data licensed under the Open Government Licence v3.0"
 format = "boe_monthly"
+
+[dataset.giltyield]
+title = "10 year nominal par yield on British government stock, monthly average (IUMAMNPY)"
+publisher = "Bank of England"
+url = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/1995&Dateto=31/Dec/2025&SeriesCodes=IUMAMNPY&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
+page = "https://www.bankofengland.co.uk/boeapps/database"
+licence = "Open Government Licence v3.0 (Bank of England Database)"
+attribution = "Contains Bank of England data licensed under the Open Government Licence v3.0"
+format = "boe_monthly"

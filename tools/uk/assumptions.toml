@@ -4,7 +4,8 @@
 # is recalibrated by construction.
 
 [stocks]
-# Opening balances, £ million, end of 2024. Rough orders of magnitude, not yet taken from
+# Opening balances, £ million, end of 2024. For another base year they are scaled by
+# nominal GDP; money amounts per person below (benefit_per_unemployed) by the GDP deflator. Rough orders of magnitude, not yet taken from
 # the Bank of England's money and credit data (a later step of the pipeline).
 household_deposits = 1_900_000
 firm_deposits = 800_000
@@ -34,6 +35,10 @@ world_demand_growth_annual = 0.035
 inflation_target_annual = 0.02
 natural_unemployment = 0.045
 phillips_slope = 0.5
+# Pay grows faster than prices and productivity when unemployment is below its natural
+# rate, slower when above: this much a year per point of the gap. It is what stops
+# employment running ahead of (or behind) the labour force.
+wage_curve = 1.0
 # The government pays this market rate on new gilts; the average rate on its debt moves
 # toward it as old gilts mature (average maturity about 14 years in the UK).
 gilt_yield = { low = 0.035, central = 0.042, high = 0.05 }
@@ -51,3 +56,11 @@ benefit_per_unemployed = 450
 # Financial corporations keep this part of the gilt interest they receive and pay the
 # rest to households; chosen so that the sector's 2024 net lending is reproduced.
 match_financial_net_lending = true
+
+[statutory]
+# Statutory rates with the date each took effect, for any base year and for the hindcast.
+# A year's figure is the average of the rate in force on the 15th of each month.
+vat_rate = [["1991-04-01", 0.175], ["2008-12-01", 0.15], ["2010-01-01", 0.175], ["2011-01-04", 0.2]]
+corporation_tax_rate = [["1999-04-01", 0.3], ["2008-04-01", 0.28], ["2011-04-01", 0.26], ["2012-04-01", 0.24],
+                        ["2013-04-01", 0.23], ["2014-04-01", 0.21], ["2015-04-01", 0.2], ["2017-04-01", 0.19],
+                        ["2023-04-01", 0.25]]

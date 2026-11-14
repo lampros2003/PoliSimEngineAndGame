@@ -22,6 +22,10 @@ jobs:
       - name: Run tests
         working-directory: oracle
         run: python -m unittest discover -s tests
+      - name: The UK hindcast reproduces its committed results
+        # Its inputs use the platform's exp and log, so it is checked on one platform.
+        if: runner.os == 'Linux' && matrix.python == '3.13'
+        run: python tools/uk/hindcast.py --check
 
   engine:
     # The engine must match the oracle: recorded hashes, the conformance corpus, save and

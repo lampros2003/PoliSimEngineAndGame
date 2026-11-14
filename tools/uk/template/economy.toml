@@ -3,9 +3,9 @@
 #
 # GENERATED from tools/uk/template/economy.toml by tools/uk/calibrate.py. Parameters and
 # lever settings are in calibration.toml, derived so the first month reproduces one
-# twelfth of 2024. Amounts set by policy are in 2024 terms and grow automatically with
+# twelfth of {{base_year}}. Amounts set by policy are in {{base_year}} terms and grow automatically with
 # the economy's trend (2% inflation plus trend real growth); setting a lever above or below
-# its 2024 value spends more or less than that.
+# its {{base_year}} value spends more or less than that.
 
 # ================================================================= phase: labour
 
@@ -47,7 +47,7 @@ phase = "income"
 expr = "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index)"
 
 [var.payout_factor]
-label = "Firms' payout relative to 2024"
+label = "Firms' payout relative to {{base_year}}"
 type = "real"
 unit = "1"
 phase = "income"
@@ -124,7 +124,7 @@ label = "Household spending"
 from = "households"
 to = "firms"
 phase = "spending"
-expr = "min(round(spend_out_of_income * disposable_income + spend_out_of_savings * household_money), disposable_income + per_step(household_money))"
+expr = "min(round((spend_out_of_income + spending_shift) * disposable_income + spend_out_of_savings * household_money), disposable_income + per_step(household_money))"
 
 [flow.dwellings]
 label = "Household investment in homes"
@@ -166,14 +166,14 @@ label = "Exports"
 from = "rest_of_world"
 to = "firms"
 phase = "spending"
-expr = "round(exports_base * world_index)"
+expr = "round(exports_base * world_index * export_demand)"
 
 [var.business_investment]
 label = "Business investment"
 type = "money"
 unit = "GBP/month"
 phase = "spending"
-expr = "round(investment_share * prev(private_demand))"
+expr = "round(investment_share * investment_demand * prev(private_demand))"
 
 [var.private_demand]
 label = "Sales by firms"
@@ -188,7 +188,7 @@ label = "Imports"
 from = "firms"
 to = "rest_of_world"
 phase = "spending"
-expr = "round(import_share * private_demand)"
+expr = "round(import_share * import_propensity * private_demand)"
 
 [flow.vat]
 label = "VAT"
@@ -379,8 +379,8 @@ phase = "accounts"
 doc = "Gross domestic product at market prices, current prices"
 expr = "consumption + dwellings + business_investment + public_investment + procurement + public_pay + exports - imports + round(gdp_adjustment_share * private_demand)"
 
-[var.gdp_2024_prices]
-label = "Output in 2024 prices"
+[var.real_gdp]
+label = "Output at {{base_year}} prices"
 type = "real"
 unit = "GBP/month"
 phase = "accounts"
@@ -406,7 +406,7 @@ label = "Inflation this month"
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "inflation_target + phillips_slope * (natural_unemployment - unemployment_rate)"
+expr = "inflation_target + phillips_slope * (natural_unemployment - unemployment_rate) + inflation_shock"
 
 [var.inflation_annual]
 label = "Inflation, annual rate"

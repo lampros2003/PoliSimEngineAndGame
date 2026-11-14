@@ -149,8 +149,8 @@ class UnchangedPolicy(unittest.TestCase):
 
     def test_real_growth_is_between_one_and_two_and_a_half_percent(self):
         rows = run()
-        first = sum(r["gdp_2024_prices"] for r in rows[:12])
-        last = sum(r["gdp_2024_prices"] for r in rows[-12:])
+        first = sum(r["real_gdp"] for r in rows[:12])
+        last = sum(r["real_gdp"] for r in rows[-12:])
         growth = (last / first) ** (1 / 29) - 1
         self.assertGreater(growth, 0.01)
         self.assertLess(growth, 0.025)

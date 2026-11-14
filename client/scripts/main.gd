@@ -233,7 +233,7 @@ func _model_changed() -> void:
 		entries[entry["name"]] = entry
 		if str(entry["row"]) != "":
 			rows[entry["row"]] = entry
-		if entry["kind"] == "lever":
+		if entry["kind"] == "lever" and entry.get("player", true):
 			lever_entries.append(entry)
 	trace.entries = entries
 	budget.build(catalogue, entries, str(play.get("government", "government")))

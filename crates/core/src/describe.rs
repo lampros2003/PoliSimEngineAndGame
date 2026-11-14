@@ -36,6 +36,9 @@ pub struct Entry {
     /// A flow marked `financial = true`: a purchase or sale of an asset, such as paying for
     /// gilts, rather than income or spending. Budget screens leave these out.
     pub financial: bool,
+    /// A lever the player may set: every lever except those marked `player = false`,
+    /// which are inputs that scenarios set (world demand, market rates).
+    pub player: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,6 +116,7 @@ impl Catalogue {
                     model.instruments[account.instrument].name.clone()
                 }),
                 financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
+                player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
             });
         }
         let sectors = model

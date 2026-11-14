@@ -99,7 +99,10 @@ parameter.
 ### `[lever.<name>]`
 
 A value the player sets: `type`, `unit`, `default`, optional `range`. Changed only by
-commands, which take effect before the phases of the step they name.
+commands, which take effect before the phases of the step they name. Optional
+`player = false` marks an input that scenarios set but the game does not offer the
+player, such as world demand or a market interest rate in a historical run; it behaves
+like any other lever.
 
 ### `[table.<name>]`
 
@@ -131,7 +134,10 @@ A payment: `from` and `to` (two different sectors), `phase`, `expr` for the amou
 optional `instrument` (default: the first declared). It is record-level when either
 sector is; a flow between two record-level sectors is not in format 0. Its type is
 `money` and its unit is derived: the instrument's unit per step, per record if
-record-level. A flow's amount can be read by name like a `var`.
+record-level. A flow's amount can be read by name like a `var`. Optional
+`financial = true` marks a purchase or sale of an asset (paying for gilts, drawing a
+loan) rather than income or spending; it changes nothing in a run, and budget screens
+leave such flows out.
 
 Any element may carry `doc`, a sentence for people and for generated documentation.
 

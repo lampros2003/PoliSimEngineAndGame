@@ -124,7 +124,10 @@ Largest absolute residual since 2000: 0.
 | employment | 33,618 |
 | exports | 882,353 |
 | gdp | 2,904,950 |
+| gdp_deflator | 100.0 |
+| gdp_real | 2,904,950 |
 | gdp_statistical_discrepancy | 0 |
+| gilt_yield_10y | 4.1442 |
 | government_consumption | 603,449 |
 | household_consumption | 1,708,930 |
 | household_disposable_income | 1,867,259 |

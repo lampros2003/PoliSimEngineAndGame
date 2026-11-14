@@ -1,14 +1,15 @@
 """The United Kingdom's data pipeline (stage S3.0).
 
     python tools/uk/pipeline.py fetch      download every dataset in sources.toml into .cache/uk/
+                                           (or only those named: fetch giltyield)
     python tools/uk/pipeline.py extract    write models/uk/data/ from the cached downloads
     python tools/uk/pipeline.py check      test the accounting identities and write CHECKS.md
     python tools/uk/pipeline.py all        all three
 
 `extract` and `check` read only the cache, so with the same downloads they rebuild every
 committed file byte for byte. Values are copied as the publisher wrote them; the only
-arithmetic is averaging Bank Rate's months into quarters and years, done in exact
-decimals.
+arithmetic is averaging the Bank of England's monthly series (Bank Rate, the 10 year
+gilt yield) into quarters and years, done in exact decimals.
 """
 
 from __future__ import annotations
@@ -39,9 +40,17 @@ def load_toml(name: str) -> dict:
 
 # ---------------------------------------------------------------------------- fetch
 
-def fetch() -> None:
+def fetch(only: list[str] | None = None) -> None:
+    """Download every dataset, or only those named (so adding a source does not pull new
+    releases of the others, which would change every derived figure)."""
     CACHE.mkdir(parents=True, exist_ok=True)
-    for name, spec in load_toml("sources.toml")["dataset"].items():
+    datasets = load_toml("sources.toml")["dataset"]
+    unknown = [name for name in only or [] if name not in datasets]
+    if unknown:
+        raise SystemExit(f"no dataset named {', '.join(unknown)} in sources.toml")
+    for name, spec in datasets.items():
+        if only and name not in only:
+            continue
         request = urllib.request.Request(spec["url"], headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(request, timeout=600) as response:
             data = response.read()
@@ -218,7 +227,7 @@ def check() -> int:
 def main() -> int:
     command = sys.argv[1] if len(sys.argv) > 1 else "all"
     if command in ("fetch", "all"):
-        fetch()
+        fetch(sys.argv[2:] if command == "fetch" else None)
     if command in ("extract", "all"):
         extract()
     if command in ("check", "all"):

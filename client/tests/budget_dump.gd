@@ -18,6 +18,16 @@ func _initialize() -> void:
 		push_error("the game did not start")
 		quit(1)
 		return
+	# Inputs marked player = false (world demand, market rates) never reach the policy panel.
+	for name in main.levers._rows:
+		if not main.entries[name].get("player", true):
+			push_error("the input %s is offered to the player" % name)
+			quit(1)
+			return
+	if main.levers._rows.has("export_demand") or not main.levers._rows.has("vat_rate"):
+		push_error("the policy panel does not hold the right levers")
+		quit(1)
+		return
 	main.advance(1)
 	await _settle()
 	var lines := PackedStringArray(["label,text"])

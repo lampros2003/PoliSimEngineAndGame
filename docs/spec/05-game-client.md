@@ -101,7 +101,7 @@ compares them with the command-line runner or with published figures:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
-| `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%) |
+| `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel |
 
 `tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one
 screenshot of any scenario (`--scenario`, `--months`, `--chart=a,b`, `--why=name`,

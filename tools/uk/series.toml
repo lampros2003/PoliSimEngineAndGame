@@ -315,3 +315,24 @@ code = "IUMABEDR"
 unit = "percent"
 meaning = "Bank Rate, monthly average; annual and quarterly values are averages of the months"
 basis = "NSA"
+
+[series.gilt_yield_10y]
+dataset = "giltyield"
+code = "IUMAMNPY"
+unit = "percent"
+meaning = "Yield on 10 year gilts (nominal par yield), monthly average; annual and quarterly values are averages of the months"
+basis = "NSA"
+
+[series.gdp_real]
+dataset = "qna"
+code = "ABMI"
+unit = "GBP million"
+meaning = "Gross domestic product, chained volume measure (prices of the ONS reference year); for real growth"
+basis = "SA"
+
+[series.gdp_deflator]
+dataset = "qna"
+code = "YBGB"
+unit = "index"
+meaning = "Implied GDP deflator at market prices (last full year = 100); for the price level"
+basis = "SA"
