@@ -197,6 +197,33 @@ phase = "summary"
 entity = "town"
 expr = "local_rate[region: region_code] * (1.0 + migration_rate[region: region_code])"
 
+[var.rate_by_region]
+doc = "Format 1 (S4.0): the towns' weighted rates summed by the region they are in"
+type = "real"
+unit = "town"
+phase = "summary"
+dims = ["region"]
+expr = "wsum_by(town, town_rate, region, region_code)"
+
+[var.towns_by_region]
+type = "int"
+unit = "town"
+phase = "summary"
+dims = ["region"]
+expr = "wcount_by(town, town_rate > 0.2, region, region_code)"
+
+[var.rate_by_region_total]
+type = "real"
+unit = "town"
+phase = "summary"
+expr = "sum(rate_by_region, region)"
+
+[var.towns_counted]
+type = "int"
+unit = "town"
+phase = "summary"
+expr = "sum(towns_by_region, region)"
+
 [var.town_rate_total]
 type = "real"
 unit = "town"

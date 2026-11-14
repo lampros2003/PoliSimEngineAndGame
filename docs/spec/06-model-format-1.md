@@ -97,6 +97,8 @@ household can look up a rate by its region column: `rate_by_region[region: regio
 | `sum(x, d1, d2, ...)` | as `x` | sum of `x` over every combination of members of the named dimensions |
 | `coord(d)` | whole | the current cell's member along `d` (range dimension) or its position (list dimension) |
 | `cohort_shift(x, d)` | as `x` | `x` moved one member up along `d`; below |
+| `wsum_by(entity, x, d, key)` | as `x` | `wsum` over the records whose `key` is the current cell's member of `d`; below |
+| `wcount_by(entity, c, d, key)` | whole | `wcount` over the records whose `key` is the current cell's member of `d` |
 
 **`sum`.** The named dimensions must not already be in scope; they are in scope inside
 `x`, along with the surrounding formula's. The terms are taken in row-major order of the
@@ -123,10 +125,21 @@ next = "population - deaths + migration - ageing_share * population + ageing_sha
 
 where `ageing_share` is 1/12 a month.
 
+**`wsum_by` and `wcount_by`** (added in stage S4.0) total records by a dimension, such
+as tax paid by households in each region. `d` must be in scope; `x` (or the condition
+`c`) and `key` are record-level formulas, and `key` is a whole number without a unit
+giving each record's member of `d` (a range's member, or a list's position). In the cell
+whose coordinate along `d` is `p`, the result is the `wsum` (or `wcount`) of the records
+whose key is `p`: every record's `x` and key are evaluated, and the terms of the matching
+records are taken in ascending record order, as in `wsum`. A record whose key is not a
+member of `d` is a run-time error. The unit is `unit(x) * entity` (`entity` for
+`wcount_by`). Writing `x` as a dimensioned var with `dims = [d]` gives the totals by
+member; their `sum` over `d` equals the `wsum` of all records, up to rounding of reals.
+
 ### Where the new functions work
 
-`sum`, `coord` and `cohort_shift` work in national and dimensioned formulas, not in
-record-level ones (a record reaches a dimensioned value only by indexing every dimension).
+`sum`, `coord`, `cohort_shift`, `wsum_by` and `wcount_by` work in national and dimensioned
+formulas, not in record-level ones (a record reaches a dimensioned value only by indexing every dimension).
 `rand` does not work in a dimensioned formula. The inner formula of `wsum` and `wcount`
 is a record's formula and sees no dimensions, even inside a dimensioned formula.
 
@@ -156,8 +169,8 @@ that dimension, or the same dimension indexed twice.
 ## Not in format 1
 
 Dimensioned levers, flows and accounts (a regional budget is a dimensioned var summed
-into a national flow); dimensions on record-level elements; random draws per cell;
-aggregates of records by a dimension (households by region); interpolation between
+into a national flow); dimensions on record-level elements; random draws per cell; record weights that change
+during a run (planned for stage S4.4); interpolation between
 members; reductions other than `sum` (means and shares are written with `sum` and `/`).
 
 ## Test model

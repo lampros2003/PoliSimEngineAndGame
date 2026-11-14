@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use crate::error::{Error, Result};
 use crate::model::{Kind, Model};
 use crate::program::{
-    Agg, AggKind, Cmp, Compiled, Fixed, IndexUse, Op, Program, R, Rounding, Src, Sub, SubKind, TableUse, Ty,
+    Agg, AggBy, AggKind, Cmp, Compiled, Fixed, IndexUse, Op, Program, R, Rounding, Src, Sub, SubKind, TableUse, Ty,
 };
 use crate::syntax::{BinOp, Node, parse};
 use crate::units::{self, Unit};
@@ -37,6 +37,7 @@ struct Builder<'a> {
     coords: Vec<Vec<i64>>,
     indexes: Vec<IndexUse>,
     subs: Vec<Sub>,
+    aggs_by: Vec<AggBy>,
 }
 
 fn number(b: &Built, what: &str) -> Check<()> {
@@ -77,6 +78,7 @@ impl<'a> Builder<'a> {
             coords: Vec::new(),
             indexes: Vec::new(),
             subs: Vec::new(),
+            aggs_by: Vec::new(),
         }
     }
 
@@ -95,6 +97,7 @@ impl<'a> Builder<'a> {
             coords: self.coords,
             indexes: self.indexes,
             subs: self.subs,
+            aggs_by: self.aggs_by,
         })
     }
 
@@ -621,6 +624,70 @@ impl<'a> Builder<'a> {
                 let cells = self.model.cell_count(&domain);
                 let (ty, unit, prog) = self.sub_program(&args[0], domain, ctx, "sum()")?;
                 self.load_sub(ty, unit, Sub { kind: SubKind::Sum { group }, cells, prog })
+            }
+            "wsum_by" | "wcount_by" => {
+                arg_count(fname, args, 4)?;
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("{fname}() cannot be used inside a per-{entity} formula"));
+                }
+                let entity = match &args[0] {
+                    Node::Name(name) => self.model.entity_index.get(name.as_str()).copied(),
+                    _ => None,
+                };
+                let Some(entity) = entity else {
+                    return Err(format!("{fname}(): the first argument must be the name of an entity"));
+                };
+                let dim = self.dim_arg(&args[2], fname)?;
+                if !self.scope.contains(&dim) {
+                    return Err(format!("{fname}(): {} is not in scope here", self.dim_name(dim)));
+                }
+                let (value_ty, value_unit, value) = {
+                    let mut sub = Builder::new(self.model, self.deps, self.lagged);
+                    let b = sub.build(&args[1], Some(entity))?;
+                    (b.ty, b.unit.clone(), sub.finish(&b)?)
+                };
+                let (key_ty, key_unit, key) = {
+                    let mut sub = Builder::new(self.model, self.deps, self.lagged);
+                    let b = sub.build(&args[3], Some(entity))?;
+                    (b.ty, b.unit.clone(), sub.finish(&b)?)
+                };
+                if key_ty != Ty::Int {
+                    return Err(format!("{fname}(): the key must be a whole number"));
+                }
+                if key_unit.is_some() {
+                    units::unify(&key_unit, &Some(Unit::one()), &format!("{fname}() key"))?;
+                }
+                let entity_unit = Some(Unit::base(&self.model.entities[entity].name));
+                let (kind, ty, unit) = if fname == "wsum_by" {
+                    if value_ty == Ty::Bool {
+                        return Err("wsum_by() needs a number, not a true/false value".to_string());
+                    }
+                    let kind = if value_ty == Ty::Int { AggKind::SumInt } else { AggKind::SumReal };
+                    (kind, value_ty, units::mul(&value_unit, &entity_unit))
+                } else {
+                    if value_ty != Ty::Bool {
+                        return Err("wcount_by() needs a true/false value, not a number".to_string());
+                    }
+                    (AggKind::Count, Ty::Int, entity_unit.expect("an entity unit"))
+                };
+                let info = &self.model.dims[dim];
+                let agg = AggBy {
+                    name: if fname == "wsum_by" { "wsum_by" } else { "wcount_by" },
+                    kind,
+                    entity,
+                    value,
+                    key,
+                    dim: info.name.clone(),
+                    first: info.first.unwrap_or(0),
+                    size: info.size(),
+                };
+                let map = self.map_over_domain(&[dim], &[]);
+                let g = Self::push_table(&mut self.gathers, map)?;
+                let index = Self::push_table(&mut self.aggs_by, agg)?;
+                let d = self.reg(ty);
+                self.ops.push(if ty == Ty::Int { Op::LoadAggByI(d, index, g) } else { Op::LoadAggByF(d, index, g) });
+                Ok(Built { ty, unit: Some(unit), reg: d })
             }
             "coord" => {
                 arg_count(fname, args, 1)?;

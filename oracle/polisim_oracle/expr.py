@@ -767,6 +767,82 @@ class _Builder:
             return acc
         return Built("real", unit, fn_real)
 
+    def _grouped(self, fname: str, args, ctx):
+        """Format 1 (S4.0): wsum_by / wcount_by(entity, x, d, key)."""
+        self._args(fname, args, 4)
+        if ctx is not None:
+            raise FormulaError(f"{fname}() cannot be used inside a per-{ctx} formula")
+        if args[0][0] != "name" or args[0][1] not in self.scope.entities:
+            raise FormulaError(f"{fname}(): the first argument must be the name of an entity")
+        D = self._dim(args[2], fname)
+        if D.name not in self.in_scope:
+            raise FormulaError(f"{fname}(): {D.name} is not in scope here")
+        entity = self.scope.entities[args[0][1]]
+        saved, self.in_scope = self.in_scope, ()
+        try:
+            inner = self.build(args[1], entity.name)
+            key = self.build(args[3], entity.name)
+        finally:
+            self.in_scope = saved
+        if key.type != "int":
+            raise FormulaError(f"{fname}(): the key must be a whole number")
+        if key.unit is not None:
+            U.unify(key.unit, U.ONE, f"{fname}() key")
+        return entity, D, inner, key
+
+    def _group_fn(self, fname, entity, D, inner, key, term):
+        weights, count, f, k, dim = entity.weights, len(entity.weights), inner.fn, key.fn, D.name
+        first = D.first if D.kind == "range" else 0
+
+        def positions():
+            out = []
+            for r in range(count):
+                v = k(r)
+                pos = v - first
+                if not 0 <= pos < D.size:
+                    raise SimError(f"{fname}(): a record's key {v} is not a member of {dim}")
+                out.append(pos)
+            return out
+        return weights, count, f, dim, positions
+
+    def _fn_wsum_by(self, args, ctx):
+        """wsum over the records whose key is the current cell's member of a dimension."""
+        entity, D, inner, key = self._grouped("wsum_by", args, ctx)
+        self._number(inner, "wsum_by()")
+        weights, count, f, dim, positions = self._group_fn("wsum_by", entity, D, inner, key, None)
+        unit = U.mul(inner.unit, ((entity.name, 1),))
+        if inner.type == "int":
+            def fn(i):
+                p, pos, total = i[dim], positions(), 0
+                for r in range(count):
+                    v = f(r)
+                    if pos[r] == p:
+                        total += weights[r] * v
+                return checked(total)
+            return Built("int", unit, fn)
+
+        def fn_real(i):
+            p, pos, acc = i[dim], positions(), 0.0
+            for r in range(count):
+                v = f(r)
+                if pos[r] == p:
+                    acc = acc + float(weights[r]) * v
+            return acc
+        return Built("real", unit, fn_real)
+
+    def _fn_wcount_by(self, args, ctx):
+        entity, D, inner, key = self._grouped("wcount_by", args, ctx)
+        self._boolean(inner, "wcount_by()")
+        weights, count, f, dim, positions = self._group_fn("wcount_by", entity, D, inner, key, None)
+
+        def fn(i):
+            p, pos, total = i[dim], positions(), 0
+            for r in range(count):
+                if f(r) and pos[r] == p:
+                    total += weights[r]
+            return checked(total)
+        return Built("int", ((entity.name, 1),), fn)
+
     def _fn_wcount(self, args, ctx):
         entity, inner = self._aggregate("wcount", args, ctx)
         self._boolean(inner, "wcount()")

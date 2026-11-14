@@ -86,3 +86,16 @@ fn a_data_file_must_hold_every_cell_once() {
         assert!(!loads(name, &model, &[("rates.csv", text)]), "{name} should be refused");
     }
 }
+
+#[test]
+fn reserved_function_names_match_the_oracle() {
+    // The oracle reserves the name of every function it implements
+    // (oracle/polisim_oracle/expr.py, FUNCTIONS); a model may not name an element after one.
+    let oracle =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../oracle/polisim_oracle/expr.py"))
+            .unwrap();
+    let mut names: Vec<&str> =
+        oracle.lines().filter_map(|l| l.trim().strip_prefix("def _fn_")).filter_map(|l| l.split('(').next()).collect();
+    names.sort();
+    assert_eq!(names, polisim_core::model::FUNCTIONS.to_vec());
+}

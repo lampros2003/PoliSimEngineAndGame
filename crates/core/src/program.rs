@@ -157,6 +157,24 @@ pub enum Op {
     /// destination, sub-program: its result at each cell of this program's domain.
     LoadSubI(R, u16),
     LoadSubF(R, u16),
+    /// destination, grouped aggregate, gather: `wsum_by` / `wcount_by`, read at each cell's
+    /// position along the grouping dimension.
+    LoadAggByI(R, u16, u16),
+    LoadAggByF(R, u16, u16),
+}
+
+/// Format 1 (S4.0): `wsum_by` or `wcount_by`: a per-record value and key, summed by key.
+#[derive(Clone, Debug)]
+pub struct AggBy {
+    pub name: &'static str,
+    pub kind: AggKind,
+    pub entity: usize,
+    pub value: Program,
+    pub key: Program,
+    pub dim: String,
+    /// Subtracted from a key to give the position: a range's first member, else 0.
+    pub first: i64,
+    pub size: usize,
 }
 
 /// Format 1: one fixed dimension of an index, `d: e`.
@@ -240,6 +258,7 @@ pub struct Program {
     pub coords: Vec<Vec<i64>>,
     pub indexes: Vec<IndexUse>,
     pub subs: Vec<Sub>,
+    pub aggs_by: Vec<AggBy>,
 }
 
 impl Program {
@@ -249,6 +268,7 @@ impl Program {
             + self.aggs.iter().map(|a| a.prog.op_count()).sum::<usize>()
             + self.tables.iter().flat_map(|t| t.lows.iter().chain(&t.rates)).map(Program::op_count).sum::<usize>()
             + self.subs.iter().map(|s| s.prog.op_count()).sum::<usize>()
+            + self.aggs_by.iter().map(|a| a.value.op_count() + a.key.op_count()).sum::<usize>()
     }
 }
 

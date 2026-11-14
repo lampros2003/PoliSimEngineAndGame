@@ -25,6 +25,19 @@
 town	real	1	local_rate[region: region_code] * migration_rate[region: region_code]	3f0a36e2eb1c432d,befa36e2eb1c432d,3f1a36e2eb1c432d,3f1a36e2eb1c432d
 town	real	person	population[region: region_code, sex: female, age: 30]	40b5d3b2d75f14cd,40b9710c8815f660,40bd1ea91c402f72,40bd1ea91c402f72
 town	real	person	population[region: region_code, sex: region_code - region_code, age: region_code * 40]	40bedcebd65c8f18,40b57fe1481ef191,40a72a4376e32088,40a72a4376e32088
+-	real	town	sum(wsum_by(town, town_rate, region, region_code), region)	4040e1126e978d50
+-	int	town	sum(wcount_by(town, town_rate > 0.2, region, region_code), region)	135
+-	real	town	sum(wsum_by(town, local_rate[region: region_code], region, region_code) * coord(region), region)	4044a00000000000
+-	int	town	sum(wsum_by(town, region_code, region, region_code), region)	165
+-	real	town	sum(wsum_by(town, town_rate, region, 2 - region_code), region, sex)	4050e1126e978d50
+-	real	town	sum(wsum_by(town, town_rate, region, region_code + 1), region)	E:runtime
+-	real	town	wsum_by(town, town_rate, region, region_code)	E:static
+-	real	town	sum(wsum_by(town, town_rate, region), region)	E:static
+-	real	town	sum(wsum_by(town, town_rate, region, 0.5), region)	E:static
+town	real	town	wsum_by(town, town_rate, region, region_code)	E:static
+-	real	town	sum(wsum_by(nowhere, town_rate, region, region_code), region)	E:static
+-	int	town	sum(wcount_by(town, town_rate, region, region_code), region)	E:static
+-	real	town	sum(wsum_by(town, town_rate > 0.2, region, region_code), region)	E:static
 -	real	person	population[region: south, sex: male, age: 101]	E:runtime
 -	real	person	population[region: 3, sex: male, age: 1]	E:runtime
 -	real	person	sum(population[age: coord(age) + 1], region, sex, age)	E:runtime

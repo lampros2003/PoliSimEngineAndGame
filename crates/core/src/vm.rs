@@ -6,7 +6,7 @@
 //! anywhere fails the whole formula.
 
 use crate::model::Entity;
-use crate::program::{Agg, AggKind, Cmp, Col, Op, Program, Rounding, Src, SubKind, Ty, Val};
+use crate::program::{Agg, AggBy, AggKind, Cmp, Col, Op, Program, Rounding, Src, SubKind, Ty, Val};
 use crate::rng::uniform;
 
 /// Records per block. Stage S0 measured 64 to 1,024 as equally good.
@@ -62,6 +62,8 @@ struct Prepared {
     tables: Vec<(Vec<i64>, Vec<f64>)>,
     /// Format 1: each sub-program's result, one value per cell of this program's domain.
     subs: Vec<Col>,
+    /// Format 1: each grouped aggregate, one value per member of its dimension.
+    aggs_by: Vec<Col>,
 }
 
 fn overflow<T>() -> Check<T> {
@@ -100,7 +102,66 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
         let column = eval_cells(&sub.prog, sub.cells, cx)?;
         subs.push(finish_sub(sub.kind, column)?);
     }
-    Ok(Prepared { aggs, tables, subs })
+    let mut aggs_by = Vec::with_capacity(prog.aggs_by.len());
+    for agg in &prog.aggs_by {
+        aggs_by.push(eval_agg_by(agg, cx)?);
+    }
+    Ok(Prepared { aggs, tables, subs, aggs_by })
+}
+
+/// `wsum_by` and `wcount_by`: like `wsum` and `wcount`, but each record's term goes to the
+/// member its key names, in ascending record order within each member.
+fn eval_agg_by(agg: &AggBy, cx: &EvalCtx) -> Check<Col> {
+    let value_prepared = prepare(&agg.value, cx)?;
+    let key_prepared = prepare(&agg.key, cx)?;
+    let weights = &cx.entities[agg.entity].weights;
+    let count = weights.len();
+    let width = BLOCK.min(count.max(1));
+    let mut value_regs = Regs::new(&agg.value, width);
+    let mut key_regs = Regs::new(&agg.key, width);
+    let (vr, kr) = (agg.value.result as usize, agg.key.result as usize);
+    let mut whole = vec![0i128; agg.size];
+    let mut real = vec![0.0f64; agg.size];
+    let mut start = 0;
+    while start < count {
+        let len = BLOCK.min(count - start);
+        run_block(&agg.value, cx, Some(agg.entity), start, len, &mut value_regs, &value_prepared)?;
+        run_block(&agg.key, cx, Some(agg.entity), start, len, &mut key_regs, &key_prepared)?;
+        for k in 0..len {
+            let key = key_regs.i[kr][k];
+            let pos = key.checked_sub(agg.first).filter(|p| (0..agg.size as i64).contains(p));
+            let Some(pos) = pos else {
+                return Err(format!("{}(): a record's key {key} is not a member of {}", agg.name, agg.dim));
+            };
+            let (pos, w) = (pos as usize, weights[start + k]);
+            match agg.kind {
+                AggKind::SumInt => match whole[pos].checked_add(w as i128 * value_regs.i[vr][k] as i128) {
+                    Some(total) => whole[pos] = total,
+                    None => return overflow(),
+                },
+                AggKind::SumReal => real[pos] += w as f64 * value_regs.f[vr][k],
+                AggKind::Count => {
+                    if value_regs.b[vr][k] {
+                        whole[pos] += w as i128;
+                    }
+                }
+            }
+        }
+        start += len;
+    }
+    match agg.kind {
+        AggKind::SumReal => Ok(Col::F(real)),
+        _ => {
+            let mut out = Vec::with_capacity(agg.size);
+            for total in whole {
+                match i64::try_from(total) {
+                    Ok(t) => out.push(t),
+                    Err(_) => return overflow(),
+                }
+            }
+            Ok(Col::I(out))
+        }
+    }
 }
 
 /// Format 1: evaluates a formula with dimensions for every cell of its domain, in row-major order.
@@ -473,6 +534,20 @@ fn run_block(
                         }
                     }
                     _ => return internal("index of another type"),
+                }
+            }
+            Op::LoadAggByI(d, k, g) => {
+                let map = &prog.gathers[g as usize][start..end];
+                let Col::I(v) = &prepared.aggs_by[k as usize] else { return internal("grouped aggregate type") };
+                for (d, m) in regs.i[d as usize][..len].iter_mut().zip(map) {
+                    *d = v[*m as usize];
+                }
+            }
+            Op::LoadAggByF(d, k, g) => {
+                let map = &prog.gathers[g as usize][start..end];
+                let Col::F(v) = &prepared.aggs_by[k as usize] else { return internal("grouped aggregate type") };
+                for (d, m) in regs.f[d as usize][..len].iter_mut().zip(map) {
+                    *d = v[*m as usize];
                 }
             }
             Op::LoadSubI(d, k) => match &prepared.subs[k as usize] {
