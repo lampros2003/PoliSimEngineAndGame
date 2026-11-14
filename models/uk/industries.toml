@@ -1,0 +1,115 @@
+# The UK's 15 industries (stage S3.6), model format 1.
+#
+# GENERATED from tools/uk/template/industries.toml by tools/uk/calibrate.py. Each month the
+# economy's spending (households, government, investment, exports) is turned into demand
+# for UK products with the 2023 input-output tables' shares, and each industry's output
+# follows from the Leontief inverse: what it makes for final buyers plus what it sells to
+# other industries along the way. Value added and pay by industry are fixed shares of
+# output. The economy does not read it back yet.
+
+[dim.industry]
+members = ["agriculture", "energy_water", "manufacturing", "construction", "trade", "transport", "hospitality", "information", "finance", "real_estate", "business_services", "public_administration", "education", "health", "other_services"]
+labels = ["Agriculture, forestry and fishing", "Mining, energy, water and waste", "Manufacturing", "Construction", "Wholesale and retail trade", "Transport and storage", "Accommodation and food", "Information and communication", "Finance and insurance", "Real estate", "Professional and support services", "Public administration and defence", "Education", "Health and social work", "Arts, recreation and other services"]
+
+[dim.product]
+doc = "The products of the industries, as bought by final users"
+members = ["agriculture", "energy_water", "manufacturing", "construction", "trade", "transport", "hospitality", "information", "finance", "real_estate", "business_services", "public_administration", "education", "health", "other_services"]
+labels = ["Agriculture, forestry and fishing", "Mining, energy, water and waste", "Manufacturing", "Construction", "Wholesale and retail trade", "Transport and storage", "Accommodation and food", "Information and communication", "Finance and insurance", "Real estate", "Professional and support services", "Public administration and defence", "Education", "Health and social work", "Arts, recreation and other services"]
+
+[param.leontief]
+doc = "Output of each industry needed for one pound of final demand for each product"
+type = "real"
+unit = "1"
+dims = ["industry", "product"]
+data = "industries/leontief.csv"
+
+[param.household_products]
+doc = "Domestic product bought per pound of household and non-profit spending"
+type = "real"
+unit = "1"
+dims = ["product"]
+data = "industries/shares.csv"
+column = "households"
+
+[param.government_products]
+type = "real"
+unit = "1"
+dims = ["product"]
+data = "industries/shares.csv"
+column = "government"
+
+[param.investment_products]
+type = "real"
+unit = "1"
+dims = ["product"]
+data = "industries/shares.csv"
+column = "investment"
+
+[param.export_products]
+type = "real"
+unit = "1"
+dims = ["product"]
+data = "industries/shares.csv"
+column = "exports"
+
+[param.gva_ratio]
+doc = "Gross value added per pound of output"
+type = "real"
+unit = "1"
+dims = ["industry"]
+data = "industries/ratios.csv"
+column = "gva"
+
+[param.pay_ratio]
+doc = "Compensation of employees per pound of output"
+type = "real"
+unit = "1"
+dims = ["industry"]
+data = "industries/ratios.csv"
+column = "compensation"
+
+[var.final_demand]
+label = "Final demand for UK products"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+dims = ["product"]
+expr = "consumption * household_products + (public_pay + procurement) * government_products + (business_investment + dwellings + public_investment) * investment_products + exports * export_products"
+
+[var.industry_output]
+label = "Output"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+dims = ["industry"]
+expr = "sum(leontief * final_demand, product)"
+
+[var.industry_gva]
+label = "Value added"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+dims = ["industry"]
+expr = "industry_output * gva_ratio"
+
+[var.industry_pay]
+label = "Pay"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+dims = ["industry"]
+expr = "industry_output * pay_ratio"
+
+[var.gva_by_industries]
+label = "Value added, all industries"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "sum(industry_gva, industry)"
+
+[var.output_by_industries]
+label = "Output, all industries"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "sum(industry_output, industry)"

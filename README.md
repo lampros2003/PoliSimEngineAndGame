@@ -134,4 +134,4 @@ yet: no threads, no register reuse, no explicit SIMD.
 | The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
 | The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
 
-Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.5 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions). The status is in `docs/S3-PLAN.md`.
+Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.6 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions, the population by region, sex and age, and 15 industries). The status is in `docs/S3-PLAN.md`.

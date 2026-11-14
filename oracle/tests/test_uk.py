@@ -210,6 +210,50 @@ class Population(unittest.TestCase):
         self.assertTrue(0.17 < share_old < 0.35)
 
 
+class Industries(unittest.TestCase):
+    """The industries block (S3.6): spending turned into output by industry through the
+    2023 input-output tables."""
+
+    @staticmethod
+    def table(name, folder=UK / "data"):
+        with open(folder / name, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def test_the_leontief_inverse_turns_the_tables_final_demand_into_their_output(self):
+        industries = self.table("industries.csv")
+        names = [r["industry"] for r in industries]
+        final = {r["industry"]: sum(float(r[k]) for k in ("households", "government", "investment", "exports"))
+                 for r in industries}
+        inverse = {(r["industry"], r["product"]): float(r["value"]) for r in self.table("leontief.csv", UK / "industries")}
+        for r in industries:
+            made = sum(inverse[(r["industry"], p)] * final[p] for p in names)
+            self.assertAlmostEqual(made / float(r["output"]), 1.0, places=6, msg=r["industry"])
+
+    def test_industries_add_up_to_national_output_in_the_first_month(self):
+        first, p23, p24 = run()[0], published("2023"), published("2024")
+        gva_2024 = 2_497_390 / p23["gdp"] * p24["gdp"]  # the tables' value added, scaled to 2024
+        self.assertLess(abs(first["gva_by_industries"] * 12 / PENCE_PER_MILLION / gva_2024 - 1), 0.02)
+
+    def test_each_industry_is_near_the_tables_scaled_to_2024(self):
+        sim = Simulation(model(), seed=SEED)
+        sim.step()
+        scale = published("2024")["gdp"] / published("2023")["gdp"]
+        outputs = dict(zip(model().dims["industry"].members, sim.rt.C["industry_output"]))
+        for r in self.table("industries.csv"):
+            got = outputs[r["industry"]] * 12 / PENCE_PER_MILLION
+            self.assertLess(abs(got / (float(r["output"]) * scale) - 1), 0.05, r["industry"])
+
+    def test_a_cut_in_public_spending_falls_mostly_on_public_services(self):
+        base = Simulation(model(), seed=SEED)
+        cut = Simulation(model(), seed=SEED, levers={"procurement_bill": 20_000_000_000})
+        base.step()
+        cut.step()
+        names = model().dims["industry"].members
+        fall = {n: b - c for n, b, c in zip(names, base.rt.C["industry_output"], cut.rt.C["industry_output"])}
+        services = fall["public_administration"] + fall["education"] + fall["health"]
+        self.assertGreater(services, 0.5 * sum(fall.values()))
+
+
 class Reproducibility(unittest.TestCase):
     def test_matches_the_recorded_hashes(self):
         # Recorded with:

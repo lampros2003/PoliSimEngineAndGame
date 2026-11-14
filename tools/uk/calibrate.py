@@ -224,6 +224,57 @@ def write_population(out_dir: Path, a: dict) -> dict[str, str]:
     return {"boy_share": r12(p["boy_share"])}
 
 
+def invert(matrix: list[list[float]]) -> list[list[float]]:
+    """Gauss-Jordan with partial pivoting; the matrices here are 15 x 15 and well conditioned."""
+    n = len(matrix)
+    aug = [row[:] + [1.0 if i == j else 0.0 for j in range(n)] for i, row in enumerate(matrix)]
+    for c in range(n):
+        pivot = max(range(c, n), key=lambda r: abs(aug[r][c]))
+        aug[c], aug[pivot] = aug[pivot], aug[c]
+        p = aug[c][c]
+        aug[c] = [x / p for x in aug[c]]
+        for r in range(n):
+            if r != c and aug[r][c] != 0.0:
+                f = aug[r][c]
+                aug[r] = [x - f * y for x, y in zip(aug[r], aug[c])]
+    return [row[n:] for row in aug]
+
+
+def write_industries(out_dir: Path) -> dict[str, str]:
+    """Format 1: the industries block's coefficients from the 2023 input-output tables.
+    Returns the template's fills."""
+    data_dir = ROOT / "models" / "uk" / "data"
+
+    def table(name):
+        return list(csv.DictReader((data_dir / name).read_text(encoding="utf-8").splitlines()))
+
+    industries = table("industries.csv")
+    names = [r["industry"] for r in industries]
+    output = {r["industry"]: float(r["output"]) for r in industries}
+    z = {(r["from"], r["to"]): float(r["value"]) for r in table("io_domestic.csv")}
+    totals = {r["use"]: float(r["total_purchasers_prices"]) for r in table("io_final_totals.csv")}
+    # A[i][j]: domestic input from industry i per pound of industry j's output; L = (I - A)^-1.
+    ident = [[(1.0 if i == j else 0.0) - z[(a, b)] / output[b] for j, b in enumerate(names)] for i, a in enumerate(names)]
+    leontief = invert(ident)
+    folder = out_dir / "industries"
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = ["industry,product,value"] + [f"{a},{b},{r12(leontief[i][j])}" for i, a in enumerate(names)
+                                         for j, b in enumerate(names)]
+    (folder / "leontief.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    uses = ("households", "government", "investment", "exports")
+    rows = ["product," + ",".join(uses)]
+    for r in industries:
+        rows.append(r["industry"] + "," + ",".join(r12(float(r[u]) / totals[u]) for u in uses))
+    (folder / "shares.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    rows = ["industry,gva,compensation"] + [
+        f"{r['industry']},{r12(float(r['gva']) / float(r['output']))},{r12(float(r['compensation']) / float(r['output']))}"
+        for r in industries]
+    (folder / "ratios.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    labels = {r["industry"]: r["label"] for r in industries}
+    return {"industry_members": "[" + ", ".join(f'"{n}"' for n in names) + "]",
+            "industry_labels": "[" + ", ".join(f'"{labels[n]}"' for n in names) + "]"}
+
+
 def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | None = None) -> SimpleNamespace:
     a = a if a is not None else load_assumptions()
     v = derive(year, data, a)
@@ -365,9 +416,10 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     # The people block starts from mid-2024, so only a 2024 base year has it.
     people = year == STOCKS_YEAR
-    files = ["calibration.toml", "economy.toml"] + (["population.toml"] if people else [])
-    fills = write_population(out_dir, a) if people else {}
-    for name in ("model.toml", "economy.toml") + (("population.toml",) if people else ()):
+    detail = ("population.toml", "industries.toml") if people else ()
+    files = ["calibration.toml", "economy.toml", *detail]
+    fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
+    for name in ("model.toml", "economy.toml", *detail):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))

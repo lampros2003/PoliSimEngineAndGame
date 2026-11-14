@@ -7,13 +7,16 @@ prices, £ million; Open Government Licence v3.0), which `python tools/uk/pipeli
 iot2023` downloads into .cache/uk/, and aggregates the 104 products into 15 industries by
 SIC 2007 section. Writes into models/uk/data/:
 
-- industries.csv: per industry, output, domestic and imported intermediate inputs, taxes
+- industries.csv: per industry, its label, output, domestic and imported intermediate inputs, taxes
   on products paid on inputs, compensation of employees, gross operating surplus and
   mixed income, other taxes on production, gross value added, and domestic final use by
   households and non-profits, government, investment (fixed capital, inventories,
   valuables) and exports;
 - io_domestic.csv: from, to, value: domestic intermediate use of each industry's products
   by each industry;
+- io_final_totals.csv: per final use (households, government, investment, exports), the
+  total at purchasers' prices, imports and taxes included, and the domestic part at basic
+  prices, so that spending can be turned into demand for UK industries' products;
 
 and INDUSTRIES.md with the source, checksum and checks: each industry's output equals its
 inputs plus value added, and the sale of its products (intermediate plus final) equals
@@ -91,6 +94,7 @@ def main() -> int:
             by_code[key] = row
     products = [codes[i] for i in product_cols]
     names = [n for n, _, _ in INDUSTRIES]
+    labels = {n: label for n, label, _ in INDUSTRIES}
 
     def num(x) -> float:
         return float(x) if isinstance(x, (int, float)) else 0.0
@@ -126,7 +130,7 @@ def main() -> int:
         checks.append(f"| {a} | {output:,.0f} | {inputs:,.0f} | {sales:,.0f} | {r1:,.1f} / {r2:,.1f} |")
         va = primary["compensation"][a] + primary["operating_surplus"][a] + primary["production_taxes"][a]
         problems += abs(va - primary["gva"][a]) > 1
-        out_rows.append([a, *(round(v, 3) for v in (
+        out_rows.append([a, labels[a], *(round(v, 3) for v in (
             output, sum(z[b][a] for b in names), primary["imports"][a], primary["product_taxes"][a],
             primary["compensation"][a], primary["operating_surplus"][a], primary["production_taxes"][a],
             primary["gva"][a], final[a]["households"], final[a]["government"], final[a]["investment"],
@@ -145,11 +149,15 @@ def main() -> int:
         path.write_text(buffer.getvalue(), encoding="utf-8", newline="\n")
 
     write(OUT / "industries.csv",
-          ["industry", "output", "domestic_inputs", "imported_inputs", "product_taxes", "compensation",
+          ["industry", "label", "output", "domestic_inputs", "imported_inputs", "product_taxes", "compensation",
            "operating_surplus", "production_taxes", "gva", "households", "government", "investment", "exports"],
           out_rows)
     write(OUT / "io_domestic.csv", ["from", "to", "value"],
           [[a, b, round(z[a][b], 3)] for a in names for b in names])
+    purchasers = by_code["Total intermediate use at purchaser's prices"]
+    write(OUT / "io_final_totals.csv", ["use", "total_purchasers_prices", "domestic_basic_prices"],
+          [[k, round(sum(num(purchasers[col_index[c]]) for c in cols), 3), round(sum(final[a][k] for a in names), 3)]
+           for k, cols in FINAL.items()])
 
     data = (CACHE / "iot2023.xlsx").read_bytes()
     meta_path = CACHE / "iot2023.meta.json"
