@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from polisim_oracle import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
 from polisim_oracle.expr import compile_formula, marginal_amount  # noqa: E402
-from polisim_oracle.model import Decl, Entity, Table  # noqa: E402
+from polisim_oracle.model import Decl, Entity, Table, convert  # noqa: E402
 from polisim_oracle.rng import fnv1a32, philox4x32_10, uniform  # noqa: E402
 from polisim_oracle.sim import Runtime  # noqa: E402
 from polisim_oracle.units import parse_unit  # noqa: E402
@@ -252,6 +252,19 @@ class Loader(unittest.TestCase):
                 unit = "GBP"
                 value = 1.005
             """)
+
+    def test_money_is_scaled_from_the_number_as_typed(self):
+        # The same cases are in crates/core/src/model.rs.
+        cases = [(2301745961.03, 230174596103), (0.29, 29), (1.1, 110), (-5072066666.6, -507206666660),
+                 (24217000000.0, 2421700000000), (1e16, 10**18), (12.5, 1250)]
+        for raw, pence in cases:
+            self.assertEqual(convert(raw, "int", True, 100, "x"), pence)
+        self.assertEqual(convert(3.0, "int", True, 1, "x"), 3)
+        for raw in (1.005, 0.123456789, 2301745961.035, 1.5e-7):
+            with self.assertRaises(ModelError):
+                convert(raw, "int", True, 100, "x")
+        with self.assertRaises(ModelError):
+            convert(1.5, "int", True, 1, "x")
 
     def test_reading_a_later_phase_is_rejected(self):
         with self.assertRaises(ModelError):

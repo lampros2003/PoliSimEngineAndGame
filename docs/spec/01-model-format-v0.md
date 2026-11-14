@@ -35,9 +35,17 @@ reserved. The full identifier of an element is `<model id>:<section>.<name>`, fo
 | `real` | real | any number |
 | `bool` | true/false | `true` / `false` (in CSV: `1`/`0` or `true`/`false`) |
 
-A `money` value times `minor_units` must be a whole number to within 1e-6, otherwise the
-file has more decimal places than the currency and loading fails. In formulas `money` and
+A `money` value times `minor_units` must be a whole number, otherwise the file has more
+decimal places than the currency and loading fails. A value with a fractional part is read
+as the shortest decimal that gives the same 64-bit float (Python's `repr`), which is what
+was typed, and scaled exactly: `2301745961.03` pounds is 230174596103 pence, although the
+floating-point product is 230174596102.99997. In formulas `money` and
 `int` are the same kind of value.
+
+Money is held in minor units everywhere at run time. A `real` whose unit includes the
+currency (an average wage, say) is therefore also in minor units, and its value in a file
+must be written in minor units: the loader scales only `money`. The unit checker cannot
+catch a real written in major units, because pounds and pence share one unit name.
 
 `unit` is a product of named base units with integer powers, read left to right:
 `"GBP/month"`, `"GBP/month/household"`, `"1/month"`, `"share"`, `"1"`. Base units are

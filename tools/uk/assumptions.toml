@@ -1,0 +1,53 @@
+# Judgements the UK model needs that the extracted data do not settle. Each has a reason.
+# tools/uk/calibrate.py combines these with models/uk/data/annual.csv (base year 2024) to
+# write models/uk/calibration.toml. Change a value here, rerun the script, and the model
+# is recalibrated by construction.
+
+[stocks]
+# Opening balances, £ million, end of 2024. Rough orders of magnitude, not yet taken from
+# the Bank of England's money and credit data (a later step of the pipeline).
+household_deposits = 1_900_000
+firm_deposits = 800_000
+rest_of_world_deposits = 500_000
+government_deposits = 0
+# Bank loans owed by non-financial corporations, roughly half a trillion pounds.
+firm_bank_loans = 500_000
+# Share of public sector net debt held abroad. Overseas holders own roughly a quarter to
+# a third of gilts; 0.27 is a round figure inside that range.
+gilts_held_abroad = 0.27
+
+[behaviour]
+# Households spend this share of their money holdings each month on top of spending out
+# of income (about 5% a year): the wealth effect. The share of income spent is then
+# derived so that 2024 consumption is reproduced.
+spend_out_of_savings = 0.004
+# Speed at which firms close the gap between the employment they have and the employment
+# their sales justify, per month.
+hiring_speed = 0.25
+# Annual growth of the working-age labour force (about 0.6% a year recently).
+labour_force_growth_annual = 0.006
+# Annual trend growth of output per worker and of world demand for UK exports, nominal.
+productivity_growth_annual = 0.01
+world_demand_growth_annual = 0.035
+# Inflation when unemployment is at its natural rate, and how much one point of
+# unemployment below that rate adds to annual inflation.
+inflation_target_annual = 0.02
+natural_unemployment = 0.045
+phillips_slope = 0.5
+# The government pays this market rate on new gilts; the average rate on its debt moves
+# toward it as old gilts mature (average maturity about 14 years in the UK).
+gilt_yield = { low = 0.035, central = 0.042, high = 0.05 }
+average_maturity_years = 14
+# Firms pay out more (dividends, self-employment income) when their cash is above its
+# usual share of sales and less when below. 1.0 means a 10% cash surplus raises payouts
+# by 10%.
+payout_sensitivity = 0.5
+# Firms borrow (or repay) this share of the gap between their cash and its usual level
+# each month. 1.0 keeps cash at its usual level, as a firm with a credit line would.
+loan_adjustment = 1.0
+# Benefits that rise with unemployment, per unemployed person, £ a month (2024 prices).
+# The rest of social benefits (pensions above all) is set by policy, not by the cycle.
+benefit_per_unemployed = 450
+# Financial corporations keep this part of the gilt interest they receive and pay the
+# rest to households; chosen so that the sector's 2024 net lending is reproduced.
+match_financial_net_lending = true

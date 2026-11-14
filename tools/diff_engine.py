@@ -2,6 +2,7 @@
 
     cargo build --release
     python tools/diff_engine.py --count 200
+    python tools/diff_engine.py --model models/uk --count 50
 
 For each scenario both sides must give the same exit code (0 finished, 1 could not
 start, 2 failed part-way) and, unless they could not start, the same CSV byte for byte:
@@ -9,6 +10,10 @@ every national value and the state hash of every step. Scenarios vary the seed, 
 parameter preset, parameter overrides, starting lever settings and scheduled lever
 changes, and now and then use values that are out of range or malformed, so that the
 refusals are compared as well as the successes.
+
+The toy model's levers and parameters are listed below with hand-chosen limits. For any
+other model they are read from its files: declared ranges where given, otherwise half to
+one and a half times the value.
 
 Exits with status 1 if any scenario differs.
 """
@@ -27,7 +32,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "oracle"))
 
-from polisim_oracle import FormulaError, ModelError, SimError  # noqa: E402
+from polisim_oracle import FormulaError, ModelError, SimError, load_model  # noqa: E402
 from polisim_oracle.__main__ import main as oracle_main  # noqa: E402
 
 MODEL = ROOT / "models" / "toy"
@@ -85,8 +90,39 @@ def param_value(rng: random.Random, name: str):
     return round(value, 2) if money else value
 
 
+def use_model(path: Path) -> None:
+    """Point the generator at another model, taking its levers and parameters from its files."""
+    global MODEL, LEVERS, PARAMS, MAX_STEPS
+    MODEL, MAX_STEPS = path.resolve(), 120
+    if MODEL == (ROOT / "models" / "toy").resolve():
+        MAX_STEPS = 40
+        return
+    model = load_model(MODEL)
+    LEVERS, PARAMS = {}, {}
+    for decl in model.symbols.values():
+        if decl.type == "bool" or decl.kind not in ("lever", "param"):
+            continue
+        spec = decl.spec
+        money = decl.money
+        if decl.kind == "lever":
+            default = spec["default"]
+            low, high = spec.get("range", (min(0.5 * default, 1.5 * default), max(0.5 * default, 1.5 * default)))
+            LEVERS[decl.name] = (default, low, high, money)
+        else:
+            value = spec.get("value", spec.get("central"))
+            if not isinstance(value, (int, float)):
+                continue
+            low, high = spec.get("range", (min(0.5 * value, 1.5 * value), max(0.5 * value, 1.5 * value)))
+            if low == high:
+                low, high = low - 0.01, high + 0.01
+            PARAMS[decl.name] = (low, high, money)
+
+
+MAX_STEPS = 40
+
+
 def make_scenario(rng: random.Random) -> str:
-    steps = rng.randrange(1, 41)
+    steps = rng.randrange(1, MAX_STEPS + 1)
     seed = rng.choice([rng.randrange(0, 1 << 63), rng.randrange(-(1 << 63), 0), rng.randrange(0, 100)])
     lines = ["[scenario]", f'model = "{MODEL.as_posix()}"', f"seed = {seed}", f"steps = {steps}",
              f'preset = "{rng.choice(["low", "central", "central", "high"])}"', ""]
@@ -124,7 +160,9 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=200)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--engine", type=Path, default=ROOT / "target" / "release" / EXE)
+    parser.add_argument("--model", type=Path, default=MODEL, help="model folder (default: the toy model)")
     args = parser.parse_args()
+    use_model(args.model)
     if not args.engine.exists():
         print(f"engine not found at {args.engine}; run `cargo build --release` first", file=sys.stderr)
         return 1

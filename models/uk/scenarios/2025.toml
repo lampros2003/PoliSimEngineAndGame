@@ -1,0 +1,17 @@
+# A five-year parliament from January 2025, starting from the 2024 accounts.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 60
+preset = "central"
+
+[play]
+country = "United Kingdom"
+currency_symbol = "£"
+currency_name = "pounds"
+start = "2025-01"
+term = 60
+government = "government"
+headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp"]
+watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual"]

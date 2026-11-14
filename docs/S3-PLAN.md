@@ -32,6 +32,15 @@ later stages; this stage is the national economy and the government's accounts.
 S3.0 to S3.3 come first: they give a playable United Kingdom without any engine change.
 S3.5 and S3.6 then add the detail S4 (households) builds on.
 
+## Status
+
+| # | Status |
+|---|---|
+| S3.0 | Done. `python tools/uk/pipeline.py` rebuilds `models/uk/data/` from the cached downloads |
+| S3.1 | Done in a narrower form than planned: `models/uk/data/CHECKS.md` shows the three identities (GDP by expenditure, sector balances, the public sector's borrowing) close for every year from 2000 to 2024: exactly, except sector balances, which are off by at most £5 million (rounding in the published figures); 2025 is incomplete and does not close, and the model's first month reproduces the 2024 net lending of households and financial corporations. A full transaction-by-sector matrix was not needed for a five-sector model and is left for S3.6 |
+| S3.2 | Built. `models/uk/`, calibrated by `tools/uk/calibrate.py`; tests in `oracle/tests/test_uk.py` and `crates/core/tests/golden.rs`; random scenarios compared with `python tools/diff_engine.py --model models/uk`. Known weaknesses are listed in `models/uk/README.md` |
+| S3.3 | Next |
+
 ## Bands for the hindcast (S3.4)
 
 To be confirmed when the harness exists; proposed now so the target is not chosen after

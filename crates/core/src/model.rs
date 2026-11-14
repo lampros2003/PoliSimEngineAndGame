@@ -285,16 +285,42 @@ pub fn convert(raw: Raw, ty: Ty, money: bool, minor: i64, what: &str) -> Result<
             if scaled.is_nan() || scaled.abs() > 9.0e18 {
                 return model_err(format!("{what}: {} is out of range", show(raw)));
             }
-            let rounded = scaled.round_ties_even();
-            if (scaled - rounded).abs() > 1e-6 {
-                return model_err(format!("{what}: {} has more decimal places than the currency", show(raw)));
+            match exact_minor_units(f, minor) {
+                Some(v) => v,
+                None => return model_err(format!("{what}: {} has more decimal places than the currency", show(raw))),
             }
-            rounded as i64
         }
         (Number::Whole(i), false) => i,
         (Number::Real(_), false) => return model_err(format!("{what}: expected a whole number, got {}", show(raw))),
     };
     Ok(Val::I(value))
+}
+
+/// `f` major units in minor units, if that is a whole number. The number is read as the
+/// shortest decimal that gives this float (Python's `repr`), which is what was typed, and
+/// scaled exactly: 2301745961.03 pounds is 230174596103 pence, although
+/// `2301745961.03 * 100.0` is 230174596102.99997.
+fn exact_minor_units(f: f64, minor: i64) -> Option<i64> {
+    let text = crate::pyfmt::float_repr(f);
+    let (mantissa, exponent) = match text.split_once('e') {
+        Some((m, e)) => (m, e.parse::<i32>().ok()?),
+        None => (text.as_str(), 0),
+    };
+    let decimals = mantissa.split_once('.').map_or(0, |(_, frac)| frac.len()) as i32;
+    let digits: String = mantissa.chars().filter(|c| *c == '-' || c.is_ascii_digit()).collect();
+    // The value is digits * 10^power.
+    let power = exponent - decimals;
+    let scaled = digits.parse::<i128>().ok()?.checked_mul(minor as i128)?;
+    let whole = if power >= 0 {
+        scaled.checked_mul(10i128.checked_pow(power as u32)?)?
+    } else {
+        let divisor = 10i128.checked_pow(power.unsigned_abs())?;
+        if scaled % divisor != 0 {
+            return None;
+        }
+        scaled / divisor
+    };
+    i64::try_from(whole).ok()
 }
 
 fn unit_of(spec: &Toml, what: &str, default: Option<&str>) -> Result<Unit> {
@@ -997,4 +1023,31 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
             _ => Toml::new(),
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exact_minor_units;
+
+    #[test]
+    fn money_is_scaled_from_the_number_as_typed() {
+        // The same cases are in oracle/tests/test_language.py.
+        let cases: [(f64, i64); 7] = [
+            (2301745961.03, 230174596103),
+            (0.29, 29),
+            (1.1, 110),
+            (-5072066666.6, -507206666660),
+            (24217000000.0, 2421700000000),
+            (1e16, 1_000_000_000_000_000_000),
+            (12.5, 1250),
+        ];
+        for (raw, pence) in cases {
+            assert_eq!(exact_minor_units(raw, 100), Some(pence), "{raw}");
+        }
+        assert_eq!(exact_minor_units(3.0, 1), Some(3));
+        for raw in [1.005, 0.123456789, 2301745961.035, 1.5e-7] {
+            assert_eq!(exact_minor_units(raw, 100), None, "{raw}");
+        }
+        assert_eq!(exact_minor_units(1.5, 1), None);
+    }
 }

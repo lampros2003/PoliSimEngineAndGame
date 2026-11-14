@@ -278,6 +278,8 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("row", e.row.clone().unwrap_or_default().as_str());
         d.set("from", e.from.clone().unwrap_or_default().as_str());
         d.set("to", e.to.clone().unwrap_or_default().as_str());
+        d.set("instrument", e.instrument.clone().unwrap_or_default().as_str());
+        d.set("financial", e.financial);
         entries.push(&d.to_variant());
     }
     let mut sectors = VarArray::new();
@@ -295,6 +297,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
     out.set("currency", catalogue.currency.as_str());
     out.set("minor", catalogue.minor);
     out.set("step_unit", catalogue.step_unit.as_str());
+    out.set("instruments", &strings(&catalogue.instruments));
     out.set("entries", &entries);
     out.set("sectors", &sectors);
     out

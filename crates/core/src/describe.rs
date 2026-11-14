@@ -29,9 +29,13 @@ pub struct Entry {
     /// Name of this value's column in a result row, if it has one: national values by
     /// name, per-record accounts and flows as `<name>.total`.
     pub row: Option<String>,
-    /// For flows: the paying and receiving sectors.
+    /// For flows: the paying and receiving sectors, and the instrument.
     pub from: Option<String>,
     pub to: Option<String>,
+    pub instrument: Option<String>,
+    /// A flow marked `financial = true`: a purchase or sale of an asset, such as paying for
+    /// gilts, rather than income or spending. Budget screens leave these out.
+    pub financial: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,6 +55,8 @@ pub struct Catalogue {
     pub currency: String,
     pub minor: i64,
     pub step_unit: String,
+    /// Instruments in declaration order; the first is the one payments use by default.
+    pub instruments: Vec<String>,
     pub entries: Vec<Entry>,
     pub sectors: Vec<SectorEntry>,
 }
@@ -102,6 +108,11 @@ impl Catalogue {
                 row,
                 from: flow.map(|f| sector_name(f.src_account)),
                 to: flow.map(|f| sector_name(f.dst_account)),
+                instrument: flow.map(|f| {
+                    let account = model.accounts.iter().find(|a| a.sym == f.src_account).expect("flows use accounts");
+                    model.instruments[account.instrument].name.clone()
+                }),
+                financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
             });
         }
         let sectors = model
@@ -139,6 +150,7 @@ impl Catalogue {
             currency: model.currency.clone(),
             minor: model.minor,
             step_unit: units::fmt(&Some(model.step_unit.clone())),
+            instruments: model.instruments.iter().map(|i| i.name.clone()).collect(),
             entries,
             sectors,
         }

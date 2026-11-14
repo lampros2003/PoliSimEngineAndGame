@@ -98,13 +98,22 @@ func build(catalogue: Dictionary, entries: Dictionary, sector: String) -> void:
 	_title.text = "Budget of the %s, this month" % str(found["label"]).to_lower()
 	for heading in ["", "This month", "Last month", "Change", "", ""]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
+	# Only payments count: not purchases or sales of assets (marked financial in the
+	# model), and nothing in an instrument other than the one payments use.
+	var instruments: PackedStringArray = catalogue.get("instruments", PackedStringArray())
+	var payments := instruments[0] if instruments.size() > 0 else ""
+	var counts := func(name: String) -> bool:
+		var e: Dictionary = entries.get(name, {})
+		return not e.get("financial", false) and str(e.get("instrument", payments)) == payments
 	_section("Revenue")
 	for name in found["inflows"]:
-		_line(name, entries.get(name, {}), 1)
+		if counts.call(name):
+			_line(name, entries.get(name, {}), 1)
 	_total("revenue", "Total revenue")
 	_section("Spending")
 	for name in found["outflows"]:
-		_line(name, entries.get(name, {}), -1)
+		if counts.call(name):
+			_line(name, entries.get(name, {}), -1)
 	_total("spending", "Total spending")
 	_section("")
 	_total("balance", "Surplus or deficit")

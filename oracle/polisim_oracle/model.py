@@ -11,6 +11,7 @@ import hashlib
 import re
 import tomllib
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 
 from . import units as U
@@ -117,9 +118,13 @@ def convert(raw, typ: str, money: bool, minor: int, what: str):
             scaled = raw * minor
             if scaled != scaled or abs(scaled) > 9.0e18:
                 raise ModelError(f"{what}: {raw!r} is out of range")
-            value = round(scaled)  # half to even
-            if abs(scaled - value) > 1e-6:
+            # Read the number as the shortest decimal that gives this float, which is what
+            # was typed, and scale that exactly: 2301745961.03 is 230174596103 pence, though
+            # 2301745961.03 * 100 in floating point is 230174596102.99997.
+            exact = Decimal(repr(raw)) * minor
+            if exact != exact.to_integral_value():
                 raise ModelError(f"{what}: {raw!r} has more decimal places than the currency")
+            value = int(exact)
     else:
         if not isinstance(raw, int):
             raise ModelError(f"{what}: expected a whole number, got {raw!r}")
