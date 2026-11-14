@@ -21,7 +21,7 @@ def outcome(case: dict):
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         (root / "model.toml").write_text(CASES["base"] + "\n" + case["add"].replace("\\n", "\n") + "\n",
-                                         encoding="utf-8")
+                                         encoding="utf-8", newline="\n")
         try:
             sim = Simulation(load_model(root))
             rows = [sim.step() for _ in range(case["steps"])]

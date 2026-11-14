@@ -25,14 +25,14 @@ def outcome(case: dict):
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         (root / "model").mkdir()
-        (root / "model" / "model.toml").write_text(CASES["base"], encoding="utf-8")
+        (root / "model" / "model.toml").write_text(CASES["base"], encoding="utf-8", newline="\n")
         mods = []
         for i, mod in enumerate(case.get("mods", [])):
             where = root / f"mod{i}"
             where.mkdir()
-            (where / "mod.toml").write_text(text(mod["toml"]), encoding="utf-8")
+            (where / "mod.toml").write_text(text(mod["toml"]), encoding="utf-8", newline="\n")
             for name, content in mod.get("files", {}).items():
-                (where / name).write_text(text(content), encoding="utf-8")
+                (where / name).write_text(text(content), encoding="utf-8", newline="\n")
             mods.append(where)
         try:
             model = load_model(root / "model", mods)
