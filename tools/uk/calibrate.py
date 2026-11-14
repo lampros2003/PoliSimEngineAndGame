@@ -507,6 +507,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
                              else "round(exports_base * world_index * export_demand)")
     fills["imports_expr"] = ("round(sum(imports_by_partner, partner))" if people
                              else "round(import_share * import_propensity * private_demand)")
+    # Customs duties (trade.toml) are public receipts too.
+    fills["customs_receipts"] = " + customs_duties" if people else ""
     for name in ("model.toml", "economy.toml",
                  *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml"))):
         text = (HERE / "template" / name).read_text(encoding="utf-8")

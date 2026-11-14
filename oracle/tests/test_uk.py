@@ -388,3 +388,7 @@ class Trade(unittest.TestCase):
         imports, imports_base = walled.column("imports_by_partner"), base.column("imports_by_partner")
         self.assertAlmostEqual((imports[china] / imports[0]) / (imports_base[china] / imports_base[0]), 0.6, places=9)
         self.assertAlmostEqual(row["customs_duties"], round(0.2 * walled.column("imports_by_partner")[china]), delta=1)
+        # They are public receipts, so the budget balance counts them.
+        parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
+                 "other_receipts", "customs_duties"]
+        self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))

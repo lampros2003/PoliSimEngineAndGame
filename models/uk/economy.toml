@@ -234,7 +234,7 @@ label = "Public sector receipts"
 type = "money"
 unit = "GBP/month"
 phase = "finance"
-expr = "income_tax + national_insurance + council_tax + vat + production_taxes + corporation_tax + other_receipts"
+expr = "income_tax + national_insurance + council_tax + vat + production_taxes + corporation_tax + other_receipts + customs_duties"
 
 [var.public_spending]
 label = "Public sector spending"
