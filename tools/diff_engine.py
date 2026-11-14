@@ -70,6 +70,8 @@ def toml_value(value) -> str:
 
 def lever_value(rng: random.Random, name: str):
     default, low, high, money = LEVERS[name]
+    if money == "bool":
+        return rng.choice([True, False, True, False, 1]) if rng.random() < 0.98 else "yes"
     kind = rng.random()
     if kind < 0.80:
         value = default * rng.uniform(0.5, 1.5)
@@ -101,6 +103,9 @@ def use_model(path: Path) -> None:
     model = load_model(MODEL)
     LEVERS, PARAMS = {}, {}
     for decl in model.symbols.values():
+        if decl.kind == "lever" and decl.type == "bool":
+            LEVERS[decl.name] = (decl.spec["default"], None, None, "bool")
+            continue
         if decl.type == "bool" or decl.kind not in ("lever", "param"):
             continue
         spec = decl.spec
@@ -136,7 +141,7 @@ def make_scenario(rng: random.Random) -> str:
     if levers:
         lines += ["[levers]"] + [f"{k} = {toml_value(v)}" for k, v in levers.items()] + [""]
     for _ in range(rng.choice([0, 0, 1, 2, 3, 6]) if LEVERS else 0):
-        names = rng.sample(sorted(LEVERS), rng.choice([1, 1, 2]))
+        names = rng.sample(sorted(LEVERS), min(len(LEVERS), rng.choice([1, 1, 2])))
         if rng.random() < 0.02:
             names.append("not_a_lever")
         settings = ", ".join(f"{n} = {toml_value(lever_value(rng, n) if n in LEVERS else 1)}" for n in names)

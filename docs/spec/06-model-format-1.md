@@ -157,6 +157,96 @@ not written cell by cell; write a national var with `sum(...)` for any total a r
 report. Its cells are part of the state hash, in row-major order, like a record-level
 column.
 
+## Weights that change (stage S4.4)
+
+An entity's weights may be a record-level state instead of a data column, so that they
+can change during a run: synthetic households kept in line with a population that ages.
+
+```toml
+[entity.household]
+data = "households.csv"
+id = "id"
+weight = { state = "household_weight" }
+
+[state.household_weight]
+entity = "household"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = { column = "weight" }
+
+[state.household_weight.rake]
+when = "month_of_year == 0"
+passes = 10
+
+[[state.household_weight.rake.margin]]
+target = "adults_in_households"   # dims = ["region", "sex", "adult_band"]
+slots = [
+  { count = "select(adults >= 1, 1, 0)", at = ["region_code", "sex1", "band_of_age[age: age1]"] },
+  { count = "select(adults >= 2, 1, 0)", at = ["region_code", "sex2", "band_of_age[age: age2]"] },
+]
+
+[[state.household_weight.rake.margin]]
+target = "households_by_region"   # dims = ["region"]
+slots = [{ count = "1", at = ["region_code"] }]
+```
+
+**The weight state.** `weight = { state = "s" }` names a state of that entity, of type
+`int`, unit `1` and no dimensions. Every value it holds, from its initial value on, must
+be a whole number of at least 1 (a run-time error otherwise). Wherever records are
+weighted (`wsum`, `wcount`, `wsum_by`, `wcount_by`, and the totals that explanations and
+results give for record-level values), the weight is the state's value as a formula
+would read it at that point: the start-of-step value until the phase that updates it has
+committed, the new value after. No sector may hold its accounts record by record in an
+entity whose weights change: a changed weight would create or destroy money. The state
+has either a `next` formula, like any state, or a `rake`, and only a weight state may
+have a `rake`.
+
+**`rake`** sets the weights so that weighted totals of the records meet targets, by
+iterative proportional updating. Its keys:
+
+| Key | Meaning |
+|---|---|
+| `when` | A national formula, `bool`: the weights change only in steps where it is true |
+| `passes` | A whole number from 1 to 1,000 |
+| `margin` | One or more tables, each with `target` and `slots` |
+| `target` | The name of a national param, var or state with dimensions, whole or real; a var must be computed in the state's phase or earlier |
+| `slots` | One or more tables, each with `count` and `at` |
+| `count` | A record formula, whole or real: how many of the target's units the record adds to one cell, per unit of weight |
+| `at` | A list of record formulas, one per dimension of the target in its declared order, each a whole number without a unit: the record's member along that dimension (a range's member, or a list's position), as `wsum_by`'s key |
+
+Every slot of a margin has counts of one unit `u`, and the target's unit is `u * entity`,
+as for `wsum` of the count.
+
+The rake is evaluated where the state's `next` formula would be (step 2.2 of the
+[engine contract](00-engine-contract.md)), sees what such a formula sees, and its result
+is committed with the phase's other states:
+
+1. `when` is evaluated. If it is false, every weight stays as it is and nothing else of
+   the rake is evaluated.
+2. For each margin in order: every cell of the target must be finite and not negative
+   (checked in row-major order); each slot's `count`, then its `at` formulas left to
+   right, are evaluated for every record, strictly as record formulas always are; then,
+   for each record in ascending order and each slot in order, the count must be finite
+   and not negative and, if it is not zero, each `at` value must be a member of its
+   dimension (left to right). The first failure is the error reported. A record and slot
+   with a count that is not zero form a **pair** in the cell its `at` values name; an
+   `at` value that goes with a zero count is not checked.
+3. Each record starts from `v`, its current weight as a real. Then `passes` times, for each
+   margin in order, for each cell of its target in row-major order: `S` is the sum,
+   starting at real 0.0, of `v * real(count)` over the cell's pairs, records ascending and
+   slots in order within a record, added one at a time; `T` is the target cell as a real.
+   If `S > 0` and `T > 0`, then `f = T / S`, and every record with a pair in the cell,
+   in ascending order, gets `v = v * f`, once however many of its slots are in the cell.
+   Otherwise the cell is left alone.
+4. The new weight of each record is `round(v)` (halves to the even neighbour), or 1 if
+   that is less than 1. A `v` that is not finite, or rounds outside 64 bits, is an error.
+
+Each pass brings each margin to its targets in turn, so after the last pass the last
+margin fits exactly (before rounding) and the others more closely the more passes there
+are; a cell with no pairs or a zero target cannot be met and is skipped. Only
+multiplications and divisions are used, so every machine gives the same weights.
+
 ## Load-time checks
 
 Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot
@@ -164,14 +254,22 @@ have them, or with a repeat; a list member named like an element; a data file wi
 missing, repeated or unknown cell, or a missing column; a dimensioned value read with a
 dimension out of scope; `sum` over a dimension already in scope or not declared;
 `coord` or `cohort_shift` of a dimension not in scope; an index on something without
-that dimension, or the same dimension indexed twice.
+that dimension, or the same dimension indexed twice. For weights that change: a weight
+state that is not an `int` state of unit `1`, without dimensions, of its own entity; a
+sector held record by record in that entity; a state with both `next` and `rake`, or a
+`rake` on a state that is not a weight state; a `rake` whose `passes` is not a whole
+number from 1 to 1,000, with no margin or a margin with no slot, whose target is not a
+national param, var or state with dimensions, or is a var computed in a later phase;
+`at` with the wrong number of formulas; counts of different units in one margin, or of
+a unit that does not match the target's.
 
 ## Not in format 1
 
 Dimensioned levers, flows and accounts (a regional budget is a dimensioned var summed
-into a national flow); dimensions on record-level elements; random draws per cell; record weights that change
-during a run (planned for stage S4.4); interpolation between
-members; reductions other than `sum` (means and shares are written with `sum` and `/`).
+into a national flow); dimensions on record-level elements; random draws per cell; weights
+that are not whole numbers, and calibration methods other than the rake (such as
+exponential calibration, which needs `exp`); interpolation between members; reductions
+other than `sum` (means and shares are written with `sum` and `/`).
 
 ## Test model
 
@@ -181,3 +279,11 @@ integer state on a range starting at 16; a parameter with a column per preset; a
 dimensioned var read through `prev()`; and records that look a rate up by region.
 `oracle/tests/test_format1.py` tests the rules; `models/cohort/golden/` holds the
 oracle's state hashes, which the engine must reproduce.
+
+`models/raking/` (written by `tools/make_raking.py`) tests weights that change: 2,000
+invented households raked once a year to three margins (adults by region, sex and age
+band, three slots per household; children by region; households by size, a whole-number
+target on a range dimension), with aggregates before and after the rake. The hand-worked
+cases of `conformance/rake_cases.toml` (the rake's arithmetic, its skips and rounding, and
+every refusal and run-time error above) are run by both `oracle/tests/test_raking.py` and
+`crates/core/tests/raking.rs`.

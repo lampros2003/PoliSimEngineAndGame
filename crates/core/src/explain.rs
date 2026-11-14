@@ -151,7 +151,7 @@ impl Simulation {
         }
         match d.entity {
             None => total(&scal[id]),
-            Some(entity) => column_total(&cols[id], &self.model().entities[entity].weights),
+            Some(entity) => column_total(&cols[id], &self.weights_in(cols)[entity]),
         }
     }
 
@@ -159,12 +159,14 @@ impl Simulation {
     fn run(&self, id: usize, cx: &Context, prev: &Snapshot, swap: Option<Swap>, step: u32) -> Option<Num> {
         let prog = self.progs_of(id)?;
         let model = self.model();
+        let weights = self.weights_in(&cx.cols);
         let eval = EvalCtx {
             scal: &cx.scal,
             cols: &cx.cols,
             prev_scal: &prev.scal,
             prev_cols: &prev.cols,
             entities: &model.entities,
+            weights: &weights,
             seed: self.seed(),
             step,
             swap,
@@ -174,9 +176,7 @@ impl Simulation {
         }
         match model.symbols[id].entity {
             None => vm::eval_scalar(prog, &eval).ok().map(|v| total(&v)),
-            Some(entity) => {
-                vm::eval_column(prog, entity, &eval).ok().map(|c| column_total(&c, &model.entities[entity].weights))
-            }
+            Some(entity) => vm::eval_column(prog, entity, &eval).ok().map(|c| column_total(&c, &weights[entity])),
         }
     }
 
@@ -217,6 +217,9 @@ impl Simulation {
         };
 
         match d.kind {
+            Kind::State if d.rake.is_some() => {
+                explanation.note = Some("set by raking the weights to their targets".to_string())
+            }
             Kind::Lever => explanation.note = Some("set by the player".to_string()),
             Kind::Param | Kind::Column => explanation.note = Some("fixed for the whole run".to_string()),
             Kind::Account => {

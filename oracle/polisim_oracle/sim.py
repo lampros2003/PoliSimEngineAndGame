@@ -19,6 +19,7 @@ import struct
 
 from .expr import SimError, compile_formula
 from .model import Model, ModelError, Scenario, convert
+from . import units as U
 from .units import parse_unit
 
 
@@ -30,6 +31,7 @@ class Runtime:
         self.C: dict[str, list] = {}  # current per-record columns
         self.PS: dict[str, object] = {}  # scalars at the end of the previous step
         self.PC: dict[str, list] = {}  # columns at the end of the previous step
+        self.W: dict[str, list[int]] = {}  # each entity's current weights, updated in place
         self.seed = seed
         self.step = 0  # index of the step being computed
 
@@ -44,6 +46,8 @@ class Simulation:
         self.flow_totals: dict[str, int] = {}
         m, minor = model, model.minor
         sym = m.symbols
+        for name, entity in m.entities.items():
+            rt.W[name] = list(entity.weights)
 
         # ---- parameters, levers, data columns
         overrides = dict(params or {})
@@ -104,6 +108,7 @@ class Simulation:
         for d in sym.values():
             if d.kind == "state" or (d.kind == "account" and d.initial is not None):
                 self._store(d, initial(d))
+        self._sync_weights()
         for instrument, info in m.instruments.items():
             held = sum(self._total(sym[name]) for (sector, ins), name in m.accounts.items()
                        if ins == instrument and sector != info["issuer"])
@@ -122,6 +127,12 @@ class Simulation:
             self.fn[d.name], deps[d.name], lagged = compile_formula(
                 d.expr, m, rt, d.entity, d.type, d.unit, label, d.dims)
             self.lagged |= lagged
+        self.weight_states = {e.weight_state for e in m.entities.values() if e.weight_state}
+        self.rakes: dict[str, object] = {}
+        for d in sym.values():
+            if d.rake is not None:
+                self.rakes[d.name], deps[d.name], lagged = self._compile_rake(d)
+                self.lagged |= lagged
         self.plan = self._plan(deps)
 
         # ---- values that prev() sees during the first step
@@ -153,8 +164,106 @@ class Simulation:
         """Sector-level total of a scalar or per-record whole-number quantity."""
         if d.entity is None:
             return self.rt.S[d.name]
-        weights = self.model.entities[d.entity].weights
+        weights = self.rt.W[d.entity]
         return sum(w * v for w, v in zip(weights, self.rt.C[d.name]))
+
+    def _sync_weights(self) -> None:
+        """Format 1 (S4.4): copy weight states into the weights every aggregate reads."""
+        for name, entity in self.model.entities.items():
+            if entity.weight_state is not None:
+                values = self.rt.C[entity.weight_state]
+                if min(values) < 1:
+                    raise SimError(f"state {entity.weight_state}: weights must be whole numbers of at least 1")
+                self.rt.W[name][:] = values
+
+    def _compile_rake(self, d):
+        """Format 1 (S4.4): a weight state's rake (docs/spec/06-model-format-1.md). Returns
+        a function giving the new weights, the names it reads and those read through prev()."""
+        m, rt, rake = self.model, self.rt, d.rake
+        what = f"state {d.name} rake"
+        count = len(m.entities[d.entity].ids)
+        when, deps, lagged = compile_formula(rake.when, m, rt, None, "bool", parse_unit("1"), f"{what} when")
+        margins = []
+        for k, margin in enumerate(rake.margins):
+            t = m.symbols[margin.target]
+            deps.add(t.name)
+            dims = [m.dims[n] for n in t.dims]
+            strides, stride = [], 1
+            for D in reversed(dims):
+                strides.append(stride)
+                stride *= D.size
+            strides.reverse()
+            per_record = U.div(t.unit, ((d.entity, 1),))
+            slots = []
+            for slot in margin.slots:
+                where = f"{what} margin {k + 1}"
+                fn, used, lag = compile_formula(slot.count, m, rt, d.entity, "real", per_record, f"{where} count")
+                deps |= used
+                lagged |= lag
+                ats = []
+                for D, src in zip(dims, slot.at):
+                    at, used, lag = compile_formula(src, m, rt, d.entity, "int", U.ONE, f"{where} at {D.name}")
+                    deps |= used
+                    lagged |= lag
+                    ats.append(at)
+                slots.append((fn, ats))
+            margins.append((t.name, dims, strides, stride, slots))
+
+        def run():
+            if not when(0):
+                return list(rt.C[d.name])
+            prepared = []
+            for target, dims, strides, cells, slots in margins:
+                values = rt.C[target]
+                for x in values:
+                    if x != x or x in (float("inf"), float("-inf")) or x < 0:
+                        raise SimError(f"{what}: a cell of the target {target} is {x}, not a finite number of at least 0")
+                evaluated = []
+                for fn, ats in slots:
+                    counts = [fn(r) for r in range(count)]
+                    evaluated.append((counts, [[at(r) for r in range(count)] for at in ats]))
+                pairs = [[] for _ in range(cells)]
+                for r in range(count):
+                    for counts, ats in evaluated:
+                        c = counts[r]
+                        if c != c or c in (float("inf"), float("-inf")) or c < 0:
+                            raise SimError(f"{what}: a record's count is {c}, not a finite number of at least 0")
+                        if c == 0:
+                            continue
+                        flat = 0
+                        for D, stride, at in zip(dims, strides, ats):
+                            v = at[r]
+                            pos = v - (D.first if D.kind == "range" else 0)
+                            if not 0 <= pos < D.size:
+                                raise SimError(f"{what}: a record's member {v} is not in {D.name}")
+                            flat += pos * stride
+                        pairs[flat].append((r, float(c)))
+                prepared.append((values, pairs))
+            v = [float(w) for w in rt.C[d.name]]
+            for _ in range(rake.passes):
+                for values, pairs in prepared:
+                    for cell, members in enumerate(pairs):
+                        total = 0.0
+                        for r, c in members:
+                            total = total + v[r] * c
+                        goal = float(values[cell])
+                        if total > 0.0 and goal > 0.0:
+                            f = goal / total
+                            last = -1
+                            for r, _ in members:
+                                if r != last:
+                                    v[r] = v[r] * f
+                                    last = r
+            out = []
+            for x in v:
+                if x != x or x in (float("inf"), float("-inf")):
+                    raise SimError(f"{what}: a weight is not finite")
+                w = round(x)
+                if not -(1 << 63) <= w < (1 << 63):
+                    raise SimError(f"{what}: a weight does not fit in 64 bits")
+                out.append(max(w, 1))
+            return out
+        return run, deps, lagged
 
     def _set_lever(self, name: str, raw) -> None:
         d = self.model.symbols.get(name)
@@ -196,6 +305,8 @@ class Simulation:
         return plan
 
     def _evaluate(self, d):
+        if d.name in self.rakes:
+            return self.rakes[d.name]()
         fn = self.fn[d.name]
         if d.dims:
             return [fn(cell) for cell in self.cells[d.name]]
@@ -217,6 +328,8 @@ class Simulation:
                 pending = [(sym[name], self._evaluate(sym[name])) for name in states]
                 for d, value in pending:
                     self._store(d, value)
+                if any(d.name in self.weight_states for d, _ in pending):
+                    self._sync_weights()
 
             self._post_flows()
         except SimError as exc:
@@ -246,7 +359,7 @@ class Simulation:
                 amounts = rt.C[flow.name]
                 if min(amounts) < 0:
                     raise SimError(f"flow {flow.name} is negative for at least one record")
-                total = sum(w * a for w, a in zip(m.entities[d.entity].weights, amounts))
+                total = sum(w * a for w, a in zip(rt.W[d.entity], amounts))
             self._int64(total, f"flow {flow.name}")
             # Flows are applied in declaration order and every intermediate balance must fit.
             for account, sign in ((src, -1), (dst, 1)):

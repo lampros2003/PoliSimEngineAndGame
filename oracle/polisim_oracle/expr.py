@@ -732,6 +732,11 @@ class _Builder:
         ids = self.scope.entities[ctx].ids
         return Built("real", U.ONE, lambda i: uniform(rt.seed, stream, ids[i], rt.step))
 
+    def _weights(self, entity) -> list[int]:
+        """The run's current weights of an entity: a list the simulation updates in place when
+        a weight state changes (format 1, S4.4), so closures built now always see them."""
+        return self.rt.W.get(entity.name, entity.weights)
+
     def _aggregate(self, fname: str, args, ctx):
         self._args(fname, args, 2)
         if ctx is not None:
@@ -750,7 +755,7 @@ class _Builder:
         left to right in ascending record order, each term being real(weight) * value."""
         entity, inner = self._aggregate("wsum", args, ctx)
         self._number(inner, "wsum()")
-        weights, count, f = entity.weights, len(entity.weights), inner.fn
+        weights, count, f = self._weights(entity), len(entity.ids), inner.fn
         unit = U.mul(inner.unit, ((entity.name, 1),))
         if inner.type == "int":
             def fn(_):
@@ -791,7 +796,7 @@ class _Builder:
         return entity, D, inner, key
 
     def _group_fn(self, fname, entity, D, inner, key, term):
-        weights, count, f, k, dim = entity.weights, len(entity.weights), inner.fn, key.fn, D.name
+        weights, count, f, k, dim = self._weights(entity), len(entity.ids), inner.fn, key.fn, D.name
         first = D.first if D.kind == "range" else 0
 
         def positions():
@@ -846,7 +851,7 @@ class _Builder:
     def _fn_wcount(self, args, ctx):
         entity, inner = self._aggregate("wcount", args, ctx)
         self._boolean(inner, "wcount()")
-        weights, count, f = entity.weights, len(entity.weights), inner.fn
+        weights, count, f = self._weights(entity), len(entity.ids), inner.fn
 
         def fn(_):
             total = 0

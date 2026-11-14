@@ -23,6 +23,8 @@ pub struct EvalCtx<'a> {
     pub prev_scal: &'a [Val],
     pub prev_cols: &'a [Col],
     pub entities: &'a [Entity],
+    /// Each entity's current weights (format 1: they change when a weight state does).
+    pub weights: &'a [Vec<i64>],
     pub seed: u64,
     /// Index of the step being computed.
     pub step: u32,
@@ -114,7 +116,7 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
 fn eval_agg_by(agg: &AggBy, cx: &EvalCtx) -> Check<Col> {
     let value_prepared = prepare(&agg.value, cx)?;
     let key_prepared = prepare(&agg.key, cx)?;
-    let weights = &cx.entities[agg.entity].weights;
+    let weights = &cx.weights[agg.entity];
     let count = weights.len();
     let width = BLOCK.min(count.max(1));
     let mut value_regs = Regs::new(&agg.value, width);
@@ -305,7 +307,7 @@ pub fn eval_column(prog: &Program, entity: usize, cx: &EvalCtx) -> Check<Col> {
 fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {
     let prog = &agg.prog;
     let prepared = prepare(prog, cx)?;
-    let weights = &cx.entities[agg.entity].weights;
+    let weights = &cx.weights[agg.entity];
     let count = weights.len();
     let mut regs = Regs::new(prog, BLOCK.min(count.max(1)));
     let r = prog.result as usize;

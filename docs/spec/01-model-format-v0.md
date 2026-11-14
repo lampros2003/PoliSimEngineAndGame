@@ -87,7 +87,8 @@ unit is the instrument's, divided by the entity for a record-level account.
 
 A table of records: `data` (CSV path), `id` (column of unique non-negative whole
 numbers), `weight` (column of positive whole numbers: how many real units each record
-stands for). `[entity.<name>.columns.<column>]` declares a data column that formulas may
+stands for; in format 1 it may instead be a state, so that weights change during a run:
+[format 1](06-model-format-1.md#weights-that-change-stage-s44)). `[entity.<name>.columns.<column>]` declares a data column that formulas may
 read, with `type` and `unit`. Other CSV columns can be used only as `initial` values.
 
 ### `[param.<name>]`

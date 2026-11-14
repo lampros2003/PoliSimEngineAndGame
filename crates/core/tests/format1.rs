@@ -99,3 +99,23 @@ fn reserved_function_names_match_the_oracle() {
     names.sort();
     assert_eq!(names, polisim_core::model::FUNCTIONS.to_vec());
 }
+
+/// Reloading unchanged files carries dimensioned states across: the run goes on exactly as
+/// if it had never been reloaded (before S4.4 they started again from their initial value).
+#[test]
+fn an_unchanged_reload_keeps_dimensioned_states() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let scenario = polisim_core::load_scenario(&root.join("models/cohort/scenarios/base.toml")).unwrap();
+    let model = std::sync::Arc::new(scenario.model.clone());
+    let mut plain = Simulation::new(std::sync::Arc::clone(&model), scenario.config()).unwrap();
+    let mut sim = Simulation::new(std::sync::Arc::clone(&model), scenario.config()).unwrap();
+    for _ in 0..5 {
+        plain.step().unwrap();
+        sim.step().unwrap();
+    }
+    let (mut reloaded, reset) = sim.reload(std::sync::Arc::clone(&model), &scenario.preset, Vec::new()).unwrap();
+    assert!(reset.is_empty(), "{reset:?}");
+    for _ in 0..5 {
+        assert_eq!(reloaded.step().unwrap().hash, plain.step().unwrap().hash);
+    }
+}

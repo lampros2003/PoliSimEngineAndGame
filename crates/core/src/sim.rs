@@ -92,6 +92,26 @@ pub struct Simulation {
     pub(crate) snapshots: VecDeque<Snapshot>,
     /// Time spent in each phase, then in posting, since the run started.
     phase_time: Vec<Duration>,
+    /// Each entity's current weights: its data's, or its weight state's (format 1, S4.4).
+    weights: Vec<Vec<i64>>,
+    /// Per symbol: the compiled rake of a weight state that has one.
+    rakes: Vec<Option<RakeProg>>,
+}
+
+/// Format 1 (S4.4): a compiled rake (docs/spec/06-model-format-1.md).
+struct RakeProg {
+    when: Program,
+    passes: u32,
+    margins: Vec<MarginProg>,
+}
+
+struct MarginProg {
+    target: usize,
+    /// (first member, size, stride) per dimension of the target.
+    dims: Vec<(i64, usize, usize)>,
+    cells: usize,
+    /// Per slot: the count, then one formula per dimension.
+    slots: Vec<(Program, Vec<Program>)>,
 }
 
 /// The whole state at the end of a step, kept only while tracing.
@@ -182,6 +202,8 @@ impl Simulation {
             tracing: false,
             snapshots: VecDeque::new(),
             phase_time: vec![Duration::ZERO; model.phases.len() + 1],
+            weights: model.entities.iter().map(|e| e.weights.clone()).collect(),
+            rakes: (0..count).map(|_| None).collect(),
         };
         let m = &*model;
         let minor = m.minor;
@@ -290,6 +312,7 @@ impl Simulation {
             let balance = fits(-held, &format!("account {}", issuer.name))?;
             simulation.store(instrument.issuer_account, Computed::One(Val::I(balance)))?;
         }
+        simulation.sync_weights()?;
 
         // ---- compile formulas and build the evaluation plan
         let mut deps: Vec<Vec<usize>> = vec![Vec::new(); count];
@@ -303,6 +326,17 @@ impl Simulation {
             deps[id] = compiled.deps;
             simulation.lagged_deps[id] = compiled.lagged;
             simulation.progs[id] = Some(compiled.prog);
+        }
+        for (id, d) in m.symbols.iter().enumerate() {
+            if d.rake.is_some() {
+                let (rake, used, lagged) = compile_rake(m, d)?;
+                for &l in &lagged {
+                    simulation.lagged[l] = true;
+                }
+                deps[id] = used;
+                simulation.lagged_deps[id] = lagged;
+                simulation.rakes[id] = Some(rake);
+            }
         }
         simulation.plan = plan(m, &deps)?;
         simulation.deps = deps;
@@ -455,7 +489,7 @@ impl Simulation {
         let d = &self.model.symbols[id];
         let Some(entity) = d.entity else { return Ok(as_int(&self.scal[id]) as i128) };
         let mut total: i128 = 0;
-        for (w, v) in self.model.entities[entity].weights.iter().zip(int_column(&self.cols[id])) {
+        for (w, v) in self.weights[entity].iter().zip(int_column(&self.cols[id])) {
             total = total.checked_add(*w as i128 * *v as i128).ok_or_else(too_large)?;
         }
         Ok(total)
@@ -496,13 +530,169 @@ impl Simulation {
             prev_scal: &self.prev_scal,
             prev_cols: &self.prev_cols,
             entities: &self.model.entities,
+            weights: &self.weights,
             seed: self.seed,
             step: self.step as u32,
             swap: None,
         }
     }
 
+    /// Format 1 (S4.4): copies weight states into the weights every aggregate reads.
+    fn sync_weights(&mut self) -> Result<()> {
+        let model = Arc::clone(&self.model);
+        for (index, entity) in model.entities.iter().enumerate() {
+            let Some(state) = &entity.weight_state else { continue };
+            let id = model.sym_index[state];
+            let values = int_column(&self.cols[id]);
+            if values.iter().any(|w| *w < 1) {
+                return sim_err(format!("state {state}: weights must be whole numbers of at least 1"));
+            }
+            self.weights[index].clone_from_slice(values);
+        }
+        Ok(())
+    }
+
+    /// The weights that go with a copy of the state: each weight state's value in `cols`.
+    pub(crate) fn weights_in(&self, cols: &[Col]) -> Vec<Vec<i64>> {
+        let model = &self.model;
+        model
+            .entities
+            .iter()
+            .map(|e| match &e.weight_state {
+                Some(state) => int_column(&cols[model.sym_index[state]]).to_vec(),
+                None => e.weights.clone(),
+            })
+            .collect()
+    }
+
+    /// Runs a weight state's rake: the new weights (docs/spec/06-model-format-1.md).
+    fn rake(&self, id: usize, rake: &RakeProg) -> Result<Computed> {
+        let d = &self.model.symbols[id];
+        let what = format!("state {} rake", d.name);
+        let named = |message: String| Error::Sim(format!("{what}: {message}"));
+        let cx = self.ctx();
+        let current = int_column(&self.cols[id]);
+        if vm::eval_scalar(&rake.when, &cx).map_err(named)? != Val::B(true) {
+            return Ok(Computed::Each(Col::I(current.to_vec())));
+        }
+        let entity = d.entity.expect("weight states belong to an entity");
+        let count = current.len();
+        // Per margin: the target as reals, and its pairs grouped by cell, records ascending
+        // and slots in order (offsets into `records` and `counts`).
+        let mut prepared = Vec::with_capacity(rake.margins.len());
+        for margin in &rake.margins {
+            let target: Vec<f64> = match &self.cols[margin.target] {
+                Col::I(v) => v.iter().map(|x| *x as f64).collect(),
+                Col::F(v) => v.clone(),
+                Col::B(_) => unreachable!("targets are numbers"),
+            };
+            if let Some(x) = target.iter().find(|x| !x.is_finite() || **x < 0.0) {
+                let name = &self.model.symbols[margin.target].name;
+                return sim_err(format!(
+                    "{what}: a cell of the target {name} is {}, not a finite number of at least 0",
+                    crate::pyfmt::float_repr(*x)
+                ));
+            }
+            let mut counts = Vec::with_capacity(margin.slots.len());
+            let mut ats = Vec::with_capacity(margin.slots.len());
+            for (count_prog, at_progs) in &margin.slots {
+                let column = vm::eval_column(count_prog, entity, &cx).map_err(named)?;
+                let Col::F(column) = column else { unreachable!("counts are compiled as reals") };
+                counts.push(column);
+                let mut columns = Vec::with_capacity(at_progs.len());
+                for prog in at_progs {
+                    let Col::I(column) = vm::eval_column(prog, entity, &cx).map_err(named)? else {
+                        unreachable!("members are whole numbers")
+                    };
+                    columns.push(column);
+                }
+                ats.push(columns);
+            }
+            let mut cell_of: Vec<(usize, usize, f64)> = Vec::new(); // (cell, record, count)
+            for r in 0..count {
+                for (slot, column) in counts.iter().enumerate() {
+                    let c = column[r];
+                    if !c.is_finite() || c < 0.0 {
+                        return sim_err(format!(
+                            "{what}: a record's count is {}, not a finite number of at least 0",
+                            crate::pyfmt::float_repr(c)
+                        ));
+                    }
+                    if c == 0.0 {
+                        continue;
+                    }
+                    let mut flat = 0usize;
+                    for (k, &(first, size, stride)) in margin.dims.iter().enumerate() {
+                        let v = ats[slot][k][r];
+                        let pos = v.checked_sub(first).filter(|p| (0..size as i64).contains(p));
+                        let Some(pos) = pos else {
+                            let dim = &self.model.dims[self.model.symbols[margin.target].dims[k]].name;
+                            return sim_err(format!("{what}: a record's member {v} is not in {dim}"));
+                        };
+                        flat += pos as usize * stride;
+                    }
+                    cell_of.push((flat, r, c));
+                }
+            }
+            // Group by cell, keeping the order within each cell (a stable counting sort).
+            let mut offsets = vec![0usize; margin.cells + 1];
+            for &(cell, _, _) in &cell_of {
+                offsets[cell + 1] += 1;
+            }
+            for k in 0..margin.cells {
+                offsets[k + 1] += offsets[k];
+            }
+            let mut fill = offsets.clone();
+            let mut records = vec![0usize; cell_of.len()];
+            let mut weights = vec![0.0f64; cell_of.len()];
+            for &(cell, r, c) in &cell_of {
+                records[fill[cell]] = r;
+                weights[fill[cell]] = c;
+                fill[cell] += 1;
+            }
+            prepared.push((target, offsets, records, weights));
+        }
+        let mut v: Vec<f64> = current.iter().map(|w| *w as f64).collect();
+        for _ in 0..rake.passes {
+            for (target, offsets, records, counts) in &prepared {
+                for cell in 0..target.len() {
+                    let range = offsets[cell]..offsets[cell + 1];
+                    let mut total = 0.0f64;
+                    for k in range.clone() {
+                        total += v[records[k]] * counts[k];
+                    }
+                    let goal = target[cell];
+                    if total > 0.0 && goal > 0.0 {
+                        let f = goal / total;
+                        let mut last = usize::MAX;
+                        for &r in &records[range] {
+                            if r != last {
+                                v[r] *= f;
+                                last = r;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let mut out = Vec::with_capacity(count);
+        for x in v {
+            if !x.is_finite() {
+                return sim_err(format!("{what}: a weight is not finite"));
+            }
+            let w = x.round_ties_even();
+            if !(-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0).contains(&w) {
+                return sim_err(format!("{what}: a weight does not fit in 64 bits"));
+            }
+            out.push((w as i64).max(1));
+        }
+        Ok(Computed::Each(Col::I(out)))
+    }
+
     fn compute(&self, id: usize) -> Result<Computed> {
+        if let Some(rake) = &self.rakes[id] {
+            return self.rake(id, rake);
+        }
         let d = &self.model.symbols[id];
         let prog = self.progs[id].as_ref().expect("planned symbols have a program");
         let named = |message: String| Error::Sim(format!("{} {}: {message}", d.kind.name(), d.name));
@@ -543,7 +733,7 @@ impl Simulation {
             Some(s) if s.steps_done == self.step => {
                 self.scal.clone_from(&s.scal);
                 self.cols.clone_from(&s.cols);
-                true
+                self.sync_weights().is_ok()
             }
             _ => false,
         }
@@ -597,8 +787,13 @@ impl Simulation {
             for &id in &self.plan[phase].states {
                 pending.push((id, self.compute(id)?));
             }
+            let mut weights_changed = false;
             for (id, value) in pending {
+                weights_changed |= self.rakes[id].is_some() || self.is_weight_state(id);
                 self.store(id, value)?;
+            }
+            if weights_changed {
+                self.sync_weights()?;
             }
             self.phase_time[phase] += started.elapsed();
         }
@@ -648,7 +843,7 @@ impl Simulation {
                         return sim_err(format!("flow {} is negative for at least one record", d.name));
                     }
                     let mut total: i128 = 0;
-                    for (w, a) in m.entities[entity].weights.iter().zip(amounts) {
+                    for (w, a) in self.weights[entity].iter().zip(amounts) {
                         total = total.checked_add(*w as i128 * *a as i128).ok_or_else(too_large)?;
                     }
                     (total, Some(amounts))
@@ -802,7 +997,7 @@ impl Simulation {
             let d = &model.symbols[id];
             let carried = self.model.sym_index.get(&d.name).and_then(|&old| {
                 let o = &self.model.symbols[old];
-                let same_shape = match (o.entity, d.entity) {
+                let same_entity = match (o.entity, d.entity) {
                     (None, None) => true,
                     (Some(a), Some(b)) => {
                         self.model.entities[a].name == model.entities[b].name
@@ -810,10 +1005,15 @@ impl Simulation {
                     }
                     _ => false,
                 };
-                let value = match o.entity {
-                    None => Computed::One(self.scal[old]),
-                    Some(_) => Computed::Each(self.cols[old].clone()),
-                };
+                // Format 1: the same dimensions, in the same order, with the same members.
+                let same_dims = o.dims.len() == d.dims.len()
+                    && o.dims.iter().zip(&d.dims).all(|(a, b)| {
+                        let (a, b) = (&self.model.dims[*a], &model.dims[*b]);
+                        a.name == b.name && a.members == b.members
+                    });
+                let same_shape = same_entity && same_dims;
+                let value =
+                    if o.columnar() { Computed::Each(self.cols[old].clone()) } else { Computed::One(self.scal[old]) };
                 let ty_ok = match &value {
                     Computed::One(v) => type_of(v) == d.ty,
                     Computed::Each(c) => {
@@ -897,8 +1097,14 @@ impl Simulation {
             self.store(id, value)?;
         }
         self.step = steps_done;
+        self.sync_weights()?;
         self.remember();
         Ok(())
+    }
+
+    fn is_weight_state(&self, id: usize) -> bool {
+        let name = &self.model.symbols[id].name;
+        self.model.entities.iter().any(|e| e.weight_state.as_ref() == Some(name))
     }
 
     /// SHA-256 over everything needed to continue the run (engine contract, section 9).
@@ -985,6 +1191,58 @@ fn text_column(cells: &[String], d: &Decl, minor: i64, what: &str) -> Result<Col
 }
 
 /// Per phase: vars and flows in dependency order, then the states updated there.
+/// Format 1 (S4.4): compiles a weight state's rake. Returns it with the symbols it reads
+/// this step (its targets among them) and those it reads through `prev()`.
+fn compile_rake(m: &Model, d: &Decl) -> Result<(RakeProg, Vec<usize>, Vec<usize>)> {
+    let rake = d.rake.as_ref().expect("a rake");
+    let entity = d.entity.expect("weight states belong to an entity");
+    let what = format!("state {} rake", d.name);
+    let mut deps = std::collections::BTreeSet::new();
+    let mut lagged = std::collections::BTreeSet::new();
+    let mut take = |c: crate::program::Compiled| {
+        deps.extend(c.deps);
+        lagged.extend(c.lagged);
+        c.prog
+    };
+    let when = take(compile_formula(m, &rake.when, None, &[], Ty::Bool, &Unit::one(), &format!("{what} when"))?);
+    let mut margins = Vec::with_capacity(rake.margins.len());
+    for (k, margin) in rake.margins.iter().enumerate() {
+        let where_ = format!("{what} margin {}", k + 1);
+        let target = m.sym_index[&margin.target];
+        let t = &m.symbols[target];
+        let mut dims = Vec::with_capacity(t.dims.len());
+        let mut stride = 1usize;
+        for &x in t.dims.iter().rev() {
+            let dim = &m.dims[x];
+            dims.push((dim.first.unwrap_or(0), dim.size(), stride));
+            stride *= dim.size();
+        }
+        dims.reverse();
+        let per_record = crate::units::div(&Some(t.unit.clone()), &Some(Unit::base(&m.entities[entity].name)));
+        let mut slots = Vec::with_capacity(margin.slots.len());
+        for slot in &margin.slots {
+            let count = take(compile_formula(
+                m,
+                &slot.count,
+                Some(entity),
+                &[],
+                Ty::Real,
+                &per_record,
+                &format!("{where_} count"),
+            )?);
+            let mut ats = Vec::with_capacity(slot.at.len());
+            for (src, &x) in slot.at.iter().zip(&t.dims) {
+                let label = format!("{where_} at {}", m.dims[x].name);
+                ats.push(take(compile_formula(m, src, Some(entity), &[], Ty::Int, &Unit::one(), &label)?));
+            }
+            slots.push((count, ats));
+        }
+        margins.push(MarginProg { target, dims, cells: stride, slots });
+    }
+    deps.extend(margins.iter().map(|m| m.target));
+    Ok((RakeProg { when, passes: rake.passes, margins }, deps.into_iter().collect(), lagged.into_iter().collect()))
+}
+
 fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
     let mut phases = Vec::with_capacity(m.phases.len());
     for p in 0..m.phases.len() {

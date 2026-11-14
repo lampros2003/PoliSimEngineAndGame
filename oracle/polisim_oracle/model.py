@@ -49,6 +49,27 @@ class Decl:
     spec: dict = field(default_factory=dict)
     dims: tuple[str, ...] = ()  # format 1: one value per cell of these dimensions
     data: dict[str, list[str]] = field(default_factory=dict)  # format 1: CSV column -> text per cell
+    rake: Rake | None = None  # format 1 (S4.4): a weight state's rake, instead of `next`
+
+
+@dataclass
+class Slot:
+    count: str  # record formula
+    at: list[str]  # record formulas, one per dimension of the target
+
+
+@dataclass
+class Margin:
+    target: str  # national param, var or state with dimensions
+    slots: list[Slot]
+
+
+@dataclass
+class Rake:
+    """Format 1 (S4.4): iterative proportional updating of a weight state."""
+    when: str  # national bool formula
+    passes: int
+    margins: list[Margin]
 
 
 @dataclass
@@ -73,8 +94,9 @@ class Dim:
 class Entity:
     name: str
     ids: list[int]
-    weights: list[int]
+    weights: list[int]  # from the data; a run's current weights are in its runtime
     raw: dict[str, list[str]]  # every CSV column as text
+    weight_state: str | None = None  # format 1 (S4.4): weights held by this state
 
 
 @dataclass
@@ -198,16 +220,25 @@ def _read_entity(root: Path, name: str, spec: dict) -> Entity:
     if not rows:
         raise ModelError(f"entity {name}: {path} has no rows")
     raw = {column: [row[column] for row in rows] for column in rows[0]}
-    for needed in (spec["id"], spec["weight"]):
+    weight = spec["weight"]
+    state = None
+    if isinstance(weight, dict):
+        if set(weight) != {"state"} or not isinstance(weight["state"], str):
+            raise ModelError(f"entity {name}: 'weight' is a column name or {{ state = \"<name>\" }}")
+        state = weight["state"]
+    for needed in (spec["id"],) + (() if state else (weight,)):
         if needed not in raw:
             raise ModelError(f"entity {name}: column {needed!r} not found in {path.name}")
     ids = [convert(v, "int", False, 1, f"entity {name} id") for v in raw[spec["id"]]]
-    weights = [convert(v, "int", False, 1, f"entity {name} weight") for v in raw[spec["weight"]]]
+    if state:
+        weights = [1] * len(ids)  # the state's initial value replaces these when a run starts
+    else:
+        weights = [convert(v, "int", False, 1, f"entity {name} weight") for v in raw[weight]]
     if len(set(ids)) != len(ids) or min(ids) < 0:
         raise ModelError(f"entity {name}: ids must be unique and non-negative")
     if min(weights) <= 0:
         raise ModelError(f"entity {name}: weights must be positive whole numbers")
-    return Entity(name, ids, weights, raw)
+    return Entity(name, ids, weights, raw, state)
 
 
 def load_model(path: str | Path) -> Model:
@@ -434,11 +465,12 @@ def load_model(path: str | Path) -> Model:
     for name, spec in merged["state"].items():
         what = f"state {name}"
         typ, money = _type(spec, what)
-        if "next" not in spec or "initial" not in spec:
-            raise ModelError(f"{what}: needs both 'initial' and 'next'")
+        if "initial" not in spec or ("next" in spec) == ("rake" in spec):
+            raise ModelError(f"{what}: needs 'initial' and either 'next' or 'rake'")
         declare(with_data(Decl(name, "state", typ, _unit(spec, what, "1" if typ == "bool" else None), money,
-                               entity_of(spec, what), phase_of(spec, what), spec["next"], spec["initial"],
-                               _range(spec, money, minor, what), spec, dims_of(spec, "state", what)),
+                               entity_of(spec, what), phase_of(spec, what), spec.get("next"), spec["initial"],
+                               _range(spec, money, minor, what), spec, dims_of(spec, "state", what),
+                               rake=_rake(spec["rake"], what) if "rake" in spec else None),
                           spec["initial"]))
 
     accounts: dict[tuple[str, str], str] = {}
@@ -495,6 +527,8 @@ def load_model(path: str | Path) -> Model:
         if sectors[info["issuer"]] is not None:
             raise ModelError(f"instrument {instrument}: the issuer cannot be a per-record sector")
 
+    _check_weights(entities, sectors, symbols, phases)
+
     for dim in dims.values():
         if dim.kind == "list":
             for member in dim.members:
@@ -508,6 +542,70 @@ def load_model(path: str | Path) -> Model:
 
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
                  entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt)
+
+
+def _rake(spec, what: str) -> Rake:
+    """Format 1 (S4.4): the structure of a rake; names and formulas are checked later."""
+    what = f"{what} rake"
+    if not isinstance(spec, dict) or set(spec) - {"when", "passes", "margin"}:
+        raise ModelError(f"{what}: takes 'when', 'passes' and 'margin'")
+    passes = spec.get("passes")
+    if not isinstance(passes, int) or isinstance(passes, bool) or not 1 <= passes <= 1000:
+        raise ModelError(f"{what}: 'passes' must be a whole number from 1 to 1,000")
+    if not isinstance(spec.get("when"), str):
+        raise ModelError(f"{what}: 'when' must be a formula")
+    margins = []
+    if not isinstance(spec.get("margin"), list) or not spec["margin"]:
+        raise ModelError(f"{what}: needs at least one margin")
+    for k, margin in enumerate(spec["margin"]):
+        where = f"{what} margin {k + 1}"
+        if not isinstance(margin, dict) or set(margin) != {"target", "slots"} or not isinstance(margin["target"], str):
+            raise ModelError(f"{where}: needs 'target' and 'slots'")
+        slots = margin["slots"]
+        if not isinstance(slots, list) or not slots:
+            raise ModelError(f"{where}: needs at least one slot")
+        parsed = []
+        for slot in slots:
+            if (not isinstance(slot, dict) or set(slot) != {"count", "at"} or not isinstance(slot["count"], str)
+                    or not isinstance(slot["at"], list) or not all(isinstance(a, str) for a in slot["at"])):
+                raise ModelError(f"{where}: a slot needs 'count' (a formula) and 'at' (a list of formulas)")
+            parsed.append(Slot(slot["count"], list(slot["at"])))
+        margins.append(Margin(margin["target"], parsed))
+    return Rake(spec["when"], passes, margins)
+
+
+def _check_weights(entities, sectors, symbols, phases) -> None:
+    """Format 1 (S4.4): weight states and rakes."""
+    for entity in entities.values():
+        if entity.weight_state is None:
+            continue
+        what = f"entity {entity.name}: the weight state {entity.weight_state!r}"
+        d = symbols.get(entity.weight_state)
+        if d is None or d.kind != "state" or d.entity != entity.name:
+            raise ModelError(f"{what} must be a state of that entity")
+        if d.type != "int" or d.money or d.unit != U.ONE or d.dims:
+            raise ModelError(f"{what} must be of type int and unit 1")
+        for sector, held in sectors.items():
+            if held == entity.name:
+                raise ModelError(f"sector {sector}: its accounts are held in {entity.name}, whose weights change")
+    weight_states = {e.weight_state for e in entities.values()}
+    for d in symbols.values():
+        if d.rake is None:
+            continue
+        what = f"state {d.name} rake"
+        if d.name not in weight_states:
+            raise ModelError(f"{what}: only a weight state can have a rake")
+        for k, margin in enumerate(d.rake.margins):
+            t = symbols.get(margin.target)
+            where = f"{what} margin {k + 1}"
+            if t is None or t.kind not in ("param", "var", "state") or not t.dims or t.type == "bool":
+                raise ModelError(f"{where}: the target must be a param, var or state with dimensions")
+            if t.kind == "var" and t.phase > d.phase:
+                raise ModelError(f"{where}: the target {t.name} is computed in a later phase "
+                                 f"({phases[t.phase]}) than the rake ({phases[d.phase]})")
+            for slot in margin.slots:
+                if len(slot.at) != len(t.dims):
+                    raise ModelError(f"{where}: 'at' needs one formula per dimension of {t.name} ({', '.join(t.dims)})")
 
 
 @dataclass

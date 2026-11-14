@@ -108,6 +108,32 @@ pub struct Decl {
     /// Format 1: a dimensioned parameter's or initial value's CSV columns, as text per cell
     /// in row-major order.
     pub data: Vec<(String, Vec<String>)>,
+    /// Format 1 (S4.4): a weight state's rake, instead of a `next` formula.
+    pub rake: Option<Rake>,
+}
+
+/// Format 1 (S4.4): iterative proportional updating of a weight state.
+#[derive(Clone, Debug)]
+pub struct Rake {
+    /// National formula, bool: the weights change only in steps where it is true.
+    pub when: String,
+    pub passes: u32,
+    pub margins: Vec<Margin>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Margin {
+    /// A national param, var or state with dimensions.
+    pub target: String,
+    pub slots: Vec<Slot>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Slot {
+    /// Record formula: units of the target per unit of weight.
+    pub count: String,
+    /// Record formulas, one per dimension of the target: the record's member along it.
+    pub at: Vec<String>,
 }
 
 impl Decl {
@@ -154,7 +180,10 @@ impl Dim {
 pub struct Entity {
     pub name: String,
     pub ids: Vec<u64>,
+    /// From the data. A run's current weights are the simulation's: see `weight_state`.
     pub weights: Vec<i64>,
+    /// Format 1 (S4.4): the record-level state that holds the weights, if they change.
+    pub weight_state: Option<String>,
     header: Vec<String>,
     /// Every CSV column as text, in header order.
     raw: Vec<Vec<String>>,
@@ -492,8 +521,15 @@ fn parse_csv(text: &str) -> Vec<Vec<String>> {
 
 fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>, String)> {
     let what = format!("entity {name}");
-    let (Some(data), Some(id), Some(weight)) = (text_of(spec, "data"), text_of(spec, "id"), text_of(spec, "weight"))
-    else {
+    let state = match spec.get("weight") {
+        Some(Value::Table(t)) => match (t.len(), t.get("state").and_then(Value::as_str)) {
+            (1, Some(name)) => Some(name.to_string()),
+            _ => return model_err(format!("{what}: 'weight' is a column name or {{ state = \"<name>\" }}")),
+        },
+        _ => None,
+    };
+    let weight = if state.is_some() { Some("") } else { text_of(spec, "weight") };
+    let (Some(data), Some(id), Some(weight)) = (text_of(spec, "data"), text_of(spec, "id"), weight) else {
         return model_err(format!("{what}: needs 'data', 'id' and 'weight'"));
     };
     let path = root.join(data);
@@ -519,8 +555,10 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
             column.push(cell);
         }
     }
-    let mut entity = Entity { name: name.to_string(), ids: Vec::new(), weights: Vec::new(), header, raw };
-    for needed in [id, weight] {
+    let mut entity =
+        Entity { name: name.to_string(), ids: Vec::new(), weights: Vec::new(), weight_state: state, header, raw };
+    let needed: &[&str] = if entity.weight_state.is_some() { &[id] } else { &[id, weight] };
+    for &needed in needed {
         if entity.column(needed).is_none() {
             return model_err(format!("{what}: column {needed:?} not found in {data}"));
         }
@@ -537,7 +575,9 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
             .collect()
     };
     let ids = whole(id, &format!("{what} id"))?;
-    let weights = whole(weight, &format!("{what} weight"))?;
+    // Weights held by a state come from its initial value when a run starts.
+    let weights =
+        if entity.weight_state.is_some() { vec![1; ids.len()] } else { whole(weight, &format!("{what} weight"))? };
     let mut sorted = ids.clone();
     sorted.sort_unstable();
     if sorted.windows(2).any(|w| w[0] == w[1]) || sorted[0] < 0 {
@@ -1003,6 +1043,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
                 spec: spec.clone(),
                 dims: Vec::new(),
                 data: Vec::new(),
+                rake: None,
             })?;
         }
     }
@@ -1028,6 +1069,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             spec: spec.clone(),
             dims,
             data,
+            rake: None,
         })?;
     }
 
@@ -1052,6 +1094,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             spec: spec.clone(),
             dims: Vec::new(),
             data: Vec::new(),
+            rake: None,
         })?;
     }
 
@@ -1077,6 +1120,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             spec: spec.clone(),
             dims,
             data,
+            rake: None,
         })?;
     }
 
@@ -1084,8 +1128,13 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let what = format!("state {name}");
         let spec = table_of(spec, &what)?;
         let (ty, money) = type_of(spec, &what)?;
-        let (Some(next), Some(initial)) = (spec.get("next"), spec.get("initial")) else {
-            return model_err(format!("{what}: needs both 'initial' and 'next'"));
+        let (Some(initial), true) = (spec.get("initial"), spec.contains_key("next") != spec.contains_key("rake"))
+        else {
+            return model_err(format!("{what}: needs 'initial' and either 'next' or 'rake'"));
+        };
+        let rake = match spec.get("rake") {
+            Some(r) => Some(rake_of(r, &what)?),
+            None => None,
         };
         let unit = loader.unit_or_one(spec, &what, ty)?;
         let dims = loader.dims_of(spec, Kind::State, &what)?;
@@ -1098,12 +1147,13 @@ pub fn load_model(path: &Path) -> Result<Model> {
             money,
             entity: loader.entity_of(spec, &what)?,
             phase: loader.phase_of(spec, &what)?,
-            expr: Some(formula_text(next)),
+            expr: spec.get("next").map(formula_text),
             initial: Some(initial.clone()),
             range: range_of(spec, money, loader.minor, &what)?,
             spec: spec.clone(),
             dims,
             data,
+            rake,
         })?;
     }
 
@@ -1147,6 +1197,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             spec: spec.clone(),
             dims: Vec::new(),
             data: Vec::new(),
+            rake: None,
         })?;
         accounts.push(Account { sym, sector, instrument });
     }
@@ -1205,6 +1256,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             spec: spec.clone(),
             dims: Vec::new(),
             data: Vec::new(),
+            rake: None,
         })?;
         flows.push(Flow { sym, src_account, dst_account });
     }
@@ -1227,6 +1279,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             issuer_account,
         });
     }
+
+    check_weights(&entities, &sectors, &loader, &phases)?;
 
     for dim in &loader.dims {
         if dim.first.is_none() {
@@ -1269,6 +1323,117 @@ pub fn load_model(path: &Path) -> Result<Model> {
         dim_index: loader.dim_index,
         format,
     })
+}
+
+/// Format 1 (S4.4): the structure of a rake; names and formulas are checked later.
+fn rake_of(value: &Value, what: &str) -> Result<Rake> {
+    let what = format!("{what} rake");
+    let Value::Table(spec) = value else { return model_err(format!("{what}: takes 'when', 'passes' and 'margin'")) };
+    if spec.keys().any(|k| !matches!(k.as_str(), "when" | "passes" | "margin")) {
+        return model_err(format!("{what}: takes 'when', 'passes' and 'margin'"));
+    }
+    let passes = match spec.get("passes") {
+        Some(Value::Integer(n)) if (1..=1000).contains(n) => *n as u32,
+        _ => return model_err(format!("{what}: 'passes' must be a whole number from 1 to 1,000")),
+    };
+    let Some(Value::String(when)) = spec.get("when") else {
+        return model_err(format!("{what}: 'when' must be a formula"));
+    };
+    let margins = match spec.get("margin") {
+        Some(Value::Array(list)) if !list.is_empty() => list,
+        _ => return model_err(format!("{what}: needs at least one margin")),
+    };
+    let mut out = Vec::new();
+    for (k, margin) in margins.iter().enumerate() {
+        let where_ = format!("{what} margin {}", k + 1);
+        let (Some(Value::Table(m)), true) = (Some(margin), true) else {
+            return model_err(format!("{where_}: needs 'target' and 'slots'"));
+        };
+        let (Some(Value::String(target)), Some(slots), 2) = (m.get("target"), m.get("slots"), m.len()) else {
+            return model_err(format!("{where_}: needs 'target' and 'slots'"));
+        };
+        let Value::Array(slots) = slots else { return model_err(format!("{where_}: needs at least one slot")) };
+        if slots.is_empty() {
+            return model_err(format!("{where_}: needs at least one slot"));
+        }
+        let mut parsed = Vec::new();
+        for slot in slots {
+            let bad = || model_err(format!("{where_}: a slot needs 'count' (a formula) and 'at' (a list of formulas)"));
+            let Value::Table(slot) = slot else { return bad() };
+            let (Some(Value::String(count)), Some(Value::Array(at)), 2) =
+                (slot.get("count"), slot.get("at"), slot.len())
+            else {
+                return bad();
+            };
+            let Some(at) = at.iter().map(|a| a.as_str().map(str::to_string)).collect::<Option<Vec<String>>>() else {
+                return bad();
+            };
+            parsed.push(Slot { count: count.clone(), at });
+        }
+        out.push(Margin { target: target.clone(), slots: parsed });
+    }
+    Ok(Rake { when: when.clone(), passes, margins: out })
+}
+
+/// Format 1 (S4.4): weight states and rakes.
+fn check_weights(entities: &[Entity], sectors: &[Sector], loader: &Loader, phases: &[String]) -> Result<()> {
+    let sym = |name: &str| loader.sym_index.get(name).map(|i| &loader.symbols[*i]);
+    for (index, entity) in entities.iter().enumerate() {
+        let Some(state) = &entity.weight_state else { continue };
+        let what = format!("entity {}: the weight state {state:?}", entity.name);
+        let d = match sym(state) {
+            Some(d) if d.kind == Kind::State && d.entity == Some(index) => d,
+            _ => return model_err(format!("{what} must be a state of that entity")),
+        };
+        if d.ty != Ty::Int || d.money || d.unit != Unit::one() || !d.dims.is_empty() {
+            return model_err(format!("{what} must be of type int and unit 1"));
+        }
+        if let Some(sector) = sectors.iter().find(|s| s.entity == Some(index)) {
+            return model_err(format!(
+                "sector {}: its accounts are held in {}, whose weights change",
+                sector.name, entity.name
+            ));
+        }
+    }
+    for d in &loader.symbols {
+        let Some(rake) = &d.rake else { continue };
+        let what = format!("state {} rake", d.name);
+        if !entities.iter().any(|e| e.weight_state.as_deref() == Some(d.name.as_str())) {
+            return model_err(format!("{what}: only a weight state can have a rake"));
+        }
+        for (k, margin) in rake.margins.iter().enumerate() {
+            let where_ = format!("{what} margin {}", k + 1);
+            let t = match sym(&margin.target) {
+                Some(t)
+                    if matches!(t.kind, Kind::Param | Kind::Var | Kind::State)
+                        && !t.dims.is_empty()
+                        && t.ty != Ty::Bool =>
+                {
+                    t
+                }
+                _ => return model_err(format!("{where_}: the target must be a param, var or state with dimensions")),
+            };
+            if let (Kind::Var, Some(tp), Some(dp)) = (t.kind, t.phase, d.phase) {
+                if tp > dp {
+                    return model_err(format!(
+                        "{where_}: the target {} is computed in a later phase ({}) than the rake ({})",
+                        t.name, phases[tp], phases[dp]
+                    ));
+                }
+            }
+            for slot in &margin.slots {
+                if slot.at.len() != t.dims.len() {
+                    let names: Vec<&str> = t.dims.iter().map(|x| loader.dims[*x].name.as_str()).collect();
+                    return model_err(format!(
+                        "{where_}: 'at' needs one formula per dimension of {} ({})",
+                        t.name,
+                        names.join(", ")
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A formula written in a TOML file. Text is used as is; a bare number or true/false is
