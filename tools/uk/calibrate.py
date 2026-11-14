@@ -476,6 +476,11 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         import sys
         if sys_path_tools not in sys.path:
             sys.path.insert(0, sys_path_tools)
+        import jobs
+        # Stage S6.4: jobs by industry, at their 2024 numbers in the base month: per person in
+        # work as the model counts them there (public employment from the rounded pay bill).
+        in_work = float(r12(v.private_employment)) + monthly(v.public_pay) / money(v.pay_per_worker / MONTHS)
+        fills.update(jobs.write(out_dir, in_work))
         import make_rules
         source = (households or ROOT / "models" / "uk" / "households") / "households.csv"
         alignment = make_rules.write_alignment(out_dir / "households",

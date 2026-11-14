@@ -297,6 +297,67 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class Jobs(unittest.TestCase):
+    """Stage S6.4: jobs by industry, at their 2024 numbers in the first month
+    (models/uk/data/industry_jobs.csv, from ONS JOBS02), then each industry's share of the
+    jobs following its output against the others'."""
+
+    MONTHS = 4
+
+    @staticmethod
+    def sim(**kw):
+        return Simulation(model(), seed=SEED, **kw)
+
+    def test_the_first_month_has_2024_jobs_by_industry(self):
+        with open(UK / "data" / "industry_jobs.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual([r["industry"] for r in rows], model().dims["industry"].members)
+        sim = self.sim()
+        row = sim.step()
+        for r, jobs in zip(rows, sim.column("industry_jobs")):
+            self.assertAlmostEqual(jobs / (float(r["workforce_jobs"]) * 1000), 1.0, places=12, msg=r["industry"])
+        self.assertAlmostEqual(row["workforce_jobs"], sum(float(r["workforce_jobs"]) * 1000 for r in rows), delta=1e-6)
+
+    def test_the_shares_add_to_one_and_the_jobs_to_the_total(self):
+        sim = self.sim()
+        for _ in range(self.MONTHS):
+            row = sim.step()
+            self.assertAlmostEqual(sum(sim.column("industry_job_share")), 1.0, places=12)
+            self.assertAlmostEqual(sum(sim.column("industry_jobs")) / row["workforce_jobs"], 1.0, places=12)
+            self.assertAlmostEqual(row["workforce_jobs"] / row["employment"], model().symbols["jobs_per_worker"].spec["value"],
+                                   places=12)
+
+    def test_a_cut_in_public_spending_moves_jobs_out_of_public_services(self):
+        names = model().dims["industry"].members
+        public = [names.index(n) for n in ("public_administration", "education", "health")]
+        cut = {1: {"procurement_bill": 20_000_000_000}}
+
+        def public_share(**kw) -> float:
+            sim = self.sim(**kw)
+            for _ in range(self.MONTHS):
+                sim.step()
+            return sum(sim.column("industry_job_share")[i] for i in public)
+
+        base = public_share()
+        half = public_share(commands=cut) - base
+        whole = public_share(commands=cut, params={"jobs_output_elasticity": 1.0}) - base
+        # A quarter of procurement gone (from £27bn a month to £20bn) takes public services' share of jobs down.
+        self.assertLess(half, -0.001)
+        # Twice the elasticity, about twice the move.
+        self.assertAlmostEqual(whole / half, 2.0, delta=0.1)
+
+    def test_pay_per_employee_job_is_the_industries_pay_over_their_employees(self):
+        sim = self.sim()
+        row = sim.step()
+        employees = [j * s for j, s in zip(sim.column("industry_jobs"), sim.column("employee_share"))]
+        self.assertAlmostEqual(row["pay_per_employee_job"] / (sum(sim.column("industry_pay")) / sum(employees)), 1.0,
+                               places=12)
+        by_industry = dict(zip(model().dims["industry"].members, sim.column("industry_pay_per_employee")))
+        # Finance pays most, hospitality and agriculture least, as in the tables.
+        self.assertEqual(max(by_industry, key=by_industry.get), "finance")
+        self.assertEqual(sorted(by_industry, key=by_industry.get)[:2], ["agriculture", "other_services"])
+
+
 class Trade(unittest.TestCase):
     """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
 

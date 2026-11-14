@@ -34,6 +34,7 @@ Presentation settings. The engine ignores them and they never affect a run.
 | `labels` | Overrides of labels by key, including negated keys such as `"-gov_money"` | none |
 | `breakdowns` | Names of values with one dimension for the "Who gains, who loses" panel, in the order of its menu (format 1; see below) | none: no panel |
 | `breakdown_all` | The national value the breakdowns average to, shown as their last line, "All households" | none |
+| `breakdown_totals` | A table from breakdown names to the national value shown as their last line instead, under its own label (stage S6.4: jobs by industry and their total) | none |
 | `politics` | A table naming the model's politics for the politics panel and election night (stage S5.5): `intention`, `seats`, `projected` (values over one dimension of blocs: voting intention, seats held, seats if an election were held now), `governing` (true/false by bloc), `support` and `turnout` (national: the government's poll rating, turnout), `election` (true in a month with a general election), `months_to_election`, `player` (true while the player's bloc governs) and `majority` (seats) | none: no panel |
 
 Any model element may carry `label` (a short name) and `doc` (a sentence) for the
@@ -75,7 +76,13 @@ and the menu item "By income decile"). Amounts follow the "Amounts a year" choic
 
 The UK scenario shows net income per household (pay and pensions after income tax and
 National Insurance, with Child Benefit and Universal Credit) by income decile, household
-type and region, from the synthetic households (`models/uk/households/README.md`).
+type and region, from the synthetic households (`models/uk/households/README.md`); and
+jobs and pay per employee job by industry (stage S6.4), each with its national total as
+the last line (`breakdown_totals`). A breakdown with a total of its own takes its note
+from the value's `doc` (or its label when it has none), and only money is said to be "at
+an annual rate". Two breakdowns whose labels end the same ("..., by industry") keep their
+full labels in the menu. Numbers of people (unit `person`) are shown whole, to the
+person, below 100 million, and their changes too.
 
 ## Explaining a change
 

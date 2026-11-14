@@ -130,7 +130,8 @@ def main() -> int:
         if problems:
             print("\n".join(problems), file=sys.stderr)
             return 1
-        print("UK who gains, who loses: every group shown; a basic rate rise hits the upper deciles, not Scotland")
+        print("UK who gains, who loses: every group shown; a basic rate rise hits the upper deciles, not Scotland;"
+              " jobs by industry start at 2024's")
         return 0
 
 
@@ -197,6 +198,14 @@ UK_GROUPS = {
     "By region": ["North East", "North West", "Yorkshire and The Humber", "East Midlands", "West Midlands",
                   "East of England", "London", "South East", "South West", "Wales", "Scotland", "Northern Ireland"],
 }
+# Stage S6.4: jobs and pay by industry, each with its own national line.
+UK_INDUSTRIES = ["Agriculture, forestry and fishing", "Mining, energy, water and waste", "Manufacturing",
+                 "Construction", "Wholesale and retail trade", "Transport and storage", "Accommodation and food",
+                 "Information and communication", "Finance and insurance", "Real estate",
+                 "Professional and support services", "Public administration and defence", "Education",
+                 "Health and social work", "Arts, recreation and other services"]
+UK_INDUSTRY_BREAKDOWNS = {"Jobs, by industry": "Workforce jobs",
+                          "Pay per employee job, by industry": "Pay per employee job"}
 
 
 def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
@@ -207,9 +216,11 @@ def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
     rows = list(csv.DictReader(text.splitlines(), delimiter="\t"))
     problems = []
     for month in ("1", "2"):
-        for breakdown, groups in UK_GROUPS.items():
+        expected = {b: g + ["All households"] for b, g in UK_GROUPS.items()}
+        expected.update({b: UK_INDUSTRIES + [total] for b, total in UK_INDUSTRY_BREAKDOWNS.items()})
+        for breakdown, groups in expected.items():
             shown = [r["group"] for r in rows if r["month"] == month and r["breakdown"] == breakdown]
-            if shown != groups + ["All households"]:
+            if shown != groups:
                 problems.append(f"UK breakdowns: month {month}, {breakdown} shows {shown}")
     if problems:
         return problems
@@ -233,6 +244,33 @@ def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
         problems.append(f"UK breakdowns: the rise should fall on every region but Scotland: {regions}")
     if not change("By income decile", "All households") < 0:
         problems.append("UK breakdowns: average net income should fall")
+    problems += check_uk_industries(line, runner)
+    return problems
+
+
+def check_uk_industries(line: dict, runner: Path) -> list[str]:
+    """Jobs by industry in the first month are 2024's (ONS JOBS02), and so is their total;
+    pay per employee job is the runner's; after the tax rise the jobs move from the
+    industries households buy from (accommodation and food) to public services (health)."""
+    import csv
+    problems = []
+    with open(ROOT / "models" / "uk" / "data" / "industry_jobs.csv", newline="", encoding="utf-8") as handle:
+        jobs = [float(r["workforce_jobs"]) * 1000 for r in csv.DictReader(handle)]
+    for group, want in zip(UK_INDUSTRIES + ["Workforce jobs"], jobs + [sum(jobs)]):
+        shown = parse_money(line[("1", "Jobs, by industry", group)]["now"])
+        if abs(shown - want) > 0.5:  # shown to the person
+            problems.append(f"UK jobs by industry: {group} shows {shown:,.0f}, 2024 had {want:,.0f}")
+    out = subprocess.run([str(runner), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"), "--steps", "1",
+                          "--columns", "pay_per_employee_job"], capture_output=True, text=True, timeout=600)
+    pay = float(out.stdout.splitlines()[1]) * 12 / 100
+    shown = parse_money(line[("1", "Pay per employee job, by industry", "Pay per employee job")]["now"])
+    if abs(shown - pay) > 0.5:
+        problems.append(f"UK pay by industry: all industries show £{shown:,.0f} a year, the runner £{pay:,.2f}")
+
+    def percent(group: str) -> float:
+        return float(line[("2", "Jobs, by industry", group)]["percent"].replace("\u2212", "-").replace("\u2060", "").rstrip("%"))
+    if not percent("Accommodation and food") < 0 < percent("Health and social work"):
+        problems.append("UK jobs by industry: after a tax rise, jobs should move from accommodation and food to health")
     return problems
 
 

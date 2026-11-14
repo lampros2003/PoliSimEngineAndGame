@@ -5,7 +5,9 @@
 # for UK products with the 2023 input-output tables' shares, and each industry's output
 # follows from the Leontief inverse: what it makes for final buyers plus what it sells to
 # other industries along the way. Value added and pay by industry are fixed shares of
-# output. The economy does not read it back yet.
+# output. Jobs by industry (stage S6.4) start at their 2024 numbers (ONS JOBS02), and each
+# industry's share of the jobs then follows its output against the others'. The economy
+# does not read the industries back yet.
 
 [dim.industry]
 members = ["agriculture", "energy_water", "manufacturing", "construction", "trade", "transport", "hospitality", "information", "finance", "real_estate", "business_services", "public_administration", "education", "health", "other_services"]
@@ -83,6 +85,8 @@ unit = "GBP/month"
 phase = "accounts"
 dims = ["industry"]
 expr = "sum(leontief * final_demand, product)"
+# Read through prev() by the jobs: nothing before the first month.
+initial = 0.0
 
 [var.industry_gva]
 label = "Value added"
@@ -113,3 +117,86 @@ type = "real"
 unit = "GBP/month"
 phase = "accounts"
 expr = "sum(industry_output, industry)"
+
+# ------------------------------------------------------------------ jobs (stage S6.4)
+
+[param.employee_share]
+doc = "Employee jobs per workforce job in each industry, 2024; the rest are the self-employed, HM Forces and trainees"
+type = "real"
+unit = "1"
+dims = ["industry"]
+data = "industries/jobs.csv"
+column = "employees"
+
+[param.jobs_per_worker]
+doc = "Workforce jobs per person in work, 2024: second jobs, and the difference between the employers' and the households' surveys"
+type = "real"
+unit = "1"
+value = 1.0920270990444858
+
+[param.jobs_output_elasticity]
+doc = "How far an industry's share of jobs moves with its output against the other industries' (output per worker grows with output: Verdoorn's law)"
+type = "real"
+unit = "1"
+low = 0.3
+central = 0.5
+high = 0.7
+
+[var.job_shift]
+doc = "Each industry's growth of output this month, as it moves the industry's jobs (1 in the first month)"
+type = "real"
+unit = "1"
+phase = "accounts"
+dims = ["industry"]
+expr = "select(prev(industry_output) > 0.0, 1.0 + jobs_output_elasticity * (industry_output / prev(industry_output) - 1.0), 1.0)"
+
+[var.industry_job_share]
+label = "Share of jobs"
+doc = "Each industry's share of workforce jobs: its 2024 share, moved each month by its output's growth against the other industries'"
+type = "real"
+unit = "1"
+phase = "accounts"
+dims = ["industry"]
+expr = "prev(industry_job_share) * job_shift / job_shift_total"
+initial = { data = "industries/jobs.csv", column = "jobs" }
+
+[var.job_shift_total]
+doc = "Last month's shares of jobs moved by this month's growth of output, added up: what the new shares are divided by, so they add to one"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "sum(prev(industry_job_share) * job_shift, industry)"
+
+[var.industry_jobs]
+label = "Jobs, by industry"
+doc = "Workforce jobs in each industry: employees, the self-employed, HM Forces and trainees"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["industry"]
+expr = "employment * jobs_per_worker * industry_job_share"
+
+[var.workforce_jobs]
+label = "Workforce jobs"
+doc = "Jobs in all industries: people in work, with second jobs"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "employment * jobs_per_worker"
+
+[var.industry_pay_per_employee]
+label = "Pay per employee job, by industry"
+doc = "Compensation of employees (pay, with employers' National Insurance and pension contributions) per employee job"
+type = "real"
+unit = "GBP/month/person"
+phase = "accounts"
+dims = ["industry"]
+expr = "industry_pay / (industry_jobs * employee_share)"
+
+[var.pay_per_employee_job]
+label = "Pay per employee job"
+doc = "Compensation of employees in all industries per employee job"
+type = "real"
+unit = "GBP/month/person"
+phase = "accounts"
+expr = "sum(industry_pay, industry) / sum(industry_jobs * employee_share, industry)"

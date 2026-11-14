@@ -118,7 +118,9 @@ func unit_words(unit: String) -> String:
 	var parts := unit.split("/")
 	var words := PackedStringArray()
 	var top := parts[0]
-	if top != "1" and top != currency:
+	if top == "person":
+		words.append("people")
+	elif top != "1" and top != currency:
 		words.append(top + ("s" if not top.ends_with("s") else ""))
 	for i in range(1, parts.size()):
 		var bottom := parts[i]
@@ -129,6 +131,11 @@ func unit_words(unit: String) -> String:
 		else:
 			words.append("per " + bottom)
 	return "" if words.is_empty() else " " + " ".join(words)
+
+
+## True for a number of people (unit "person"): its changes are shown in whole people.
+static func is_count(entry: Dictionary) -> bool:
+	return str(entry.get("unit", "")) == "person"
 
 
 ## True for an amount of money: a `money` value, or a real whose unit is the currency (an
@@ -165,7 +172,10 @@ func value(entry: Dictionary, v: Variant, shown := true, with_unit := true, scal
 		text = grouped(float(v))
 	else:
 		var f := float(v)
-		text = grouped(f, 2) if absf(f) < 1e4 else compact(f)
+		if is_count(entry) and absf(f) < 1e8:
+			text = grouped(roundf(f))
+		else:
+			text = grouped(f, 2) if absf(f) < 1e4 else compact(f)
 	return text + (unit_words(unit) if with_unit else "")
 
 
@@ -183,4 +193,6 @@ func change(entry: Dictionary, delta: Variant) -> String:
 		return sign + String.num(absf(d) * 100.0, 2) + " pts"
 	if typeof(delta) == TYPE_INT:
 		return sign + grouped(absf(d))
+	if is_count(entry):
+		return sign + (grouped(roundf(absf(d))) if absf(d) < 1e6 else compact(absf(d)))
 	return sign + (grouped(absf(d), 3) if absf(d) < 1e4 else compact(absf(d)))

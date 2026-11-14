@@ -1,8 +1,8 @@
 extends SceneTree
 ## Opens the scenario given by --scenario, plays --months months, charts the rows listed in
 ## --chart=a,b, explains --why=name, shows the lower right's tab --tab=N (1 for the web) and
-## saves a screenshot to --shot=FILE. For looking at a
-## model's screen; needs a display (xvfb-run on a server).
+## the breakdown --breakdown=name in the "who gains, who loses" panel, and saves a screenshot
+## to --shot=FILE. For looking at a model's screen; needs a display (xvfb-run on a server).
 
 var main: Control
 
@@ -13,6 +13,7 @@ func _initialize() -> void:
 	var charted := PackedStringArray()
 	var why := ""
 	var tab := 0
+	var breakdown := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--shot="):
 			shot = arg.substr(7)
@@ -24,6 +25,8 @@ func _initialize() -> void:
 			why = arg.substr(6)
 		elif arg.begins_with("--tab="):
 			tab = int(arg.substr(6))
+		elif arg.begins_with("--breakdown="):
+			breakdown = arg.substr(12)
 	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await _settle()
@@ -36,6 +39,11 @@ func _initialize() -> void:
 		main.explain(why, true)
 		await _settle()
 	main.tabs.current_tab = tab
+	var choice: OptionButton = main.breakdown._choice
+	var at: int = main.breakdown._names.find(breakdown)
+	if at >= 0:
+		choice.select(at)
+		choice.item_selected.emit(at)
 	await _settle()
 	await RenderingServer.frame_post_draw
 	root.get_viewport().get_texture().get_image().save_png(shot)

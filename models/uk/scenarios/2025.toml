@@ -17,9 +17,12 @@ government = "government"
 amounts = "year"
 headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "government_support"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual"]
-# "Who gains, who loses": net income per household by group, from the households.
-breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region"]
+# "Who gains, who loses": net income per household by group, from the households; jobs and
+# pay by industry (stage S6.4).
+breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region",
+              "industry_jobs", "industry_pay_per_employee"]
 breakdown_all = "net_income_average"
+breakdown_totals = { industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job" }
 
 # Stage S5.5: the politics panel and election night.
 [play.politics]

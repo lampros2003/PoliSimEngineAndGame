@@ -1,8 +1,9 @@
 extends PanelContainer
 ## Who gains, who loses: a value broken down by a dimension (income decile, household
-## type, region), this month, with each group's change on last month drawn as a bar.
-## The breakdowns are the scenario's `[play] breakdowns`; `breakdown_all` names the
-## national value they average to, shown as the last line.
+## type, region, industry), this month, with each group's change on last month drawn as a
+## bar. The breakdowns are the scenario's `[play] breakdowns`; `breakdown_all` names the
+## national value the households' breakdowns average to, shown as the last line, and
+## `breakdown_totals` the national value of any other breakdown.
 
 const Palette := preload("res://scripts/palette.gd")
 const Format := preload("res://scripts/format.gd")
@@ -14,7 +15,9 @@ var _grid: GridContainer
 var _note: Label
 var _names: Array = []  # breakdown value names, parallel to the choice's items
 var _entries := {}
-var _all := ""  # row of the national value, or ""
+var _all := ""  # row of the national value the households' breakdowns average to, or ""
+var _totals := {}  # breakdown name -> its national value's catalogue entry
+var _total := {}  # the entry of the national value shown as the last line, or {}
 var _rows: Array = []  # {cells: [label, now, change, percent], bar}
 var _all_cells: Array = []
 var _all_bar: Control
@@ -71,14 +74,28 @@ func build(play: Dictionary, entries: Dictionary) -> void:
 	var keep := selected()
 	_names.clear()
 	_choice.clear()
+	_totals.clear()
+	var totals: Variant = play.get("breakdown_totals", {})
+	if totals is Dictionary:
+		for name in totals:
+			var total: Dictionary = entries.get(str(totals[name]), {})
+			if not total.is_empty():
+				_totals[str(name)] = total
+	var shorts := []
 	for name in play.get("breakdowns", []):
 		var entry: Dictionary = entries.get(str(name), {})
 		if entry.is_empty() or (entry.get("dims", []) as Array).size() != 1:
 			continue
 		_names.append(str(name))
-		_choice.add_item(_short_label(entry))
-		if str(name) == keep:
-			_choice.select(_names.size() - 1)
+		shorts.append(_short_label(entry))
+	for i in _names.size():
+		# Two breakdowns by the same dimension keep their full labels in the menu.
+		var label: String = shorts[i]
+		if shorts.count(label) > 1:
+			label = str(entries[_names[i]].get("label", _names[i]))
+		_choice.add_item(label)
+		if _names[i] == keep:
+			_choice.select(i)
 	var all: Dictionary = entries.get(str(play.get("breakdown_all", "")), {})
 	_all = str(all.get("row", ""))
 	visible = not _names.is_empty()
@@ -111,18 +128,26 @@ func _clear() -> void:
 
 
 ## The rows follow the cells: one per member of the value's dimension.
-func _build_rows(entry: Dictionary, labels: PackedStringArray) -> void:
+func _build_rows(name: String, entry: Dictionary, labels: PackedStringArray) -> void:
 	_clear()
 	var label := str(entry.get("label", ""))
 	var comma := label.rfind(", ")
-	_note.text = "%s, %s. Each group's average over the simulated households in it; the bar is its change on last month." % [
-		label.substr(0, comma) if comma >= 0 else label, "at an annual rate" if fmt.per_year else "a month"]
+	var head := label.substr(0, comma) if comma >= 0 else label
+	var rate := ""
+	if fmt.is_money(entry):
+		rate = ", at an annual rate" if fmt.per_year else ", a month"
+	_total = _totals.get(name, {})
+	if _total.is_empty():
+		_note.text = "%s%s. Each group's average over the simulated households in it; the bar is its change on last month." % [head, rate]
+	else:
+		var doc := str(entry.get("doc", ""))
+		_note.text = "%s%s. The bar is each group's change on last month." % [doc if doc != "" else head, rate]
 	for heading in ["", "This month", "Change", "", ""]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	for member in labels:
 		_rows.append(_row(member, Palette.TEXT))
-	if _all != "":
-		var line := _row("All households", Palette.ACCENT)
+	if not _total.is_empty() or _all != "":
+		var line := _row(str(_total.get("label", "All")) if not _total.is_empty() else "All households", Palette.ACCENT)
 		_all_cells = line["cells"]
 		_all_bar = line["bar"]
 
@@ -155,7 +180,7 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable) -> void:
 				c.text = "–"
 		return
 	if _rows.size() != labels.size():
-		_build_rows(entry, labels)
+		_build_rows(name, entry, labels)
 	var before: PackedFloat64Array = data.get("previous", PackedFloat64Array())
 	var shares := []
 	var widest := 0.005  # a bar's full width is at least a 0.5% change
@@ -172,8 +197,9 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable) -> void:
 		line["bar"].fraction = 0.0 if shares[i] == null else shares[i] / widest
 		line["bar"].queue_redraw()
 	if _all_cells.size() == 4:
-		var a: Variant = latest.call(_all)
-		var b: Variant = previous.call(_all)
+		var row := str(_total.get("row", "")) if not _total.is_empty() else _all
+		var a: Variant = latest.call(row)
+		var b: Variant = previous.call(row)
 		var share: Variant = null
 		if a != null and b != null and float(b) != 0.0:
 			share = float(a) / float(b) - 1.0

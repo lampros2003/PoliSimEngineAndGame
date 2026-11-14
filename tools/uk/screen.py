@@ -166,6 +166,13 @@ def main() -> int:
     for c, label, show in OUTCOMES:
         ranked = sorted(names, key=lambda f: -mu_star(f, c))[:3]
         lines.append(f"- {label}: " + ", ".join(f"{f} ({show(mu_star(f, c)).lstrip('+')})" for f in ranked) + ".")
+    idle = [f for f in names if all(mu_star(f, c) == 0.0 and not any(x != 0.0 for x in effects[f][c])
+                                    for c, _, _ in OUTCOMES)]
+    if idle:
+        lines += ["", f"No effect on any of these outcomes: {', '.join(idle)}. With the levers where the scenario "
+                      "sets them, these move nothing the outcomes depend on: some act only through a lever (how trade "
+                      "answers a barrier, when there is none), others on values the economy does not read back (jobs "
+                      "by industry)."]
     lines += ["",
               "The factors with the largest effects are where calibration should go first; one whose sigma is "
               "large against its mu* acts through the others. The central preset is the calibration; the ranges "
