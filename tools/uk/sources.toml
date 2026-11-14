@@ -115,3 +115,46 @@ licence = "Open Government Licence v3.0"
 attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
 format = "ons_xlsx"
 file = "ashe6.zip"
+
+# ---- Stage S5: elections
+
+[dataset.ge2024]
+title = "Results for the UK general election on 4 July 2024, by candidate"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/6/candidacies.csv"
+page = "https://electionresults.parliament.uk/general-elections/6"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2024.csv"
+note = "Votes by party and constituency only; candidates' names are not kept"
+
+[dataset.ge2024parties]
+title = "Results for the UK general election on 4 July 2024, by party"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/6/political-parties.csv"
+page = "https://electionresults.parliament.uk/general-elections/6"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2024parties.csv"
+
+[dataset.census_age_pcon]
+title = "Census 2021: usual residents by age (6 categories), 2024 Westminster constituencies, England and Wales"
+publisher = "Office for National Statistics"
+url = "https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=p19wpc&dimensions=resident_age_6a"
+page = "https://www.ons.gov.uk/datasets/create"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "table"
+file = "census_age_pcon.json"
+
+[dataset.census_work_pcon]
+title = "Census 2021: usual residents aged 16 and over by economic activity (4 categories), 2024 Westminster constituencies, England and Wales"
+publisher = "Office for National Statistics"
+url = "https://api.beta.ons.gov.uk/v1/population-types/UR/census-observations?area-type=p19wpc&dimensions=economic_activity_status_4a"
+page = "https://www.ons.gov.uk/datasets/create"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "table"
+file = "census_work_pcon.json"
