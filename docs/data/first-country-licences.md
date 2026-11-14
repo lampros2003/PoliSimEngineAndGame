@@ -1,58 +1,48 @@
-# Data licences for the provisional first country (United Kingdom)
+# Data licences for the first country (United Kingdom)
 
-The roadmap makes the choice of first country conditional on being allowed to ship what
-we derive from its data in a commercial game. This is the state of that check on
-2026-11-13.
+The roadmap makes the first country conditional on being allowed to ship what we derive
+from its data in a commercial game. The owner chose the United Kingdom on 2026-11-14.
 
-**Status: not yet passed.** Nothing found blocks the United Kingdom, but every row below
-rests on a search-result summary of the publisher's page, not on a reading of the page or
-the licence text. Each must be opened and confirmed, and the confirmation recorded here,
-before any real data enters the repository (stage S3).
+**Status on 2026-11-14: passed for the sources stage S3 needs.** The publishers' own pages
+were read on that date (they were reachable once the environment allowed their hosts),
+and the relevant sentences are quoted below. Sources marked as closed or unchecked must not
+be used until that changes.
 
 ## Rule for all sources
 
-Ship derived parameters and a synthetic population generated from published tables. Never
-ship a third party's raw tables or survey microdata. Keep one line per input here: what
-it is, where it came from, the licence, the attribution wording, and the date checked.
+- Every input has a line in the provenance manifest (`models/uk/data/MANIFEST.toml` from
+  stage S3.0): what it is, where it came from, the licence, the attribution wording, the
+  release date and a checksum.
+- Open Government Licence data may be shipped, including extracts, with the attribution
+  statement. The game's credits screen and the repository carry it.
+- Survey microdata are never shipped and are not used without the owner's written
+  permission. The household sample is synthetic, built from published tables.
 
-## Sources
+## Confirmed from the publisher's page
 
-| Source | Needed for | Licence found | Commercial reuse | Confidence | Action |
-|---|---|---|---|---|---|
-| Office for National Statistics: national and sector accounts, supply-use and input-output tables, population estimates and projections, census tables, labour market, regional accounts | sector balance sheets, industries, cohort table, regions | Crown copyright, Open Government Licence v3.0, with a published list of exemptions | permitted with attribution | search summary of [ONS terms](https://www.ons.gov.uk/help/terms-conditions) and the [Statistics Authority copyright page](https://uksa.statisticsauthority.gov.uk/copyright) | Read the exemptions list. The Statistics Authority page distinguishes reuse from repackaging and redistributing; confirm that shipping derived parameters is plain reuse. |
-| ONS geography products (region and constituency boundaries, lookups) | regions, electoral map | Open Government Licence v3.0 with extra notices | permitted, but some products carry Ordnance Survey and Royal Mail rights, and Northern Ireland postcodes need a separate commercial licence | search summary of [ONS geography licences](https://www.ons.gov.uk/methodology/geography/licences) | Use boundary and lookup products only; avoid postcode products. |
-| Bank of England statistical database | interest rates, money and credit, the published stock-flow model as a reference | Open Government Licence for data in the Bank's database | permitted with attribution; third-party series (such as LSEG data) excluded | search summary of the [Bank's legal page](https://www.bankofengland.co.uk/legal) | Check each series used is the Bank's own. |
-| Office for Budget Responsibility: forecasts, ready reckoners, macro model documentation and code | validation targets, borrowed behavioural equations | publications under Open Government Licence v3.0 unless stated otherwise | permitted for publications | search summary of an OBR publication's licence notice; the terms for the model code were **not found** | Read the [OBR legal pages](https://obr.uk/legal-pages/) for the model code specifically. |
-| House of Commons Library election results, 1918 onwards | back-casting elections, constituency structure | Open Parliament Licence | permitted with attribution | search summary of the [election results site](https://electionresults.parliament.uk/) | Read the Open Parliament Licence text. |
-| OECD inter-country input-output tables | industry structure, trade with partner blocs | OECD content from 1 July 2024 is CC BY 4.0 by default; earlier content on similar terms | permitted with attribution by default | search summary of the [OECD open-by-default policy](https://oecd.org/en/about/oecd-open-by-default-policy.html); **no licence statement found for this dataset itself** | Read the dataset's ReadMe at [oe.cd/icio](http://oe.cd/icio). |
-| Family Resources Survey microdata (UK Data Service) | household incomes and benefits at record level | End User Licence; a Secure Access version also exists | **not without the data owner's approval**; the Secure Access version forbids it | search summary of UK Data Service catalogue records | **Do not use.** Build the household sample from published tables instead. |
-| British Election Study survey data | voter attitudes by demographic group | BES terms plus UK Data Service licence | **not without the data owner's permission** | search summary of [BES terms](https://britishelectionstudy.com/terms-and-conditions-of-data-use) and UK Data Service records | **Do not use without written permission.** Either ask the BES team, or estimate voter behaviour from published results and published tables only. |
+| Source | Needed for | Licence | Commercial reuse | What the page says (2026-11-14) |
+|---|---|---|---|---|
+| Office for National Statistics: all time-series datasets (UK Economic Accounts, Quarterly National Accounts, Public Sector Finances, Labour Market Statistics), population estimates and projections, input-output tables | Sector accounts, public finances, labour market, cohort table, industries | Open Government Licence v3.0 | **Yes**, with attribution | "Most content on this website is subject to Crown copyright protection and is published under the Open Government Licence (OGL)." The exemptions listed are third-party photographs, illustrations and videos. ([ONS terms](https://www.ons.gov.uk/help/termsandconditions)) |
+| Open Government Licence v3.0 itself | The terms above | — | — | "You are free to … exploit the Information commercially and non-commercially … You must … acknowledge the source … If the Information Provider does not provide a specific attribution statement, you must use the following: Contains public sector information licensed under the Open Government Licence v3.0." Not covered: personal data, logos, third-party rights. ([OGL v3](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)) |
+| ONS geography (boundaries and lookups) | Regions | OGL v3.0 | **Yes**, with "Source: Office for National Statistics licensed under the Open Government Licence v.3.0". Postcode products need Royal Mail attribution, and Northern Ireland postcodes need a separate commercial licence | ([ONS geography licences](https://www.ons.gov.uk/methodology/geography/licences)) |
+| Nomis (ONS labour market and census tables) | Regional labour market and population | OGL v3.0 | **Yes**: "anyone wishing to use or re-use ONS material, whether commercially or privately, may do so freely without a specific application for a licence, subject to the conditions of the OGL" | ([Nomis copyright](https://www.nomisweb.co.uk/home/copyright.asp)) |
+| Office for Budget Responsibility: forecasts, ready reckoners, the published macroeconomic model code | Validation targets, borrowed behavioural equations | OGL | **Yes**: "You may use and re-use the information featured on this website (not including logos) free of charge in any format or medium, under the terms of the Open Government Licence." The model code is provided "as is" and its results "do not constitute the views of the OBR" | ([OBR copyright](https://obr.uk/copyright/), [OBR model](https://obr.uk/forecasts-in-depth/obr-macroeconomic-model/)) |
+| Bank of England Database (interest rates, money and credit) | Bank Rate, gilt yields, lending | OGL | **Yes, for the database**: "Reproduction of data in the Database is subject to the terms of the UK Open Government Licence." Excluded: "selected exchange rate data and series … reproduced by the Bank under licence from third parties" | ([Bank of England legal](https://www.bankofengland.co.uk/legal)) |
+| House of Commons election results | Back-casting elections (stage S5) | Open Parliament Licence | **Yes**, conditions not yet read: "Re-use our content freely and flexibly with only a few conditions under the Open Parliament Licence." The licence text is on parliament.uk, which this environment does not reach | ([election results](https://electionresults.parliament.uk/)) |
+
+## Closed or restricted
+
+| Source | Status | Consequence |
+|---|---|---|
+| Bank of England website content other than the database (working papers, including its stock-flow model of the UK; publications; charts) | **Non-commercial only without permission**: "You may … download, display or print the Resources for personal use or internal use within an individual organisation for non-commercial purposes." | Read for ideas; do not reproduce text, figures or code from it |
+| Family Resources Survey microdata (UK Data Service) | Commercial use needs the data owner's approval (catalogue records, not re-read) | Not used. The household sample is built from published tables |
+| British Election Study survey data | Commercial use needs permission (catalogue records, not re-read) | Not used unless the owner obtains permission. Voter behaviour is estimated from published results and tables |
 
 ## Not checked yet
 
-- HM Revenue and Customs and Department for Work and Pensions published statistics (tax
-  receipts by band, benefit caseloads and rates). Expected to be Open Government Licence;
-  not searched.
-- Scotland's and Northern Ireland's census publishers (National Records of Scotland,
-  NISRA). Their tables are separate from the ONS census for England and Wales.
-- Eurostat tables for the partner blocs.
-- The open synthetic population of England mentioned in the research report, and the
-  licence of the rule definitions in open tax-benefit models. The research report notes
-  that one such engine is AGPL, which rules out linking it into a closed game; reading it
-  as a reference is a separate question.
-- Whether estimating parameters offline from a research-only dataset, without shipping
-  the data, counts as commercial use. The UK Data Service definition found in the search
-  (research with a direct objective of generating revenue) suggests it does. This is a
-  legal question and should be treated as closed until answered.
-
-## What this means for the design
-
-1. The aggregate side of a UK model (accounts, industries, demography, regions, election
-   results) looks buildable from openly licensed official statistics.
-2. The household sample must be synthetic, generated from published tables. That was the
-   plan already; the Family Resources Survey terms make it a requirement.
-3. The voter model cannot lean on the British Election Study without permission. Election
-   back-casts can still use the Commons Library results.
-4. The United Kingdom has 12 top-level statistical regions (ITL1), which sits at the low
-   end of the 10 to 50 band the ballot asked for. This figure is from memory, not from
-   the searches above.
+- The Open Parliament Licence's conditions (parliament.uk is not on the environment's
+  allowed hosts; needed before stage S5).
+- HM Revenue and Customs and Department for Work and Pensions statistics on gov.uk
+  (reachable now; expected OGL; check when a series from them is first used).
+- National Records of Scotland and NISRA for Scottish and Northern Irish census tables.
+- Eurostat and OECD tables for the trading blocs (hosts not allowed yet; needed in S6).
