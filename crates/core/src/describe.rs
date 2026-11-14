@@ -39,6 +39,8 @@ pub struct Entry {
     /// A lever the player may set: every lever except those marked `player = false`,
     /// which are inputs that scenarios set (world demand, market rates).
     pub player: bool,
+    /// The `group` key: where a policy panel lists it (empty for none).
+    pub group: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -119,6 +121,7 @@ impl Catalogue {
                 }),
                 financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
                 player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
+                group: text("group").unwrap_or_default(),
             });
         }
         let sectors = model

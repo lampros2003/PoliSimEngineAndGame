@@ -284,6 +284,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("instrument", e.instrument.clone().unwrap_or_default().as_str());
         d.set("financial", e.financial);
         d.set("player", e.player);
+        d.set("group", e.group.as_str());
         entries.push(&d.to_variant());
     }
     let mut sectors = VarArray::new();

@@ -11,6 +11,9 @@ signal explain_requested(name: String)
 var fmt: RefCounted
 var _rows := {}  # name -> {entry, spin, now, pending, cancel}
 var _units := {}  # name -> amount one unit of a money input stands for: 1, 1e6 or 1e9
+var _groups := {}  # group -> {button, rows, open}
+## Groups shown open at the start; the rest start folded (a model can have dozens of levers).
+const OPEN_GROUPS := ["", "Spending", "Taxes", "Income tax"]
 var _list: VBoxContainer
 
 
@@ -61,8 +64,19 @@ func build(levers: Array) -> void:
 		child.queue_free()
 	_rows.clear()
 	_units.clear()
+	_groups.clear()
 	for entry in levers:
 		var name: String = entry["name"]
+		var group := str(entry.get("group", ""))
+		if group != "" and not _groups.has(group):
+			var header := Button.new()
+			header.flat = true
+			header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			header.name = "group_" + group.replace(" ", "_")
+			header.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
+			_list.add_child(header)
+			_groups[group] = {"button": header, "rows": [], "open": OPEN_GROUPS.has(group)}
+			header.pressed.connect(func() -> void: _toggle(group))
 		if entry.get("money", false):
 			_units[name] = _money_unit(entry)
 		var row := VBoxContainer.new()
@@ -130,6 +144,23 @@ func build(levers: Array) -> void:
 		row.add_child(line)
 		_list.add_child(row)
 		_rows[name] = {"entry": entry, "spin": spin, "now": now, "pending": pending, "cancel": cancel}
+		if _groups.has(group):
+			_groups[group]["rows"].append(row)
+	for group in _groups:
+		_show_group(group)
+
+
+func _toggle(group: String) -> void:
+	_groups[group]["open"] = not _groups[group]["open"]
+	_show_group(group)
+
+
+func _show_group(group: String) -> void:
+	var g: Dictionary = _groups[group]
+	var rows: Array = g["rows"]
+	g["button"].text = ("▾ " if g["open"] else "▸ ") + group + ("" if g["open"] else "  (%d)" % rows.size())
+	for row in rows:
+		row.visible = g["open"]
 
 
 func _typed(name: String, value: float) -> void:

@@ -4,6 +4,7 @@
 
 [lever.public_pay_bill]
 label = "Public sector pay bill (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 24217000000
@@ -12,6 +13,7 @@ doc = "Wages and salaries of public employees, in 2024 prices. 2024: £290.6bn a
 
 [lever.procurement_bill]
 label = "Purchases of goods and services (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 27228916667
@@ -20,14 +22,16 @@ doc = "What the public sector buys from firms, in 2024 prices. 2024: £326.7bn a
 
 [lever.benefits_bill]
 label = "Pensions and other benefits (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
-default = 25360333333
-range = [0, 50720666666]
-doc = "Social benefits that do not depend on unemployment, mostly the state pension, in 2024 prices."
+default = 21688247786
+range = [0, 43376495572]
+doc = "Social benefits that do not depend on unemployment, mostly the state pension, in 2024 prices (Child Benefit and Universal Credit come from the households)."
 
 [lever.benefit_per_unemployed]
 label = "Benefit per unemployed person (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month/person"
 default = 450
@@ -36,6 +40,7 @@ doc = "Paid each month for each unemployed person, in 2024 prices."
 
 [lever.public_investment_bill]
 label = "Public investment (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 11849333333
@@ -44,6 +49,7 @@ doc = "Gross public investment: roads, buildings, equipment, in 2024 prices. 202
 
 [lever.subsidies_bill]
 label = "Subsidies (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 3120500000
@@ -52,30 +58,16 @@ doc = "Subsidies to producers, in 2024 prices."
 
 [lever.transfers_abroad_bill]
 label = "Aid and other transfers (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 3096750000
 range = [0, 9290250000]
 doc = "Other current spending, including aid and payments abroad, in 2024 prices."
 
-[lever.income_tax_rate]
-label = "Income tax, average rate"
-type = "real"
-unit = "1"
-default = 0.131863910677
-range = [0, 0.6]
-doc = "Income tax and capital gains tax as a share of household income before tax. 2024: 13.2%."
-
-[lever.nics_rate]
-label = "National Insurance, average rate"
-type = "real"
-unit = "1"
-default = 0.122379304086
-range = [0, 0.4]
-doc = "Employee and employer National Insurance as a share of pay. 2024: 12.2%."
-
 [lever.vat_rate]
 label = "VAT standard rate"
+group = "Taxes"
 type = "real"
 unit = "1"
 default = 0.2
@@ -84,6 +76,7 @@ doc = "The standard rate. About 64% of household spending is taxed at it."
 
 [lever.corporation_tax_rate]
 label = "Corporation tax main rate"
+group = "Taxes"
 type = "real"
 unit = "1"
 default = 0.25
@@ -92,11 +85,24 @@ doc = "Main rate of corporation tax on company profits."
 
 [lever.council_tax_bill]
 label = "Council tax (2024 prices)"
+group = "Spending"
 type = "money"
 unit = "GBP/month"
 default = 3890166667
 range = [0, 11670500001]
 doc = "Total council tax, in 2024 prices. 2024: £46.7bn a year."
+
+[param.other_income_tax_rate]
+type = "real"
+unit = "1"
+value = 0.101729496757
+doc = "Income tax on other income, as a share of it"
+
+[param.ni_scale]
+type = "real"
+unit = "1"
+value = 0.983229341739
+doc = "Published National Insurance against the households' contributions in the base month"
 
 [param.public_pay_per_worker]
 type = "money"

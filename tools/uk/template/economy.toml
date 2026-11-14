@@ -44,7 +44,7 @@ label = "Social benefits"
 from = "government"
 to = "households"
 phase = "income"
-expr = "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index)"
+expr = "{{benefits_expr}}"
 
 [var.payout_factor]
 label = "Firms' payout relative to {{base_year}}"
@@ -94,14 +94,14 @@ label = "Income tax"
 from = "households"
 to = "government"
 phase = "income"
-expr = "round(income_tax_rate * (wages + public_pay + benefits + other_income))"
+expr = "{{income_tax_expr}}"
 
 [flow.national_insurance]
 label = "National Insurance"
 from = "households"
 to = "government"
 phase = "income"
-expr = "round(nics_rate * (wages + public_pay))"
+expr = "{{nics_expr}}"
 
 [flow.council_tax]
 label = "Council tax"

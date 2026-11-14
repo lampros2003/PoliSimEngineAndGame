@@ -55,7 +55,8 @@ jobs:
       - name: Random scenarios through oracle and engine
         run: python tools/diff_engine.py --count 150
       - name: Random UK scenarios through oracle and engine
-        run: python tools/diff_engine.py --model models/uk --count 60
+        # With 20,000 households the oracle takes about a second a month: short scenarios.
+        run: python tools/diff_engine.py --model models/uk --count 10 --max-steps 4
       - name: Random format 1 (cohort) scenarios through oracle and engine
         run: python tools/diff_engine.py --model models/cohort --count 40
 

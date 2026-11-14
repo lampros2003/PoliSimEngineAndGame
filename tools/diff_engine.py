@@ -162,8 +162,12 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--engine", type=Path, default=ROOT / "target" / "release" / EXE)
     parser.add_argument("--model", type=Path, default=MODEL, help="model folder (default: the toy model)")
+    parser.add_argument("--max-steps", type=int, help="longest scenario (default: 40 for the toy model, else 120)")
     args = parser.parse_args()
     use_model(args.model)
+    if args.max_steps:
+        global MAX_STEPS
+        MAX_STEPS = args.max_steps
     if not args.engine.exists():
         print(f"engine not found at {args.engine}; run `cargo build --release` first", file=sys.stderr)
         return 1

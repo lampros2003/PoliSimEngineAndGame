@@ -111,6 +111,10 @@ column.
 
 ## Lever inputs
 
+A lever's optional `group` (a name) places it under that heading in the policy panel, in
+the order the groups first appear; groups other than Spending, Taxes and Income tax start
+folded, with the number of levers they hold.
+
 Rates are typed in percent. Money is typed in major units, or in millions (`m`) or
 billions (`bn`) when the top of the lever's range is at least ten million or ten billion
 in the units shown; a lever whose unit is per step follows the "Amounts a year" choice,

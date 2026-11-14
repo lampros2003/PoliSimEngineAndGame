@@ -13,6 +13,8 @@ unit = "1"
 value = 10
 
 [lever.personal_allowance]
+label = "Personal allowance"
+group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 12570
@@ -20,6 +22,8 @@ doc = "Income tax personal allowance"
 range = [0, 50000]
 
 [lever.allowance_taper_start]
+label = "Allowance withdrawn above"
+group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 100000
@@ -27,6 +31,8 @@ doc = "Income above which the personal allowance is withdrawn, £1 for every £2
 range = [0, 1000000]
 
 [lever.basic_rate]
+label = "Basic rate"
+group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.2
@@ -34,6 +40,8 @@ doc = "Income tax basic rate, rest of the UK"
 range = [0, 1]
 
 [lever.higher_rate]
+label = "Higher rate"
+group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.4
@@ -41,6 +49,8 @@ doc = "Income tax higher rate, rest of the UK"
 range = [0, 1]
 
 [lever.additional_rate]
+label = "Additional rate"
+group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.45
@@ -48,6 +58,8 @@ doc = "Income tax additional rate, rest of the UK"
 range = [0, 1]
 
 [lever.higher_threshold]
+label = "Higher rate from"
+group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 37700
@@ -55,6 +67,8 @@ doc = "Taxable income at which the higher rate starts"
 range = [0, 1000000]
 
 [lever.additional_threshold]
+label = "Additional rate from"
+group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 125140
@@ -62,6 +76,8 @@ doc = "Taxable income at which the additional rate starts"
 range = [0, 10000000]
 
 [lever.starter_rate]
+label = "Starter rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.19
@@ -69,6 +85,8 @@ doc = "Scottish income tax starter rate"
 range = [0, 1]
 
 [lever.scottish_basic_rate]
+label = "Basic rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.2
@@ -76,6 +94,8 @@ doc = "Scottish income tax scottish basic rate"
 range = [0, 1]
 
 [lever.scottish_basic_threshold]
+label = "Basic rate from"
+group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 2306
@@ -83,6 +103,8 @@ doc = "Taxable income at which the Scottish scottish basic rate starts"
 range = [0, 10000000]
 
 [lever.intermediate_rate]
+label = "Intermediate rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.21
@@ -90,6 +112,8 @@ doc = "Scottish income tax intermediate rate"
 range = [0, 1]
 
 [lever.intermediate_threshold]
+label = "Intermediate rate from"
+group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 13991
@@ -97,6 +121,8 @@ doc = "Taxable income at which the Scottish intermediate rate starts"
 range = [0, 10000000]
 
 [lever.scottish_higher_rate]
+label = "Higher rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.42
@@ -104,6 +130,8 @@ doc = "Scottish income tax scottish higher rate"
 range = [0, 1]
 
 [lever.scottish_higher_threshold]
+label = "Higher rate from"
+group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 31092
@@ -111,6 +139,8 @@ doc = "Taxable income at which the Scottish scottish higher rate starts"
 range = [0, 10000000]
 
 [lever.advanced_rate]
+label = "Advanced rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.45
@@ -118,6 +148,8 @@ doc = "Scottish income tax advanced rate"
 range = [0, 1]
 
 [lever.advanced_threshold]
+label = "Advanced rate from"
+group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 62430
@@ -125,6 +157,8 @@ doc = "Taxable income at which the Scottish advanced rate starts"
 range = [0, 10000000]
 
 [lever.top_rate]
+label = "Top rate"
+group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.48
@@ -132,6 +166,8 @@ doc = "Scottish income tax top rate"
 range = [0, 1]
 
 [lever.top_threshold]
+label = "Top rate from"
+group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 125140
@@ -139,6 +175,8 @@ doc = "Taxable income at which the Scottish top rate starts"
 range = [0, 10000000]
 
 [lever.ni_primary_threshold]
+label = "Employees pay from"
+group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 12584
@@ -146,6 +184,8 @@ doc = "Employee National Insurance primary threshold: £242 a week x 52"
 range = [0, 100000]
 
 [lever.ni_upper_limit]
+label = "Upper earnings limit"
+group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 50284
@@ -153,6 +193,8 @@ doc = "Upper earnings limit: £967 a week x 52"
 range = [0, 1000000]
 
 [lever.ni_main_rate]
+label = "Employee main rate"
+group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.08
@@ -160,6 +202,8 @@ doc = "Employee National Insurance main rate"
 range = [0, 1]
 
 [lever.ni_upper_rate]
+label = "Employee rate above the limit"
+group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.02
@@ -167,6 +211,8 @@ doc = "Employee National Insurance rate above the upper earnings limit"
 range = [0, 1]
 
 [lever.ni_secondary_threshold]
+label = "Employers pay from"
+group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 9100
@@ -174,6 +220,8 @@ doc = "Employer National Insurance secondary threshold: £175 a week x 52"
 range = [0, 100000]
 
 [lever.ni_employer_rate]
+label = "Employer rate"
+group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.138
@@ -181,6 +229,8 @@ doc = "Employer National Insurance rate"
 range = [0, 1]
 
 [lever.class4_lower]
+label = "Self-employed pay from"
+group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 12570
@@ -188,6 +238,8 @@ doc = "Self-employed Class 4 lower profits limit"
 range = [0, 100000]
 
 [lever.class4_upper]
+label = "Self-employed upper limit"
+group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 50270
@@ -195,6 +247,8 @@ doc = "Self-employed Class 4 upper profits limit"
 range = [0, 1000000]
 
 [lever.class4_main_rate]
+label = "Self-employed main rate"
+group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.06
@@ -202,6 +256,8 @@ doc = "Class 4 main rate"
 range = [0, 1]
 
 [lever.class4_upper_rate]
+label = "Self-employed rate above the limit"
+group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.02
@@ -209,6 +265,8 @@ doc = "Class 4 rate above the upper profits limit"
 range = [0, 1]
 
 [lever.child_benefit_eldest]
+label = "Eldest child"
+group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 1331.20
@@ -216,6 +274,8 @@ doc = "Child Benefit for the eldest child: £25.60 a week x 52"
 range = [0, 10000]
 
 [lever.child_benefit_other]
+label = "Each other child"
+group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 881.40
@@ -223,6 +283,8 @@ doc = "Child Benefit for each other child: £16.95 a week x 52"
 range = [0, 10000]
 
 [lever.hicbc_start]
+label = "Withdrawn from income of"
+group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 60000
@@ -230,6 +292,8 @@ doc = "Income at which the High Income Child Benefit Charge starts"
 range = [0, 1000000]
 
 [lever.hicbc_width]
+label = "Fully withdrawn over a further"
+group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 20000
@@ -237,6 +301,8 @@ doc = "Income over which the charge rises to the whole benefit"
 range = [1, 1000000]
 
 [lever.uc_single_young]
+label = "Single, under 25"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 311.68
@@ -244,6 +310,8 @@ doc = "UC standard allowance, single under 25"
 range = [0, 10000]
 
 [lever.uc_single]
+label = "Single, 25 or over"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 393.45
@@ -251,6 +319,8 @@ doc = "UC standard allowance, single 25 or over"
 range = [0, 10000]
 
 [lever.uc_couple_young]
+label = "Couple, under 25"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 489.23
@@ -258,6 +328,8 @@ doc = "UC standard allowance, couple both under 25"
 range = [0, 10000]
 
 [lever.uc_couple]
+label = "Couple, 25 or over"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 617.60
@@ -265,6 +337,8 @@ doc = "UC standard allowance, couple one or both 25 or over"
 range = [0, 10000]
 
 [lever.uc_child]
+label = "Per child"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 287.92
@@ -272,6 +346,8 @@ doc = "UC child element"
 range = [0, 10000]
 
 [lever.uc_first_child_older]
+label = "First child born before 2017"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 333.33
@@ -279,6 +355,8 @@ doc = "UC child element for a first child born before April 2017"
 range = [0, 10000]
 
 [lever.uc_work_allowance]
+label = "Work allowance"
+group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 673.00
@@ -286,6 +364,8 @@ doc = "UC work allowance with children, no housing costs"
 range = [0, 10000]
 
 [lever.uc_taper]
+label = "Taper rate"
+group = "Universal Credit"
 type = "real"
 unit = "1"
 default = 0.55
@@ -293,6 +373,8 @@ doc = "UC taper: entitlement lost per pound of net earnings above the work allow
 range = [0, 1]
 
 [lever.uc_child_limit]
+label = "Children that count"
+group = "Universal Credit"
 type = "int"
 unit = "1"
 default = 2
@@ -300,6 +382,8 @@ doc = "Children who attract the UC child element (the two-child limit)"
 range = [0, 20]
 
 [lever.state_pension_age]
+label = "State Pension age"
+group = "Pensions"
 type = "int"
 unit = "1"
 default = 66
@@ -331,12 +415,28 @@ kind = "marginal"
 unit = "GBP/year/household"
 bands = [{ from = "class4_lower", rate = "class4_main_rate" }, { from = "class4_upper", rate = "class4_upper_rate" }]
 
+[var.earn1]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "earnings1"
+doc = "Pay or profit, a year"
+
+[var.pens1]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "pension1"
+doc = "Pensions, a year"
+
 [var.pay1]
 type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed1, 0, earnings1)"
+expr = "select(self_employed1, 0, earn1)"
 doc = "Employee pay, a year"
 
 [var.profit1]
@@ -344,7 +444,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed1, earnings1, 0)"
+expr = "select(self_employed1, earn1, 0)"
 doc = "Self-employment profit, a year"
 
 [var.income1]
@@ -352,7 +452,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "earnings1 + pension1"
+expr = "earn1 + pens1"
 doc = "Taxable income, a year"
 
 [var.allowance1]
@@ -383,12 +483,28 @@ phase = "rules"
 entity = "household"
 expr = "marginal(pay1, employer_ni)"
 
+[var.earn2]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "earnings2"
+doc = "Pay or profit, a year"
+
+[var.pens2]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "pension2"
+doc = "Pensions, a year"
+
 [var.pay2]
 type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed2, 0, earnings2)"
+expr = "select(self_employed2, 0, earn2)"
 doc = "Employee pay, a year"
 
 [var.profit2]
@@ -396,7 +512,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed2, earnings2, 0)"
+expr = "select(self_employed2, earn2, 0)"
 doc = "Self-employment profit, a year"
 
 [var.income2]
@@ -404,7 +520,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "earnings2 + pension2"
+expr = "earn2 + pens2"
 doc = "Taxable income, a year"
 
 [var.allowance2]
@@ -435,12 +551,28 @@ phase = "rules"
 entity = "household"
 expr = "marginal(pay2, employer_ni)"
 
+[var.earn3]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "earnings3"
+doc = "Pay or profit, a year"
+
+[var.pens3]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "pension3"
+doc = "Pensions, a year"
+
 [var.pay3]
 type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed3, 0, earnings3)"
+expr = "select(self_employed3, 0, earn3)"
 doc = "Employee pay, a year"
 
 [var.profit3]
@@ -448,7 +580,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed3, earnings3, 0)"
+expr = "select(self_employed3, earn3, 0)"
 doc = "Self-employment profit, a year"
 
 [var.income3]
@@ -456,7 +588,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "earnings3 + pension3"
+expr = "earn3 + pens3"
 doc = "Taxable income, a year"
 
 [var.allowance3]
@@ -487,12 +619,28 @@ phase = "rules"
 entity = "household"
 expr = "marginal(pay3, employer_ni)"
 
+[var.earn4]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "earnings4"
+doc = "Pay or profit, a year"
+
+[var.pens4]
+type = "money"
+unit = "GBP/year/household"
+phase = "rules"
+entity = "household"
+expr = "pension4"
+doc = "Pensions, a year"
+
 [var.pay4]
 type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed4, 0, earnings4)"
+expr = "select(self_employed4, 0, earn4)"
 doc = "Employee pay, a year"
 
 [var.profit4]
@@ -500,7 +648,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "select(self_employed4, earnings4, 0)"
+expr = "select(self_employed4, earn4, 0)"
 doc = "Self-employment profit, a year"
 
 [var.income4]
@@ -508,7 +656,7 @@ type = "money"
 unit = "GBP/year/household"
 phase = "rules"
 entity = "household"
-expr = "earnings4 + pension4"
+expr = "earn4 + pens4"
 doc = "Taxable income, a year"
 
 [var.allowance4]
@@ -609,14 +757,14 @@ type = "money"
 unit = "GBP/month/household"
 phase = "rules"
 entity = "household"
-expr = "round((earnings1 - income_tax1 - employee_ni1 + select(uc_couple_unit, earnings2 - income_tax2 - employee_ni2, 0)) / year)"
+expr = "round((earn1 - income_tax1 - employee_ni1 + select(uc_couple_unit, earn2 - income_tax2 - employee_ni2, 0)) / year)"
 
 [var.uc_unearned]
 type = "money"
 unit = "GBP/month/household"
 phase = "rules"
 entity = "household"
-expr = "round((pension1 + select(uc_couple_unit, pension2, 0)) / year)"
+expr = "round((pens1 + select(uc_couple_unit, pens2, 0)) / year)"
 
 [var.uc_work_allowed]
 type = "money"
