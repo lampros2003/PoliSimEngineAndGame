@@ -28,7 +28,7 @@ _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
-_SECTIONS = ("model", "dim", "sector", "instrument", "entity", "stream", "table",
+_SECTIONS = ("model", "legislature", "dim", "sector", "instrument", "entity", "stream", "table",
              "param", "lever", "var", "state", "flow", "account")
 MAX_CELLS = 16_777_216
 
@@ -133,6 +133,7 @@ class Model:
     model_hash: str
     dims: dict[str, Dim] = field(default_factory=dict)
     format: int = 0
+    legislature: dict[str, str] | None = None  # format 1 (S5.4): seats, governing, position
 
     def cells(self, dims: tuple[str, ...]) -> list[dict[str, int]]:
         """Coordinates ({dimension: position}) of every cell, in row-major order."""
@@ -261,8 +262,8 @@ def load_model(path: str | Path) -> Model:
         for section, content in doc.items():
             if section not in merged:
                 raise ModelError(f"unknown section [{section}]")
-            if section == "model":
-                merged["model"].update(content)
+            if section in ("model", "legislature"):
+                merged[section].update(content)
                 continue
             for name, spec in content.items():
                 if name in merged[section]:
@@ -528,6 +529,7 @@ def load_model(path: str | Path) -> Model:
             raise ModelError(f"instrument {instrument}: the issuer cannot be a per-record sector")
 
     _check_weights(entities, sectors, symbols, phases)
+    legislature = _check_legislature(merged["legislature"], symbols, fmt)
 
     for dim in dims.values():
         if dim.kind == "list":
@@ -541,7 +543,7 @@ def load_model(path: str | Path) -> Model:
         digest.update(Path(file).as_posix().encode() + b"\0" + (root / file).read_bytes() + b"\0")
 
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
-                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt)
+                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt, legislature)
 
 
 def _rake(spec, what: str) -> Rake:
@@ -572,6 +574,32 @@ def _rake(spec, what: str) -> Rake:
             parsed.append(Slot(slot["count"], list(slot["at"])))
         margins.append(Margin(margin["target"], parsed))
     return Rake(spec["when"], passes, margins)
+
+
+def _check_legislature(spec: dict, symbols, fmt: int) -> dict[str, str] | None:
+    """Format 1 (S5.4): the legislature that votes on lever changes, and levers' leanings."""
+    for d in symbols.values():
+        if d.kind == "lever" and "leaning" in d.spec:
+            if d.spec["leaning"] not in ("left", "right"):
+                raise ModelError(f"lever {d.name}: 'leaning' is \"left\" or \"right\"")
+            if d.type == "bool":
+                raise ModelError(f"lever {d.name}: a true/false lever has no leaning")
+    if not spec:
+        return None
+    if fmt != 1:
+        raise ModelError("[legislature] needs format = 1")
+    if set(spec) != {"seats", "governing", "position"} or not all(isinstance(v, str) for v in spec.values()):
+        raise ModelError("[legislature] takes 'seats', 'governing' and 'position', each a name")
+    wanted = {"seats": ("state", "int"), "governing": ("state", "bool"), "position": ("param", "real")}
+    dims = None
+    for key, (kind, typ) in wanted.items():
+        d = symbols.get(spec[key])
+        if d is None or d.kind != kind or d.type != typ or d.money or len(d.dims) != 1:
+            raise ModelError(f"[legislature] {key}: must be a {kind} of type {typ} with one dimension")
+        if dims is not None and d.dims != dims:
+            raise ModelError("[legislature]: seats, governing and position must have the same dimension")
+        dims = d.dims
+    return dict(spec)
 
 
 def _check_weights(entities, sectors, symbols, phases) -> None:

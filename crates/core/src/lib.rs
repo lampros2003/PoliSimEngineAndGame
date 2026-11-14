@@ -36,7 +36,7 @@ pub use explain::{Explanation, Num, Part};
 pub use model::{Model, Scenario, load_model, load_scenario};
 pub use program::{Col, Ty, Val};
 pub use session::Session;
-pub use sim::{Computed, Row, RunConfig, Simulation, check_lever};
+pub use sim::{Computed, Row, RunConfig, Simulation, Vote, check_lever};
 /// A raw value as written in a model or scenario file, before it is given a type.
 pub use toml::Value as RawValue;
 

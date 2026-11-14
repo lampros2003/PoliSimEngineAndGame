@@ -166,6 +166,17 @@ def group_of(name: str) -> str:
     return ""
 
 
+# Stage S5.4: raising these moves policy to the right (a tax cut or a benefit cut); raising
+# any other lever here (a tax rate, the upper earnings and profits limits, a benefit
+# amount) moves it to the left.
+RIGHTWARD = {"personal_allowance", "allowance_taper_start", "ni_primary_threshold", "ni_secondary_threshold",
+             "class4_lower", "hicbc_start", "hicbc_width", "uc_taper", "state_pension_age"}
+
+
+def leaning_of(name: str) -> str:
+    return "right" if name in RIGHTWARD or name.endswith("_threshold") else "left"
+
+
 def lever(name, value, unit, doc, kind="money", rng=None):
     out = f'''
 [lever.{name}]
@@ -174,6 +185,7 @@ group = "{group_of(name)}"
 type = "{kind}"
 unit = "{unit}"
 default = {value}
+leaning = "{leaning_of(name)}"
 doc = "{doc}"
 '''
     if rng:

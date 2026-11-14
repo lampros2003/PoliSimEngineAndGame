@@ -42,8 +42,9 @@ pub const FUNCTIONS: [&str; 23] = [
     "wsum_by",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 13] = [
+const SECTIONS: [&str; 14] = [
     "model",
+    "legislature",
     "dim",
     "sector",
     "instrument",
@@ -271,6 +272,18 @@ pub struct Model {
     pub dims: Vec<Dim>,
     pub dim_index: HashMap<String, usize>,
     pub format: i64,
+    /// Format 1 (S5.4): the legislature that votes on lever changes.
+    pub legislature: Option<Legislature>,
+}
+
+/// Format 1 (S5.4): symbol indices of the seats each bloc holds (whole numbers), whether it
+/// governs (true/false) and its position (real: left below zero, right above), all over
+/// one dimension of blocs.
+#[derive(Clone, Copy, Debug)]
+pub struct Legislature {
+    pub seats: usize,
+    pub governing: usize,
+    pub position: usize,
 }
 
 impl Model {
@@ -829,7 +842,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
             };
             let Value::Table(content) = content else { return model_err(format!("[{name}] must be a table")) };
             for (key, spec) in content {
-                if index != 0 && merged[index].contains_key(&key) {
+                if index > 1 && merged[index].contains_key(&key) {
                     return model_err(format!("{name}.{key} is declared twice"));
                 }
                 merged[index].insert(key, spec);
@@ -1282,6 +1295,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
     }
 
     check_weights(&entities, &sectors, &loader, &phases)?;
+    let legislature = check_legislature(&merged[section("legislature")], &loader, format)?;
 
     for dim in &loader.dims {
         if dim.first.is_none() {
@@ -1323,6 +1337,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
         dims: loader.dims,
         dim_index: loader.dim_index,
         format,
+        legislature,
     })
 }
 
@@ -1374,6 +1389,58 @@ fn rake_of(value: &Value, what: &str) -> Result<Rake> {
         out.push(Margin { target: target.clone(), slots: parsed });
     }
     Ok(Rake { when: when.clone(), passes, margins: out })
+}
+
+/// Format 1 (S5.4): the legislature that votes on lever changes, and levers' leanings.
+fn check_legislature(spec: &Toml, loader: &Loader, format: i64) -> Result<Option<Legislature>> {
+    for d in loader.symbols.iter().filter(|d| d.kind == Kind::Lever) {
+        if let Some(leaning) = d.spec.get("leaning") {
+            if !matches!(leaning.as_str(), Some("left" | "right")) {
+                return model_err(format!("lever {}: 'leaning' is \"left\" or \"right\"", d.name));
+            }
+            if d.ty == Ty::Bool {
+                return model_err(format!("lever {}: a true/false lever has no leaning", d.name));
+            }
+        }
+    }
+    if spec.is_empty() {
+        return Ok(None);
+    }
+    if format != 1 {
+        return model_err("[legislature] needs format = 1");
+    }
+    let keys_ok =
+        spec.len() == 3 && ["seats", "governing", "position"].iter().all(|k| spec.get(*k).is_some_and(Value::is_str));
+    if !keys_ok {
+        return model_err("[legislature] takes 'seats', 'governing' and 'position', each a name");
+    }
+    let mut ids = [0usize; 3];
+    let mut dims: Option<&Vec<usize>> = None;
+    for (slot, (key, kind, ty)) in
+        [("seats", Kind::State, Ty::Int), ("governing", Kind::State, Ty::Bool), ("position", Kind::Param, Ty::Real)]
+            .into_iter()
+            .enumerate()
+    {
+        let name = spec[key].as_str().expect("checked above");
+        let id = match loader.sym_index.get(name) {
+            Some(&id) => id,
+            None => usize::MAX,
+        };
+        let d = loader.symbols.get(id);
+        let Some(d) = d.filter(|d| d.kind == kind && d.ty == ty && !d.money && d.dims.len() == 1) else {
+            return model_err(format!(
+                "[legislature] {key}: must be a {} of type {} with one dimension",
+                kind.name(),
+                ty.name()
+            ));
+        };
+        if dims.is_some_and(|x| *x != d.dims) {
+            return model_err("[legislature]: seats, governing and position must have the same dimension");
+        }
+        dims = Some(&d.dims);
+        ids[slot] = id;
+    }
+    Ok(Some(Legislature { seats: ids[0], governing: ids[1], position: ids[2] }))
 }
 
 /// Format 1 (S4.4): weight states and rakes.

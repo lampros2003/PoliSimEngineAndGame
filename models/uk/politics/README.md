@@ -74,3 +74,14 @@ With unchanged policy for thirty years the player's bloc keeps office at every e
 governs with the green and the two nationalist blocs (326 together), which restarts its
 time in office; majorities again from 2044. Time in office counts heavily: the 2039 reset
 is why 2044 goes well.
+
+## Bills (stage S5.4)
+
+Every change the player makes to a tax or spending lever is a bill: raising a tax rate, a
+benefit or a spending bill moves policy to the left; raising a threshold or an allowance,
+the Universal Credit taper or the State Pension age, to the right (`leaning` in
+`households.toml` and `calibration.toml`). The leading governing bloc votes for it; every
+other bloc votes for it if the move is towards its side of the axis above (Northern
+Ireland's and the others, at zero, vote against everything). More than 325 seats pass it.
+With 411 seats of its own the government passes everything; in a hung parliament its
+partners can defeat it.

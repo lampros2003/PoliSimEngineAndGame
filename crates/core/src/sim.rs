@@ -58,6 +58,22 @@ enum RowSource {
     Scalar(usize),
     AccountTotal(usize),
     FlowTotal(usize), // index into model.flows
+    /// Format 1 (S5.4): bills defeated in the step.
+    Defeated,
+}
+
+/// Format 1 (S5.4): a vote on a change to a lever with a leaning.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Vote {
+    /// Index of the step whose first part held the vote.
+    pub step: u64,
+    pub lever: String,
+    /// The value the change would have stored.
+    pub value: Val,
+    /// Seats of the blocs that voted for it, and of all blocs.
+    pub votes_for: i64,
+    pub seats: i64,
+    pub passed: bool,
 }
 
 struct Phase {
@@ -95,6 +111,9 @@ pub struct Simulation {
     phase_time: Vec<Duration>,
     /// Each entity's current weights: its data's, or its weight state's (format 1, S4.4).
     weights: Vec<Vec<i64>>,
+    /// Format 1 (S5.4): every vote on a lever change, and the defeats in the step running.
+    votes: Vec<Vote>,
+    defeated: i64,
     /// Per symbol: the compiled rake of a weight state that has one.
     rakes: Vec<Option<RakeProg>>,
 }
@@ -217,6 +236,8 @@ impl Simulation {
             snapshots: VecDeque::new(),
             phase_time: vec![Duration::ZERO; model.phases.len() + 1],
             weights: model.entities.iter().map(|e| e.weights.clone()).collect(),
+            votes: Vec::new(),
+            defeated: 0,
             rakes: (0..count).map(|_| None).collect(),
         };
         let m = &*model;
@@ -397,6 +418,10 @@ impl Simulation {
                 simulation.row_sources.push(RowSource::FlowTotal(flow));
             }
         }
+        if m.legislature.is_some() {
+            simulation.row_names.push("bills_defeated".to_string());
+            simulation.row_sources.push(RowSource::Defeated);
+        }
         Ok(simulation)
     }
 
@@ -523,6 +548,65 @@ impl Simulation {
         let d = &self.model.symbols[id];
         let value = convert(Raw::Toml(raw), d.ty, d.money, self.model.minor, &format!("lever {name}"))?;
         self.store(id, Computed::One(value))
+    }
+
+    /// Format 1 (S5.4): a change to a lever with a leaning is a bill. The leading bloc (the
+    /// governing bloc with the most seats, the first on a tie) votes for it, and every other
+    /// bloc votes for it if the move is towards its side of zero; it passes with more than
+    /// half the seats. Every vote is kept (see [`Simulation::votes`]).
+    fn passes(&mut self, name: &str, raw: &Value) -> Result<bool> {
+        let model = Arc::clone(&self.model);
+        let Some(legislature) = model.legislature else { return Ok(true) };
+        let Some(&id) = model.sym_index.get(name) else { return Ok(true) };
+        let d = &model.symbols[id];
+        let Some(leaning) = d.spec.get("leaning").and_then(Value::as_str).filter(|_| d.kind == Kind::Lever) else {
+            return Ok(true);
+        };
+        let new = convert(Raw::Toml(raw), d.ty, d.money, model.minor, &format!("lever {name}"))?;
+        let old = self.scal[id];
+        let up = match (new, old) {
+            (Val::I(a), Val::I(b)) if a != b => a > b,
+            (Val::F(a), Val::F(b)) if a != b => a > b,
+            _ => return Ok(true),
+        };
+        let left = up == (leaning == "left");
+        let (Col::I(seats), Col::B(governing), Col::F(position)) =
+            (&self.cols[legislature.seats], &self.cols[legislature.governing], &self.cols[legislature.position])
+        else {
+            unreachable!("checked by the loader")
+        };
+        let mut leader: Option<usize> = None;
+        for (b, (n, g)) in seats.iter().zip(governing).enumerate() {
+            if *g && leader.is_none_or(|l| *n > seats[l]) {
+                leader = Some(b);
+            }
+        }
+        let mut votes_for: i128 = 0;
+        let mut everyone: i128 = 0;
+        for (b, (n, p)) in seats.iter().zip(position).enumerate() {
+            everyone += *n as i128;
+            if Some(b) == leader || (left && *p < 0.0) || (!left && *p > 0.0) {
+                votes_for += *n as i128;
+            }
+        }
+        let passed = 2 * votes_for > everyone;
+        self.votes.push(Vote {
+            step: self.step,
+            lever: name.to_string(),
+            value: new,
+            votes_for: fits(votes_for, "seats")?,
+            seats: fits(everyone, "seats")?,
+            passed,
+        });
+        if !passed {
+            self.defeated += 1;
+        }
+        Ok(passed)
+    }
+
+    /// Format 1 (S5.4): every vote on a lever change since the run started (or resumed).
+    pub fn votes(&self) -> &[Vote] {
+        &self.votes
     }
 
     fn remember(&mut self) {
@@ -804,9 +888,12 @@ impl Simulation {
     }
 
     fn step_inner(&mut self) -> Result<()> {
+        self.defeated = 0;
         if let Some(commands) = self.commands.get(&self.step).cloned() {
             for (lever, raw) in commands {
-                self.set_lever(&lever, &raw)?;
+                if self.passes(&lever, &raw)? {
+                    self.set_lever(&lever, &raw)?;
+                }
             }
         }
         for phase in 0..self.plan.len() {
@@ -951,6 +1038,7 @@ impl Simulation {
                 RowSource::Scalar(id) => self.scal[id],
                 RowSource::AccountTotal(id) => Val::I(fits(self.total(id)?, &self.model.symbols[id].name)?),
                 RowSource::FlowTotal(flow) => Val::I(self.flow_totals[flow]),
+                RowSource::Defeated => Val::I(self.defeated),
             });
         }
         Ok(Row { step: self.step - 1, hash: self.state_hash(), values })

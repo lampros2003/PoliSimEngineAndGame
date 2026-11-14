@@ -99,6 +99,9 @@ parameter.
 
 ### `[lever.<name>]`
 
+(Format 1 adds an optional `leaning`, `"left"` or `"right"`: which way raising the lever
+moves policy, for a legislature's votes. See [format 1](06-model-format-1.md#bills-stage-s54).)
+
 A value the player sets: `type`, `unit`, `default`, optional `range`. Changed only by
 commands, which take effect before the phases of the step they name. Optional
 `player = false` marks an input that scenarios set but the game does not offer the

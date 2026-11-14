@@ -45,6 +45,8 @@ class Simulation:
         self.rt = rt = Runtime(seed)
         self.commands = commands or {}
         self.flow_totals: dict[str, int] = {}
+        self.votes: list[dict] = []  # format 1 (S5.4): every vote on a lever change
+        self.defeated = 0  # bills defeated in the step being computed
         m, minor = model, model.minor
         sym = m.symbols
         for name, entity in m.entities.items():
@@ -266,6 +268,36 @@ class Simulation:
             return out
         return run, deps, lagged
 
+    def _passes(self, name: str, raw) -> bool:
+        """Format 1 (S5.4): a change to a lever with a leaning is a bill. The leading bloc (the
+        governing bloc with the most seats, the first on a tie) votes for it, and every other
+        bloc votes for it if the move is towards its side (position below zero for a move to
+        the left, above zero for a move to the right); it passes with more than half the
+        seats. Every vote is kept in `votes`."""
+        m, rt = self.model, self.rt
+        d = m.symbols.get(name)
+        if m.legislature is None or d is None or d.kind != "lever" or "leaning" not in d.spec:
+            return True
+        new = convert(raw, d.type, d.money, m.minor, f"lever {name}")
+        old = rt.S[name]
+        if new == old:
+            return True
+        left = (new > old) == (d.spec["leaning"] == "left")
+        seats, governing = rt.C[m.legislature["seats"]], rt.C[m.legislature["governing"]]
+        position = rt.C[m.legislature["position"]]
+        leader, most = -1, None
+        for b, (n, g) in enumerate(zip(seats, governing)):
+            if g and (most is None or n > most):
+                leader, most = b, n
+        votes_for = sum(n for b, (n, p) in enumerate(zip(seats, position)) if b == leader or (p < 0 if left else p > 0))
+        everyone = sum(seats)
+        passed = 2 * votes_for > everyone
+        self.votes.append({"step": rt.step, "lever": name, "value": new, "for": votes_for, "seats": everyone,
+                           "passed": passed})
+        if not passed:
+            self.defeated += 1
+        return passed
+
     def _set_lever(self, name: str, raw) -> None:
         d = self.model.symbols.get(name)
         if d is None or d.kind != "lever":
@@ -321,8 +353,10 @@ class Simulation:
     def step(self) -> dict:
         m, rt, sym = self.model, self.rt, self.model.symbols
         try:
+            self.defeated = 0
             for name, raw in self.commands.get(rt.step, {}).items():
-                self._set_lever(name, raw)
+                if self._passes(name, raw):
+                    self._set_lever(name, raw)
 
             for order, states in self.plan:
                 for name in order:
@@ -412,6 +446,8 @@ class Simulation:
                 row[d.name + ".total"] = self._total(d)
             elif d.kind == "flow":
                 row[d.name + ".total"] = self.flow_totals[d.name]
+        if self.model.legislature is not None:
+            row["bills_defeated"] = self.defeated
         return row
 
     def column(self, name: str) -> list:

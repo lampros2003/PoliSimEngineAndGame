@@ -53,7 +53,10 @@ a run.
 Steps are numbered from 0. Step `t` does the following, in this order.
 
 1. **Commands.** Apply the lever changes scheduled for step `t`. A value outside the
-   lever's declared range is an error.
+   lever's declared range is an error. In a model with a legislature (format 1, stage
+   S5.4) a change to a lever with a `leaning` is first voted on, and applied only if it
+   passes ([format 1](06-model-format-1.md#bills-stage-s54)); a defeated change is not an
+   error and is never range-checked.
 2. **Phases**, in the order the model declares them. For each phase:
    1. evaluate every `var` and `flow` of the phase, in dependency order;
    2. evaluate the `next` formula of every `state` updated in the phase;

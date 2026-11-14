@@ -219,6 +219,12 @@ def rules(seats: list[dict]) -> str:
 # Who votes for which bloc: the households' adults aged 18 and over in 600 voter types,
 # with a multinomial logit over nine blocs and not voting (models/uk/politics/README.md).
 
+# Stage S5.4: changes to levers with a leaning are bills, voted on by these seats.
+[legislature]
+seats = "seats"
+governing = "governing"
+position = "bloc_position"
+
 [dim.option]
 members = [{options}]
 labels = [{option_labels}]

@@ -1,0 +1,228 @@
+# Bills (docs/spec/06-model-format-1.md, stage S5.4): cases that both the oracle
+# (oracle/tests/test_bills.py) and the engine (crates/core/tests/bills.rs) run.
+#
+# Each case edits the base model (`replace`: pairs of [old text, new text], each old text
+# found exactly once; in them \n stands for a line break), schedules lever changes for
+# step 0 (`set`), then expects one of:
+#   ran      - step 0 runs; the levers end with the values in `levers`, and the votes held
+#              are `votes`: [lever, seats for, passed] in the order of the changes;
+#   refused  - loading or starting the model fails;
+#   runtime  - the model starts and step 0 fails.
+#
+# The base: three blocs, a (300 seats, governing, position -0.4), b (200, opposition, 0.0)
+# and c (150, governing, -0.1): a leads; c leans left; b supports nothing. 650 seats, so a
+# bill needs 326. A move to the left gets a and c (450); a move to the right only a (300).
+
+base = """
+[model]
+id = "bills"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one"]
+
+[dim.bloc]
+members = ["a", "b", "c"]
+
+[legislature]
+seats = "seats"
+governing = "governing"
+position = "position"
+
+[param.position]
+type = "real"
+unit = "1"
+dims = ["bloc"]
+data = "blocs.csv"
+column = "position"
+
+[state.seats]
+type = "int"
+unit = "seat"
+phase = "one"
+dims = ["bloc"]
+initial = { data = "blocs.csv", column = "seats" }
+next = "seats"
+
+[state.governing]
+type = "bool"
+unit = "1"
+phase = "one"
+dims = ["bloc"]
+initial = { data = "blocs.csv", column = "governing" }
+next = "governing"
+
+[lever.tax]
+type = "real"
+unit = "1"
+default = 0.2
+range = [0.0, 1.0]
+leaning = "left"
+
+[lever.allowance]
+type = "money"
+unit = "GBP"
+default = 1000
+leaning = "right"
+
+[lever.plain]
+type = "real"
+unit = "1"
+default = 1.0
+
+[lever.switch]
+type = "bool"
+default = true
+
+[var.total]
+type = "real"
+unit = "1"
+phase = "one"
+expr = "tax + plain"
+"""
+
+[files]
+"blocs.csv" = "bloc,seats,governing,position\na,300,true,-0.4\nb,200,false,0.0\nc,150,true,-0.1\n"
+
+[[case]]
+name = "a move to the left passes with the leader and the left"
+set = { tax = 0.3 }
+expect = "ran"
+levers = { tax = 0.3 }
+votes = [["tax", 450, true]]
+
+[[case]]
+name = "a move to the right fails with only the leader"
+set = { tax = 0.1 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = [["tax", 300, false]]
+
+[[case]]
+name = "raising a lever that leans right is a move to the right"
+set = { allowance = 1100 }
+expect = "ran"
+levers = { allowance = 100000 }
+votes = [["allowance", 300, false]]
+
+[[case]]
+name = "lowering it is a move to the left"
+set = { allowance = 900 }
+expect = "ran"
+levers = { allowance = 90000 }
+votes = [["allowance", 450, true]]
+
+[[case]]
+name = "no change, no vote"
+set = { tax = 0.2 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = []
+
+[[case]]
+name = "a lever without a leaning is not a bill"
+set = { plain = 3.0, switch = false }
+expect = "ran"
+levers = { plain = 3.0, switch = false }
+votes = []
+
+[[case]]
+name = "votes in the order of the changes"
+set = { allowance = 1100, tax = 0.25, plain = 2.0 }
+expect = "ran"
+levers = { allowance = 100000, tax = 0.25, plain = 2.0 }
+votes = [["allowance", 300, false], ["tax", 450, true]]
+
+[[case]]
+name = "exactly half is not a majority"
+files = { "blocs.csv" = "bloc,seats,governing,position\na,325,true,-0.4\nb,325,false,0.0\nc,0,false,-0.1\n" }
+set = { tax = 0.3 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = [["tax", 325, false]]
+
+[[case]]
+name = "the leader is the governing bloc with the most seats, the first on a tie"
+# b and c tie on 300; b comes first and leads; its position, 0.5, takes moves to the right.
+files = { "blocs.csv" = "bloc,seats,governing,position\na,50,false,-0.4\nb,300,true,0.5\nc,300,true,-0.1\n" }
+set = { tax = 0.1 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = [["tax", 300, false]]
+
+[[case]]
+name = "a government with a majority of its own passes everything"
+files = { "blocs.csv" = "bloc,seats,governing,position\na,400,true,-0.4\nb,200,false,0.0\nc,50,false,0.3\n" }
+set = { tax = 0.1 }
+expect = "ran"
+levers = { tax = 0.1 }
+votes = [["tax", 450, true]]
+
+[[case]]
+name = "with no governing bloc there is no leader"
+files = { "blocs.csv" = "bloc,seats,governing,position\na,300,false,-0.4\nb,200,false,0.0\nc,150,false,-0.1\n" }
+set = { tax = 0.3 }
+expect = "ran"
+levers = { tax = 0.3 }
+votes = [["tax", 450, true]]
+
+[[case]]
+name = "a defeated change outside the lever's range is no error"
+set = { tax = -0.5 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = [["tax", 300, false]]
+
+[[case]]
+name = "a passed change outside the lever's range is an error"
+set = { tax = 2.0 }
+expect = "runtime"
+
+# ---- refused
+
+[[case]]
+name = "a leaning that is neither left nor right"
+replace = [['leaning = "left"', 'leaning = "up"']]
+expect = "refused"
+
+[[case]]
+name = "a leaning on a true/false lever"
+replace = [['[lever.switch]\ntype = "bool"', '[lever.switch]\nleaning = "left"\ntype = "bool"']]
+expect = "refused"
+
+[[case]]
+name = "a legislature without its position"
+replace = [['position = "position"\n\n[param.position]', '\n[param.position]']]
+expect = "refused"
+
+[[case]]
+name = "a legislature with an unknown name"
+replace = [['seats = "seats"', 'seats = "chairs"']]
+expect = "refused"
+
+[[case]]
+name = "seats that are not whole numbers"
+replace = [['[state.seats]\ntype = "int"', '[state.seats]\ntype = "real"']]
+expect = "refused"
+
+[[case]]
+name = "governing that is not true or false"
+replace = [['governing = "governing"\nposition', 'governing = "seats"\nposition']]
+expect = "refused"
+
+[[case]]
+name = "a position that is a state"
+replace = [['position = "position"\n\n[param.position]', 'position = "seats"\n\n[param.position]']]
+expect = "refused"
+
+[[case]]
+name = "seats over another dimension"
+replace = [['[dim.bloc]\nmembers = ["a", "b", "c"]', '[dim.bloc]\nmembers = ["a", "b", "c"]\n\n[dim.party]\nmembers = ["x", "y", "z"]'], ['[state.seats]\ntype = "int"\nunit = "seat"\nphase = "one"\ndims = ["bloc"]', '[state.seats]\ntype = "int"\nunit = "seat"\nphase = "one"\ndims = ["party"]']]
+files = { "blocs.csv" = "bloc,party,seats,governing,position\na,x,300,true,-0.4\nb,y,200,false,0.0\nc,z,150,true,-0.1\n" }
+expect = "refused"
+
+[[case]]
+name = "a legislature in format 0"
+replace = [['format = 1', 'format = 0'], ['[dim.bloc]\nmembers = ["a", "b", "c"]\n', ''], ['dims = ["bloc"]\ndata = "blocs.csv"\ncolumn = "position"', 'value = 0.0'], ['dims = ["bloc"]\ninitial = { data = "blocs.csv", column = "seats" }', 'initial = 1'], ['dims = ["bloc"]\ninitial = { data = "blocs.csv", column = "governing" }', 'initial = true']]
+expect = "refused"

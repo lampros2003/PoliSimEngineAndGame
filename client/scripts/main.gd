@@ -38,6 +38,7 @@ var term := 60
 var scenario_path := ""
 var save_path := ""
 var term_announced := false
+var _changes_seen := 0  # policy changes already looked at for defeated bills
 var failed := false
 
 var _date: Label
@@ -244,6 +245,7 @@ func _model_changed() -> void:
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	breakdown.build(play, entries)
 	levers.build(lever_entries)
+	levers.set_legislature(bool(catalogue.get("legislature", false)))
 	_build_headline()
 
 
@@ -356,6 +358,8 @@ func _refresh_chart() -> void:
 	var steps := game.history_steps()
 	var markers := []
 	for c in game.changes():
+		if not c.get("passed", true):
+			continue  # voted down: it never took effect
 		var entry: Dictionary = entries.get(c["lever"], {})
 		markers.append({"step": c["step"], "text": "%s → %s" % [entry.get("label", c["lever"]), fmt.value(entry, c["value"], false, false)]})
 	var k: float = fmt.factor(chart.entry) if not chart.series.is_empty() else 1.0
@@ -497,11 +501,30 @@ func _announce_term() -> void:
 			last = int(last)
 		lines.append("[cell]%s   [/cell][cell]%s   [/cell][cell]%s[/cell]" % [_key_label(key), fmt.value(entry, first), fmt.value(entry, last)])
 	lines.append("[/table]\n")
-	lines.append("You changed policy %d times. You can keep governing, or load your save to try again." % game.changes().size())
+	var passed := game.changes().filter(func(c): return c.get("passed", true)).size()
+	lines.append("You changed policy %d times. You can keep governing, or load your save to try again." % passed)
 	_show_dialog("End of term", "\n".join(lines))
 
 
 # ---------------------------------------------------------------------------- events
+
+## Stage S5.4: says which bills the House of Commons voted down since the last message.
+func _announce_votes() -> void:
+	var changes := game.changes()
+	var lines := PackedStringArray()
+	for i in range(_changes_seen, changes.size()):
+		var c: Dictionary = changes[i]
+		if c.get("passed", true):
+			continue
+		var entry: Dictionary = entries.get(c["lever"], {})
+		lines.append("%s to %s, in %s: %d for, %d against" % [entry.get("label", c["lever"]),
+			fmt.value(entry, c["value"], false, true), fmt.month_name(int(c["step"])),
+			int(c["votes_for"]), int(c["seats"]) - int(c["votes_for"])])
+	_changes_seen = changes.size()
+	if not lines.is_empty():
+		_show_message("[b]The House of Commons voted down %s[/b]\n%s\nYour government lacks a majority of its own; its partners and the opposition vote by their side of politics." % [
+			"a bill" if lines.size() == 1 else "%d bills" % lines.size(), "\n".join(lines)])
+
 
 func _process(_delta: float) -> void:
 	if game == null:
@@ -510,6 +533,7 @@ func _process(_delta: float) -> void:
 	for event in events:
 		match str(event["kind"]):
 			"stepped":
+				_announce_votes()
 				if game.steps_done() >= term and not term_announced:
 					_announce_term.call_deferred()
 			"failed":
@@ -531,6 +555,7 @@ func _process(_delta: float) -> void:
 				else:
 					failed = false
 					term_announced = game.steps_done() >= term
+					_changes_seen = game.changes().size()
 					trace.trail.clear()
 					_model_changed()
 					_status.text = "loaded"

@@ -328,6 +328,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f'type = "{kind}"')
         out.append(f'unit = "{unit}"')
         out.append(f"default = {default}")
+        if people:  # S5.4: with a parliament, raising spending or a tax rate is a move to the left
+            out.append('leaning = "left"')
         out.append(f"range = [{rng[0]}, {rng[1]}]")
         out.append(f'doc = "{doc}"')
         out.append("")

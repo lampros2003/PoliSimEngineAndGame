@@ -299,6 +299,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("financial", e.financial);
         d.set("player", e.player);
         d.set("group", e.group.as_str());
+        d.set("leaning", e.leaning.as_str());
         d.set("dims", &strings(&e.dims));
         entries.push(&d.to_variant());
     }
@@ -321,6 +322,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
     }
     let mut out = VarDictionary::new();
     out.set("id", catalogue.id.as_str());
+    out.set("legislature", catalogue.legislature);
     out.set("dims", &dims);
     out.set("currency", catalogue.currency.as_str());
     out.set("minor", catalogue.minor);
@@ -682,7 +684,9 @@ impl PoliSim {
         d
     }
 
-    /// Lever changes that have taken effect: dictionaries with step, lever and value.
+    /// Lever changes made: dictionaries with step, lever, value, and the vote (passed, and
+    /// votes_for and seats, both 0 when there was no vote). A change with passed false was
+    /// voted down and did not take effect.
     #[func]
     fn changes(&self) -> VarArray {
         let mut out = VarArray::new();
@@ -691,6 +695,9 @@ impl PoliSim {
             d.set("step", c.step as i64);
             d.set("lever", c.lever.as_str());
             d.set("value", &val(c.value));
+            d.set("passed", c.passed);
+            d.set("votes_for", c.votes_for);
+            d.set("seats", c.seats);
             out.push(&d.to_variant());
         }
         out

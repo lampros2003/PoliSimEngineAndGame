@@ -8,6 +8,7 @@ signal lever_changed(name: String, raw: String)
 signal lever_cancelled(name: String)
 signal explain_requested(name: String)
 
+var hint: Label
 var fmt: RefCounted
 var _rows := {}  # name -> {entry, spin, now, pending, cancel}
 var _units := {}  # name -> amount one unit of a money input stands for: 1, 1e6 or 1e9
@@ -26,8 +27,9 @@ func _ready() -> void:
 	title.text = "Policy"
 	title.add_theme_font_size_override("font_size", Palette.TITLE)
 	box.add_child(title)
-	var hint := Label.new()
+	hint = Label.new()
 	hint.text = "Changes take effect from next month."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_color_override("font_color", Palette.MUTED)
 	hint.add_theme_font_size_override("font_size", Palette.SMALL)
 	box.add_child(hint)
@@ -57,6 +59,12 @@ func _money_unit(entry: Dictionary) -> float:
 	if top >= 1e7:
 		return 1e6
 	return 1.0
+
+
+## With a legislature (stage S5.4) a change to a lever with a leaning is a bill.
+func set_legislature(on: bool) -> void:
+	hint.text = ("Changes are bills: the House of Commons votes on them at the start of next month, and a "
+		+ "government without a majority of its own can lose them.") if on else "Changes take effect from next month."
 
 
 func build(levers: Array) -> void:

@@ -41,6 +41,8 @@ pub struct Entry {
     pub player: bool,
     /// The `group` key: where a policy panel lists it (empty for none).
     pub group: String,
+    /// Format 1 (S5.4): "left" or "right" for a lever whose changes are bills, else "".
+    pub leaning: String,
     /// Format 1: the value's dimensions, by name.
     pub dims: Vec<String>,
 }
@@ -73,6 +75,8 @@ pub struct Catalogue {
     pub instruments: Vec<String>,
     pub entries: Vec<Entry>,
     pub sectors: Vec<SectorEntry>,
+    /// Format 1 (S5.4): the model has a legislature that votes on lever changes.
+    pub legislature: bool,
     pub dims: Vec<DimEntry>,
 }
 
@@ -132,6 +136,7 @@ impl Catalogue {
                 financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
                 player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
                 group: text("group").unwrap_or_default(),
+                leaning: text("leaning").unwrap_or_default(),
                 dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
             });
         }
@@ -173,6 +178,7 @@ impl Catalogue {
             instruments: model.instruments.iter().map(|i| i.name.clone()).collect(),
             entries,
             sectors,
+            legislature: model.legislature.is_some(),
             dims: model.dims.iter().map(|d| DimEntry { name: d.name.clone(), labels: d.labels.clone() }).collect(),
         }
     }

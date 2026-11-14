@@ -1,0 +1,18 @@
+# A test of bills (stage S5.4): the early election of early_election.toml leaves the
+# centre-right leading a coalition, whose liberal partner votes against a cut in the basic
+# rate and the personal allowance's rise (moves to the right), which then fail; a VAT rise
+# (a move to the left) passes with the left-leaning opposition. Not a scenario to play.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 3
+preset = "central"
+
+[params]
+parliament_months = 7
+vote_tenure_effect = -0.9
+
+[[command]]
+step = 2
+set = { basic_rate = 0.18, personal_allowance = 13000, vat_rate = 0.21 }

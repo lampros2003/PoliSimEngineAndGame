@@ -35,8 +35,10 @@ use crate::program::{Col, Val};
 use crate::sim::Simulation;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
-/// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them).
-const SAVE_VERSION: u32 = 1;
+/// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them);
+/// 2 adds each policy change's vote in the legislature (S5.4; older games count every
+/// change as passed).
+const SAVE_VERSION: u32 = 2;
 
 /// A lever change that has taken effect.
 #[derive(Clone, Debug, PartialEq)]
@@ -44,6 +46,11 @@ pub struct Change {
     pub step: u64,
     pub lever: String,
     pub value: Val,
+    /// Format 1 (S5.4): false when the legislature voted the change down, so the lever kept
+    /// its value. `votes_for` and `seats` are the vote (both 0 when there was none).
+    pub passed: bool,
+    pub votes_for: i64,
+    pub seats: i64,
 }
 
 /// Every result of every step, by name. Money is in minor units; true/false is 1 or 0.
@@ -243,7 +250,9 @@ impl Session {
         for (lever, value) in applying.into_iter().rev() {
             if !seen.contains(&lever) {
                 seen.push(lever.clone());
-                self.changes.push(Change { step: index, lever, value });
+                let vote = self.sim.votes().iter().rev().find(|v| v.step == index && v.lever == lever);
+                let (passed, votes_for, seats) = vote.map(|v| (v.passed, v.votes_for, v.seats)).unwrap_or((true, 0, 0));
+                self.changes.push(Change { step: index, lever, value, passed, votes_for, seats });
             }
         }
         Ok(())
@@ -325,6 +334,10 @@ impl Session {
             out.extend_from_slice(&change.step.to_le_bytes());
             put_text(&mut out, &change.lever);
             put_val(&mut out, &change.value);
+            // Version 2: the vote.
+            out.push(u8::from(change.passed));
+            out.extend_from_slice(&change.votes_for.to_le_bytes());
+            out.extend_from_slice(&change.seats.to_le_bytes());
         }
         let h = &self.history;
         out.extend_from_slice(&(h.names.len() as u32).to_le_bytes());
@@ -395,7 +408,10 @@ impl Session {
         for _ in 0..r.u32()? {
             let step = r.u64()?;
             let lever = r.text()?;
-            session.changes.push(Change { step, lever, value: r.val()? });
+            let value = r.val()?;
+            let (passed, votes_for, seats) =
+                if version >= 2 { (r.take(1)?[0] != 0, r.u64()? as i64, r.u64()? as i64) } else { (true, 0, 0) };
+            session.changes.push(Change { step, lever, value, passed, votes_for, seats });
         }
         let mut history = History::default();
         for _ in 0..r.u32()? {

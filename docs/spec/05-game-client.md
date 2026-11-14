@@ -90,7 +90,7 @@ error is shown. Reloading unchanged files gives exactly the run that was never r
 ## Saved games
 
 A saved game is the engine save (save format 0) plus the commands still to come, the
-policy changes made, the full history of every result and the last two steps' values,
+policy changes made (with their votes, from version 2), the full history of every result and the last two steps' values,
 dimensioned values' cells included, in one file (`crates/core/src/session.rs` documents the
 layout). Version 1 added the cells; a version 0 file still loads, and its panels by
 dimension fill from the next month. Loading continues exactly
@@ -106,6 +106,11 @@ dictionaries with a `kind` key. Everything the screen reads (`latest`, `previous
 from a mirror the worker refreshes after each request, so reading never waits for the
 simulation. No Godot object is touched off the main thread.
 
+Stage S5.4: the catalogue says whether the model has a `legislature`, and each lever's
+`leaning`; `changes()` gives each policy change's vote (`passed`, `votes_for`, `seats`).
+The policy panel then says that changes are bills; a defeated bill is announced after
+the step and never marked on the chart.
+
 Format 1: the catalogue gives each entry's `dims` (dimension names) and a `dims` list of
 every dimension with its members' `labels`. `cells(name)` returns a value with one
 dimension: `values` and `previous` (the cells after the last step and the one before, in
@@ -119,7 +124,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs five scripted sessions in Godot without a display and
+`tools/check_client.py` runs six scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -128,6 +133,7 @@ compares them with the command-line runner or with published figures:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
+| `tests/bill_vote.gd` | Stage S5.4: in the UK's early-election test scenario, the coalition's basic rate cut is voted down 283 to 367: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
 | `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel. Then the "Who gains, who loses" panel, every breakdown, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 
 `tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one

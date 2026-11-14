@@ -165,6 +165,7 @@ group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 12570
+leaning = "right"
 doc = "Income tax personal allowance"
 range = [0, 50000]
 
@@ -174,6 +175,7 @@ group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 100000
+leaning = "right"
 doc = "Income above which the personal allowance is withdrawn, £1 for every £2"
 range = [0, 1000000]
 
@@ -183,6 +185,7 @@ group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.2
+leaning = "left"
 doc = "Income tax basic rate, rest of the UK"
 range = [0, 1]
 
@@ -192,6 +195,7 @@ group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.4
+leaning = "left"
 doc = "Income tax higher rate, rest of the UK"
 range = [0, 1]
 
@@ -201,6 +205,7 @@ group = "Income tax"
 type = "real"
 unit = "1"
 default = 0.45
+leaning = "left"
 doc = "Income tax additional rate, rest of the UK"
 range = [0, 1]
 
@@ -210,6 +215,7 @@ group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 37700
+leaning = "right"
 doc = "Taxable income at which the higher rate starts"
 range = [0, 1000000]
 
@@ -219,6 +225,7 @@ group = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 125140
+leaning = "right"
 doc = "Taxable income at which the additional rate starts"
 range = [0, 10000000]
 
@@ -228,6 +235,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.19
+leaning = "left"
 doc = "Scottish income tax starter rate"
 range = [0, 1]
 
@@ -237,6 +245,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.2
+leaning = "left"
 doc = "Scottish income tax scottish basic rate"
 range = [0, 1]
 
@@ -246,6 +255,7 @@ group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 2306
+leaning = "right"
 doc = "Taxable income at which the Scottish scottish basic rate starts"
 range = [0, 10000000]
 
@@ -255,6 +265,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.21
+leaning = "left"
 doc = "Scottish income tax intermediate rate"
 range = [0, 1]
 
@@ -264,6 +275,7 @@ group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 13991
+leaning = "right"
 doc = "Taxable income at which the Scottish intermediate rate starts"
 range = [0, 10000000]
 
@@ -273,6 +285,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.42
+leaning = "left"
 doc = "Scottish income tax scottish higher rate"
 range = [0, 1]
 
@@ -282,6 +295,7 @@ group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 31092
+leaning = "right"
 doc = "Taxable income at which the Scottish scottish higher rate starts"
 range = [0, 10000000]
 
@@ -291,6 +305,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.45
+leaning = "left"
 doc = "Scottish income tax advanced rate"
 range = [0, 1]
 
@@ -300,6 +315,7 @@ group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 62430
+leaning = "right"
 doc = "Taxable income at which the Scottish advanced rate starts"
 range = [0, 10000000]
 
@@ -309,6 +325,7 @@ group = "Scottish income tax"
 type = "real"
 unit = "1"
 default = 0.48
+leaning = "left"
 doc = "Scottish income tax top rate"
 range = [0, 1]
 
@@ -318,6 +335,7 @@ group = "Scottish income tax"
 type = "money"
 unit = "GBP/year/household"
 default = 125140
+leaning = "right"
 doc = "Taxable income at which the Scottish top rate starts"
 range = [0, 10000000]
 
@@ -327,6 +345,7 @@ group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 12584
+leaning = "right"
 doc = "Employee National Insurance primary threshold: £242 a week x 52"
 range = [0, 100000]
 
@@ -336,6 +355,7 @@ group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 50284
+leaning = "left"
 doc = "Upper earnings limit: £967 a week x 52"
 range = [0, 1000000]
 
@@ -345,6 +365,7 @@ group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.08
+leaning = "left"
 doc = "Employee National Insurance main rate"
 range = [0, 1]
 
@@ -354,6 +375,7 @@ group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.02
+leaning = "left"
 doc = "Employee National Insurance rate above the upper earnings limit"
 range = [0, 1]
 
@@ -363,6 +385,7 @@ group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 9100
+leaning = "right"
 doc = "Employer National Insurance secondary threshold: £175 a week x 52"
 range = [0, 100000]
 
@@ -372,6 +395,7 @@ group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.138
+leaning = "left"
 doc = "Employer National Insurance rate"
 range = [0, 1]
 
@@ -381,6 +405,7 @@ group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 12570
+leaning = "right"
 doc = "Self-employed Class 4 lower profits limit"
 range = [0, 100000]
 
@@ -390,6 +415,7 @@ group = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 default = 50270
+leaning = "left"
 doc = "Self-employed Class 4 upper profits limit"
 range = [0, 1000000]
 
@@ -399,6 +425,7 @@ group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.06
+leaning = "left"
 doc = "Class 4 main rate"
 range = [0, 1]
 
@@ -408,6 +435,7 @@ group = "National Insurance"
 type = "real"
 unit = "1"
 default = 0.02
+leaning = "left"
 doc = "Class 4 rate above the upper profits limit"
 range = [0, 1]
 
@@ -417,6 +445,7 @@ group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 1331.20
+leaning = "left"
 doc = "Child Benefit for the eldest child: £25.60 a week x 52"
 range = [0, 10000]
 
@@ -426,6 +455,7 @@ group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 881.40
+leaning = "left"
 doc = "Child Benefit for each other child: £16.95 a week x 52"
 range = [0, 10000]
 
@@ -435,6 +465,7 @@ group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 60000
+leaning = "right"
 doc = "Income at which the High Income Child Benefit Charge starts"
 range = [0, 1000000]
 
@@ -444,6 +475,7 @@ group = "Child Benefit"
 type = "money"
 unit = "GBP/year/household"
 default = 20000
+leaning = "right"
 doc = "Income over which the charge rises to the whole benefit"
 range = [1, 1000000]
 
@@ -453,6 +485,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 311.68
+leaning = "left"
 doc = "UC standard allowance, single under 25"
 range = [0, 10000]
 
@@ -462,6 +495,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 393.45
+leaning = "left"
 doc = "UC standard allowance, single 25 or over"
 range = [0, 10000]
 
@@ -471,6 +505,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 489.23
+leaning = "left"
 doc = "UC standard allowance, couple both under 25"
 range = [0, 10000]
 
@@ -480,6 +515,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 617.60
+leaning = "left"
 doc = "UC standard allowance, couple one or both 25 or over"
 range = [0, 10000]
 
@@ -489,6 +525,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 287.92
+leaning = "left"
 doc = "UC child element"
 range = [0, 10000]
 
@@ -498,6 +535,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 333.33
+leaning = "left"
 doc = "UC child element for a first child born before April 2017"
 range = [0, 10000]
 
@@ -507,6 +545,7 @@ group = "Universal Credit"
 type = "money"
 unit = "GBP/month/household"
 default = 673.00
+leaning = "left"
 doc = "UC work allowance with children, no housing costs"
 range = [0, 10000]
 
@@ -516,6 +555,7 @@ group = "Universal Credit"
 type = "real"
 unit = "1"
 default = 0.55
+leaning = "right"
 doc = "UC taper: entitlement lost per pound of net earnings above the work allowance"
 range = [0, 1]
 
@@ -525,6 +565,7 @@ group = "Universal Credit"
 type = "int"
 unit = "1"
 default = 2
+leaning = "left"
 doc = "Children who attract the UC child element (the two-child limit)"
 range = [0, 20]
 
@@ -534,6 +575,7 @@ group = "Pensions"
 type = "int"
 unit = "1"
 default = 66
+leaning = "right"
 doc = "State Pension age"
 range = [55, 75]
 

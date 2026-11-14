@@ -80,6 +80,16 @@ def main() -> int:
             print("res://tests/second_model.gd failed", file=sys.stderr)
             return 1
         print(second.stdout.strip().splitlines()[-1])
+        # Stage S5.4: a bill voted down by a coalition, through the interface.
+        bill = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/bill_vote.gd",
+             "--", "--scenario=models/uk/scenarios/early_election.toml"],
+            capture_output=True, text=True, timeout=900)
+        if bill.returncode != 0:
+            print(bill.stdout.strip()[-2000:], bill.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/bill_vote.gd failed", file=sys.stderr)
+            return 1
+        print(bill.stdout.strip().splitlines()[-1])
         # The UK's budget screen, as the player reads it, against the 2024 public finances.
         dump, breakdowns = folder / "uk_budget.csv", folder / "uk_breakdowns.tsv"
         uk = subprocess.run(

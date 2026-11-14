@@ -247,6 +247,47 @@ margin fits exactly (before rounding) and the others more closely the more passe
 are; a cell with no pairs or a zero target cannot be met and is skipped. Only
 multiplications and divisions are used, so every machine gives the same weights.
 
+## Bills (stage S5.4)
+
+A model may have a legislature that votes on the player's policy changes:
+
+```toml
+[legislature]
+seats = "seats"            # a state of whole numbers with one dimension, the blocs
+governing = "governing"    # a true/false state over the same dimension
+position = "bloc_position" # a real parameter over the same dimension: left below zero
+
+[lever.basic_rate]
+leaning = "left"           # raising it moves policy to the left; "right" for the opposite
+```
+
+A lever's `leaning` is `"left"` or `"right"`; a true/false lever has none. In part 1 of a
+step (engine contract, section 3), each lever change scheduled for the step is taken in
+the order the commands list them (for one lever in one step the last command wins, in the
+place of the first). If the model has a legislature, the lever has a leaning, and the
+value the change would store differs from the lever's current value, the change is a
+**bill** and is voted on:
+
+1. The move is to the **left** if the value rises and the lever leans left, or falls and
+   it leans right; otherwise it is to the right.
+2. The **leader** is the governing bloc with the most seats (the first of the dimension on
+   a tie); with no governing bloc there is none.
+3. A bloc votes for the bill if it is the leader, or if its position is below zero and the
+   move is to the left, or above zero and the move is to the right. The others vote
+   against. Seats, governing and positions are read at their start-of-step values.
+4. The bill **passes** if twice the seats of the blocs voting for it exceed the seats of
+   all blocs (whole numbers, exactly). A bill that passes is applied, and its value then
+   checked against the lever's range as any change is. A defeated bill changes nothing,
+   is not range-checked, and is not an error.
+
+Every vote is kept: the step, the lever, the value it would have stored, the seats for,
+the seats of all blocs, and whether it passed. A model with a legislature adds the
+result `bills_defeated` to each step's results: the number of bills defeated in it. A
+saved game (version 2) keeps each policy change's vote.
+
+So a government with a majority of its own passes every bill; a coalition's partners and
+the opposition vote by their side of politics, and can defeat it.
+
 ## Load-time checks
 
 Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot
@@ -261,7 +302,11 @@ sector held record by record in that entity; a state with both `next` and `rake`
 number from 1 to 1,000, with no margin or a margin with no slot, whose target is not a
 national param, var or state with dimensions, or is a var computed in a later phase;
 `at` with the wrong number of formulas; counts of different units in one margin, or of
-a unit that does not match the target's.
+a unit that does not match the target's. For bills: a `leaning` other than `"left"` or
+`"right"`, or on a true/false lever; a `[legislature]` in format 0, without exactly the
+keys `seats`, `governing` and `position`, naming something that is not a whole-number
+state, a true/false state and a real parameter respectively, each with one dimension, or
+with different dimensions.
 
 ## Not in format 1
 
@@ -286,4 +331,5 @@ band, three slots per household; children by region; households by size, a whole
 target on a range dimension), with aggregates before and after the rake. The hand-worked
 cases of `conformance/rake_cases.toml` (the rake's arithmetic, its skips and rounding, and
 every refusal and run-time error above) are run by both `oracle/tests/test_raking.py` and
-`crates/core/tests/raking.rs`.
+`crates/core/tests/raking.rs`. Likewise `conformance/bill_cases.toml` for bills, run by
+`oracle/tests/test_bills.py` and `crates/core/tests/bills.rs`.
