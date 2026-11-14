@@ -61,3 +61,23 @@ fn damaged_or_foreign_saves_are_refused() {
     let other = Arc::new(load_model(&root().join("conformance/model")).unwrap());
     assert!(matches!(Simulation::resume(other, &bytes), Err(Error::Model(_))), "another model");
 }
+
+#[test]
+fn a_dimensioned_model_resumes_exactly() {
+    // Format 1: dimensioned parameters travel in the save as columns, states as columns.
+    let mut scenario = load_scenario(&root().join("models/cohort/scenarios/base.toml")).unwrap();
+    scenario.params.push(("local_rate".to_string(), toml::Value::Float(0.3)));
+    let model = Arc::new(scenario.model.clone());
+    let mut straight = Simulation::new(Arc::clone(&model), scenario.config()).unwrap();
+    let whole: Vec<_> = (0..24).map(|_| straight.step().unwrap()).collect();
+
+    let mut first = Simulation::new(Arc::clone(&model), scenario.config()).unwrap();
+    for expected in &whole[..10] {
+        assert_eq!(&first.step().unwrap(), expected);
+    }
+    let bytes = first.save();
+    let mut second = Simulation::resume(Arc::clone(&model), &bytes).unwrap();
+    for expected in &whole[10..] {
+        assert_eq!(&second.step().unwrap(), expected);
+    }
+}

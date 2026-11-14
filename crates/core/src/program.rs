@@ -143,6 +143,61 @@ pub enum Op {
     Marginal(R, R, u16),
     /// destination, stream id, one draw per record (`true`) or the national draw
     Rand(R, u32, bool),
+    /// Format 1. destination, source, gather: the value of a dimensioned element at
+    /// `gathers[g][cell]` for each cell of the program's domain.
+    LoadGI(R, Src, u16),
+    LoadGF(R, Src, u16),
+    LoadGB(R, Src, u16),
+    /// destination, coordinate table: `coords[c][cell]`.
+    Coord(R, u16),
+    /// destination, index use: `x[d: e, ...]`.
+    IndexI(R, u16),
+    IndexF(R, u16),
+    IndexB(R, u16),
+    /// destination, sub-program: its result at each cell of this program's domain.
+    LoadSubI(R, u16),
+    LoadSubF(R, u16),
+}
+
+/// Format 1: one fixed dimension of an index, `d: e`.
+#[derive(Clone, Debug)]
+pub struct Fixed {
+    pub dim: String,
+    /// Register holding the coordinate: a member of a range, or a position in a list.
+    pub reg: R,
+    /// Subtracted from the coordinate to give the position: a range's first member, else 0.
+    pub first: i64,
+    pub size: u32,
+    pub stride: u32,
+}
+
+/// Format 1: `x[d: e, ...]` in a program.
+#[derive(Clone, Debug)]
+pub struct IndexUse {
+    pub name: String,
+    pub src: Src,
+    /// Flat offset contributed by the dimensions in scope, per cell of the domain; empty
+    /// when every dimension is fixed.
+    pub base: Vec<u32>,
+    /// The fixed dimensions, in the order written.
+    pub fixed: Vec<Fixed>,
+}
+
+/// Format 1: what happens to a sub-program's column.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SubKind {
+    /// `sum`: each run of `group` consecutive cells becomes one cell.
+    Sum { group: usize },
+    /// `cohort_shift`: cells move one member up along a dimension with this stride and size.
+    Shift { stride: usize, size: usize },
+}
+
+/// Format 1: a program evaluated over `cells` cells before the program that uses it.
+#[derive(Clone, Debug)]
+pub struct Sub {
+    pub kind: SubKind,
+    pub cells: usize,
+    pub prog: Program,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -180,6 +235,11 @@ pub struct Program {
     pub ty: Ty,
     pub aggs: Vec<Agg>,
     pub tables: Vec<TableUse>,
+    /// Format 1: maps from this program's cells to cells of dimensioned elements.
+    pub gathers: Vec<Vec<u32>>,
+    pub coords: Vec<Vec<i64>>,
+    pub indexes: Vec<IndexUse>,
+    pub subs: Vec<Sub>,
 }
 
 impl Program {
@@ -188,6 +248,7 @@ impl Program {
         self.ops.len()
             + self.aggs.iter().map(|a| a.prog.op_count()).sum::<usize>()
             + self.tables.iter().flat_map(|t| t.lows.iter().chain(&t.rates)).map(Program::op_count).sum::<usize>()
+            + self.subs.iter().map(|s| s.prog.op_count()).sum::<usize>()
     }
 }
 

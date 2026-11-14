@@ -48,6 +48,9 @@ pub enum Node {
     Not(Box<Node>),
     Bin(BinOp, Box<Node>, Box<Node>),
     Call(String, Vec<Node>),
+    /// Format 1: `x[d: e, ...]`, a dimensioned element with some dimensions fixed, in the
+    /// order written.
+    Index(String, Vec<(String, Node)>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,7 +62,7 @@ enum Token {
     End,
 }
 
-const OPERATORS: [&str; 13] = ["<=", ">=", "==", "!=", "-", "+", "*", "/", "(", ")", "<", ">", ","];
+const OPERATORS: [&str; 16] = ["<=", ">=", "==", "!=", "-", "+", "*", "/", "(", ")", "<", ">", ",", "[", "]", ":"];
 
 fn tokenize(src: &str) -> Result<Vec<Token>, String> {
     let text: Vec<char> = src.trim_end().chars().collect();
@@ -248,6 +251,27 @@ impl Parser {
                     }
                     return Ok(Node::Call(name, args));
                 }
+                if self.accept_op(&["["]).is_some() {
+                    let mut coords = Vec::new();
+                    loop {
+                        let dim = match self.peek().clone() {
+                            Token::Name(dim) if !matches!(dim.as_str(), "and" | "or" | "not" | "true" | "false") => dim,
+                            _ => return Err("expected a dimension name inside [ ]".to_string()),
+                        };
+                        self.pos += 1;
+                        if self.accept_op(&[":"]).is_none() {
+                            return Err(format!("expected ':' after {dim} inside [ ]"));
+                        }
+                        coords.push((dim, self.expr()?));
+                        if self.accept_op(&["]"]).is_some() {
+                            break;
+                        }
+                        if self.accept_op(&[","]).is_none() {
+                            return Err("expected ',' or ']' inside [ ]".to_string());
+                        }
+                    }
+                    return Ok(Node::Index(name, coords));
+                }
                 Ok(Node::Name(name))
             }
             Token::Op("(") => {
@@ -295,13 +319,42 @@ mod tests {
         assert!(parse("f(1, g(x), -y)").is_ok());
         assert_eq!(parse("1_000").unwrap(), Node::Int(1000));
         assert_eq!(parse("2.5E-1").unwrap(), Node::Real(0.25));
+        assert_eq!(
+            parse("x[sex: female, age: 1 + a]").unwrap(),
+            Node::Index(
+                "x".to_string(),
+                vec![
+                    ("sex".to_string(), Node::Name("female".to_string())),
+                    (
+                        "age".to_string(),
+                        Node::Bin(BinOp::Add, Box::new(Node::Int(1)), Box::new(Node::Name("a".to_string())))
+                    ),
+                ]
+            )
+        );
     }
 
     #[test]
     fn rejections() {
-        for bad in
-            ["", "1 +", "(1", "1 2", "@", "1.", "1e", "9223372036854775808", "1 < 2 < 3", "1 = 1", "and", "f(1,)"]
-        {
+        for bad in [
+            "",
+            "1 +",
+            "(1",
+            "1 2",
+            "@",
+            "1.",
+            "1e",
+            "9223372036854775808",
+            "1 < 2 < 3",
+            "1 = 1",
+            "and",
+            "f(1,)",
+            "x[]",
+            "x[a 1]",
+            "x[a: 1",
+            "x[1: 2]",
+            "x[a: 1,]",
+        ] {
             assert!(parse(bad).is_err(), "{bad:?} should not parse");
         }
     }

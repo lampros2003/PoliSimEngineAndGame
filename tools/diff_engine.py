@@ -3,6 +3,7 @@
     cargo build --release
     python tools/diff_engine.py --count 200
     python tools/diff_engine.py --model models/uk --count 50
+    python tools/diff_engine.py --model models/cohort --count 50
 
 For each scenario both sides must give the same exit code (0 finished, 1 could not
 start, 2 failed part-way) and, unless they could not start, the same CSV byte for byte:
@@ -134,7 +135,7 @@ def make_scenario(rng: random.Random) -> str:
     levers = {name: lever_value(rng, name) for name in LEVERS if rng.random() < 0.2}
     if levers:
         lines += ["[levers]"] + [f"{k} = {toml_value(v)}" for k, v in levers.items()] + [""]
-    for _ in range(rng.choice([0, 0, 1, 2, 3, 6])):
+    for _ in range(rng.choice([0, 0, 1, 2, 3, 6]) if LEVERS else 0):
         names = rng.sample(sorted(LEVERS), rng.choice([1, 1, 2]))
         if rng.random() < 0.02:
             names.append("not_a_lever")

@@ -56,6 +56,8 @@ jobs:
         run: python tools/diff_engine.py --count 150
       - name: Random UK scenarios through oracle and engine
         run: python tools/diff_engine.py --model models/uk --count 60
+      - name: Random format 1 (cohort) scenarios through oracle and engine
+        run: python tools/diff_engine.py --model models/cohort --count 40
 
   client:
     # The game client: build the engine library, let Godot register it, play 60 scripted

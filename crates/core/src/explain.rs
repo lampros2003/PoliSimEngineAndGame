@@ -133,9 +133,10 @@ impl Simulation {
                 _ => false,
             };
             if old {
-                match d.entity {
-                    None => scal[id] = before.scal[id],
-                    Some(_) => cols[id].clone_from(&before.cols[id]),
+                if d.columnar() {
+                    cols[id].clone_from(&before.cols[id]);
+                } else {
+                    scal[id] = before.scal[id];
                 }
             }
         }
@@ -143,7 +144,12 @@ impl Simulation {
     }
 
     fn total_in(&self, id: usize, scal: &[Val], cols: &[Col]) -> Num {
-        match self.model().symbols[id].entity {
+        let d = &self.model().symbols[id];
+        if !d.dims.is_empty() {
+            // Format 1: a dimensioned input is measured by its sum over every cell.
+            return column_total(&cols[id], &vec![1; cols[id].len()]);
+        }
+        match d.entity {
             None => total(&scal[id]),
             Some(entity) => column_total(&cols[id], &self.model().entities[entity].weights),
         }
@@ -163,6 +169,9 @@ impl Simulation {
             step,
             swap,
         };
+        if !model.symbols[id].dims.is_empty() {
+            return None;
+        }
         match model.symbols[id].entity {
             None => vm::eval_scalar(prog, &eval).ok().map(|v| total(&v)),
             Some(entity) => {
@@ -177,6 +186,11 @@ impl Simulation {
         let Some(&id) = model.sym_index.get(name) else { return model_err(format!("unknown name {name:?}")) };
         let d = &model.symbols[id];
         let snaps = &self.snapshots;
+        if !d.dims.is_empty() {
+            return Err(Error::Model(format!(
+                "{name} has dimensions; explanations of dimensioned values are not in format 1"
+            )));
+        }
         if !self.is_tracing() {
             return Err(Error::Model("explanations need tracing to be turned on".to_string()));
         }

@@ -17,8 +17,10 @@
 //! state hash at the time of save  32 bytes
 //! parameter count                 u32
 //!   name                          u16 length + UTF-8
-//!   type                          u8: 0 whole number, 1 real, 2 true/false
-//!   value                         8 bytes (1 byte for true/false)
+//!   type                          u8: 0 whole number, 1 real, 2 true/false;
+//!                                 3, 4, 5 the same for a dimensioned parameter (format 1)
+//!   value                         8 bytes (1 byte for true/false); for types 3 to 5, a u64
+//!                                 count then that many values, in row-major order
 //! value count                     u32, the hashed symbols in hash order
 //!   name                          u16 length + UTF-8
 //!   type                          u8, as above
@@ -40,6 +42,14 @@ const FORMAT: u32 = 0;
 fn put_name(out: &mut Vec<u8>, name: &str) {
     out.extend_from_slice(&(name.len() as u16).to_le_bytes());
     out.extend_from_slice(name.as_bytes());
+}
+
+fn put_column(out: &mut Vec<u8>, column: &Col) {
+    match column {
+        Col::I(c) => c.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
+        Col::F(c) => c.iter().for_each(|v| out.extend_from_slice(&v.to_bits().to_le_bytes())),
+        Col::B(c) => out.extend(c.iter().map(|v| *v as u8)),
+    }
 }
 
 fn put_val(out: &mut Vec<u8>, value: &Val) {
@@ -98,6 +108,16 @@ impl<'a> Reader<'a> {
         Ok(text.to_string())
     }
 
+    /// `count` values of type `tag` (0 whole, 1 real, 2 true/false).
+    fn column(&mut self, tag: u8, count: usize) -> Result<Col> {
+        Ok(match tag {
+            0 => Col::I((0..count).map(|_| self.u64().map(|v| v as i64)).collect::<Result<_>>()?),
+            1 => Col::F((0..count).map(|_| self.u64().map(f64::from_bits)).collect::<Result<_>>()?),
+            2 => Col::B(self.take(count)?.iter().map(|b| *b != 0).collect()),
+            _ => return Err(corrupt()),
+        })
+    }
+
     fn val(&mut self, tag: u8) -> Result<Val> {
         match tag {
             0 => Ok(Val::I(self.u64()? as i64)),
@@ -128,8 +148,21 @@ impl Simulation {
         out.extend_from_slice(&(params.len() as u32).to_le_bytes());
         for (name, value) in params {
             put_name(&mut out, name);
-            out.push(tag(&value));
-            put_val(&mut out, &value);
+            match value {
+                Computed::One(v) => {
+                    out.push(tag(&v));
+                    put_val(&mut out, &v);
+                }
+                Computed::Each(column) => {
+                    out.push(match &column {
+                        Col::I(_) => 3,
+                        Col::F(_) => 4,
+                        Col::B(_) => 5,
+                    });
+                    out.extend_from_slice(&(column.len() as u64).to_le_bytes());
+                    put_column(&mut out, &column);
+                }
+            }
         }
 
         let values = self.persistent();
@@ -150,11 +183,7 @@ impl Simulation {
                     };
                     out.extend_from_slice(&[kind, 1]);
                     out.extend_from_slice(&(column.len() as u64).to_le_bytes());
-                    match &column {
-                        Col::I(c) => c.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
-                        Col::F(c) => c.iter().for_each(|v| out.extend_from_slice(&v.to_bits().to_le_bytes())),
-                        Col::B(c) => out.extend(c.iter().map(|v| *v as u8)),
-                    }
+                    put_column(&mut out, &column);
                 }
             }
         }
@@ -184,7 +213,18 @@ impl Simulation {
         for _ in 0..r.u32()? {
             let name = r.name()?;
             let tag = r.u8()?;
-            params.push((name, r.val(tag)?));
+            let value = match tag {
+                0..=2 => Computed::One(r.val(tag)?),
+                3..=5 => {
+                    let count = usize::try_from(r.u64()?).map_err(|_| corrupt())?;
+                    if count > bytes.len() {
+                        return Err(corrupt());
+                    }
+                    Computed::Each(r.column(tag - 3, count)?)
+                }
+                _ => return Err(corrupt()),
+            };
+            params.push((name, value));
         }
         let mut values = Vec::new();
         for _ in 0..r.u32()? {
@@ -197,21 +237,7 @@ impl Simulation {
             }
             let value = match (shape, tag) {
                 (0, _) if count == 1 => Computed::One(r.val(tag)?),
-                (1, 0) => {
-                    let mut column = Vec::with_capacity(count);
-                    for _ in 0..count {
-                        column.push(r.u64()? as i64);
-                    }
-                    Computed::Each(Col::I(column))
-                }
-                (1, 1) => {
-                    let mut column = Vec::with_capacity(count);
-                    for _ in 0..count {
-                        column.push(f64::from_bits(r.u64()?));
-                    }
-                    Computed::Each(Col::F(column))
-                }
-                (1, 2) => Computed::Each(Col::B(r.take(count)?.iter().map(|b| *b != 0).collect())),
+                (1, 0..=2) => Computed::Each(r.column(tag, count)?),
                 _ => return Err(corrupt()),
             };
             values.push((name, value));

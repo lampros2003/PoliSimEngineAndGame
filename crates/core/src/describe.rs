@@ -86,6 +86,8 @@ impl Catalogue {
             let entity = d.entity.map(|e| model.entities[e].name.clone());
             let row = match (d.kind, &entity) {
                 (Kind::Param, _) => None,
+                // Format 1: dimensioned values are not written cell by cell.
+                _ if !d.dims.is_empty() => None,
                 (_, None) => Some(d.name.clone()),
                 (Kind::Account | Kind::Flow, Some(_)) => Some(format!("{}.total", d.name)),
                 _ => None,

@@ -38,3 +38,18 @@ fn uk_matches_the_oracles_recorded_hashes() {
         assert_eq!(pyfmt::hex(&row.hash), *want, "UK state hash differs from the oracle at step {step}");
     }
 }
+
+#[test]
+fn cohort_matches_the_oracles_recorded_hashes() {
+    // Format 1: dimensions, sums, indexes, coordinates and cohort ageing.
+    let scenario = load_scenario(&root().join("models/cohort/scenarios/base.toml")).unwrap();
+    let recorded = std::fs::read_to_string(root().join("models/cohort/golden/base.hashes.csv")).unwrap();
+    let golden: Vec<&str> = recorded.lines().skip(1).map(|line| line.split(',').nth(1).unwrap()).collect();
+    assert_eq!(golden.len(), 36);
+
+    let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
+    for (step, want) in golden.iter().enumerate() {
+        let row = sim.step().unwrap();
+        assert_eq!(pyfmt::hex(&row.hash), *want, "cohort state hash differs from the oracle at step {step}");
+    }
+}

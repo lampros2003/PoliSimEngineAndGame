@@ -6,7 +6,7 @@
 //! anywhere fails the whole formula.
 
 use crate::model::Entity;
-use crate::program::{Agg, AggKind, Cmp, Col, Op, Program, Rounding, Src, Ty, Val};
+use crate::program::{Agg, AggKind, Cmp, Col, Op, Program, Rounding, Src, SubKind, Ty, Val};
 use crate::rng::uniform;
 
 /// Records per block. Stage S0 measured 64 to 1,024 as equally good.
@@ -60,6 +60,8 @@ impl Regs {
 struct Prepared {
     aggs: Vec<Val>,
     tables: Vec<(Vec<i64>, Vec<f64>)>,
+    /// Format 1: each sub-program's result, one value per cell of this program's domain.
+    subs: Vec<Col>,
 }
 
 fn overflow<T>() -> Check<T> {
@@ -93,7 +95,110 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
     for agg in &prog.aggs {
         aggs.push(eval_agg(agg, cx)?);
     }
-    Ok(Prepared { aggs, tables })
+    let mut subs = Vec::with_capacity(prog.subs.len());
+    for sub in &prog.subs {
+        let column = eval_cells(&sub.prog, sub.cells, cx)?;
+        subs.push(finish_sub(sub.kind, column)?);
+    }
+    Ok(Prepared { aggs, tables, subs })
+}
+
+/// Format 1: evaluates a formula with dimensions for every cell of its domain, in row-major order.
+pub fn eval_cells(prog: &Program, cells: usize, cx: &EvalCtx) -> Check<Col> {
+    let prepared = prepare(prog, cx)?;
+    let mut regs = Regs::new(prog, BLOCK.min(cells.max(1)));
+    let r = prog.result as usize;
+    let mut out = match prog.ty {
+        Ty::Int => Col::I(Vec::with_capacity(cells)),
+        Ty::Real => Col::F(Vec::with_capacity(cells)),
+        Ty::Bool => Col::B(Vec::with_capacity(cells)),
+    };
+    let mut start = 0;
+    while start < cells {
+        let len = BLOCK.min(cells - start);
+        run_block(prog, cx, None, start, len, &mut regs, &prepared)?;
+        match &mut out {
+            Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
+            Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
+            Col::B(v) => v.extend_from_slice(&regs.b[r][..len]),
+        }
+        start += len;
+    }
+    Ok(out)
+}
+
+/// `sum`: runs of `group` cells added one at a time from 0 (whole numbers exactly, only the
+/// total checked) or 0.0. `cohort_shift`: everything one member up along a dimension, the
+/// first member zero and the last keeping its own plus the one below.
+fn finish_sub(kind: SubKind, column: Col) -> Check<Col> {
+    match kind {
+        SubKind::Sum { group } => match column {
+            Col::I(v) => {
+                let mut out = Vec::with_capacity(v.len() / group.max(1));
+                for run in v.chunks(group) {
+                    let total: i128 = run.iter().map(|x| *x as i128).sum();
+                    match i64::try_from(total) {
+                        Ok(t) => out.push(t),
+                        Err(_) => return overflow(),
+                    }
+                }
+                Ok(Col::I(out))
+            }
+            Col::F(v) => Ok(Col::F(
+                v.chunks(group)
+                    .map(|run| {
+                        let mut acc = 0.0f64;
+                        for x in run {
+                            acc += *x;
+                        }
+                        acc
+                    })
+                    .collect(),
+            )),
+            Col::B(_) => internal("sum of true/false values"),
+        },
+        SubKind::Shift { stride, size } => {
+            let at = |c: usize| (c / stride) % size;
+            match column {
+                Col::I(v) => {
+                    let mut out = Vec::with_capacity(v.len());
+                    for c in 0..v.len() {
+                        let p = at(c);
+                        out.push(if size == 1 {
+                            v[c]
+                        } else if p == 0 {
+                            0
+                        } else if p == size - 1 {
+                            match v[c - stride].checked_add(v[c]) {
+                                Some(total) => total,
+                                None => return overflow(),
+                            }
+                        } else {
+                            v[c - stride]
+                        });
+                    }
+                    Ok(Col::I(out))
+                }
+                Col::F(v) => Ok(Col::F(
+                    (0..v.len())
+                        .map(|c| {
+                            let p = at(c);
+                            if size == 1 {
+                                v[c]
+                            } else if p == 0 {
+                                0.0
+                            } else if p == size - 1 {
+                                v[c - stride] + v[c]
+                            } else {
+                                v[c - stride]
+                            }
+                        })
+                        .collect(),
+                )),
+                Col::B(_) => internal("cohort_shift of true/false values"),
+            }
+        }
+    }
 }
 
 /// Evaluates a national formula.
@@ -307,6 +412,76 @@ fn run_block(
             Op::LoadCB(d, src) => match column(cx, src) {
                 Col::B(v) if v.len() >= end => regs.b[d as usize][..len].copy_from_slice(&v[start..end]),
                 _ => return internal("true/false column load"),
+            },
+            Op::LoadGI(d, src, g) => {
+                let map = &prog.gathers[g as usize][start..end];
+                let Col::I(v) = column(cx, src) else { return internal("whole-number gather") };
+                for (d, m) in regs.i[d as usize][..len].iter_mut().zip(map) {
+                    *d = v[*m as usize];
+                }
+            }
+            Op::LoadGF(d, src, g) => {
+                let map = &prog.gathers[g as usize][start..end];
+                let Col::F(v) = column(cx, src) else { return internal("real gather") };
+                for (d, m) in regs.f[d as usize][..len].iter_mut().zip(map) {
+                    *d = v[*m as usize];
+                }
+            }
+            Op::LoadGB(d, src, g) => {
+                let map = &prog.gathers[g as usize][start..end];
+                let Col::B(v) = column(cx, src) else { return internal("true/false gather") };
+                for (d, m) in regs.b[d as usize][..len].iter_mut().zip(map) {
+                    *d = v[*m as usize];
+                }
+            }
+            Op::Coord(d, c) => regs.i[d as usize][..len].copy_from_slice(&prog.coords[c as usize][start..end]),
+            Op::IndexI(d, u) | Op::IndexF(d, u) | Op::IndexB(d, u) => {
+                let usage = &prog.indexes[u as usize];
+                let mut flats = vec![0usize; len];
+                if !usage.base.is_empty() {
+                    for (f, b) in flats.iter_mut().zip(&usage.base[start..end]) {
+                        *f = *b as usize;
+                    }
+                }
+                for fixed in &usage.fixed {
+                    let coords = &regs.i[fixed.reg as usize][..len];
+                    for (f, v) in flats.iter_mut().zip(coords) {
+                        let pos = v.checked_sub(fixed.first).filter(|p| (0..fixed.size as i64).contains(p));
+                        let Some(pos) = pos else {
+                            return Err(format!(
+                                "{}[{}: {v}]: {} has no such member",
+                                usage.name, fixed.dim, fixed.dim
+                            ));
+                        };
+                        *f += pos as usize * fixed.stride as usize;
+                    }
+                }
+                match (op, column(cx, usage.src)) {
+                    (Op::IndexI(..), Col::I(v)) => {
+                        for (d, f) in regs.i[d as usize][..len].iter_mut().zip(&flats) {
+                            *d = v[*f];
+                        }
+                    }
+                    (Op::IndexF(..), Col::F(v)) => {
+                        for (d, f) in regs.f[d as usize][..len].iter_mut().zip(&flats) {
+                            *d = v[*f];
+                        }
+                    }
+                    (Op::IndexB(..), Col::B(v)) => {
+                        for (d, f) in regs.b[d as usize][..len].iter_mut().zip(&flats) {
+                            *d = v[*f];
+                        }
+                    }
+                    _ => return internal("index of another type"),
+                }
+            }
+            Op::LoadSubI(d, k) => match &prepared.subs[k as usize] {
+                Col::I(v) => regs.i[d as usize][..len].copy_from_slice(&v[start..end]),
+                _ => return internal("sub-program type"),
+            },
+            Op::LoadSubF(d, k) => match &prepared.subs[k as usize] {
+                Col::F(v) => regs.f[d as usize][..len].copy_from_slice(&v[start..end]),
+                _ => return internal("sub-program type"),
             },
             Op::LoadAggI(d, k) => match prepared.aggs[k as usize] {
                 Val::I(v) => regs.i[d as usize][..len].fill(v),

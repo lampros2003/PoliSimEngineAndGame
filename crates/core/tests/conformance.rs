@@ -1,4 +1,5 @@
-//! Every line of conformance/cases.tsv must evaluate to what the oracle recorded:
+//! Every line of conformance/cases.tsv and conformance/format1.tsv must evaluate to what
+//! the oracle recorded:
 //! the same value bit for bit, or the same kind of refusal.
 
 use std::path::PathBuf;
@@ -29,17 +30,27 @@ fn encode(value: Computed) -> String {
 #[test]
 fn engine_reproduces_every_recorded_case() {
     // Seed and warm-up steps are those of tools/gen_conformance.py.
-    let model = Arc::new(load_model(&root().join("conformance/model")).unwrap());
-    let config = RunConfig { seed: 20261114, preset: "central".to_string(), ..Default::default() };
+    check_corpus("conformance/model", 20261114, "conformance/cases.tsv", 3000);
+}
+
+#[test]
+fn engine_reproduces_every_recorded_format1_case() {
+    // Seed and warm-up steps are those of tools/gen_conformance_format1.py.
+    check_corpus("models/cohort", 1, "conformance/format1.tsv", 900);
+}
+
+fn check_corpus(model: &str, seed: u64, corpus: &str, at_least: usize) {
+    let model = Arc::new(load_model(&root().join(model)).unwrap());
+    let config = RunConfig { seed, preset: "central".to_string(), ..Default::default() };
     let mut sim = Simulation::new(model, config).unwrap();
     for _ in 0..3 {
         sim.step().unwrap();
     }
 
-    let text = std::fs::read_to_string(root().join("conformance/cases.tsv")).unwrap();
+    let text = std::fs::read_to_string(root().join(corpus)).unwrap();
     let mut lines: Vec<&str> = text.split('\n').collect();
     assert_eq!(lines.pop(), Some(""));
-    assert!(lines.len() > 3000);
+    assert!(lines.len() > at_least);
     let mut mismatches = Vec::new();
     for (number, line) in lines.iter().enumerate() {
         let fields: Vec<&str> = line.split('\t').collect();

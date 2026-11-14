@@ -144,7 +144,7 @@ fn schedule(commands: Vec<(u64, String, Value)>) -> BTreeMap<u64, Vec<(String, V
 /// Where parameter values come from: a scenario's preset and overrides, or a save file.
 pub(crate) enum Params {
     Scenario { preset: String, overrides: Vec<(String, Value)> },
-    Resolved(Vec<(String, Val)>),
+    Resolved(Vec<(String, Computed)>),
 }
 
 impl Simulation {
@@ -196,24 +196,55 @@ impl Simulation {
                 Kind::Param => {
                     let what = format!("param {}", d.name);
                     if let Some(values) = &mut resolved {
+                        let cells = m.cell_count(&d.dims);
                         let value = match values
                             .iter()
                             .position(|(name, _)| *name == d.name)
                             .map(|i| values.remove(i).1)
                         {
-                            Some(value) if type_of(&value) == d.ty => value,
+                            Some(Computed::One(value)) if d.dims.is_empty() && type_of(&value) == d.ty => {
+                                Computed::One(value)
+                            }
+                            Some(Computed::Each(column))
+                                if !d.dims.is_empty()
+                                    && column.len() == cells
+                                    && matches!(
+                                        (&column, d.ty),
+                                        (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool)
+                                    ) =>
+                            {
+                                Computed::Each(column)
+                            }
                             _ => return model_err(format!("{what}: missing from the save file or of the wrong type")),
                         };
-                        simulation.store(id, Computed::One(value))?;
+                        simulation.store(id, value)?;
                         continue;
                     }
                     let given = overrides.iter().position(|(name, _)| *name == d.name).map(|i| overrides.remove(i).1);
+                    if given.is_none() && !d.dims.is_empty() && d.spec.get("data").is_some() {
+                        // Format 1: a column of the data file, one per preset if so declared.
+                        let column = match d.spec.get("columns") {
+                            Some(Value::Table(columns)) => match columns.get(&preset).and_then(Value::as_str) {
+                                Some(c) => c.to_string(),
+                                None => return model_err(format!("{what}: no column for the {preset:?} preset")),
+                            },
+                            _ => d.spec.get("column").and_then(Value::as_str).unwrap_or("value").to_string(),
+                        };
+                        let texts = d.data_column(&column).expect("read by the loader");
+                        let column = text_column(texts, d, minor, &what)?;
+                        simulation.store(id, Computed::Each(column))?;
+                        continue;
+                    }
                     let raw = match given.as_ref().or_else(|| d.spec.get("value")).or_else(|| d.spec.get(&preset)) {
                         Some(raw) => raw,
                         None => return model_err(format!("{what}: no 'value' and no {preset:?} preset")),
                     };
                     let value = convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?;
-                    simulation.store(id, Computed::One(value))?;
+                    if d.dims.is_empty() {
+                        simulation.store(id, Computed::One(value))?;
+                    } else {
+                        simulation.store(id, Computed::Each(Col::filled(value, m.cell_count(&d.dims))))?;
+                    }
                 }
                 Kind::Column => {
                     let entity = &m.entities[d.entity.expect("columns belong to an entity")];
@@ -265,7 +296,7 @@ impl Simulation {
         for (id, d) in m.symbols.iter().enumerate() {
             let Some(expr) = &d.expr else { continue };
             let label = format!("{} {}{}", d.kind.name(), d.name, if d.kind == Kind::State { " (next)" } else { "" });
-            let compiled = compile_formula(m, expr, d.entity, d.ty, &d.unit, &label)?;
+            let compiled = compile_formula(m, expr, d.entity, &d.dims, d.ty, &d.unit, &label)?;
             for &lagged in &compiled.lagged {
                 simulation.lagged[lagged] = true;
             }
@@ -303,7 +334,7 @@ impl Simulation {
         simulation.hashed.sort_by(|a, b| m.symbols[*a].name.cmp(&m.symbols[*b].name));
 
         for (id, d) in m.symbols.iter().enumerate() {
-            if d.kind == Kind::Param {
+            if d.kind == Kind::Param || !d.dims.is_empty() {
                 continue;
             }
             if d.entity.is_none() {
@@ -345,6 +376,15 @@ impl Simulation {
         let minor = self.model.minor;
         let what = format!("{} {} initial", d.kind.name(), d.name);
         let Some(raw) = &d.initial else { return model_err(format!("{what}: missing")) };
+        if !d.dims.is_empty() {
+            if let Value::Table(table) = raw {
+                let column = table.get("column").and_then(Value::as_str).unwrap_or("value");
+                let texts = d.data_column(column).expect("read by the loader");
+                return Ok(Computed::Each(text_column(texts, d, minor, &what)?));
+            }
+            let value = convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?;
+            return Ok(Computed::Each(Col::filled(value, self.model.cell_count(&d.dims))));
+        }
         let Some(entity) = d.entity else {
             return Ok(Computed::One(convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?));
         };
@@ -440,7 +480,7 @@ impl Simulation {
     fn remember(&mut self) {
         for id in 0..self.lagged.len() {
             if self.lagged[id] {
-                if self.model.symbols[id].entity.is_none() {
+                if !self.model.symbols[id].columnar() {
                     self.prev_scal[id] = self.scal[id];
                 } else {
                     self.prev_cols[id].clone_from(&self.cols[id]);
@@ -466,6 +506,10 @@ impl Simulation {
         let d = &self.model.symbols[id];
         let prog = self.progs[id].as_ref().expect("planned symbols have a program");
         let named = |message: String| Error::Sim(format!("{} {}: {message}", d.kind.name(), d.name));
+        if !d.dims.is_empty() {
+            let cells = self.model.cell_count(&d.dims);
+            return vm::eval_cells(prog, cells, &self.ctx()).map(Computed::Each).map_err(named);
+        }
         match d.entity {
             None => vm::eval_scalar(prog, &self.ctx()).map(Computed::One).map_err(named),
             Some(entity) => vm::eval_column(prog, entity, &self.ctx()).map(Computed::Each).map_err(named),
@@ -687,13 +731,13 @@ impl Simulation {
     /// Current per-record values of a symbol.
     pub fn column(&self, name: &str) -> Option<&Col> {
         let id = *self.model.sym_index.get(name)?;
-        self.model.symbols[id].entity.map(|_| &self.cols[id])
+        self.model.symbols[id].columnar().then(|| &self.cols[id])
     }
 
     /// Current national value of a symbol.
     pub fn scalar(&self, name: &str) -> Option<Val> {
         let id = *self.model.sym_index.get(name)?;
-        if self.model.symbols[id].entity.is_some() {
+        if self.model.symbols[id].columnar() {
             return None;
         }
         Some(self.scal[id])
@@ -713,7 +757,7 @@ impl Simulation {
             },
         };
         let unit = Unit::parse(unit).map_err(Error::Formula)?;
-        let compiled = compile_formula(&self.model, src, ctx, ty, &unit, "evaluate")?;
+        let compiled = compile_formula(&self.model, src, ctx, &[], ty, &unit, "evaluate")?;
         let cx = EvalCtx { prev_scal: &self.scal, prev_cols: &self.cols, ..self.ctx() };
         match ctx {
             None => vm::eval_scalar(&compiled.prog, &cx).map(Computed::One).map_err(Error::Sim),
@@ -794,9 +838,10 @@ impl Simulation {
     }
 
     fn value_now(&self, id: usize) -> Computed {
-        match self.model.symbols[id].entity {
-            None => Computed::One(self.scal[id]),
-            Some(_) => Computed::Each(self.cols[id].clone()),
+        if self.model.symbols[id].columnar() {
+            Computed::Each(self.cols[id].clone())
+        } else {
+            Computed::One(self.scal[id])
         }
     }
 
@@ -812,18 +857,14 @@ impl Simulation {
     }
 
     /// Current parameter values, in declaration order.
-    pub(crate) fn params(&self) -> Vec<(&str, Val)> {
+    pub(crate) fn params(&self) -> Vec<(&str, Computed)> {
         let symbols = self.model.symbols.iter().enumerate();
-        symbols.filter(|(_, d)| d.kind == Kind::Param).map(|(id, d)| (d.name.as_str(), self.scal[id])).collect()
+        symbols.filter(|(_, d)| d.kind == Kind::Param).map(|(id, d)| (d.name.as_str(), self.value_now(id))).collect()
     }
 
     /// The persistent state: every hashed symbol with its value(s), in hash order.
     pub(crate) fn persistent(&self) -> Vec<(&str, Computed)> {
-        let value = |id: usize| match self.model.symbols[id].entity {
-            None => Computed::One(self.scal[id]),
-            Some(_) => Computed::Each(self.cols[id].clone()),
-        };
-        self.hashed.iter().map(|id| (self.model.symbols[*id].name.as_str(), value(*id))).collect()
+        self.hashed.iter().map(|id| (self.model.symbols[*id].name.as_str(), self.value_now(*id))).collect()
     }
 
     /// Overwrites the persistent state from a save. `values` must list the hashed symbols
@@ -835,10 +876,14 @@ impl Simulation {
         }
         for (id, (name, value)) in hashed.into_iter().zip(values) {
             let d = &self.model.symbols[id];
-            let fits_declaration = match (&value, d.entity) {
-                (Computed::One(v), None) => type_of(v) == d.ty,
-                (Computed::Each(column), Some(entity)) => {
-                    column.len() == self.model.entities[entity].len()
+            let cells = match d.entity {
+                Some(entity) => self.model.entities[entity].len(),
+                None => self.model.cell_count(&d.dims),
+            };
+            let fits_declaration = match &value {
+                Computed::One(v) => !d.columnar() && type_of(v) == d.ty,
+                Computed::Each(column) if d.columnar() => {
+                    column.len() == cells
                         && matches!(
                             (column, d.ty),
                             (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool)
@@ -866,7 +911,7 @@ impl Simulation {
             let d = &self.model.symbols[id];
             digest.update(d.name.as_bytes());
             digest.update([0u8]);
-            if d.entity.is_none() {
+            if !d.columnar() {
                 match self.scal[id] {
                     Val::I(v) => digest.update(v.to_le_bytes()),
                     Val::F(v) => digest.update(v.to_bits().to_le_bytes()),

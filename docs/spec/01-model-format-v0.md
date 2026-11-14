@@ -171,5 +171,5 @@ phase; formulas within a phase depend on each other in a circle; something read 
 ## Planned, not in format 0
 
 Patches (`[[patch]]` entries that edit one named element of another model), multiple
-namespaces, dimensions such as region and industry, further table kinds, and native
-operators.
+namespaces, further table kinds, and native operators. Dimensions such as age, region and
+industry, with sums over them and cohort ageing, are [format 1](06-model-format-1.md).

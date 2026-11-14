@@ -39,13 +39,14 @@ All integers are little-endian. Text is UTF-8 preceded by its length in bytes as
 | steps completed | `u64` |
 | state hash | 32 bytes |
 | parameter count | `u32` |
-| each parameter | name (text), type (`u8`), value |
+| each parameter | name (text), type (`u8`), value; a dimensioned parameter (format 1 models) has type 3, 4 or 5 (whole, real, true/false), then a count (`u64`) and that many values in row-major order |
 | value count | `u32` |
 | each value | name (text), type (`u8`), shape (`u8`), count (`u64`), then `count` values |
 
 Type is 0 for a whole number, 1 for a real, 2 for true/false. Shape is 0 for one national
-value (count is 1) and 1 for one value per record. A whole number is 8 bytes two's
-complement, a real is the 8 bytes of its IEEE 754 pattern, true/false is one byte.
+value (count is 1) and 1 for one value per record, or per cell of a dimensioned value in
+row-major order. A whole number is 8 bytes two's complement, a real is the 8 bytes of its
+IEEE 754 pattern, true/false is one byte.
 
 ## Loading
 

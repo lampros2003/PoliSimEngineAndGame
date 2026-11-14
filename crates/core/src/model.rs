@@ -3,7 +3,7 @@
 //! A port of oracle/polisim_oracle/model.py. Formulas are compiled later, by the
 //! simulation.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -36,8 +36,23 @@ pub const FUNCTIONS: [&str; 17] = [
     "wsum",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 12] =
-    ["model", "sector", "instrument", "entity", "stream", "table", "param", "lever", "var", "state", "flow", "account"];
+const SECTIONS: [&str; 13] = [
+    "model",
+    "dim",
+    "sector",
+    "instrument",
+    "entity",
+    "stream",
+    "table",
+    "param",
+    "lever",
+    "var",
+    "state",
+    "flow",
+    "account",
+];
+/// Format 1: the most cells one value may have.
+pub const MAX_CELLS: usize = 16_777_216;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -83,6 +98,51 @@ pub struct Decl {
     pub initial: Option<Value>,
     pub range: Option<(f64, f64)>,
     pub spec: Toml,
+    /// Format 1: one value per cell of these dimensions (indices into `Model::dims`).
+    pub dims: Vec<usize>,
+    /// Format 1: a dimensioned parameter's or initial value's CSV columns, as text per cell
+    /// in row-major order.
+    pub data: Vec<(String, Vec<String>)>,
+}
+
+impl Decl {
+    /// Held as a column: one value per record of an entity, or per cell of its dimensions.
+    pub fn columnar(&self) -> bool {
+        self.entity.is_some() || !self.dims.is_empty()
+    }
+
+    pub fn data_column(&self, name: &str) -> Option<&[String]> {
+        self.data.iter().find(|(n, _)| n == name).map(|(_, cells)| cells.as_slice())
+    }
+}
+
+/// Format 1: a named, ordered set of members.
+#[derive(Clone, Debug)]
+pub struct Dim {
+    pub name: String,
+    /// `Some(first)` for a range of whole numbers, `None` for a list of names.
+    pub first: Option<i64>,
+    /// Member names of a list; members of a range as text.
+    pub members: Vec<String>,
+    pub labels: Vec<String>,
+}
+
+impl Dim {
+    pub fn size(&self) -> usize {
+        self.members.len()
+    }
+
+    /// Position of a member written in a data file.
+    pub fn position(&self, text: &str) -> Option<usize> {
+        match self.first {
+            Some(first) => {
+                let value: i64 = text.parse().ok()?;
+                let pos = value.checked_sub(first)?;
+                (0..self.size() as i64).contains(&pos).then_some(pos as usize)
+            }
+            None => self.members.iter().position(|m| m == text),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -172,9 +232,18 @@ pub struct Model {
     pub sym_index: HashMap<String, usize>,
     pub table_index: HashMap<String, usize>,
     pub entity_index: HashMap<String, usize>,
+    /// Format 1: dimensions in declaration order.
+    pub dims: Vec<Dim>,
+    pub dim_index: HashMap<String, usize>,
+    pub format: i64,
 }
 
 impl Model {
+    /// Number of cells of a list of dimensions (1 for none).
+    pub fn cell_count(&self, dims: &[usize]) -> usize {
+        dims.iter().map(|d| self.dims[*d].size()).product()
+    }
+
     pub fn stream_id(&self, name: &str) -> Option<u32> {
         self.streams.iter().find(|(n, _)| n == name).map(|(_, id)| *id)
     }
@@ -484,6 +553,12 @@ fn relative_name(path: &str) -> String {
 
 struct Loader {
     minor: i64,
+    format: i64,
+    root: PathBuf,
+    dims: Vec<Dim>,
+    dim_index: HashMap<String, usize>,
+    /// Data files of dimensioned elements, by path as written: parsed rows and bytes.
+    cell_files: BTreeMap<String, (Vec<Vec<String>>, Vec<u8>)>,
     phases: Vec<String>,
     symbols: Vec<Decl>,
     sym_index: HashMap<String, usize>,
@@ -523,6 +598,148 @@ impl Loader {
                 None => model_err(format!("{what}: unknown entity {}", value.to_string_lossy())),
             },
         }
+    }
+
+    /// Format 1: the `dims` of an element, checked.
+    fn dims_of(&self, spec: &Toml, kind: Kind, what: &str) -> Result<Vec<usize>> {
+        let Some(value) = spec.get("dims") else { return Ok(Vec::new()) };
+        if self.format != 1 {
+            return model_err(format!("{what}: dimensions need format = 1"));
+        }
+        if !matches!(kind, Kind::Param | Kind::Var | Kind::State) {
+            return model_err(format!("{what}: a {} cannot have dimensions in format 1", kind.name()));
+        }
+        if spec.get("entity").is_some() {
+            return model_err(format!("{what}: an element cannot have both an entity and dimensions"));
+        }
+        let names: Vec<&str> = match value {
+            Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
+            _ => Vec::new(),
+        };
+        let mut dims = Vec::new();
+        for name in &names {
+            match self.dim_index.get(*name) {
+                Some(index) if !dims.contains(index) => dims.push(*index),
+                _ => return model_err(format!("{what}: 'dims' must list declared dimensions, each once")),
+            }
+        }
+        if dims.is_empty() || dims.len() != value.as_array().map_or(0, Vec::len) {
+            return model_err(format!("{what}: 'dims' must list declared dimensions, each once"));
+        }
+        let mut cells: usize = 1;
+        for d in &dims {
+            cells = cells.saturating_mul(self.dims[*d].size());
+        }
+        if cells > MAX_CELLS {
+            return model_err(format!("{what}: more than {MAX_CELLS} cells"));
+        }
+        Ok(dims)
+    }
+
+    /// Format 1: the named columns of a data file, as text per cell in row-major order of `dims`.
+    fn cell_data(
+        &mut self,
+        dims: &[usize],
+        file: &str,
+        columns: &[String],
+        what: &str,
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        if !self.cell_files.contains_key(file) {
+            let path = self.root.join(file);
+            let Ok(bytes) = std::fs::read(&path) else {
+                return model_err(format!("{what}: data file {file} not found"));
+            };
+            let rows = parse_csv(&String::from_utf8_lossy(&bytes));
+            self.cell_files.insert(file.to_string(), (rows, bytes));
+        }
+        let rows = &self.cell_files[file].0;
+        let Some(header) = rows.first() else { return model_err(format!("{what}: {file} is empty")) };
+        let find = |name: &str| header.iter().position(|h| h == name);
+        let mut dim_cols = Vec::new();
+        for d in dims {
+            match find(&self.dims[*d].name) {
+                Some(i) => dim_cols.push(i),
+                None => return model_err(format!("{what}: {file} has no column {:?}", self.dims[*d].name)),
+            }
+        }
+        let mut value_cols = Vec::new();
+        for c in columns {
+            match find(c) {
+                Some(i) => value_cols.push(i),
+                None => return model_err(format!("{what}: {file} has no column {c:?}")),
+            }
+        }
+        let mut strides = vec![1usize; dims.len()];
+        for k in (0..dims.len().saturating_sub(1)).rev() {
+            strides[k] = strides[k + 1] * self.dims[dims[k + 1]].size();
+        }
+        let count: usize = dims.iter().map(|d| self.dims[*d].size()).product();
+        let mut out: Vec<Vec<Option<String>>> = vec![vec![None; count]; columns.len()];
+        for row in &rows[1..] {
+            let mut flat = 0;
+            for (k, d) in dims.iter().enumerate() {
+                let text = row.get(dim_cols[k]).map(|t| t.trim()).unwrap_or("");
+                match self.dims[*d].position(text) {
+                    Some(pos) => flat += pos * strides[k],
+                    None => {
+                        return model_err(format!(
+                            "{what}: {file}: {text:?} is not a member of {}",
+                            self.dims[*d].name
+                        ));
+                    }
+                }
+            }
+            if out[0][flat].is_some() {
+                return model_err(format!("{what}: {file}: a cell appears twice"));
+            }
+            for (j, col) in value_cols.iter().enumerate() {
+                out[j][flat] = Some(row.get(*col).cloned().unwrap_or_default());
+            }
+        }
+        let mut result = Vec::new();
+        for (j, c) in columns.iter().enumerate() {
+            let mut cells = Vec::with_capacity(count);
+            for cell in &out[j] {
+                match cell {
+                    Some(text) => cells.push(text.clone()),
+                    None => return model_err(format!("{what}: {file}: some cells are missing")),
+                }
+            }
+            result.push((c.clone(), cells));
+        }
+        Ok(result)
+    }
+
+    /// Format 1: reads the CSV behind a dimensioned parameter or initial value.
+    fn data_for(
+        &mut self,
+        kind: Kind,
+        dims: &[usize],
+        spec: &Toml,
+        initial: Option<&Value>,
+        what: &str,
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        if dims.is_empty() {
+            return Ok(Vec::new());
+        }
+        if kind == Kind::Param {
+            if let Some(file) = spec.get("data") {
+                let Some(file) = file.as_str() else { return model_err(format!("{what}: 'data' must be a path")) };
+                let columns: Vec<String> = match spec.get("columns") {
+                    Some(Value::Table(t)) => t.values().filter_map(|v| v.as_str().map(str::to_string)).collect(),
+                    _ => vec![text_of(spec, "column").unwrap_or("value").to_string()],
+                };
+                return self.cell_data(dims, file, &columns, what);
+            }
+            return Ok(Vec::new());
+        }
+        if let Some(Value::Table(t)) = initial {
+            if let Some(file) = t.get("data").and_then(Value::as_str) {
+                let column = text_of(t, "column").unwrap_or("value").to_string();
+                return self.cell_data(dims, file, &[column], what);
+            }
+        }
+        Ok(Vec::new())
     }
 
     fn unit_or_one(&self, spec: &Toml, what: &str, ty: Ty) -> Result<Unit> {
@@ -575,8 +792,71 @@ pub fn load_model(path: &Path) -> Result<Model> {
     }
 
     let head = &merged[0];
-    if head.get("format").and_then(Value::as_integer) != Some(0) {
-        return model_err("this loader reads model format 0 only");
+    let format = match head.get("format").and_then(Value::as_integer) {
+        Some(f @ (0 | 1)) => f,
+        _ => return model_err("this loader reads model formats 0 and 1"),
+    };
+    if format == 0 && !merged[section("dim")].is_empty() {
+        return model_err("dimensions need format = 1");
+    }
+    let mut dims: Vec<Dim> = Vec::new();
+    let mut dim_index: HashMap<String, usize> = HashMap::new();
+    for (name, spec) in &merged[section("dim")] {
+        let what = format!("dim {name}");
+        let spec = table_of(spec, &what)?;
+        let usable = |n: &str| {
+            let mut chars = n.chars();
+            chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !FUNCTIONS.contains(&n)
+                && !KEYWORDS.contains(&n)
+        };
+        if !usable(name) {
+            return model_err(format!("{what}: not a usable name"));
+        }
+        let (first, members) = match (spec.get("range"), spec.get("members")) {
+            (Some(Value::Array(range)), None) => {
+                let ends: Vec<i64> = range.iter().filter_map(Value::as_integer).collect();
+                match ends.as_slice() {
+                    [lo, hi] if range.len() == 2 && lo <= hi => {
+                        if hi - lo >= 1_000_000 {
+                            return model_err(format!("{what}: more than 1,000,000 members"));
+                        }
+                        (Some(*lo), (*lo..=*hi).map(|v| v.to_string()).collect::<Vec<_>>())
+                    }
+                    _ => {
+                        return model_err(format!(
+                            "{what}: 'range' must be [first, last], whole numbers, first <= last"
+                        ));
+                    }
+                }
+            }
+            (None, Some(Value::Array(list))) => {
+                let names: Vec<String> = list.iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
+                if names.is_empty() || names.len() != list.len() || !names.iter().all(|n| usable(n)) {
+                    return model_err(format!("{what}: members must be usable names"));
+                }
+                if (1..names.len()).any(|i| names[..i].contains(&names[i])) {
+                    return model_err(format!("{what}: a member is listed twice"));
+                }
+                if names.len() > 1_000_000 {
+                    return model_err(format!("{what}: more than 1,000,000 members"));
+                }
+                (None, names)
+            }
+            _ => return model_err(format!("{what}: give either 'range' or 'members'")),
+        };
+        let labels: Vec<String> = match spec.get("labels") {
+            Some(Value::Array(l)) => {
+                l.iter().map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string_lossy())).collect()
+            }
+            _ => members.clone(),
+        };
+        if labels.len() != members.len() {
+            return model_err(format!("{what}: one label per member"));
+        }
+        dim_index.insert(name.clone(), dims.len());
+        dims.push(Dim { name: name.clone(), first, members, labels });
     }
     let (Some(id), Some(currency), Some(minor), Some(step), Some(Value::Array(phases))) = (
         text_of(head, "id"),
@@ -681,6 +961,11 @@ pub fn load_model(path: &Path) -> Result<Model> {
     taken.extend(entity_index.keys().cloned());
     let mut loader = Loader {
         minor,
+        format,
+        root: root.clone(),
+        dims,
+        dim_index,
+        cell_files: BTreeMap::new(),
         phases: phases.clone(),
         symbols: Vec::new(),
         sym_index: HashMap::new(),
@@ -711,6 +996,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
                 initial: None,
                 range: None,
                 spec: spec.clone(),
+                dims: Vec::new(),
+                data: Vec::new(),
             })?;
         }
     }
@@ -720,6 +1007,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let spec = table_of(spec, &what)?;
         let (ty, money) = type_of(spec, &what)?;
         let unit = loader.unit_or_one(spec, &what, ty)?;
+        let dims = loader.dims_of(spec, Kind::Param, &what)?;
+        let data = loader.data_for(Kind::Param, &dims, spec, None, &what)?;
         loader.declare(Decl {
             name: name.clone(),
             kind: Kind::Param,
@@ -732,6 +1021,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: None,
             range: range_of(spec, money, loader.minor, &what)?,
             spec: spec.clone(),
+            dims,
+            data,
         })?;
     }
 
@@ -740,6 +1031,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let spec = table_of(spec, &what)?;
         let (ty, money) = type_of(spec, &what)?;
         let Some(default) = spec.get("default") else { return model_err(format!("{what}: missing 'default'")) };
+        loader.dims_of(spec, Kind::Lever, &what)?;
         let unit = loader.unit_or_one(spec, &what, ty)?;
         loader.declare(Decl {
             name: name.clone(),
@@ -753,6 +1045,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: Some(default.clone()),
             range: range_of(spec, money, loader.minor, &what)?,
             spec: spec.clone(),
+            dims: Vec::new(),
+            data: Vec::new(),
         })?;
     }
 
@@ -762,6 +1056,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
         let (ty, money) = type_of(spec, &what)?;
         let Some(expr) = spec.get("expr") else { return model_err(format!("{what}: missing 'expr'")) };
         let unit = loader.unit_or_one(spec, &what, ty)?;
+        let dims = loader.dims_of(spec, Kind::Var, &what)?;
+        let data = loader.data_for(Kind::Var, &dims, spec, spec.get("initial"), &what)?;
         loader.declare(Decl {
             name: name.clone(),
             kind: Kind::Var,
@@ -774,6 +1070,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: spec.get("initial").cloned(),
             range: range_of(spec, money, loader.minor, &what)?,
             spec: spec.clone(),
+            dims,
+            data,
         })?;
     }
 
@@ -785,6 +1083,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             return model_err(format!("{what}: needs both 'initial' and 'next'"));
         };
         let unit = loader.unit_or_one(spec, &what, ty)?;
+        let dims = loader.dims_of(spec, Kind::State, &what)?;
+        let data = loader.data_for(Kind::State, &dims, spec, Some(initial), &what)?;
         loader.declare(Decl {
             name: name.clone(),
             kind: Kind::State,
@@ -797,6 +1097,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: Some(initial.clone()),
             range: range_of(spec, money, loader.minor, &what)?,
             spec: spec.clone(),
+            dims,
+            data,
         })?;
     }
 
@@ -805,6 +1107,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
     for (name, spec) in &merged[section("account")] {
         let what = format!("account {name}");
         let spec = table_of(spec, &what)?;
+        loader.dims_of(spec, Kind::Account, &what)?;
         let (Some(sector), Some(instrument)) =
             (text_of(spec, "sector").and_then(sector_index), text_of(spec, "instrument").and_then(instrument_index))
         else {
@@ -837,6 +1140,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: spec.get("initial").cloned(),
             range: range_of(spec, true, loader.minor, &what)?,
             spec: spec.clone(),
+            dims: Vec::new(),
+            data: Vec::new(),
         })?;
         accounts.push(Account { sym, sector, instrument });
     }
@@ -848,6 +1153,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
     for (name, spec) in &merged[section("flow")] {
         let what = format!("flow {name}");
         let spec = table_of(spec, &what)?;
+        loader.dims_of(spec, Kind::Flow, &what)?;
         let ends = (text_of(spec, "from").and_then(sector_index), text_of(spec, "to").and_then(sector_index));
         let (Some(src), Some(dst)) = ends else {
             return model_err(format!("{what}: 'from' and 'to' must be two different declared sectors"));
@@ -892,6 +1198,8 @@ pub fn load_model(path: &Path) -> Result<Model> {
             initial: spec.get("initial").cloned(),
             range: range_of(spec, true, loader.minor, &what)?,
             spec: spec.clone(),
+            dims: Vec::new(),
+            data: Vec::new(),
         })?;
         flows.push(Flow { sym, src_account, dst_account });
     }
@@ -915,6 +1223,24 @@ pub fn load_model(path: &Path) -> Result<Model> {
         });
     }
 
+    for dim in &loader.dims {
+        if dim.first.is_none() {
+            if let Some(member) = dim.members.iter().find(|m| loader.sym_index.contains_key(*m)) {
+                return model_err(format!("dim {}: the member {member:?} has the name of an element", dim.name));
+            }
+        }
+        if loader.sym_index.contains_key(&dim.name) {
+            return model_err(format!("the name {:?} is used twice", dim.name));
+        }
+    }
+    // Data files of dimensioned elements, after the entities', in ascending order of path.
+    for (file, (_, bytes)) in &loader.cell_files {
+        digest.update(relative_name(file).as_bytes());
+        digest.update([0u8]);
+        digest.update(bytes);
+        digest.update([0u8]);
+    }
+
     Ok(Model {
         root,
         id: id.to_string(),
@@ -934,6 +1260,9 @@ pub fn load_model(path: &Path) -> Result<Model> {
         sym_index: loader.sym_index,
         table_index,
         entity_index,
+        dims: loader.dims,
+        dim_index: loader.dim_index,
+        format,
     })
 }
 
