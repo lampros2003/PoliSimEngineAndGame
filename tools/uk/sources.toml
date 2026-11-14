@@ -224,3 +224,69 @@ licence = "Open Government Licence v3.0"
 attribution = "Contains public sector information licensed under the Open Government Licence v3.0. Source: NHS England, Referral to Treatment waiting times statistics"
 format = "ons_xlsx"
 file = "nhs_rtt.xlsx"
+
+# ---- Stage S9.4: past general elections, to fit the voters' reactions
+
+[dataset.ge2010]
+title = "Results for the UK general election on 6 May 2010, by candidate"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/1/candidacies.csv"
+page = "https://electionresults.parliament.uk/general-elections/1"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2010.csv"
+note = "Votes by party and constituency only; candidates' names are not kept"
+
+[dataset.ge2015]
+title = "Results for the UK general election on 7 May 2015, by candidate"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/2/candidacies.csv"
+page = "https://electionresults.parliament.uk/general-elections/2"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2015.csv"
+note = "Votes by party and constituency only; candidates' names are not kept"
+
+[dataset.ge2017]
+title = "Results for the UK general election on 8 June 2017, by candidate"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/3/candidacies.csv"
+page = "https://electionresults.parliament.uk/general-elections/3"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2017.csv"
+note = "Votes by party and constituency only; candidates' names are not kept"
+
+[dataset.ge2019]
+title = "Results for the UK general election on 12 December 2019, by candidate"
+publisher = "UK Parliament (House of Commons Library), Election Results"
+url = "https://electionresults.parliament.uk/general-elections/4/candidacies.csv"
+page = "https://electionresults.parliament.uk/general-elections/4"
+licence = "Open Parliament Licence v3.0"
+attribution = "Contains Parliamentary information licensed under the Open Parliament Licence v3.0"
+format = "table"
+file = "ge2019.csv"
+note = "Votes by party and constituency only; candidates' names are not kept"
+
+[dataset.rhdi_regions]
+title = "Regional real household disposable income (RHDI), ITL1 and ITL2, 1997 to 2024 (provisional 2024)"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/regionalaccounts/grossdisposablehouseholdincome/datasets/regionalrealhouseholddisposableincome/1997to2024/regionalrealhouseholddisposableincomeprovisional2024.xlsx"
+page = "https://www.ons.gov.uk/economy/regionalaccounts/grossdisposablehouseholdincome/datasets/regionalrealhouseholddisposableincome"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_xlsx"
+file = "rhdi_regions.xlsx"
+
+[dataset.aps_history]
+title = "Annual Population Survey: people aged 16 and over in employment and unemployed, by region, in the twelve months before each general election from 2010 to 2024"
+publisher = "Office for National Statistics (Nomis)"
+url = "https://www.nomisweb.co.uk/api/v01/dataset/NM_170_1.data.csv?geography=TYPE480&c_sex=0&c_age=20&c_ecopuk11=2,12&measure=1&measures=20100&time=2010-03,2015-03,2017-06,2019-12,2024-06&select=date_name,geography_name,geography_code,c_ecopuk11_name,obs_value"
+page = "https://www.nomisweb.co.uk/datasets/apsnew"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "table"
+file = "aps_history.csv"

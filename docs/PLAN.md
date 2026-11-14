@@ -15,7 +15,7 @@ in `README.md`. Update the status column here as milestones close.
 | S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
 | S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done), S6 in `docs/S6-PLAN.md` (done), S7 in `docs/S7-PLAN.md` (its building milestones done; the business decisions are the owner's) |
 | S8 What government does | Added after S7: spending by function, what services deliver, emissions, the issues voters weigh (`docs/S8-PLAN.md`, done but for the NHS waiting list, whose source is not reachable from this environment) |
-| S9 Dilemmas, prices, history | Chosen by the owner on the decision page (2026-11-14): the NHS waiting list, dilemmas, taxes that reach prices, and the voters' reactions fitted to past elections (`docs/S9-PLAN.md`) |
+| S9 Dilemmas, prices, history | Chosen by the owner on the decision page (2026-11-14): the NHS waiting list, dilemmas, taxes that reach prices, and the voters' reactions fitted to past elections (`docs/S9-PLAN.md`, done; the fit to past elections is weak evidence and only moves the judgements a little). Open for the play test: a seed of its own for each new game, and the size of the dilemmas' political costs |
 
 ## Decisions this plan rests on
 

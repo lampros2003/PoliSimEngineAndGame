@@ -34,7 +34,7 @@ average over about a year (`income_change`); a type's is the average over its ad
 |---|---|
 | Intercepts (`intercepts.csv`) | Fitted so that in the base month every region's shares of its adults (each bloc, and not voting) equal its 2024 shares of its electorate (`../data/elections/ge2024.csv`): exact to within 1e-12 |
 | Age effects (`age_effects.csv`) | Assumptions: the 2024 election's widely reported pattern, that turnout rises with age, the young lean to the centre-left and the greens and older voters to the centre-right and the populist right. Sized so that the centre-right's odds among those 65 and over are about seven times those among 18 to 24 year olds. An ecological regression of the 2024 constituency results on Census 2021's age mix was tried first and gave impossible shares (everyone aged 25 to 34 not voting, three quarters of those over 65 voting centre-right): age, class and place cannot be told apart from constituency totals |
-| The government's fundamentals | Assumptions in the range of the economic-voting literature (`docs/S5-PLAN.md`): a 1% rise in a type's real household income adds about half a point to the government's share among it; a point of unemployment takes off about a point and a half; a year in office about half a point. Each has low (half) and high (one and a half times) presets; the intercepts are fitted for each preset (`intercepts.csv`), so every preset reproduces 2024. Screening (`../SENSITIVITY.md`) finds time in office the most influential |
+| The government's fundamentals | Assumptions in the range of the economic-voting literature (`docs/S5-PLAN.md`): a 1% rise in a type's real household income adds about half a point to the government's share among it; a point of unemployment takes off about a point and a half; a year in office about half a point. Each has low (half) and high (one and a half times) presets; the intercepts are fitted for each preset (`intercepts.csv`), so every preset reproduces 2024. Screening (`../SENSITIVITY.md`) finds time in office the most influential. Since stage S9.4 the income and unemployment effects are these judgements combined with their fit to the elections of 2010 to 2024 (below) |
 
 Income quintile and work enter only through the government's fundamentals: no published
 table without survey microdata gives their effect on the vote.
@@ -85,7 +85,7 @@ governing bloc stands. It votes for its bills; every other bloc votes for a move
 left if it stands further left than the leader, and for a move to the right if further
 right. More than 325 seats pass a bill. With 411 seats of its own the government passes
 everything; in a hung parliament, a left-led government needs enough seats to its left to
-raise taxes (`scenarios/hung_parliament.toml`: 323 votes, one bloc too few).
+raise taxes (`scenarios/hung_parliament.toml`: 324 votes, one bloc too few).
 
 ## Unemployment by region (stage S6.2)
 
@@ -111,7 +111,7 @@ scales them all, for screening.
 The issues start at zero in the base month, so the intercepts and the 2024 shares are
 unchanged. With unchanged policy services wear down as the population ages and emissions
 drift above their path, so the government polls a little lower: 352 seats in July 2029
-(373 before the issues), still a majority. A third off health spending costs it about six
+(373 before the issues), still a majority; 359 since stage S9.4's fitted reactions (below). A third off health spending costs it about six
 and a half points within seven months, with the recession it brings. The figures for later elections
 above were measured before stage S8.
 
@@ -125,3 +125,25 @@ government. It is zero until the government answers one of the questions in
 and Yorkshire for two years, and so on (`models/uk/README.md`, Dilemmas). The voter types'
 quintile and work (`type_quintile`, `type_in_work`) are there for these effects. The base
 month and the 2024 shares are unchanged.
+
+## Against past elections (stage S9.4)
+
+`tools/uk/history.py` fits the government's reactions to income and unemployment to the
+general elections of 2010, 2015, 2017, 2019 and 2024 (UK Parliament's results, Open
+Parliament Licence; ONS's regional real household disposable income per head and the
+Annual Population Survey, OGL): for each of the four terms and the eleven regions of Great
+Britain, the change in the log-odds of the senior governing party's share of the
+electorate, on the change in real income growth in the year before each election and in
+regional unemployment, with an effect for each term (`../data/elections/history.csv`,
+`HISTORY.md` there).
+
+The income effect comes out at 4.0 (standard error 2.7) against the judgement of 2.5; the
+unemployment effect at +0.9 (3.4) against -6: regional unemployment moved too much in step
+to show its effect. Fitted on the first three terms, the effects do not predict 2024's
+regional pattern (a correlation of -0.14). So the data are weak evidence, and each effect
+is the judgement and the fit combined, weighted by their precisions (the judgement's low
+and high presets taken as a standard deviation either side): income 2.76 (presets 1.62
+and 3.90), unemployment -2.96 (-0.74 and -5.21). Time in office and inflation, which only
+the four term effects could show, are left as they were. With unchanged policy the
+government polls 30.5% at the 2029 election, against 30.2% with the earlier judgements,
+and wins 359 seats rather than 352.

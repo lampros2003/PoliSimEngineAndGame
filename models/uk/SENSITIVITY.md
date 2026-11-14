@@ -8,7 +8,7 @@ Every parameter of the UK model with a low and a high preset is a factor; the ra
 
 | GDP | Unemployment | Budget balance | Debt / GDP | Poll rating | Seats in 2029 |
 |---:|---:|---:|---:|---:|---:|
-| 3,438.3bn | 4.69% | -186.8bn | 106.40% | 31.51% | 352 |
+| 3,438.3bn | 4.69% | -186.8bn | 106.40% | 31.55% | 359 |
 
 ## One at a time: each factor at low and at high, the rest central
 
@@ -16,24 +16,24 @@ Every parameter of the UK model with a low and a high preset is a factor; the ra
 |---|---:|---:|---:|---:|---:|---:|
 | household spending (wealth effect and share of income) | -1.6bn / +1.4bn | +0.01 pts / -0.00 pts | -0.9bn / +0.8bn | +0.1 pts / -0.1 pts | -0.00 pts / +0.00 pts | +0 / +0 |
 | hiring_speed | -1.2bn / +0.7bn | -0.02 pts / +0.00 pts | -1.5bn / +0.8bn | +0.2 pts / -0.1 pts | -0.00 pts / +0.00 pts | +0 / +0 |
-| labour_force_growth | -28.0bn / +28.4bn | -0.14 pts / +0.14 pts | +11.8bn / -11.9bn | +0.0 pts / -0.0 pts | +0.01 pts / -0.01 pts | +3 / -5 |
-| productivity_growth | -38.4bn / +39.1bn | -0.20 pts / +0.19 pts | +14.1bn / -14.4bn | +0.3 pts / -0.3 pts | -0.14 pts / +0.14 pts | +3 / -2 |
-| world_growth | -58.1bn / +60.3bn | +0.25 pts / -0.26 pts | -27.8bn / +28.8bn | +3.7 pts / -3.7 pts | -0.06 pts / +0.06 pts | -7 / +6 |
-| natural_unemployment | -0.1bn / +0.1bn | -0.50 pts / +0.50 pts | -0.0bn / +0.0bn | +0.1 pts / -0.1 pts | -0.00 pts / +0.00 pts | +9 / -8 |
-| phillips_slope | +0.7bn / -0.5bn | +0.03 pts / -0.02 pts | -0.2bn / +0.2bn | -0.0 pts / +0.0 pts | -0.01 pts / +0.01 pts | -2 / +3 |
-| wage_curve | -0.8bn / +0.4bn | +0.10 pts / -0.05 pts | +0.3bn / -0.2bn | -0.0 pts / +0.0 pts | +0.02 pts / -0.01 pts | -1 / +1 |
+| labour_force_growth | -28.0bn / +28.4bn | -0.14 pts / +0.14 pts | +11.8bn / -11.9bn | +0.0 pts / -0.0 pts | +0.01 pts / -0.01 pts | +1 / -3 |
+| productivity_growth | -38.4bn / +39.1bn | -0.20 pts / +0.19 pts | +14.1bn / -14.4bn | +0.3 pts / -0.3 pts | -0.16 pts / +0.16 pts | -1 / +0 |
+| world_growth | -58.1bn / +60.3bn | +0.25 pts / -0.26 pts | -27.8bn / +28.8bn | +3.7 pts / -3.7 pts | -0.06 pts / +0.07 pts | -4 / +1 |
+| natural_unemployment | -0.1bn / +0.1bn | -0.50 pts / +0.50 pts | -0.0bn / +0.0bn | +0.1 pts / -0.1 pts | -0.00 pts / +0.00 pts | +1 / -4 |
+| phillips_slope | +0.7bn / -0.5bn | +0.03 pts / -0.02 pts | -0.2bn / +0.2bn | -0.0 pts / +0.0 pts | -0.01 pts / +0.01 pts | -3 / +1 |
+| wage_curve | -0.8bn / +0.4bn | +0.10 pts / -0.05 pts | +0.3bn / -0.2bn | -0.0 pts / +0.0 pts | +0.02 pts / -0.01 pts | +0 / +0 |
 | gilt_yield | -3.6bn / +4.1bn | +0.02 pts / -0.02 pts | +6.4bn / -7.3bn | -0.3 pts / +0.4 pts | -0.00 pts / +0.00 pts | +0 / +0 |
 | loan_adjustment | -3.3bn / +0.0bn | -0.00 pts / +0.00 pts | -1.7bn / +0.0bn | +0.3 pts / +0.0 pts | -0.00 pts / +0.00 pts | +0 / +0 |
 | payout_sensitivity | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / -0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
 | jobs_output_elasticity | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
-| vote_income_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.20 pts / +0.20 pts | -5 / +3 |
-| vote_unemployment_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / -0.00 pts | +6 / -7 |
-| vote_inflation_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.00 pts / +0.00 pts | -1 / +2 |
-| vote_tenure_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +1.44 pts / +4.84 pts | +20 / -26 |
-| issue_weight_scale | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.06 pts / -0.06 pts | +11 / -9 |
+| vote_income_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.18 pts / +0.18 pts | -4 / +3 |
+| vote_unemployment_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / -0.00 pts | +2 / -4 |
+| vote_inflation_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.00 pts / +0.00 pts | -3 / +1 |
+| vote_tenure_effect | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +1.44 pts / +4.84 pts | +15 / -29 |
+| issue_weight_scale | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.06 pts / -0.06 pts | +6 / -15 |
 | trade_response | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
-| service_adjust_months | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / -0.00 pts | +0 / +2 |
-| intensity_fall | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.02 pts / +0.02 pts | -7 / +4 |
+| service_adjust_months | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / -0.00 pts | +0 / +1 |
+| intensity_fall | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | -0.02 pts / +0.02 pts | -4 / +3 |
 | carbon_price_response | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
 | treatment_response | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
 | vat_pass_through | +0.0bn / +0.0bn | +0.00 pts / +0.00 pts | +0.0bn / +0.0bn | +0.0 pts / +0.0 pts | +0.00 pts / +0.00 pts | +0 / +0 |
@@ -49,20 +49,20 @@ Each cell: low minus central / high minus central.
 
 | Factor | GDP mu* (sigma) | Unemployment mu* (sigma) | Budget balance mu* (sigma) | Debt / GDP mu* (sigma) | Poll rating mu* (sigma) | Seats in 2029 mu* (sigma) |
 |---|---:|---:|---:|---:|---:|---:|
-| vote_tenure_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 6.92 pts (10.13 pts) | 28 (30) |
-| issue_weight_scale | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 4.63 pts (7.52 pts) | 22 (32) |
-| vote_unemployment_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 1.90 pts (5.71 pts) | 11 (19) |
-| productivity_growth | 38.4bn (1.0bn) | 0.22 pts (0.06 pts) | 14.2bn (0.4bn) | 0.3 pts (0.0 pts) | 1.38 pts (3.67 pts) | 8 (22) |
-| vote_income_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 1.37 pts (3.64 pts) | 10 (22) |
-| intensity_fall | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 1.29 pts (3.64 pts) | 10 (22) |
-| phillips_slope | 1.0bn (0.6bn) | 0.05 pts (0.05 pts) | 0.4bn (0.2bn) | 0.0 pts (0.0 pts) | 1.24 pts (3.66 pts) | 9 (22) |
-| natural_unemployment | 0.4bn (0.3bn) | 0.50 pts (0.01 pts) | 0.1bn (0.1bn) | 0.1 pts (0.0 pts) | 0.51 pts (1.52 pts) | 6 (4) |
-| wage_curve | 1.3bn (1.0bn) | 0.14 pts (0.12 pts) | 0.5bn (0.3bn) | 0.0 pts (0.0 pts) | 0.10 pts (0.21 pts) | 1 (2) |
-| world_growth | 59.5bn (1.6bn) | 0.29 pts (0.08 pts) | 27.9bn (0.5bn) | 3.7 pts (0.0 pts) | 0.09 pts (0.18 pts) | 3 (3) |
-| labour_force_growth | 27.8bn (0.5bn) | 0.15 pts (0.04 pts) | 11.9bn (0.4bn) | 0.0 pts (0.0 pts) | 0.01 pts (0.02 pts) | 3 (2) |
-| hiring_speed | 1.1bn (0.6bn) | 0.01 pts (0.02 pts) | 1.4bn (0.7bn) | 0.2 pts (0.1 pts) | 0.00 pts (0.01 pts) | 0 (1) |
-| gilt_yield | 4.0bn (0.3bn) | 0.02 pts (0.00 pts) | 7.0bn (0.5bn) | 0.4 pts (0.0 pts) | 0.00 pts (0.00 pts) | 0 (1) |
-| service_adjust_months | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 0.00 pts (0.00 pts) | 1 (1) |
+| vote_tenure_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 3.74 pts (4.62 pts) | 23 (6) |
+| vote_income_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 2.10 pts (4.12 pts) | 10 (22) |
+| natural_unemployment | 0.4bn (0.3bn) | 0.50 pts (0.01 pts) | 0.1bn (0.1bn) | 0.1 pts (0.0 pts) | 1.50 pts (3.36 pts) | 3 (5) |
+| world_growth | 59.5bn (1.6bn) | 0.29 pts (0.08 pts) | 27.9bn (0.5bn) | 3.7 pts (0.0 pts) | 1.48 pts (3.23 pts) | 2 (4) |
+| intensity_fall | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 1.45 pts (2.88 pts) | 4 (6) |
+| vote_unemployment_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 1.22 pts (3.66 pts) | 12 (23) |
+| issue_weight_scale | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 0.91 pts (2.25 pts) | 7 (4) |
+| productivity_growth | 38.4bn (1.0bn) | 0.22 pts (0.06 pts) | 14.2bn (0.4bn) | 0.3 pts (0.0 pts) | 0.90 pts (2.29 pts) | 4 (6) |
+| wage_curve | 1.3bn (1.0bn) | 0.14 pts (0.12 pts) | 0.5bn (0.3bn) | 0.0 pts (0.0 pts) | 0.79 pts (2.29 pts) | 2 (5) |
+| phillips_slope | 1.0bn (0.6bn) | 0.05 pts (0.05 pts) | 0.4bn (0.2bn) | 0.0 pts (0.0 pts) | 0.02 pts (0.02 pts) | 1 (1) |
+| labour_force_growth | 27.8bn (0.5bn) | 0.15 pts (0.04 pts) | 11.9bn (0.4bn) | 0.0 pts (0.0 pts) | 0.01 pts (0.01 pts) | 1 (1) |
+| gilt_yield | 4.0bn (0.3bn) | 0.02 pts (0.00 pts) | 7.0bn (0.5bn) | 0.4 pts (0.0 pts) | 0.00 pts (0.00 pts) | 0 (0) |
+| hiring_speed | 1.1bn (0.6bn) | 0.01 pts (0.02 pts) | 1.4bn (0.7bn) | 0.2 pts (0.1 pts) | 0.00 pts (0.00 pts) | 0 (0) |
+| service_adjust_months | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 0.00 pts (0.00 pts) | 0 (1) |
 | household spending (wealth effect and share of income) | 1.6bn (0.6bn) | 0.00 pts (0.00 pts) | 0.9bn (0.4bn) | 0.1 pts (0.0 pts) | 0.00 pts (0.00 pts) | 0 (0) |
 | vote_inflation_effect | 0.0bn (0.0bn) | 0.00 pts (0.00 pts) | 0.0bn (0.0bn) | 0.0 pts (0.0 pts) | 0.00 pts (0.00 pts) | 2 (2) |
 | loan_adjustment | 2.0bn (1.7bn) | 0.00 pts (0.00 pts) | 1.0bn (0.9bn) | 0.2 pts (0.2 pts) | 0.00 pts (0.00 pts) | 0 (0) |
@@ -82,8 +82,8 @@ Each cell: low minus central / high minus central.
 - Unemployment: natural_unemployment (0.50 pts), world_growth (0.29 pts), productivity_growth (0.22 pts).
 - Budget balance: world_growth (27.9bn), productivity_growth (14.2bn), labour_force_growth (11.9bn).
 - Debt / GDP: world_growth (3.7 pts), gilt_yield (0.4 pts), productivity_growth (0.3 pts).
-- Poll rating: vote_tenure_effect (6.92 pts), issue_weight_scale (4.63 pts), vote_unemployment_effect (1.90 pts).
-- Seats in 2029: vote_tenure_effect (28), issue_weight_scale (22), vote_unemployment_effect (11).
+- Poll rating: vote_tenure_effect (3.74 pts), vote_income_effect (2.10 pts), natural_unemployment (1.50 pts).
+- Seats in 2029: vote_tenure_effect (23), vote_unemployment_effect (12), vote_income_effect (10).
 
 No effect on any of these outcomes: jobs_output_elasticity, trade_response, carbon_price_response, treatment_response, vat_pass_through, cost_pass_through, price_adjust_months, wage_catchup. With the levers where the scenario sets them, these move nothing the outcomes depend on: some act only through a lever (how trade answers a barrier, when there is none), others on values the economy does not read back (jobs by industry).
 

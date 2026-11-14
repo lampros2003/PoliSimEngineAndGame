@@ -506,6 +506,38 @@ class WaitingList(unittest.TestCase):
         self.assertFalse(row["waiting_list_record"])
 
 
+class History(unittest.TestCase):
+    """Stage S9.4: the voters' reactions to income and unemployment, combined with their fit
+    to the general elections of 2010 to 2024 (tools/uk/history.py, from the committed
+    models/uk/data/elections/history.csv)."""
+
+    @staticmethod
+    def history():
+        sys.path.insert(0, str(ROOT / "tools" / "uk"))
+        import history
+        return history
+
+    def test_the_fit_and_its_report_are_current(self):
+        history = self.history()
+        res = history.results()
+        self.assertEqual(res["full"]["n"], 44)
+        # Faster income growth went with swings to the government; the fit's errors are wide.
+        self.assertGreater(res["full"]["income"][0], 0)
+        self.assertGreater(res["full"]["income"][1], 1.0)
+        report = (UK / "data" / "elections" / "HISTORY.md").read_text(encoding="utf-8")
+        self.assertEqual(report, history.report(res), "HISTORY.md is out of date: run tools/uk/history.py")
+
+    def test_the_model_uses_the_combined_effects(self):
+        res = self.history().results()
+        for name, element in (("income", "vote_income_effect"), ("unemployment", "vote_unemployment_effect")):
+            spec = model().symbols[element].spec
+            self.assertEqual({k: spec[k] for k in ("low", "central", "high")},
+                             {k: res[name][k] for k in ("low", "central", "high")}, name)
+            # Between the earlier judgement and the fit.
+            prior, fitted = self.history().PRIOR[name]["central"], res["full"][name][0]
+            self.assertTrue(min(prior, fitted) <= res[name]["central"] <= max(prior, fitted), name)
+
+
 class Prices(unittest.TestCase):
     """Stage S9.3: taxes on spending reach consumer prices (models/uk/prices.toml): a VAT
     rise by its pass-through share, the carbon price and customs duties by the share firms

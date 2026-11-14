@@ -35,7 +35,9 @@ def first_month():
 
 
 def run(steps: int, **levers) -> list[dict]:
-    return Simulation(model(), seed=SEED, levers=levers).run(steps)
+    """`steps` months, with the levers changed from the second month on, as a player would:
+    the base month is 2024's, and the change registers with voters as a change."""
+    return Simulation(model(), seed=SEED, commands={1: levers} if levers else None).run(steps)
 
 
 class BaseMonth(unittest.TestCase):
@@ -84,11 +86,11 @@ class Regions(unittest.TestCase):
 
 class Response(unittest.TestCase):
     def test_a_tax_rise_costs_the_government_support(self):
-        base, higher = run(3), run(3, basic_rate=0.25)
+        base, higher = run(4), run(4, basic_rate=0.25)
         self.assertLess(higher[-1]["government_support"], base[-1]["government_support"] - 0.001)
 
     def test_a_higher_allowance_wins_it_support(self):
-        base, kinder = run(3), run(3, personal_allowance=15000)
+        base, kinder = run(4), run(4, personal_allowance=15000)
         self.assertGreater(kinder[-1]["government_support"], base[-1]["government_support"] + 0.001)
 
     def test_unchanged_policy_wears_the_government_down(self):

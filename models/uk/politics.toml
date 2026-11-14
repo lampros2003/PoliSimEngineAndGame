@@ -86,17 +86,17 @@ data = "politics/age_effects.csv"
 doc = "On the governing blocs' utility, per unit of proportional change in a voter type's real household income"
 type = "real"
 unit = "1"
-low = 1.25
-central = 2.5
-high = 3.75
+low = 1.621
+central = 2.759
+high = 3.896
 
 [param.vote_unemployment_effect]
 doc = "On the governing blocs' utility, per unit of unemployment rate above its level at the last election"
 type = "real"
 unit = "1"
-low = -3.0
-central = -6.0
-high = -9.0
+low = -0.74
+central = -2.959
+high = -5.208
 
 [param.vote_inflation_effect]
 doc = "On the governing blocs' utility, per unit of annual inflation above its level at the last election"

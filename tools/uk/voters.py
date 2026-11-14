@@ -65,6 +65,8 @@ ASSUMPTIONS = {
     # election's, under a point; each year in office about half a point.
     # Stage S6.0: { low, central, high } for the presets and screening; low is the weaker
     # effect. The literature's estimates of economic voting vary by about half either way.
+    # Stage S9.4: the income and unemployment effects are then combined with their fit to the
+    # elections of 2010 to 2024 (_with_history, below).
     "income_effect": {"low": 1.25, "central": 2.5, "high": 3.75},  # per unit of change in real household income
     "unemployment_effect": {"low": -3.0, "central": -6.0, "high": -9.0},  # per unit of unemployment rate
     "inflation_effect": {"low": -1.5, "central": -3.0, "high": -4.5},  # per unit of annual inflation
@@ -93,6 +95,25 @@ ASSUMPTIONS = {
     "parliament_months": 60,  # a Parliament's longest life; the 2024 one ends in July 2029
     "months_since_election": 6,
 }
+
+
+def _with_history() -> None:
+    """Stage S9.4: the income and unemployment effects above are the judgements; each is
+    combined with its fit to the general elections of 2010 to 2024 (tools/uk/history.py,
+    models/uk/data/elections/HISTORY.md), weighted by precision, and the result is used."""
+    import sys
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import history
+    fitted = history.results()
+    for key, name in (("income_effect", "income"), ("unemployment_effect", "unemployment")):
+        if ASSUMPTIONS[key] != history.PRIOR[name]:
+            raise SystemExit(f"voters: the judgement for {key} differs from history.PRIOR")
+        ASSUMPTIONS[key] = {k: fitted[name][k] for k in ("low", "central", "high")}
+
+
+_with_history()
 
 
 def voter_types() -> list[tuple[int, int, int, int]]:
