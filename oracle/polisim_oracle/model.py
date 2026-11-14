@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import itertools
 import re
 import tomllib
 from dataclasses import dataclass, field
@@ -27,8 +28,9 @@ _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
-_SECTIONS = ("model", "sector", "instrument", "entity", "stream", "table",
+_SECTIONS = ("model", "dim", "sector", "instrument", "entity", "stream", "table",
              "param", "lever", "var", "state", "flow", "account")
+MAX_CELLS = 16_777_216
 
 
 @dataclass
@@ -45,6 +47,26 @@ class Decl:
     initial: object = None  # raw value, or {"column": name}
     range: tuple[float, float] | None = None
     spec: dict = field(default_factory=dict)
+    dims: tuple[str, ...] = ()  # format 1: one value per cell of these dimensions
+    data: dict[str, list[str]] = field(default_factory=dict)  # format 1: CSV column -> text per cell
+
+
+@dataclass
+class Dim:
+    """Format 1: a named, ordered set of members."""
+    name: str
+    kind: str  # "range" | "list"
+    members: list  # whole numbers for a range, names for a list
+    labels: list[str]
+    first: int = 0  # a range's first member
+
+    @property
+    def size(self) -> int:
+        return len(self.members)
+
+    @property
+    def position(self) -> dict:
+        return {m: i for i, m in enumerate(self.members)}
 
 
 @dataclass
@@ -87,6 +109,13 @@ class Model:
     flows: dict[str, Flow]
     accounts: dict[tuple[str, str], str]  # (sector, instrument) -> account name
     model_hash: str
+    dims: dict[str, Dim] = field(default_factory=dict)
+    format: int = 0
+
+    def cells(self, dims: tuple[str, ...]) -> list[dict[str, int]]:
+        """Coordinates ({dimension: position}) of every cell, in row-major order."""
+        sizes = [range(self.dims[d].size) for d in dims]
+        return [dict(zip(dims, combo)) for combo in itertools.product(*sizes)]
 
 
 def convert(raw, typ: str, money: bool, minor: int, what: str):
@@ -210,8 +239,11 @@ def load_model(path: str | Path) -> Model:
                 merged[section][name] = spec
 
     head = merged["model"]
-    if head.get("format") != 0:
-        raise ModelError("this loader reads model format 0 only")
+    fmt = head.get("format")
+    if fmt not in (0, 1):
+        raise ModelError("this loader reads model formats 0 and 1")
+    if fmt == 0 and merged["dim"]:
+        raise ModelError("dimensions need format = 1")
     minor = head["minor_units"]
     phases = list(head["phases"])
     step_unit = U.parse_unit(head["step"])
@@ -247,6 +279,102 @@ def load_model(path: str | Path) -> Model:
             raise ModelError(f"table {name}: needs at least one band")
         tables[name] = Table(name, _unit(spec, f"table {name}"), bands)
 
+    dims: dict[str, Dim] = {}
+    for name, spec in merged["dim"].items():
+        what = f"dim {name}"
+        if not _NAME.match(name) or name in _RESERVED:
+            raise ModelError(f"{what}: not a usable name")
+        if ("range" in spec) == ("members" in spec):
+            raise ModelError(f"{what}: give either 'range' or 'members'")
+        if "range" in spec:
+            lo, hi = spec["range"]
+            if not all(isinstance(x, int) and not isinstance(x, bool) for x in (lo, hi)) or lo > hi:
+                raise ModelError(f"{what}: 'range' must be [first, last], whole numbers, first <= last")
+            members, kind = list(range(lo, hi + 1)), "range"
+        else:
+            members, kind = list(spec["members"]), "list"
+            if not members or not all(isinstance(m, str) and _NAME.match(m) and m not in _RESERVED for m in members):
+                raise ModelError(f"{what}: members must be usable names")
+            if len(set(members)) != len(members):
+                raise ModelError(f"{what}: a member is listed twice")
+        if len(members) > 1_000_000:
+            raise ModelError(f"{what}: more than 1,000,000 members")
+        labels = [str(x) for x in spec.get("labels", members)]
+        if len(labels) != len(members):
+            raise ModelError(f"{what}: one label per member")
+        dims[name] = Dim(name, kind, members, labels, members[0] if kind == "range" else 0)
+
+    # Data files of dimensioned elements: read once each, hashed after the entities' in
+    # ascending order of path.
+    cell_files: dict[str, list[dict[str, str]]] = {}
+
+    def cell_data(dim_names: tuple[str, ...], file: str, columns: list[str], what: str) -> dict[str, list[str]]:
+        if file not in cell_files:
+            path_ = root / file
+            if not path_.is_file():
+                raise ModelError(f"{what}: data file {file} not found")
+            with open(path_, newline="", encoding="utf-8") as handle:
+                cell_files[file] = list(csv.DictReader(handle))
+        rows = cell_files[file]
+        header = rows[0].keys() if rows else []
+        for column in list(dim_names) + columns:
+            if column not in header:
+                raise ModelError(f"{what}: {file} has no column {column!r}")
+        positions = [dims[d].position for d in dim_names]
+        strides, stride = [], 1
+        for d in reversed(dim_names):
+            strides.append(stride)
+            stride *= dims[d].size
+        strides.reverse()
+        out = {c: [None] * stride for c in columns}
+        for row in rows:
+            flat = 0
+            for d, pos, st in zip(dim_names, positions, strides):
+                text = row[d].strip()
+                key = int(text) if dims[d].kind == "range" and _WHOLE.match(text) else text
+                if key not in pos:
+                    raise ModelError(f"{what}: {file}: {text!r} is not a member of {d}")
+                flat += pos[key] * st
+            if out[columns[0]][flat] is not None:
+                raise ModelError(f"{what}: {file}: a cell appears twice")
+            for c in columns:
+                out[c][flat] = row[c]
+        if any(v is None for v in out[columns[0]]):
+            raise ModelError(f"{what}: {file}: some cells are missing")
+        return out
+
+    def dims_of(spec: dict, kind: str, what: str) -> tuple[str, ...]:
+        if "dims" not in spec:
+            return ()
+        if fmt != 1:
+            raise ModelError(f"{what}: dimensions need format = 1")
+        if kind not in ("param", "var", "state"):
+            raise ModelError(f"{what}: a {kind} cannot have dimensions in format 1")
+        if spec.get("entity") is not None:
+            raise ModelError(f"{what}: an element cannot have both an entity and dimensions")
+        names = tuple(spec["dims"])
+        if not names or len(set(names)) != len(names) or not all(n in dims for n in names):
+            raise ModelError(f"{what}: 'dims' must list declared dimensions, each once")
+        cells = 1
+        for n in names:
+            cells *= dims[n].size
+        if cells > MAX_CELLS:
+            raise ModelError(f"{what}: more than {MAX_CELLS:,} cells")
+        return names
+
+    def with_data(decl: Decl, value) -> Decl:
+        """Reads the CSV behind a dimensioned parameter or initial value."""
+        if not decl.dims:
+            return decl
+        what = f"{decl.kind} {decl.name}"
+        if decl.kind == "param" and "data" in decl.spec:
+            columns = decl.spec.get("columns")
+            wanted = list(columns.values()) if isinstance(columns, dict) else [decl.spec.get("column", "value")]
+            decl.data = cell_data(decl.dims, decl.spec["data"], wanted, what)
+        elif isinstance(value, dict) and "data" in value:
+            decl.data = cell_data(decl.dims, value["data"], [value.get("column", "value")], what)
+        return decl
+
     # ---- declarations
     symbols: dict[str, Decl] = {}
 
@@ -280,14 +408,16 @@ def load_model(path: str | Path) -> Model:
     for name, spec in merged["param"].items():
         what = f"param {name}"
         typ, money = _type(spec, what)
-        declare(Decl(name, "param", typ, _unit(spec, what, "1" if typ == "bool" else None),
-                     money, range=_range(spec, money, minor, what), spec=spec))
+        declare(with_data(Decl(name, "param", typ, _unit(spec, what, "1" if typ == "bool" else None),
+                               money, range=_range(spec, money, minor, what), spec=spec,
+                               dims=dims_of(spec, "param", what)), None))
 
     for name, spec in merged["lever"].items():
         what = f"lever {name}"
         typ, money = _type(spec, what)
         if "default" not in spec:
             raise ModelError(f"{what}: missing 'default'")
+        dims_of(spec, "lever", what)
         declare(Decl(name, "lever", typ, _unit(spec, what, "1" if typ == "bool" else None),
                      money, initial=spec["default"], range=_range(spec, money, minor, what), spec=spec))
 
@@ -296,18 +426,20 @@ def load_model(path: str | Path) -> Model:
         typ, money = _type(spec, what)
         if "expr" not in spec:
             raise ModelError(f"{what}: missing 'expr'")
-        declare(Decl(name, "var", typ, _unit(spec, what, "1" if typ == "bool" else None), money,
-                     entity_of(spec, what), phase_of(spec, what), spec["expr"], spec.get("initial"),
-                     _range(spec, money, minor, what), spec))
+        declare(with_data(Decl(name, "var", typ, _unit(spec, what, "1" if typ == "bool" else None), money,
+                               entity_of(spec, what), phase_of(spec, what), spec["expr"], spec.get("initial"),
+                               _range(spec, money, minor, what), spec, dims_of(spec, "var", what)),
+                          spec.get("initial")))
 
     for name, spec in merged["state"].items():
         what = f"state {name}"
         typ, money = _type(spec, what)
         if "next" not in spec or "initial" not in spec:
             raise ModelError(f"{what}: needs both 'initial' and 'next'")
-        declare(Decl(name, "state", typ, _unit(spec, what, "1" if typ == "bool" else None), money,
-                     entity_of(spec, what), phase_of(spec, what), spec["next"], spec["initial"],
-                     _range(spec, money, minor, what), spec))
+        declare(with_data(Decl(name, "state", typ, _unit(spec, what, "1" if typ == "bool" else None), money,
+                               entity_of(spec, what), phase_of(spec, what), spec["next"], spec["initial"],
+                               _range(spec, money, minor, what), spec, dims_of(spec, "state", what)),
+                          spec["initial"]))
 
     accounts: dict[tuple[str, str], str] = {}
     for name, spec in merged["account"].items():
@@ -324,6 +456,7 @@ def load_model(path: str | Path) -> Model:
         unit = instruments[instrument]["unit"]
         if entity is not None:
             unit = U.div(unit, ((entity, 1),))
+        dims_of(spec, "account", what)
         accounts[(sector, instrument)] = name
         declare(Decl(name, "account", "int", unit, True, entity, initial=spec.get("initial"),
                      range=_range(spec, True, minor, what), spec=spec))
@@ -351,6 +484,7 @@ def load_model(path: str | Path) -> Model:
             raise ModelError(f"{what}: unit must be {U.fmt(unit)}")
         if "expr" not in spec:
             raise ModelError(f"{what}: missing 'expr'")
+        dims_of(spec, "flow", what)
         flows[name] = Flow(name, src, dst, instrument)
         declare(Decl(name, "flow", "int", unit, True, entity, phase_of(spec, what), spec["expr"],
                      spec.get("initial"), _range(spec, True, minor, what), spec))
@@ -361,8 +495,19 @@ def load_model(path: str | Path) -> Model:
         if sectors[info["issuer"]] is not None:
             raise ModelError(f"instrument {instrument}: the issuer cannot be a per-record sector")
 
+    for dim in dims.values():
+        if dim.kind == "list":
+            for member in dim.members:
+                if member in symbols:
+                    raise ModelError(f"dim {dim.name}: the member {member!r} has the name of an element")
+    for name in dims:
+        if name in symbols:
+            raise ModelError(f"the name {name!r} is used twice")
+    for file in sorted(cell_files, key=lambda f: f.encode("utf-8")):
+        digest.update(Path(file).as_posix().encode() + b"\0" + (root / file).read_bytes() + b"\0")
+
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
-                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest())
+                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt)
 
 
 @dataclass

@@ -49,15 +49,30 @@ class Simulation:
         overrides = dict(params or {})
         for d in sym.values():
             if d.kind == "param":
+                what = f"param {d.name}"
                 if d.name in overrides:
                     raw = overrides.pop(d.name)
+                elif d.dims and "data" in d.spec:
+                    columns = d.spec.get("columns")
+                    if isinstance(columns, dict):
+                        if preset not in columns:
+                            raise ModelError(f"{what}: no column for the {preset!r} preset")
+                        column = columns[preset]
+                    else:
+                        column = d.spec.get("column", "value")
+                    rt.C[d.name] = self._checked(d, [convert(t, d.type, d.money, minor, what) for t in d.data[column]])
+                    continue
                 elif "value" in d.spec:
                     raw = d.spec["value"]
                 elif preset in d.spec:
                     raw = d.spec[preset]
                 else:
                     raise ModelError(f"param {d.name}: no 'value' and no {preset!r} preset")
-                rt.S[d.name] = self._checked(d, convert(raw, d.type, d.money, minor, f"param {d.name}"))
+                value = convert(raw, d.type, d.money, minor, what)
+                if d.dims:
+                    rt.C[d.name] = self._checked(d, [value] * len(m.cells(d.dims)))
+                else:
+                    rt.S[d.name] = self._checked(d, value)
             elif d.kind == "column":
                 texts = m.entities[d.entity].raw[d.name]
                 rt.C[d.name] = [convert(t, d.type, d.money, minor, f"column {d.name}") for t in texts]
@@ -73,6 +88,11 @@ class Simulation:
         # ---- initial state: states and holders' accounts, then issuers' accounts
         def initial(d):
             what = f"{d.kind} {d.name} initial"
+            if d.dims:
+                if isinstance(d.initial, dict):
+                    texts = d.data[d.initial.get("column", "value")]
+                    return [convert(t, d.type, d.money, minor, what) for t in texts]
+                return [convert(d.initial, d.type, d.money, minor, what)] * len(m.cells(d.dims))
             if d.entity is None:
                 return convert(d.initial, d.type, d.money, minor, what)
             entity = m.entities[d.entity]
@@ -91,6 +111,7 @@ class Simulation:
             self._store(sym[issuer], self._int64(-held, f"account {issuer}"))
 
         # ---- compile formulas and build the evaluation plan
+        self.cells = {d.name: m.cells(d.dims) for d in sym.values() if d.dims and d.expr is not None}
         self.fn: dict[str, object] = {}
         deps: dict[str, set[str]] = {}
         self.lagged: set[str] = set()
@@ -99,7 +120,7 @@ class Simulation:
                 continue
             label = f"{d.kind} {d.name}" + (" (next)" if d.kind == "state" else "")
             self.fn[d.name], deps[d.name], lagged = compile_formula(
-                d.expr, m, rt, d.entity, d.type, d.unit, label)
+                d.expr, m, rt, d.entity, d.type, d.unit, label, d.dims)
             self.lagged |= lagged
         self.plan = self._plan(deps)
 
@@ -126,7 +147,7 @@ class Simulation:
         return value
 
     def _store(self, d, value) -> None:
-        (self.rt.S if d.entity is None else self.rt.C)[d.name] = self._checked(d, value)
+        (self.rt.S if d.entity is None and not d.dims else self.rt.C)[d.name] = self._checked(d, value)
 
     def _total(self, d) -> int:
         """Sector-level total of a scalar or per-record whole-number quantity."""
@@ -176,6 +197,8 @@ class Simulation:
 
     def _evaluate(self, d):
         fn = self.fn[d.name]
+        if d.dims:
+            return [fn(cell) for cell in self.cells[d.name]]
         if d.entity is None:
             return fn(0)
         return [fn(i) for i in range(len(self.model.entities[d.entity].ids))]
@@ -266,7 +289,7 @@ class Simulation:
         sym, rt = self.model.symbols, self.rt
         row: dict[str, object] = {"step": rt.step - 1, "hash": self.state_hash()}
         for d in sym.values():
-            if d.kind == "param":
+            if d.kind == "param" or d.dims:
                 continue
             if d.entity is None:
                 row[d.name] = rt.S[d.name]
@@ -309,7 +332,7 @@ class Simulation:
             d = sym[name]
             pack = packers[d.type]
             digest.update(name.encode("utf-8") + b"\0")
-            if d.entity is None:
+            if d.entity is None and not d.dims:
                 digest.update(pack(rt.S[name]))
             else:
                 digest.update(b"".join(pack(v) for v in rt.C[name]))

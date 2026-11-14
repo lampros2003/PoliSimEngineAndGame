@@ -11,6 +11,7 @@ is an error regardless of which branch is taken.
 
 from __future__ import annotations
 
+import itertools
 import math
 import operator
 import re
@@ -37,7 +38,7 @@ class SimError(Exception):
 _TOKEN = re.compile(
     r"\s*(?:(?P<num>\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)"
     r"|(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
-    r"|(?P<op><=|>=|==|!=|[-+*/()<>,]))"
+    r"|(?P<op><=|>=|==|!=|[-+*/()<>,\[\]:]))"
 )
 _KEYWORDS = {"and", "or", "not", "true", "false"}
 
@@ -158,6 +159,21 @@ class _Parser:
                         if not self.accept_op(","):
                             raise FormulaError("expected ',' or ')' in argument list")
                 return ("call", value, args)
+            if self.accept_op("["):
+                # Format 1: x[d: e, ...] fixes dimensions of a dimensioned element.
+                coords = []
+                while True:
+                    kind2, dim = self.take()
+                    if kind2 != "name" or dim in _KEYWORDS:
+                        raise FormulaError("expected a dimension name inside [ ]")
+                    if not self.accept_op(":"):
+                        raise FormulaError(f"expected ':' after {dim} inside [ ]")
+                    coords.append((dim, self.expr()))
+                    if self.accept_op("]"):
+                        break
+                    if not self.accept_op(","):
+                        raise FormulaError("expected ',' or ']' inside [ ]")
+                return ("index", value, coords)
             return ("name", value)
         if kind == "op" and value == "(":
             node = self.expr()
@@ -262,9 +278,12 @@ class _Builder:
     values at the end of the previous step, plus seed and step.
     """
 
-    def __init__(self, scope, rt):
+    def __init__(self, scope, rt, dims: tuple[str, ...] = ()):
         self.scope = scope
         self.rt = rt
+        # Format 1: the dimensions in scope. Inside a formula with dimensions, closures get
+        # the current cell's coordinates ({dimension: position}) instead of a record index.
+        self.in_scope: tuple[str, ...] = tuple(dims)
         self.deps: set[str] = set()  # names read at their current-step value
         self.lagged: set[str] = set()  # names read through prev()
 
@@ -283,6 +302,8 @@ class _Builder:
             return Built("bool", U.ONE, lambda i: v)
         if kind == "name":
             return self._name(node[1], ctx, lagged=False)
+        if kind == "index":
+            return self._index(node, ctx)
         if kind == "neg":
             a = self._number(self.build(node[1], ctx), "unary minus")
             f = a.fn
@@ -307,6 +328,21 @@ class _Builder:
         if sym is None:
             raise FormulaError(f"unknown name {name!r}")
         (self.lagged if lagged else self.deps).add(name)
+        dims = getattr(sym, "dims", ())
+        if dims:
+            missing = [d for d in dims if d not in self.in_scope]
+            if missing:
+                raise FormulaError(f"{name!r} holds one value per {', '.join(dims)}; {missing[0]} is not in scope "
+                                   f"here: sum it with sum({name}, {missing[0]}) or fix it with {name}[{missing[0]}: ...]")
+            strides = self._strides(dims)
+            columns = self.rt.PC if lagged else self.rt.C
+
+            def cell(i):
+                flat = 0
+                for d, stride in strides:
+                    flat += i[d] * stride
+                return columns[name][flat]
+            return Built(sym.type, sym.unit, cell)
         if sym.entity is None:
             store = self.rt.PS if lagged else self.rt.S
             return Built(sym.type, sym.unit, lambda i: store[name])
@@ -315,6 +351,143 @@ class _Builder:
                 f"{name!r} holds one value per {sym.entity}; aggregate it with wsum() or wcount()")
         columns = self.rt.PC if lagged else self.rt.C
         return Built(sym.type, sym.unit, lambda i: columns[name][i])
+
+    # ---- format 1: dimensions
+
+    def _dim(self, node, fname: str):
+        if node[0] != "name" or node[1] not in getattr(self.scope, "dims", {}):
+            raise FormulaError(f"{fname}(): {node[1] if node[0] == 'name' else 'that'} is not a declared dimension")
+        return self.scope.dims[node[1]]
+
+    def _strides(self, dims) -> list[tuple[str, int]]:
+        """(dimension, stride) for row-major storage: the last dimension varies fastest."""
+        out, stride = [], 1
+        for d in reversed(dims):
+            out.append((d, stride))
+            stride *= self.scope.dims[d].size
+        return list(reversed(out))
+
+    def _index(self, node, ctx: str | None) -> Built:
+        _, name, coords = node
+        sym = self.scope.symbols.get(name)
+        if sym is None:
+            raise FormulaError(f"unknown name {name!r}")
+        dims = getattr(sym, "dims", ())
+        if not dims:
+            raise FormulaError(f"{name!r} has no dimensions to index")
+        self.deps.add(name)
+        fixed = []  # (dimension, position or None, closure, Dim), in the order written
+        for dim, expr in coords:
+            if dim not in dims:
+                raise FormulaError(f"{name}[{dim}: ...]: {name} has no dimension {dim!r}")
+            if any(f[0] == dim for f in fixed):
+                raise FormulaError(f"{name}[...]: {dim} is fixed twice")
+            D = self.scope.dims[dim]
+            if D.kind == "list" and expr[0] == "name" and expr[1] in D.position:
+                fixed.append((dim, D.position[expr[1]], None, D))
+                continue
+            b = self.build(expr, ctx)
+            if b.type != "int":
+                raise FormulaError(f"{name}[{dim}: ...]: a coordinate must be a whole number")
+            if b.unit is not None:
+                U.unify(b.unit, U.ONE, f"{name}[{dim}: ...] coordinate")
+            fixed.append((dim, None, b.fn, D))
+        named = {f[0] for f in fixed}
+        missing = [d for d in dims if d not in named and d not in self.in_scope]
+        if missing:
+            raise FormulaError(f"{name}[...]: {missing[0]} is neither fixed nor in scope here")
+        strides = dict(self._strides(dims))
+        columns = self.rt.C
+
+        def cell(i):
+            positions = {}
+            for dim, pos, f, D in fixed:
+                if f is not None:
+                    v = f(i)
+                    pos = v - D.first if D.kind == "range" else v
+                    if not 0 <= pos < D.size:
+                        raise SimError(f"{name}[{dim}: {v}]: {dim} has no such member")
+                positions[dim] = pos
+            flat = 0
+            for d in dims:
+                flat += (positions[d] if d in positions else i[d]) * strides[d]
+            return columns[name][flat]
+        return Built(sym.type, sym.unit, cell)
+
+    def _fn_sum(self, args, ctx):
+        """Sum over the named dimensions, row-major in the order listed, into one total."""
+        if len(args) < 2:
+            raise FormulaError("sum() takes a value and at least one dimension")
+        if ctx is not None:
+            raise FormulaError(f"sum() is not available in a per-{ctx} formula")
+        dims: list[str] = []
+        for node in args[1:]:
+            D = self._dim(node, "sum")
+            if D.name in self.in_scope or D.name in dims:
+                raise FormulaError(f"sum(): {D.name} is already in scope")
+            dims.append(D.name)
+        saved = self.in_scope
+        self.in_scope = saved + tuple(dims)
+        try:
+            inner = self._number(self.build(args[0], ctx), "sum()")
+        finally:
+            self.in_scope = saved
+        combos = list(itertools.product(*[range(self.scope.dims[d].size) for d in dims]))
+        f = inner.fn
+
+        def cells(i):
+            base = dict(i) if isinstance(i, dict) else {}
+            for combo in combos:
+                for d, p in zip(dims, combo):
+                    base[d] = p
+                yield base
+
+        if inner.type == "int":
+            def fn(i):
+                total = 0
+                for c in cells(i):
+                    total += f(c)
+                return checked(total)
+            return Built("int", inner.unit, fn)
+
+        def fn_real(i):
+            acc = 0.0
+            for c in cells(i):
+                acc = acc + f(c)
+            return acc
+        return Built("real", inner.unit, fn_real)
+
+    def _fn_coord(self, args, ctx):
+        self._args("coord", args, 1)
+        D = self._dim(args[0], "coord")
+        if D.name not in self.in_scope:
+            raise FormulaError(f"coord({D.name}): {D.name} is not in scope here")
+        name, first = D.name, (D.first if D.kind == "range" else 0)
+        return Built("int", U.ONE, lambda i: first + i[name])
+
+    def _fn_cohort_shift(self, args, ctx):
+        self._args("cohort_shift", args, 2)
+        D = self._dim(args[1], "cohort_shift")
+        if D.name not in self.in_scope:
+            raise FormulaError(f"cohort_shift(): {D.name} is not in scope here")
+        inner = self._number(self.build(args[0], ctx), "cohort_shift()")
+        f, n, dim, whole = inner.fn, D.size, D.name, inner.type == "int"
+        zero = 0 if whole else 0.0
+
+        def fn(i):
+            p = i[dim]
+            if n == 1:
+                return f(i)
+            if p == 0:
+                return zero
+            below = dict(i)
+            below[dim] = p - 1
+            if p == n - 1:
+                a = f(below)
+                b = f(i)
+                return checked(a + b) if whole else a + b
+            return f(below)
+        return Built(inner.type, inner.unit, fn)
 
     @staticmethod
     def _number(b: Built, what: str) -> Built:
@@ -551,6 +724,8 @@ class _Builder:
         self._args("rand", args, 1)
         if args[0][0] != "name" or args[0][1] not in self.scope.streams:
             raise FormulaError("rand() takes the name of a declared random stream")
+        if self.in_scope:
+            raise FormulaError("rand() is not available in a formula with dimensions")
         stream, rt = self.scope.streams[args[0][1]], self.rt
         if ctx is None:
             return Built("real", U.ONE, lambda i: uniform(rt.seed, stream, 0, rt.step))
@@ -564,7 +739,11 @@ class _Builder:
         if args[0][0] != "name" or args[0][1] not in self.scope.entities:
             raise FormulaError(f"{fname}(): the first argument must be the name of an entity")
         entity = self.scope.entities[args[0][1]]
-        return entity, self.build(args[1], entity.name)
+        saved, self.in_scope = self.in_scope, ()  # a record's formula sees no dimensions
+        try:
+            return entity, self.build(args[1], entity.name)
+        finally:
+            self.in_scope = saved
 
     def _fn_wsum(self, args, ctx):
         """Weighted sum over all records. Whole numbers are summed exactly; reals are summed
@@ -606,7 +785,7 @@ FUNCTIONS = sorted(name[4:] for name in dir(_Builder) if name.startswith("_fn_")
 
 
 def compile_formula(src: str, scope, rt, ctx: str | None, want_type: str,
-                    want_unit: U.Unit, label: str):
+                    want_unit: U.Unit, label: str, dims: tuple[str, ...] = ()):
     """Compile `src` for a target of the given type and unit.
 
     Returns (closure, names read this step, names read through prev()).
@@ -614,7 +793,7 @@ def compile_formula(src: str, scope, rt, ctx: str | None, want_type: str,
     target without an explicit round(), floor() or ceil().
     """
     try:
-        builder = _Builder(scope, rt)
+        builder = _Builder(scope, rt, dims)
         built = builder.build(parse(src), ctx)
         fn = built.fn
         if want_type == "real" and built.type == "int":
