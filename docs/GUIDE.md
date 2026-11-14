@@ -29,7 +29,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
 | Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry. Each group's change on last month, with a bar |
 | Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, and the months to the next election |
-| Policy | 56 levers in groups: spending, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
+| Policy | 63 levers in groups: public services (health, education, defence and six more), other spending, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
 | Chart | Any figure over time. Dashed lines are your policy changes. Click a name in the legend to remove it |
 | Why did it change? | What moved a figure last month, input by input. Press an input to follow it; Back returns |
 | Connections | The web around a figure: what it depends on to the left, what it feeds to the right, each tile coloured by last month's change. Press a tile to move to it |
@@ -55,9 +55,9 @@ election, and how long the government has been in office.
 1. **Raise the basic rate of income tax by one point** (Policy, Income tax) and advance a
    month. In Who gains, who loses, by income decile, the upper deciles lose most; by
    region, Scotland loses nothing, because it sets its own rates.
-2. **Cut purchases of goods and services by a quarter** (Policy, Spending) and advance two
-   years. Jobs by industry move out of public administration, education and health
-   (about 380,000 of them) while unemployment and the poll rating show the cost.
+2. **Cut health spending by a quarter** (Policy, Public services) and advance two years.
+   Jobs by industry move out of health and social work, public employment falls with the
+   pay bill, and unemployment, the polls and the situations show the cost.
 3. **Put a 20% trade barrier on China** (Policy, Trade). Customs duties appear in the
    budget, about £8bn a year; exports to China fall by about 40%, and so do imports from
    it.

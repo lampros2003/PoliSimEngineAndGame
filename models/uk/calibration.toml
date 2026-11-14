@@ -2,26 +2,6 @@
 # tools/uk/assumptions.toml. Do not edit: change the inputs and run the script again.
 # Money is in pounds; monthly amounts are one twelfth of 2024.
 
-[lever.public_pay_bill]
-label = "Public sector pay bill (2024 prices)"
-group = "Spending"
-type = "money"
-unit = "GBP/month"
-default = 24217000000
-leaning = "left"
-range = [0, 48434000000]
-doc = "Wages and salaries of public employees, in 2024 prices. 2024: £290.6bn a year."
-
-[lever.procurement_bill]
-label = "Purchases of goods and services (2024 prices)"
-group = "Spending"
-type = "money"
-unit = "GBP/month"
-default = 27228916667
-leaning = "left"
-range = [0, 54457833334]
-doc = "What the public sector buys from firms, in 2024 prices. 2024: £326.7bn a year."
-
 [lever.benefits_bill]
 label = "Pensions and other benefits (2024 prices)"
 group = "Spending"

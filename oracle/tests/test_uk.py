@@ -42,6 +42,13 @@ def run(steps: int = STEPS, preset: str = "central"):
     return Simulation(model(), seed=SEED, preset=preset).run(steps)
 
 
+def quarter_off_services() -> dict[str, int]:
+    """Every public service cut by a quarter: each function's spending lever (stage S8.0) at
+    three quarters of its 2024 setting, in pounds a month."""
+    return {d.name: d.spec["default"] * 3 // 4 for d in model().symbols.values()
+            if d.kind == "lever" and d.name.startswith("spending_")}
+
+
 @functools.lru_cache(maxsize=None)
 def published(year: str = "2024") -> dict[str, float]:
     with open(UK / "data" / "annual.csv", newline="", encoding="utf-8") as handle:
@@ -228,7 +235,7 @@ class Industries(unittest.TestCase):
 
     def test_a_cut_in_public_spending_falls_mostly_on_public_services(self):
         base = Simulation(model(), seed=SEED)
-        cut = Simulation(model(), seed=SEED, levers={"procurement_bill": 20_000_000_000})
+        cut = Simulation(model(), seed=SEED, levers=quarter_off_services())
         base.step()
         cut.step()
         names = model().dims["industry"].members
@@ -330,7 +337,7 @@ class Jobs(unittest.TestCase):
     def test_a_cut_in_public_spending_moves_jobs_out_of_public_services(self):
         names = model().dims["industry"].members
         public = [names.index(n) for n in ("public_administration", "education", "health")]
-        cut = {1: {"procurement_bill": 20_000_000_000}}
+        cut = {1: quarter_off_services()}
 
         def public_share(**kw) -> float:
             sim = self.sim(**kw)
@@ -341,7 +348,7 @@ class Jobs(unittest.TestCase):
         base = public_share()
         half = public_share(commands=cut) - base
         whole = public_share(commands=cut, params={"jobs_output_elasticity": 1.0}) - base
-        # A quarter of procurement gone (from £27bn a month to £20bn) takes public services' share of jobs down.
+        # A quarter off every public service takes their share of jobs down.
         self.assertLess(half, -0.001)
         # Twice the elasticity, about twice the move.
         self.assertAlmostEqual(whole / half, 2.0, delta=0.1)
@@ -356,6 +363,46 @@ class Jobs(unittest.TestCase):
         # Finance pays most, hospitality and agriculture least, as in the tables.
         self.assertEqual(max(by_industry, key=by_industry.get), "finance")
         self.assertEqual(sorted(by_industry, key=by_industry.get)[:2], ["agriculture", "other_services"])
+
+
+class Functions(unittest.TestCase):
+    """Stage S8.0: public spending by function (HM Treasury's PESA 2025 split), a lever per
+    function, adding up to the 2024 pay bill and purchases."""
+
+    def test_the_functions_add_up_to_2024_pay_and_purchases(self):
+        m = model()
+        with open(UK / "functions" / "split.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual([r["function"] for r in rows], m.dims["function"].members)
+        pay = sum(int(r["pay"]) for r in rows)
+        spending = sum(int(r["spending"]) for r in rows)
+        for r in rows:
+            self.assertEqual(m.symbols["spending_" + r["function"]].spec["default"], int(r["spending"]))
+        sim = Simulation(m, seed=SEED)
+        row = sim.step()
+        # Pounds a month in the files, pence in the run.
+        self.assertEqual(row["public_pay_bill"], pay * 100)
+        self.assertEqual(row["procurement_bill"], (spending - pay) * 100)
+
+    def test_government_demand_keeps_the_tables_mix_in_the_first_month(self):
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        products = {r["product"]: float(r["government"]) for r in Industries.table("shares.csv", UK / "industries")}
+        demand = dict(zip(model().dims["product"].members, sim.column("government_demand")))
+        total = row["public_pay"] + row["procurement"]
+        for product, share in products.items():
+            self.assertAlmostEqual(demand[product], total * share, delta=max(1.0, 1e-9 * total), msg=product)
+
+    def test_a_health_cut_falls_on_health(self):
+        cut = {"spending_health": model().symbols["spending_health"].spec["default"] * 3 // 4}
+        base, after = Simulation(model(), seed=SEED), Simulation(model(), seed=SEED, levers=cut)
+        before = base.step()
+        row = after.step()
+        names = model().dims["product"].members
+        fall = {n: b - a for n, b, a in zip(names, base.column("government_demand"), after.column("government_demand"))}
+        self.assertEqual(max(fall, key=fall.get), "health")
+        # Health's pay is cut with it: fewer public employees.
+        self.assertLess(row["public_employment"], before["public_employment"])
 
 
 class Trade(unittest.TestCase):

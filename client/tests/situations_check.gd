@@ -1,8 +1,8 @@
 extends SceneTree
 ## Stage S7.3: a situation brought on through the interface. In the UK's 2025 scenario,
-## after a quiet month (no situation shown), cuts purchases of goods and services by a
-## quarter and plays a month: a recession begins, the player is told, and the strip under
-## the headline shows it with the month it began.
+## after a quiet month (no situation shown), cuts health spending by about a third and plays
+## a month: a recession begins, the player is told, and the strip under the headline shows it
+## with the month it began.
 
 var main: Control
 
@@ -17,14 +17,14 @@ func _initialize() -> void:
 	await _settle()
 	if main._situation_strip.visible:
 		return _fail("a situation is shown in a quiet first month")
-	var refused: String = main.game.set_lever("procurement_bill", 20e9)
+	var refused: String = main.game.set_lever("spending_health", 14e9)
 	if refused != "":
 		return _fail(refused)
 	await _settle()
 	main.advance(1)
 	await _settle()
 	if main.game.latest("recession") != true:
-		return _fail("no recession after a quarter of purchases was cut")
+		return _fail("no recession after health spending was cut")
 	if not main._message.visible or not main._message_text.text.contains("Recession"):
 		return _fail("the player was not told: %s" % main._message_text.text)
 	var chip: Node = main._situation_strip.get_node_or_null("situation_recession")
@@ -33,7 +33,7 @@ func _initialize() -> void:
 	var text: String = (chip.get_child(0) as Label).text
 	if text != "Recession · since February 2025":
 		return _fail("the strip shows %s" % text)
-	print("situations: a quarter off purchases brings a recession, announced and shown: %s" % text)
+	print("situations: a third off health spending brings a recession, announced and shown: %s" % text)
 	quit(0)
 
 

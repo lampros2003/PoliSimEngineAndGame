@@ -13,6 +13,7 @@ A monthly stock-flow model of the UK economy and public finances in model format
 | `industries.toml`, `industries/`, `data/industry_jobs.csv` | The 15 industries: the Leontief inverse and the shares that turn spending into output; jobs and pay per employee job by industry, from 2024's workforce jobs (stage S6.4, below) | `tools/uk/jobs.py`, `tools/uk/calibrate.py` |
 | `households.toml`, `households/` | 20,000 synthetic households and the 2024-25 tax and benefit rules (`households/README.md`) | `tools/uk/households.py`, `tools/uk/make_rules.py`, `tools/uk/calibrate.py` |
 | `trade.toml`, `trade/`, `data/trade_partners.csv` | Trade by partner (the EU, the United States, China, the rest), a barrier lever for each, and customs duties (stage S6.3) | `tools/uk/trade.py`, `tools/uk/calibrate.py` |
+| `functions.toml`, `functions/`, `data/functions.csv` | Public spending by function: a lever per function, from HM Treasury's PESA 2025 (stage S8.0, below) | `tools/uk/functions.py`, `tools/uk/calibrate.py` |
 | `situations.toml` | The situations the player is told about (stage S7.3, below) | `tools/uk/template/situations.toml`, copied by `tools/uk/calibrate.py` |
 | `SENSITIVITY.md` | Which uncertain parameters matter: low, central and high presets screened one at a time and by elementary effects | `tools/uk/screen.py` |
 | `politics.toml`, `politics/` | The voters: 600 voter types from the households, and how they choose between nine blocs (`politics/README.md`) | `tools/uk/voters.py`, `tools/uk/calibrate.py` |
@@ -137,10 +138,10 @@ jobs (JOBS02's employee jobs per workforce job): £43,000 a year across the econ
 first month, from £23,000 in agriculture to £86,000 in finance.
 
 With unchanged policy the jobs grow about 2.5% in five years in every industry, a little
-faster in public services. Cutting public purchases from £27bn a month to £20bn takes
-about 380,000 jobs out of public administration, education and health within two years,
-while the other industries gain about 130,000. Both show on the "Who gains, who loses"
-panel, with their national totals.
+faster in public services. Cutting every public service by a quarter (stage S8.0's
+levers) takes about 650,000 jobs out of public administration, education and health within
+two years, while the other industries gain about 290,000 and unemployment is about a point
+higher. Both show on the "Who gains, who loses" panel, with their national totals.
 
 ## The households
 
@@ -168,6 +169,29 @@ cohort table above, times the base year's share living in households), and peopl
 employment falls, households without work count for more: Universal Credit rises and
 income tax falls with it. Their pay follows the economy's pay per worker.
 
+## Spending by function (stage S8.0)
+
+The public pay bill and purchases of goods and services are split into nine functions
+at their 2024-25 shares in HM Treasury's Public Expenditure Statistical Analyses 2025
+(OGL; `tools/uk/functions.py`, `data/functions.csv`): health, education, defence,
+police, courts and prisons, transport, social care, environment and housing, culture, and
+the rest of government and the economy. Each is a lever, in 2024 prices, in the policy
+panel's "Public services" group, and a bill like any spending. A function's pay and
+purchases keep their 2024 split (`muldiv`, so the default settings give the 2024 totals
+to the penny), and the economy reads their sums, the public pay bill and purchases, as it
+did when they were levers: public employment follows the pay bill.
+
+PESA reports procurement by function, but pay only in total: pay by function is a
+function's current spending less its procurement and the other spending that belongs to
+it (debt interest and grants abroad in general services, subsidies in economic affairs,
+benefits in social protection), scaled to PESA's pay total. Social care comes out as
+purchases only, which is close: most of it is bought from private providers.
+
+Each function's demand reaches the industries through its own mix of products, a judgement
+raked so that together they buy the input-output tables' government purchases, so the
+base month is unchanged. Cutting health spending by a third falls on the health industry
+and on public employment, and brings a recession at once.
+
 ## Situations (stage S7.3)
 
 `situations.toml` names seven conditions the player is told about when they begin and
@@ -185,7 +209,9 @@ end, each with a start and an end so it does not flicker:
 
 With policy unchanged, debt passes 100% of GDP in the 18th month and nothing else comes on
 in five years. Cutting purchases of goods and services by a quarter brings a recession at
-once and high unemployment from the sixth month, both over within two years.
+once and high unemployment from the sixth month, both over within two years. (That was
+written when purchases were one lever; with spending by function, cutting health spending by
+a third does the same, with unemployment above 6% at once.)
 
 ## Known weaknesses
 

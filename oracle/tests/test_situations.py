@@ -49,14 +49,15 @@ if __name__ == "__main__":
 class UnitedKingdom(unittest.TestCase):
     """The UK's situations (models/uk/situations.toml)."""
 
-    def test_a_quiet_start_then_a_recession_when_purchases_are_cut(self):
+    def test_a_quiet_start_then_a_recession_when_public_services_are_cut(self):
         from polisim_oracle.model import load_scenario
         from polisim_oracle.sim import from_scenario
         scenario = load_scenario(ROOT / "models" / "uk" / "scenarios" / "2025.toml")
         names = [d.name for d in scenario.model.symbols.values() if d.spec.get("situation")]
         self.assertEqual(names, ["recession", "strong_growth", "high_unemployment", "high_inflation",
                                  "debt_above_output", "budget_surplus", "no_majority"])
-        scenario.commands = {1: {"procurement_bill": 20_000_000_000}}
+        scenario.commands = {1: {d.name: d.spec["default"] * 3 // 4 for d in scenario.model.symbols.values()
+                                 if d.kind == "lever" and d.name.startswith("spending_")}}
         sim = from_scenario(scenario)
         first = sim.step()
         self.assertEqual([n for n in names if first[n]], [])

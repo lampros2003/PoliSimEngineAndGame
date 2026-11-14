@@ -354,11 +354,15 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         return float(x) / 1000
 
     # Levers: monthly amounts in base-year prices, and tax rates.
-    lever("public_pay_bill", "Public sector pay bill", monthly(v.public_pay), "GBP/month", (0, monthly(v.public_pay) * 2),
-          f"Wages and salaries of public employees, in {year} prices. {year}: £%.1fbn a year." % bn(v.public_pay))
-    lever("procurement_bill", "Purchases of goods and services", monthly(v.procurement), "GBP/month",
-          (0, monthly(v.procurement) * 2),
-          f"What the public sector buys from firms, in {year} prices. {year}: £%.1fbn a year." % bn(v.procurement))
+    # Stage S8.0: with the 2024 base the public pay bill and purchases are the sums of the
+    # spending by function (functions.toml), each function a lever of its own.
+    if not people:
+        lever("public_pay_bill", "Public sector pay bill", monthly(v.public_pay), "GBP/month",
+              (0, monthly(v.public_pay) * 2),
+              f"Wages and salaries of public employees, in {year} prices. {year}: £%.1fbn a year." % bn(v.public_pay))
+        lever("procurement_bill", "Purchases of goods and services", monthly(v.procurement), "GBP/month",
+              (0, monthly(v.procurement) * 2),
+              f"What the public sector buys from firms, in {year} prices. {year}: £%.1fbn a year." % bn(v.procurement))
     other_benefits = monthly(v.benefits_other) - (round(base["benefits"] / 100) if people else 0)
     lever("benefits_bill", "Pensions and other benefits", other_benefits, "GBP/month", (0, other_benefits * 2),
           f"Social benefits that do not depend on unemployment, mostly the state pension, in {year} prices"
@@ -468,8 +472,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f"# opening.{k} = {val}")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
-    detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "situations.toml")
-              if people else ())
+    detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
+               "functions.toml", "situations.toml") if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
     if people:
@@ -497,6 +501,12 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         (out_dir / "politics.toml").write_text(politics, encoding="utf-8", newline="\n")
         import trade
         (out_dir / "trade.toml").write_text(trade.write(out_dir), encoding="utf-8", newline="\n")
+        import functions
+        with open(out_dir / "industries" / "shares.csv", newline="", encoding="utf-8") as handle:
+            government = {r["product"]: float(r["government"]) for r in csv.DictReader(handle)}
+        (out_dir / "functions.toml").write_text(
+            functions.write(out_dir, monthly(v.public_pay), monthly(v.procurement), government),
+            encoding="utf-8", newline="\n")
     fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income)" if people
                                 else "round(income_tax_rate * (wages + public_pay + benefits + other_income))")
     fills["nics_expr"] = ("round(ni_scale * (employee_ni_total + employer_ni_total))" if people
@@ -511,7 +521,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     # Customs duties (trade.toml) are public receipts too.
     fills["customs_receipts"] = " + customs_duties" if people else ""
     for name in ("model.toml", "economy.toml",
-                 *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml"))):
+                 *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml", "functions.toml"))):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))

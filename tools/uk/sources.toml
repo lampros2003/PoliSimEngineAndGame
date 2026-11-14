@@ -190,3 +190,15 @@ licence = "Open Government Licence v3.0"
 attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
 format = "ons_xlsx"
 file = "workforce_jobs.xls"
+
+# ---- Stage S8: what government does
+
+[dataset.pesa2025_ch5]
+title = "Public Expenditure Statistical Analyses 2025, chapter 5 tables: public sector expenditure on services by function and economic category (2024-25 used)"
+publisher = "HM Treasury"
+url = "https://assets.publishing.service.gov.uk/media/6874fe4582370235232f9343/PESA_2025_CP_Chapter_5_tables.xlsx"
+page = "https://www.gov.uk/government/statistics/public-expenditure-statistical-analyses-2025"
+licence = "Open Government Licence v3.0"
+attribution = "Contains public sector information licensed under the Open Government Licence v3.0. Source: HM Treasury, Public Expenditure Statistical Analyses 2025"
+format = "ons_xlsx"
+file = "pesa2025_ch5.xlsx"

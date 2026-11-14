@@ -76,7 +76,7 @@ type = "real"
 unit = "GBP/month"
 phase = "accounts"
 dims = ["product"]
-expr = "consumption * household_products + (public_pay + procurement) * government_products + (business_investment + dwellings + public_investment) * investment_products + exports * export_products"
+expr = "consumption * household_products + government_demand + (business_investment + dwellings + public_investment) * investment_products + exports * export_products"
 
 [var.industry_output]
 label = "Output"
