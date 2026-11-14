@@ -50,6 +50,8 @@ jobs:
         run: cargo build --release
       - name: Random scenarios through oracle and engine
         run: python tools/diff_engine.py --count 150
+      - name: Random UK scenarios through oracle and engine
+        run: python tools/diff_engine.py --model models/uk --count 60
 
   client:
     # The game client: build the engine library, let Godot register it, play 60 scripted
