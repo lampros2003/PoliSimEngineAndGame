@@ -448,6 +448,54 @@ def power_cases() -> list[tuple[str, str, str, str]]:
     return cases
 
 
+def quantile_cases() -> list[tuple[str, str, str, str]]:
+    """Stage S10.9: quantile over the records' awkward values (ties of 0.0 and -0.0, a
+    subnormal, the 64-bit limits, a weight above 32 bits), at the ends and in between, with
+    shares that are whole numbers or national formulas, and refused: a share outside 0 to 1
+    or with a unit, a value that is not a number, a true/false value, a record formula, the
+    wrong count. Drawn from their own generator, after ln's, so the cases before them do
+    not change."""
+    rng = random.Random(109)
+    cases = [
+        ("-", "real", "1", "quantile(rec, cf1, 0.5)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.0)"),
+        ("-", "real", "1", "quantile(rec, cf1, 1.0)"),
+        ("-", "real", "1", "quantile(rec, cf1, 1)"),
+        ("-", "real", "1", "quantile(rec, cf2, 0.25)"),
+        ("-", "real", "1", "quantile(rec, cf2, rate1)"),
+        ("-", "int", "1", "quantile(rec, ci1, 0.5)"),
+        ("-", "int", "1", "quantile(rec, ci1, 0.0)"),
+        ("-", "int", "1", "quantile(rec, ci1, 1.0)"),
+        ("-", "int", "1", "quantile(rec, ci2, 0.999)"),
+        ("-", "int", "1", "quantile(rec, ci2, 1e-12)"),
+        ("-", "int", "GBP/month/rec", "quantile(rec, cm, 0.5)"),
+        ("-", "real", "1", "quantile(rec, cf1 * 0.0, 0.5)"),
+        ("-", "real", "1", "quantile(rec, -cf1 * 0.0, 0.5)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5) + wsum(rec, cf2) / wcount(rec, true)"),
+        ("-", "real", "1", "quantile(rec, select(cb1, cf2, -cf2), 0.6)"),
+        ("-", "int", "1", "quantile(rec, ci2, i1 / 2.0)"),
+        ("-", "real", "1", "quantile(rec, cf1, 1.5)"),
+        ("-", "real", "1", "quantile(rec, cf1, -0.1)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.0 / 0.0)"),
+        ("-", "real", "1", "quantile(rec, cf1 / 0.0, 0.5)"),
+        ("-", "int", "1", "quantile(rec, ci1 + 1, 0.5)"),
+        ("-", "real", "1", "quantile(rec, cf1, m1)"),
+        ("-", "real", "1", "quantile(rec, cb1, 0.5)"),
+        ("-", "real", "1", "quantile(rec, cf1, true)"),
+        ("-", "real", "1", "quantile(rec, cf1)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, 0.5)"),
+        ("-", "real", "1", "quantile(cf1, cf1, 0.5)"),
+        ("rec", "real", "1", "quantile(rec, cf1, 0.5)"),
+        ("-", "int", "1", "quantile(rec, cf1, 0.5)"),
+    ]
+    generator = Generator(rng, "rec")
+    for _ in range(120):
+        share = rng.choice([repr(rng.random()), "0.5", "0.0", "1.0", repr(rng.choice([0.1, 0.25, 0.75, 0.9]))])
+        typ = rng.choice(["int", "real"])
+        cases.append(("-", typ, "1", f"quantile(rec, {generator.expr(typ, rng.randrange(1, 4))}, {share})"))
+    return cases
+
+
 def warmed_up_simulation() -> Simulation:
     sim = Simulation(load_model(ROOT / "conformance" / "model"), seed=SEED)
     sim.run(WARM_UP_STEPS)
@@ -468,6 +516,7 @@ def main() -> None:
 
     cases += exp_cases()
     cases += power_cases()
+    cases += quantile_cases()
 
     sim = warmed_up_simulation()
     counts = {"value": 0, "E:static": 0, "E:runtime": 0}

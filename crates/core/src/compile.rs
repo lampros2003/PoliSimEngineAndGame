@@ -722,6 +722,26 @@ impl<'a> Builder<'a> {
                 self.ops.push(if inner.ty == Ty::Int { Op::LoadAggI(d, index) } else { Op::LoadAggF(d, index) });
                 Ok(Built { ty: inner.ty, unit: Some(unit), reg: d })
             }
+            "quantile" => {
+                // Stage S10.9: quantile(entity, x, share); the share is national and real.
+                arg_count(fname, args, 3)?;
+                let (entity, inner, sub) = self.aggregate(fname, &args[..2], ctx)?;
+                number(&inner, "quantile()")?;
+                let prog = sub.finish(&inner)?;
+                let mut part = Builder::new(self.model, self.deps, self.lagged);
+                let share = part.build(&args[2], None)?;
+                number(&share, "quantile() share")?;
+                if share.unit.is_some() {
+                    units::unify(&share.unit, &Some(Unit::one()), "quantile() share")?;
+                }
+                let reg = part.as_real(&share);
+                let share = part.finish(&Built { ty: Ty::Real, unit: share.unit, reg })?;
+                let index = self.push_agg(AggKind::Quantile, entity, prog)?;
+                self.aggs[index as usize].share = Some(share);
+                let d = self.reg(inner.ty);
+                self.ops.push(if inner.ty == Ty::Int { Op::LoadAggI(d, index) } else { Op::LoadAggF(d, index) });
+                Ok(Built { ty: inner.ty, unit: inner.unit, reg: d })
+            }
             "wcount" => {
                 let (entity, inner, sub) = self.aggregate(fname, args, ctx)?;
                 boolean(&inner, "wcount()")?;
@@ -936,7 +956,7 @@ impl<'a> Builder<'a> {
 impl Builder<'_> {
     fn push_agg(&mut self, kind: AggKind, entity: usize, prog: Program) -> Check<u16> {
         let index = u16::try_from(self.aggs.len()).map_err(|_| "formula is too large".to_string())?;
-        self.aggs.push(Agg { kind, entity, prog });
+        self.aggs.push(Agg { kind, entity, prog, share: None });
         Ok(index)
     }
 }

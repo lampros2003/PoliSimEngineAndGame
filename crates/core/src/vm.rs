@@ -525,12 +525,61 @@ fn eval_range(
 /// ascending record order, each term being `real(weight) * value`. Stage S10: the terms are
 /// computed on several threads and added on one, so the sum is the same bits; a sum that
 /// overflows before the first block that fails is reported first, as one thread would.
+/// Stage S10.9: `quantile`. The share, then the checks (a share from 0 to 1, no value that
+/// is not a number, weights that add to something), then the records with a weight in
+/// order of value (ties by record order): the value of the first at which the weight so
+/// far reaches the share of the total.
+fn quantile(agg: &Agg, terms: &Col, weights: &[i64], cx: &EvalCtx) -> Check<Val> {
+    let Some(share) = &agg.share else { return internal("a quantile without its share") };
+    let p = match eval_scalar(share, cx)? {
+        Val::F(p) => p,
+        _ => return internal("a quantile's share is not a real"),
+    };
+    if !(0.0..=1.0).contains(&p) {
+        return Err("quantile(): the share must be from 0 to 1".to_string());
+    }
+    if let Col::F(v) = terms {
+        if v.iter().any(|x| x.is_nan()) {
+            return Err("quantile(): a record's value is not a number".to_string());
+        }
+    }
+    let total: i128 = weights.iter().map(|w| *w as i128).sum();
+    if total <= 0 {
+        return Err("quantile(): the records' weights add to nothing".to_string());
+    }
+    let target = p * total as f64;
+    let mut order: Vec<usize> = (0..weights.len()).filter(|r| weights[*r] != 0).collect();
+    match terms {
+        Col::I(v) => order.sort_by(|a, b| v[*a].cmp(&v[*b]).then(a.cmp(b))),
+        Col::F(v) => order.sort_by(|a, b| v[*a].partial_cmp(&v[*b]).expect("no NaN").then(a.cmp(b))),
+        Col::B(_) => return internal("a quantile of true/false values"),
+    }
+    let mut so_far: i128 = 0;
+    for r in order {
+        so_far += weights[r] as i128;
+        if so_far as f64 >= target {
+            return Ok(match terms {
+                Col::I(v) => Val::I(v[r]),
+                Col::F(v) => Val::F(v[r]),
+                Col::B(_) => unreachable!("checked above"),
+            });
+        }
+    }
+    internal("a quantile past its records")
+}
+
 fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {
     let prog = &agg.prog;
     let prepared = prepare(prog, cx)?;
     let weights = &cx.weights[agg.entity];
     let count = weights.len();
     let (terms, failure) = split(eval_all(prog, cx, Some(agg.entity), count, &prepared));
+    if matches!(agg.kind, AggKind::Quantile) {
+        if let Some((_, e)) = failure {
+            return Err(e);
+        }
+        return quantile(agg, &terms, weights, cx);
+    }
     let mut whole: i128 = 0;
     let mut real: f64 = 0.0;
     match (&agg.kind, &terms) {

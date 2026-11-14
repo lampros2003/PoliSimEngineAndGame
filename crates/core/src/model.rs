@@ -16,7 +16,7 @@ use crate::rng::fnv1a32;
 use crate::units::{self, Unit};
 
 /// Function names of the formula language. With the five keywords they are reserved.
-pub const FUNCTIONS: [&str; 31] = [
+pub const FUNCTIONS: [&str; 32] = [
     "abs",
     "ceil",
     "clamp",
@@ -35,6 +35,7 @@ pub const FUNCTIONS: [&str; 31] = [
     "per_step",
     "pow",
     "prev",
+    "quantile",
     "rand",
     "round",
     "safe_div",

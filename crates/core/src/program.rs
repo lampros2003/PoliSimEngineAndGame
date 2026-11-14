@@ -282,6 +282,8 @@ pub enum AggKind {
     SumInt,
     SumReal,
     Count,
+    /// Stage S10.9: `quantile`; the share is the aggregate's `share` program.
+    Quantile,
 }
 
 /// `wsum` or `wcount` inside a national formula: a per-record program and a reduction.
@@ -290,6 +292,8 @@ pub struct Agg {
     pub kind: AggKind,
     pub entity: usize,
     pub prog: Program,
+    /// Stage S10.9: for `quantile`, the national program giving the share, a real.
+    pub share: Option<Program>,
 }
 
 /// One use of a marginal-rate table: a national program per threshold and per rate.
@@ -494,7 +498,7 @@ impl Program {
     /// Instructions in this program and everything it evaluates on the way.
     pub fn op_count(&self) -> usize {
         self.ops.len()
-            + self.aggs.iter().map(|a| a.prog.op_count()).sum::<usize>()
+            + self.aggs.iter().map(|a| a.prog.op_count() + a.share.as_ref().map_or(0, Program::op_count)).sum::<usize>()
             + self.tables.iter().flat_map(|t| t.lows.iter().chain(&t.rates)).map(Program::op_count).sum::<usize>()
             + self.subs.iter().map(|s| s.prog.op_count() + s.by.as_ref().map_or(0, |b| b.key.op_count())).sum::<usize>()
             + self.aggs_by.iter().map(|a| a.value.op_count() + a.key.op_count()).sum::<usize>()

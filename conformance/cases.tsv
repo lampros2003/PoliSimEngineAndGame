@@ -4145,3 +4145,153 @@ rec	real	1	ln(cm)	E:static
 -	real	1	pow(2.1118289225764966, -4.0)	3fa9bdd783d518da
 -	real	1	pow(1.3844518845815093, -2.1861388953864243)	3fdf6dc1bbf9195c
 -	real	1	pow(6.77939588878784e-06, 0.8839917147293406)	3efc469db7f7fbd7
+-	real	1	quantile(rec, cf1, 0.5)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.0)	c004000000000000
+-	real	1	quantile(rec, cf1, 1.0)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.25)	4008000000000000
+-	real	1	quantile(rec, cf2, rate1)	4008000000000000
+-	int	1	quantile(rec, ci1, 0.5)	9223372036854775807
+-	int	1	quantile(rec, ci1, 0.0)	-9223372036854775808
+-	int	1	quantile(rec, ci1, 1.0)	9223372036854775807
+-	int	1	quantile(rec, ci2, 0.999)	-1
+-	int	1	quantile(rec, ci2, 1e-12)	-2
+-	int	GBP/month/rec	quantile(rec, cm, 0.5)	12345678
+-	real	1	quantile(rec, cf1 * 0.0, 0.5)	0000000000000000
+-	real	1	quantile(rec, -cf1 * 0.0, 0.5)	8000000000000000
+-	real	1	quantile(rec, cf1, 0.5) + wsum(rec, cf2) / wcount(rec, true)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, select(cb1, cf2, -cf2), 0.6)	4008000000000000
+-	int	1	quantile(rec, ci2, i1 / 2.0)	-1
+-	real	1	quantile(rec, cf1, 1.5)	E:runtime
+-	real	1	quantile(rec, cf1, -0.1)	E:runtime
+-	real	1	quantile(rec, cf1, 0.0 / 0.0)	E:runtime
+-	real	1	quantile(rec, cf1 / 0.0, 0.5)	E:runtime
+-	int	1	quantile(rec, ci1 + 1, 0.5)	E:runtime
+-	real	1	quantile(rec, cf1, m1)	E:static
+-	real	1	quantile(rec, cb1, 0.5)	E:static
+-	real	1	quantile(rec, cf1, true)	E:static
+-	real	1	quantile(rec, cf1)	E:static
+-	real	1	quantile(rec, cf1, 0.5, 0.5)	E:static
+-	real	1	quantile(cf1, cf1, 0.5)	E:static
+rec	real	1	quantile(rec, cf1, 0.5)	E:static
+-	int	1	quantile(rec, cf1, 0.5)	E:static
+-	int	1	quantile(rec, div(t1, 1), 1.0)	10
+-	real	1	quantile(rec, safe_div(r2, cf2, cf1) * times_step(1.5), 0.9)	E:static
+-	int	1	quantile(rec, round(per_step(abs(4611686018427387904))), 0.5)	E:static
+-	real	1	quantile(rec, rand(s2), 0.5751065734677485)	3fd4361e64d62732
+-	int	1	quantile(rec, max(round(ci2), div(t2, 2)), 1.0)	100
+-	int	1	quantile(rec, ci2 - 2, 0.0)	-4
+-	real	1	quantile(rec, max(times_step(1e300), cf1), 0.0)	E:static
+-	real	1	quantile(rec, 0.0, 1.0)	0000000000000000
+-	int	1	quantile(rec, imax, 0.622302997090626)	9223372036854775807
+-	int	1	quantile(rec, -ci1, 0.0)	E:runtime
+-	int	1	quantile(rec, clamp(abs(abs(ci1)), clamp(div(0, 2), per_step(ci2), (ci2 - 9223372036854775807) * 9223372036854775807), min(floor(r0), per_step(ibig))), 0.5)	E:static
+-	real	1	quantile(rec, cf1, 0.7431757861000202)	7fe1ccf385ebc8a0
+-	int	1	quantile(rec, muldiv(ci1 - mod(7, 1), round(ci2 - i1), max(abs(t1), per_step(7))), 0.20188761757913953)	E:static
+-	real	1	quantile(rec, -select(bt, r1, 0.1) * (-counter + div(counter, i4)), 0.75)	4010000000000000
+-	int	1	quantile(rec, (div(ci1, ci2) - 0) * ceil(cf1), 0.0)	E:runtime
+-	int	1	quantile(rec, round(ci1), 0.5)	9223372036854775807
+-	int	1	quantile(rec, muldiv(mod(4611686018427387904 + ci1, select(bf, ci2, ci2)), i0, select(select(cb1, cb1, bt), ci1, clamp(ci2, i0, ci2))), 1.0)	E:runtime
+-	int	1	quantile(rec, div(ci1, 2), 1.0)	4611686018427387903
+-	real	1	quantile(rec, round(i1) * select(cb1, ci2, cf1) * (abs(ci1 * 0.49999999999999994) + min(cf1, clamp(cf1, i4, 1.5))), 0.5)	c3cfffffffffffff
+-	real	1	quantile(rec, clamp(cf1, ci1, cf2), 0.1)	4008000000000000
+-	real	1	quantile(rec, muldiv(4611686018427387904, ci1, ci2) + rand(s2), 0.9)	E:runtime
+-	real	1	quantile(rec, i1 * i0 + rand(s1), 0.0)	3fb8709537064df0
+-	real	1	quantile(rec, times_step(rate1), 1.0)	E:static
+-	int	1	quantile(rec, div(ci1, 2), 0.75)	4611686018427387903
+-	int	1	quantile(rec, (ci1 - ibig) * ci2, 0.25)	E:runtime
+-	int	1	quantile(rec, abs(100), 0.0)	100
+-	int	1	quantile(rec, muldiv((i2 - 7) * 0, round(ci1), div(2, 7)), 0.1)	E:runtime
+-	int	1	quantile(rec, i3, 0.0)	-13
+-	real	1	quantile(rec, muldiv(ci2, per_step(10), (7 - 1) * ci1) + abs(1e300) * 0.0, 0.75)	E:static
+-	real	1	quantile(rec, abs(rate1 * (cf1 + cf2) + ci1 * r0), 1.0)	7fac7b1f3cac7434
+-	int	1	quantile(rec, i2 - ci2, 0.0)	-93
+-	int	1	quantile(rec, 0, 1.0)	0
+-	real	1	quantile(rec, -max(cf2, ci2) + times_step(rate2), 0.35607863272028173)	E:static
+-	int	1	quantile(rec, i0, 0.0)	0
+-	int	1	quantile(rec, div(select(cb1, div(i4, 2), max(i2, i3)), div(100, i4)), 0.75)	E:runtime
+-	real	1	quantile(rec, rand(s1), 0.0)	3fb8709537064df0
+-	real	1	quantile(rec, max(cf2, rbig), 1.0)	7e37e43c8800759c
+-	int	1	quantile(rec, round(i3), 0.47634445247056656)	-13
+-	int	1	quantile(rec, mod(i1, 3), 1.0)	1
+-	real	1	quantile(rec, select(bf, cf1, cf1), 0.1)	7fe1ccf385ebc8a0
+-	int	1	quantile(rec, max(7, marginal(i2 + ci2, tb)), 1.0)	11
+-	real	1	quantile(rec, abs(3.0 * (cf2 + 1e-3)), 1.0)	41b613673f60c49c
+-	int	1	quantile(rec, mod(per_step(ci2), min(min(i2, ci2), max(t2, ci2))), 0.6229525204057774)	E:static
+-	real	1	quantile(rec, r2, 0.0)	c004000000000000
+-	real	1	quantile(rec, min(max(cf2, cf1), t1 / 2.5), 0.5)	4010000000000000
+-	real	1	quantile(rec, -cf1 - t2 - ci2, 0.6160526430878583)	ffe1ccf385ebc8a0
+-	int	1	quantile(rec, mod(10, t1), 0.0)	0
+-	real	1	quantile(rec, max(lv, cf1), 0.561099484915654)	7fe1ccf385ebc8a0
+-	int	1	quantile(rec, ci2, 1.0)	100
+-	int	1	quantile(rec, div(i0, 2) * mod(ci2, ibig), 1.0)	0
+-	int	1	quantile(rec, ci2, 0.0)	-2
+-	int	1	quantile(rec, div(ci1, 3), 0.9)	3074457345618258602
+-	real	1	quantile(rec, clamp(r2, ci1 + i0, max(ci2, i1)) + rbig, 0.25)	7e37e43c8800759c
+-	real	1	quantile(rec, select(not 0.5 > i3, round(i4), clamp(safe_div(cf1, 3.0, r4), select(cb1, ci2, t2), cf1 + r0)), 0.5)	7fc7bbef5d3a60d5
+-	real	1	quantile(rec, rand(s1), 1.0)	3fe6a3d27b02f0fb
+-	real	1	quantile(rec, clamp(3 + r2, round(ci2), -cf2), 0.75)	c008000000000000
+-	int	1	quantile(rec, muldiv(ci2, ci1, 1_000), 0.25)	-9223372036854776
+-	real	1	quantile(rec, rand(s1) - mod(-ci2, (10 - ci2) * ci2), 0.5)	E:runtime
+-	real	1	quantile(rec, r3 - cf1, 0.0)	ffe1ccf385ebc8a0
+-	int	1	quantile(rec, i0, 0.03420765764230538)	0
+-	real	1	quantile(rec, safe_div(100 * i0, imax + cf2, max(ci2, 10)) - 1e300, 0.5357857794868227)	fe37e43c8800759c
+-	real	1	quantile(rec, min(1e300 * (round(rbig) + 2 * 0.1), min(max(ci1, i3), min(lv, 2.5))), 1.0)	E:runtime
+-	int	1	quantile(rec, (mod(round(ci1), 7) - round(per_step(ci1))) * (2 - 4611686018427387904) * ci2 + div(ci1, 2), 1.0)	E:static
+-	int	1	quantile(rec, ci1, 0.75)	9223372036854775807
+-	int	1	quantile(rec, -ci2, 0.9)	1
+-	real	1	quantile(rec, -ci2 * cf2, 0.5)	4008000000000000
+-	real	1	quantile(rec, floor(t2 / cf1) * select(select(cb1, bt, bf), ci1, counter * 0.5), 0.5)	E:runtime
+-	int	1	quantile(rec, 1_000, 0.9)	1000
+-	int	1	quantile(rec, select(bt, ci2, ci1), 1.0)	100
+-	real	1	quantile(rec, select(cb1, ci2, cf1), 0.9)	bff0000000000000
+-	real	1	quantile(rec, select(min(ci1, 10) != times_step(cf1), mod(div(t2, 3), 100), cf2), 1.0)	E:static
+-	int	1	quantile(rec, ceil(r2 - cf2), 1.0)	-1
+-	int	1	quantile(rec, abs(clamp(max(100, ci1), ci1, ci2)), 0.6671713157779269)	1
+-	real	1	quantile(rec, cf2 * (ci1 + cf1 + rand(s1)), 0.9)	7ff0000000000000
+-	int	1	quantile(rec, max(max(ci1, ci2), 2), 0.32108658616865005)	9223372036854775807
+-	int	1	quantile(rec, marginal(ci1, tb), 1.0)	2305843009213693952
+-	real	1	quantile(rec, cf2, 0.5)	4008000000000000
+-	int	1	quantile(rec, mod(clamp(floor(cf2), imax + ci2, div(counter, 9223372036854775807)), 100), 1.0)	E:runtime
+-	int	1	quantile(rec, max(select(cb1 != bf, 10 * i1, mod(imin, 100)), round(r3)), 0.0)	10
+-	int	1	quantile(rec, muldiv(round(t2), div(imin, 7), -ci1), 0.25)	E:runtime
+-	int	1	quantile(rec, ci2, 0.5)	-1
+-	int	1	quantile(rec, marginal(div(select(bt, t1, ci1), 2), tb), 0.5)	0
+-	int	1	quantile(rec, floor(cf2), 0.0)	-1
+-	real	1	quantile(rec, times_step(cf2), 0.0)	E:static
+-	int	1	quantile(rec, div(ci2, marginal(t1, tb)), 0.5)	E:runtime
+-	real	1	quantile(rec, 3.0, 0.5)	4008000000000000
+-	int	1	quantile(rec, max(-round(rate1), div(7, 1)), 0.5)	7
+-	real	1	quantile(rec, ci2 - 100 * safe_div(i2, t2, cf2) * (rand(s1) + cf1 * (2 + ci2) * (max(0.0, i4) + muldiv(ci2, ci1, 7))), 0.5)	7ff0000000000000
+-	int	1	quantile(rec, ci1, 0.20570814593377496)	9223372036854775807
+-	int	1	quantile(rec, -floor(cf1), 0.9)	E:runtime
+-	real	1	quantile(rec, abs(cf2), 0.0)	00000000000007e8
+-	int	1	quantile(rec, ci2, 0.0)	-2
+-	real	1	quantile(rec, rand(s2), 0.7981750673475708)	3fd4361e64d62732
+-	real	1	quantile(rec, cf2 - ci2, 0.9)	4010000000000000
+-	real	1	quantile(rec, 0.49999999999999994, 1.0)	3fdfffffffffffff
+-	int	1	quantile(rec, ci1 * ci1 * ceil(0.5) - ci2, 0.0)	E:runtime
+-	int	1	quantile(rec, abs(imax - t2), 0.25)	9223372036854775707
+-	int	1	quantile(rec, clamp(t2, ibig, i3), 0.5)	-13
+-	real	1	quantile(rec, r3, 0.5)	3e112e0be826d695
+-	int	1	quantile(rec, t2, 1.0)	100
+-	real	1	quantile(rec, 1e-3, 0.5)	3f50624dd2f1a9fc
+-	int	1	quantile(rec, select(bt, ci1, i1), 0.9)	9223372036854775807
+-	int	1	quantile(rec, round(div(div(t1, i4), 7)), 0.75)	0
+-	int	1	quantile(rec, round(safe_div(10, 0.49999999999999994, r4)), 1.0)	20
+-	real	1	quantile(rec, rand(s2) * (per_step(4611686018427387904 - ci1) + min(ci2, abs(r0))), 0.0)	E:static
+-	real	1	quantile(rec, -1e-3, 0.8922092804663951)	bf50624dd2f1a9fc
+-	int	1	quantile(rec, 3, 0.0)	3
+-	real	1	quantile(rec, cf2, 0.5)	4008000000000000
+-	int	1	quantile(rec, marginal(mod(ci2, i4), tb), 0.0)	0
+-	int	1	quantile(rec, 0, 0.5)	0
+-	int	1	quantile(rec, ci1, 0.5)	9223372036854775807
+-	real	1	quantile(rec, abs(cf2), 0.03897017561085303)	4008000000000000
+-	real	1	quantile(rec, (div(i3, 1) - ci2) * floor(cf1) * times_step(min(cf1, cf2)), 0.5)	E:static
+-	real	1	quantile(rec, rand(s2), 0.75)	3fd4361e64d62732
+-	real	1	quantile(rec, min(cf1, cf2), 1.0)	4008000000000000
+-	int	1	quantile(rec, ci2, 1.0)	100
+-	real	1	quantile(rec, cf1 / cf2, 0.5)	7fc7bbef5d3a60d5
+-	int	1	quantile(rec, (div(4611686018427387904, counter) - round(r4) - 3) * (div(counter, t2) - ci1) * ci2, 0.5)	E:runtime
+-	real	1	quantile(rec, abs(0.0 - ci1), 0.9)	43e0000000000000
+-	int	1	quantile(rec, t2, 1.0)	100

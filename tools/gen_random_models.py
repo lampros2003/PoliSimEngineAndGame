@@ -1,7 +1,7 @@
 """Stage S10.7: random whole models, run by the oracle, for the engine to match.
 
 Writes conformance/random_models.toml: models drawn at random from what format 1 offers
-(phases, national values, records with their columns and sums over them, values with
+(phases, national values, records with their columns, sums and quantiles over them, values with
 dimensions and their sums and indexes, states, prev, lags, situations, a flow between
 two accounts, random draws and lever commands), each with the oracle's state hash after
 every step, or the step at which the oracle stopped with an error. The engine runs each
@@ -203,6 +203,8 @@ class Model:
                                   f"wcount(rec, true), 0.0)"] * 3
                 forms.append(lambda: f"safe_div(wcount(rec, {self.expr('bool', 'rec', phase, depth - 1)}), "
                                      f"wcount(rec, true), 0.0)")
+                forms += [lambda: f"quantile(rec, {self.expr('real', 'rec', phase, depth - 1)}, "
+                                  f"{rng.choice(['0.0', '0.1', '0.5', '0.9', '1.0', 'clamp(abs(k1), 0.0, 1.0)'])})"] * 2
                 ones = self.readable("real", "d1", phase)
                 ones = [n for n in ones if self.scope_of(n) == "d1"]
                 twos = [n for n in self.readable("real", "d12", phase) if self.scope_of(n) == "d12"]

@@ -1007,6 +1007,45 @@ class _Builder:
             return acc
         return Built("real", unit, fn_real)
 
+    def _fn_quantile(self, args, ctx):
+        """Stage S10.9: the value below which a share p of the records' weight lies. The
+        records with a weight are ordered by value (ties by record order) and the result is
+        the value of the first at which the weight so far reaches p times the total."""
+        self._args("quantile", args, 3)
+        if ctx is not None:
+            raise FormulaError(f"quantile() cannot be used inside a per-{ctx} formula")
+        if args[0][0] != "name" or args[0][1] not in self.scope.entities:
+            raise FormulaError("quantile(): the first argument must be the name of an entity")
+        entity = self.scope.entities[args[0][1]]
+        saved, self.in_scope = self.in_scope, ()  # neither part sees the dimensions
+        try:
+            inner = self._number(self.build(args[1], entity.name), "quantile()")
+            share = self._number(self.build(args[2], None), "quantile() share")
+        finally:
+            self.in_scope = saved
+        if share.unit is not None:
+            U.unify(share.unit, U.ONE, "quantile() share")
+        weights, count, f, fp = self._weights(entity), len(entity.ids), inner.fn, share.fn
+
+        def fn(i):
+            values = [f(r) for r in range(count)]
+            p = float(fp(i))
+            if not 0.0 <= p <= 1.0:
+                raise SimError("quantile(): the share must be from 0 to 1")
+            if any(v != v for v in values):
+                raise SimError("quantile(): a record's value is not a number")
+            total = sum(weights)
+            if total <= 0:
+                raise SimError("quantile(): the records' weights add to nothing")
+            target = p * float(total)
+            so_far = 0
+            for r in sorted((r for r in range(count) if weights[r] != 0), key=lambda r: (values[r], r)):
+                so_far += weights[r]
+                if float(so_far) >= target:
+                    return values[r]
+            raise SimError("quantile(): internal error")
+        return Built(inner.type, inner.unit, fn)
+
     def _grouped(self, fname: str, args, ctx):
         """Format 1 (S4.0): wsum_by / wcount_by(entity, x, d, key)."""
         self._args(fname, args, 4)

@@ -87,6 +87,7 @@ accounts of its own entity, which take that record's value.
 | `rand(stream)` | real | a draw in [0, 1) for this record and step from the named stream |
 | `wsum(entity, x)` | as `x` | sum over records of `weight * x`; national formulas only |
 | `wcount(entity, c)` | whole | sum of the weights of records where `c` is true |
+| `quantile(entity, x, p)` | as `x` | the value below which a share `p` of the records' weight lies, below; not in per-record formulas (added in stage S10.9) |
 
 `round`, `floor` and `ceil` of an infinity, a not-a-number or a value outside the 64-bit
 range are errors. `min`, `max` and `clamp` return a whole number only when every argument
@@ -172,6 +173,29 @@ So `pow(5, 2)` is exactly 25, a negative `x` has whole powers, and `pow(x, 0)` i
 of the product, which `exp` magnifies): the same bits everywhere, but not the closest
 double. For a square root write `sqrt`, which is.
 
+### `quantile(entity, x, p)`
+
+`x` is a per-record number (whole or real, any unit: the result has its type and unit); `p`
+is a national number of unit 1, the share, taken as a real. Like `wsum`, it may be used in
+national formulas and in formulas with dimensions, which it ignores. In this order:
+
+```
+x is evaluated for every record, in record order (the first error stops it)
+p is evaluated
+p must be from 0.0 to 1.0, else an error (not-a-number is an error)
+no record's x may be not-a-number, else an error
+W = the sum of the weights; W must be above 0, else an error
+the records whose weight is not 0, ordered by x ascending, ties by record order
+    (-0.0 and 0.0 tie)
+so_far = 0; for each record r in that order:
+    so_far = so_far + weight[r]
+    if real(so_far) >= p * real(W): result is x[r]
+```
+
+So `quantile(household, net_income, 0.5)` is the weighted median, `p = 0` gives the
+smallest value with a weight and `p = 1` the largest. The result is always one record's
+value, never an average of two.
+
 ### `marginal(x, table)`
 
 `x` is a whole number of money and must have the table's unit. With bands
@@ -190,8 +214,9 @@ Money below the first `from` is in no band. Thresholds that descend are an error
 
 ## Not in format 0
 
-Moving averages, lookup tables with interpolation and quantiles. Each will be added when
+Moving averages and lookup tables with interpolation. Each will be added when
 a model needs it, with a definition as exact as the ones above. Since this list was
-written, `exp` (stage S5.1), `ln`, `sqrt` and `pow` (S10.6) have joined the language,
+written, `exp` (stage S5.1), `ln`, `sqrt` and `pow` (S10.6) and `quantile` (S10.9) have
+joined the language,
 format 1 has added sums over dimensions (`docs/spec/06-model-format-1.md`), and lags
 longer than one step are a section of their own (`[lag]`, S10.5).
