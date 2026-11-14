@@ -117,3 +117,56 @@ fn catalogue_describes_the_budget() {
     assert_eq!(levers.len(), 6);
     assert!(catalogue.entry("gov_purchases").unwrap().money);
 }
+
+/// A copy of the mini model with two counters updated at the end of the phase; the second
+/// is limited to `limit`, so with 4 the fifth step fails after the first has already moved.
+fn counting_model(folder: &std::path::Path, limit: i64) {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/mini");
+    std::fs::create_dir_all(folder.join("scenarios")).unwrap();
+    std::fs::create_dir_all(folder.join("data")).unwrap();
+    for entry in std::fs::read_dir(source.join("data")).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::copy(entry.path(), folder.join("data").join(entry.file_name())).unwrap();
+    }
+    std::fs::copy(source.join("scenarios/island.toml"), folder.join("scenarios/island.toml")).unwrap();
+    let model = std::fs::read_to_string(source.join("model.toml")).unwrap();
+    let extra = format!(
+        "\n[state.ticks]\ntype = \"int\"\nunit = \"1\"\nphase = \"pay\"\ninitial = 0\nnext = \"ticks + 1\"\n\n\
+         [state.counter]\ntype = \"int\"\nunit = \"1\"\nphase = \"pay\"\ninitial = 0\nrange = [0, {limit}]\n\
+         next = \"counter + 1\"\n"
+    );
+    std::fs::write(folder.join("model.toml"), model + &extra).unwrap();
+}
+
+#[test]
+fn a_failed_step_is_undone_and_a_corrected_model_carries_on() {
+    let base = std::env::temp_dir().join(format!("polisim-rollback-{}", std::process::id()));
+    let (broken, fixed) = (base.join("broken"), base.join("fixed"));
+    counting_model(&broken, 4);
+    counting_model(&fixed, 1000);
+
+    // The corrected model from the start: what the repaired game must reproduce.
+    let mut clean = Session::open(&fixed.join("scenarios/island.toml")).unwrap();
+    for _ in 0..10 {
+        clean.step().unwrap();
+    }
+
+    let mut game = Session::open(&broken.join("scenarios/island.toml")).unwrap();
+    for _ in 0..4 {
+        game.step().unwrap();
+    }
+    let error = game.step().unwrap_err().to_string();
+    assert!(error.contains("outside its declared range"), "{error}");
+    assert_eq!(game.steps_done(), 4);
+    // Failing again changes nothing: the state was put back.
+    assert!(game.step().is_err());
+
+    // Correct the file in place and reload: the game carries on from the end of month 4.
+    std::fs::copy(fixed.join("model.toml"), broken.join("model.toml")).unwrap();
+    game.reload().unwrap();
+    for _ in 4..10 {
+        game.step().unwrap();
+    }
+    assert_eq!(game.history().hashes, clean.history().hashes);
+    std::fs::remove_dir_all(&base).ok();
+}

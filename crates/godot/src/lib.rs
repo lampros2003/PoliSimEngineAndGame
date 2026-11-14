@@ -158,6 +158,9 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
             }
             Request::Reload => match session.reload() {
                 Ok(reset) => {
+                    // A failed step was undone, so a corrected model carries on from the
+                    // end of the last good month.
+                    failed = None;
                     let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
                     Some(EventData::Reloaded { reset, error: None })
                 }

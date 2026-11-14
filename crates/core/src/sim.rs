@@ -490,6 +490,21 @@ impl Simulation {
         self.record()
     }
 
+    /// After a step fails part-way, puts every value back as it was at the end of the last
+    /// completed step, so that a corrected model can be reloaded and the run continued.
+    /// It uses the end-of-step copy kept while tracing; without one it returns false and
+    /// the state is left as the failed step left it.
+    pub fn roll_back(&mut self) -> bool {
+        match self.snapshots.front() {
+            Some(s) if s.steps_done == self.step => {
+                self.scal.clone_from(&s.scal);
+                self.cols.clone_from(&s.cols);
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn take_snapshot(&mut self) {
         let snapshot = Snapshot { steps_done: self.step, scal: self.scal.clone(), cols: self.cols.clone() };
         self.snapshots.push_front(snapshot);

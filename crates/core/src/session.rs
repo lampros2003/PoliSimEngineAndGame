@@ -28,7 +28,7 @@ use std::sync::Arc;
 use toml::Value;
 
 use crate::describe::Catalogue;
-use crate::error::{Error, Result, model_err};
+use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
 use crate::model::{Kind, Model, Scenario, load_model, load_scenario};
 use crate::program::Val;
@@ -106,6 +106,8 @@ pub struct Session {
     history: History,
     latest: BTreeMap<String, Val>,
     previous: BTreeMap<String, Val>,
+    /// A step failed part-way and its changes could not be undone.
+    broken: bool,
 }
 
 impl Session {
@@ -130,6 +132,7 @@ impl Session {
             history: History::default(),
             latest: BTreeMap::new(),
             previous: BTreeMap::new(),
+            broken: false,
         };
         // Lever settings are known before any step.
         for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
@@ -182,8 +185,12 @@ impl Session {
         self.previous.get(name).copied()
     }
 
-    /// Runs one step. After an error the session must not be stepped again.
+    /// Runs one step. If it fails, every value is put back as it was before the step, so
+    /// the game can go on after the model is corrected and reloaded (or a lever changed).
     pub fn step(&mut self) -> Result<()> {
+        if self.broken {
+            return sim_err("a step failed part-way and could not be undone; load a saved game");
+        }
         let index = self.sim.steps_done();
         let applying: Vec<(String, Val)> = self
             .sim
@@ -192,7 +199,13 @@ impl Session {
             .filter(|(step, _, _)| *step == index)
             .filter_map(|(_, lever, raw)| self.sim.check_lever(&lever, &raw).ok().map(|v| (lever, v)))
             .collect();
-        let row = self.sim.step()?;
+        let row = match self.sim.step() {
+            Ok(row) => row,
+            Err(error) => {
+                self.broken = !self.sim.roll_back();
+                return Err(error);
+            }
+        };
         let named: Vec<(String, Val)> = self.sim.row_names().iter().cloned().zip(row.values.iter().copied()).collect();
         self.history.push(row.step, row.hash, &named);
         self.previous = std::mem::take(&mut self.latest);
@@ -250,6 +263,9 @@ impl Session {
     /// Reads the model files again and continues the run on the new model. Returns the
     /// names of persistent values that started again from their initial value.
     pub fn reload(&mut self) -> Result<Vec<String>> {
+        if self.broken {
+            return sim_err("a step failed part-way and could not be undone; load a saved game");
+        }
         let model = Arc::new(load_model(&self.model.root)?);
         let (sim, reset) = self.sim.reload(Arc::clone(&model), &self.scenario.preset, self.scenario.params.clone())?;
         self.scenario.model = (*model).clone();

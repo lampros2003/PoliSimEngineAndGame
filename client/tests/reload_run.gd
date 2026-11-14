@@ -1,7 +1,8 @@
 extends SceneTree
 ## Hot reload through the interface, on a copy of a model (--model-dir=DIR, with
 ## --scenario pointing into it). A typo must be reported and the game must carry on with
-## the old model; a real change must take effect the next month.
+## the old model; a real change must take effect the next month; and after a run-time
+## error, reloading the corrected model must let the game carry on.
 
 var main: Control
 
@@ -51,8 +52,27 @@ func _initialize() -> void:
 	if spending_after <= spending_before * 1.05:
 		_fail("spending did not jump after the change: %d then %d" % [spending_before, spending_after])
 		return
+	# 3. A run-time failure, then the correction: the game must carry on from the last
+	# good month once the corrected model is reloaded.
+	var phase := "government"
+	_write(economy, original + '\n[var.trap]\ntype = "int"\nunit = "1"\nphase = "%s"\nrange = [0, 0]\nexpr = "1"\n' % phase)
+	main._reload.pressed.emit()
+	await _settle()
+	var good: int = main.game.steps_done()
+	main.advance(1)
+	await _settle()
+	if not main.failed or main.game.steps_done() != good:
+		_fail("the run-time error did not stop the game")
+		return
 	_write(economy, original)
-	print("reload run: typo reported, game carried on, change took effect (spending %d -> %d)" % [spending_before, spending_after])
+	main._reload.pressed.emit()
+	await _settle()
+	main.advance(1)
+	await _settle()
+	if main.failed or main.game.steps_done() != good + 1:
+		_fail("the game did not carry on after the corrected model was reloaded (%d months, failed %s)" % [main.game.steps_done(), main.failed])
+		return
+	print("reload run: typo reported, game carried on, change took effect (spending %d -> %d), recovered from a run-time error" % [spending_before, spending_after])
 	quit(0)
 
 
