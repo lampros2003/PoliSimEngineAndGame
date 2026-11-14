@@ -93,3 +93,18 @@ doc = "Real spending on public services per person served is more than 5% above 
 good = true
 start = "service_level_overall > 1.05"
 end = "service_level_overall < 1.03"
+
+# Stage S8.2: emissions (emissions.toml) against a straight path to net zero in 2050.
+
+[situation.emissions_above_path]
+label = "Emissions above the path to net zero"
+doc = "Greenhouse gas emissions are more than 5% above a straight path from 2024's to nothing in 2050"
+start = "emissions > 1.05 * net_zero_path"
+end = "emissions < net_zero_path"
+
+[situation.emissions_on_track]
+label = "On track for net zero"
+doc = "Greenhouse gas emissions are below a straight path from 2024's to nothing in 2050"
+good = true
+start = "emissions < 0.98 * net_zero_path"
+end = "emissions > net_zero_path"

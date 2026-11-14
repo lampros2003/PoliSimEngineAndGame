@@ -14,6 +14,7 @@ A monthly stock-flow model of the UK economy and public finances in model format
 | `households.toml`, `households/` | 20,000 synthetic households and the 2024-25 tax and benefit rules (`households/README.md`) | `tools/uk/households.py`, `tools/uk/make_rules.py`, `tools/uk/calibrate.py` |
 | `trade.toml`, `trade/`, `data/trade_partners.csv` | Trade by partner (the EU, the United States, China, the rest), a barrier lever for each, and customs duties (stage S6.3) | `tools/uk/trade.py`, `tools/uk/calibrate.py` |
 | `functions.toml`, `functions/`, `data/functions.csv` | Public spending by function: a lever per function, from HM Treasury's PESA 2025 (stage S8.0, below) | `tools/uk/functions.py`, `tools/uk/calibrate.py` |
+| `emissions.toml`, `emissions/`, `data/emissions.csv` | Greenhouse gas emissions by industry and from households, and a carbon price (stage S8.2, below) | `tools/uk/emissions.py`, `tools/uk/calibrate.py` |
 | `situations.toml` | The situations the player is told about (stage S7.3, below) | `tools/uk/template/situations.toml`, copied by `tools/uk/calibrate.py` |
 | `SENSITIVITY.md` | Which uncertain parameters matter: low, central and high presets screened one at a time and by elementary effects | `tools/uk/screen.py` |
 | `politics.toml`, `politics/` | The voters: 600 voter types from the households, and how they choose between nine blocs (`politics/README.md`) | `tools/uk/voters.py`, `tools/uk/calibrate.py` |
@@ -207,6 +208,29 @@ quarter off health spending takes its level halfway to 75% in about four months.
 England's waiting list, planned as health's sourced outcome, waits for its data: its site
 is not reachable from the environment this was built in.
 
+## Emissions (stage S8.2)
+
+`tools/uk/emissions.py` takes 2024's greenhouse gas emissions from ONS's atmospheric
+emissions accounts (UK residence basis, OGL; `data/emissions.csv`): 478 million tonnes of
+carbon dioxide equivalent, 354 million from the industries (the most from energy and
+water, transport, manufacturing and agriculture) and 124 million from households' own
+heating and driving. In the first month every industry emits its 2024 tonnes; after that
+in proportion to its output at constant prices, and households in proportion to their
+spending, times an intensity that falls about 3% a year (`intensity_fall`, presets 2% and
+4%: the accounts' emissions fell from 821 to 478 million tonnes from 1990 to 2024 while
+output nearly doubled).
+
+A carbon price (the "Environment" group, pounds a tonne, a bill) speeds the fall, by 2% a
+year more at £100 a tonne (`carbon_price_response`, a judgement, presets 1% and 3%), and
+firms and households pay it to the government on the previous month's emissions, as
+public receipts: £100 a tonne raises about £48bn a year at first. It does not yet raise
+prices; it takes money from firms and households.
+
+With unchanged policy emissions fall about 1.5% a year and move more than 5% above a
+straight path from 2024's to nothing in 2050 in the 16th month; at £100 a tonne they fall
+about 3.5% a year, still above the path, which falls by a twenty-sixth of 2024's each
+year.
+
 ## Situations (stage S7.3)
 
 `situations.toml` names seven conditions the player is told about when they begin and
@@ -223,6 +247,8 @@ end, each with a start and an end so it does not flicker:
 | No majority | the governing blocs hold fewer than 326 seats | 326 or more |
 | Health service, schools, or police and courts under strain (S8.1) | the service level below 95% | above 97% |
 | Public services improving (good, S8.1) | all services, weighted by spending, above 105% | below 103% |
+| Emissions above the path to net zero (S8.2) | more than 5% above a straight path from 2024's to nothing in 2050 | below the path |
+| On track for net zero (good, S8.2) | more than 2% below the path | above it |
 
 With policy unchanged, debt passes 100% of GDP in the 18th month and nothing else comes on
 in five years. Cutting purchases of goods and services by a quarter brings a recession at

@@ -202,3 +202,13 @@ licence = "Open Government Licence v3.0"
 attribution = "Contains public sector information licensed under the Open Government Licence v3.0. Source: HM Treasury, Public Expenditure Statistical Analyses 2025"
 format = "ons_xlsx"
 file = "pesa2025_ch5.xlsx"
+
+[dataset.emissions_ghg]
+title = "Atmospheric emissions: greenhouse gases by industry and gas, UK residence basis (2024 used)"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/environmentalaccounts/datasets/ukenvironmentalaccountsatmosphericemissionsgreenhousegasemissionsbyeconomicsectorandgasunitedkingdom/current/05atmoshpericemissionsghg.xlsx"
+page = "https://www.ons.gov.uk/economy/environmentalaccounts/datasets/ukenvironmentalaccountsatmosphericemissionsgreenhousegasemissionsbyeconomicsectorandgasunitedkingdom"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_xlsx"
+file = "emissions_ghg.xlsx"

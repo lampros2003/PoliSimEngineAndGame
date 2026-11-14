@@ -446,6 +446,35 @@ class Services(unittest.TestCase):
         self.assertLess(row["service_level_overall"], 1.0)
 
 
+class Emissions(unittest.TestCase):
+    """Stage S8.2: greenhouse gas emissions by industry and from households, at their 2024
+    levels in the first month (models/uk/data/emissions.csv, ONS), and a carbon price."""
+
+    def test_the_first_month_has_2024_emissions(self):
+        with open(UK / "data" / "emissions.csv", newline="", encoding="utf-8") as handle:
+            kt = {r["sector"]: float(r["kt_co2e"]) for r in csv.DictReader(handle)}
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        names = model().dims["industry"].members
+        for name, tonnes in zip(names, sim.column("industry_emissions")):
+            self.assertAlmostEqual(tonnes / (kt[name] * 1000 / 12), 1.0, places=9, msg=name)
+        self.assertAlmostEqual(row["household_emissions"] / (kt["households"] * 1000 / 12), 1.0, places=9)
+        self.assertEqual(row["carbon_tax_firms"] + row["carbon_tax_households"], 0)
+
+    def test_a_carbon_price_raises_revenue_and_cuts_emissions(self):
+        base = Simulation(model(), seed=SEED)
+        priced = Simulation(model(), seed=SEED, levers={"carbon_price": 100})
+        for _ in range(13):
+            before, row = base.step(), priced.step()
+        # Paid on last month's emissions, £100 (10,000 pence) a tonne.
+        self.assertGreater(row["carbon_tax_firms"], 0)
+        self.assertLess(row["emissions"], before["emissions"])
+        self.assertLess(row["emission_intensity"], before["emission_intensity"])
+        parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
+                 "other_receipts", "customs_duties", "carbon_tax_firms", "carbon_tax_households"]
+        self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))
+
+
 class Trade(unittest.TestCase):
     """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
 
@@ -478,5 +507,5 @@ class Trade(unittest.TestCase):
         self.assertAlmostEqual(row["customs_duties"], round(0.2 * walled.column("imports_by_partner")[china]), delta=1)
         # They are public receipts, so the budget balance counts them.
         parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
-                 "other_receipts", "customs_duties"]
+                 "other_receipts", "customs_duties", "carbon_tax_firms", "carbon_tax_households"]
         self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))

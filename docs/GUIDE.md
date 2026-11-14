@@ -29,7 +29,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
 | Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
 | Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, and the months to the next election |
-| Policy | 63 levers in groups: public services (health, education, defence and six more), other spending, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
+| Policy | 64 levers in groups: public services (health, education, defence and six more), other spending, a carbon price, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
 | Chart | Any figure over time. Dashed lines are your policy changes. Click a name in the legend to remove it |
 | Why did it change? | What moved a figure last month, input by input. Press an input to follow it; Back returns |
 | Connections | The web around a figure: what it depends on to the left, what it feeds to the right, each tile coloured by last month's change. Press a tile to move to it |
@@ -64,7 +64,10 @@ election, and how long the government has been in office.
 4. **Press Why next to the poll rating**, then open **Connections** and follow the tiles
    back to the taxes you changed: the model's own chain, from each household's income tax
    to its income, the voters' choice and the polls.
-5. **Leave policy alone and advance to July 2029.** Time in office wears the government
+5. **Set a carbon price of £100 a tonne** (Policy, Environment) and watch emissions by
+   industry (Who gains, who loses) and the budget: about £48bn a year in revenue, and
+   emissions falling faster, though not yet on the path to net zero.
+6. **Leave policy alone and advance to July 2029.** Time in office wears the government
    down, but with an economy that holds up it keeps a majority. Then try the same with
    a slump of your own making.
 

@@ -93,6 +93,6 @@ class ExampleMod(unittest.TestCase):
         # 1% a year on 40% of £1.9tn of deposits: about £630m a month (in pence).
         self.assertAlmostEqual(row["wealth_tax_paid"] / 100 / 633e6, 1.0, delta=0.01)
         parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
-                 "other_receipts", "customs_duties", "wealth_tax_paid"]
+                 "other_receipts", "customs_duties", "carbon_tax_firms", "carbon_tax_households", "wealth_tax_paid"]
         self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))
         self.assertLess(row["government_support"], before["government_support"])
