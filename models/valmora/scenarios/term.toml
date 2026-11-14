@@ -1,0 +1,22 @@
+# A five-year term in Valmora, an invented country of about eight million households.
+# The economy is the toy model's, scaled up (tools/make_valmora.py).
+
+[scenario]
+model = ".."
+seed = 20270101
+steps = 60
+preset = "central"
+
+# Presentation settings for the game client and `polisim play`. Not part of the run.
+[play]
+country = "Valmora"
+currency_symbol = "Cr"
+currency_name = "crowns"
+start = "2027-01"
+term = 60
+government = "government"
+headline = ["gdp", "unemployment_rate", "gov_balance", "-gov_money"]
+watch = ["gdp", "unemployment_rate", "gov_balance", "consumption_total", "hh_money.total"]
+
+[play.labels]
+"-gov_money" = "Public debt"

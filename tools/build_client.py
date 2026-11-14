@@ -32,8 +32,15 @@ def main() -> int:
     shutil.copy2(built, ROOT / "client" / "bin" / LIBRARY)
     print(f"copied {LIBRARY} into client/bin")
     if args.godot:
-        done = subprocess.run([args.godot, "--headless", "--path", str(ROOT / "client"), "--import"],
-                              capture_output=True, text=True, timeout=600)
+        # On a fresh checkout, Godot 4.7.2's editor aborts while quitting from its first
+        # import when the library is present (exit code 134); the import itself has been
+        # written by then, and the game runs normally. A second import with the cache in
+        # place exits cleanly, so that one is the check.
+        command = [args.godot, "--headless", "--path", str(ROOT / "client"), "--import"]
+        first = subprocess.run(command, capture_output=True, text=True, timeout=600)
+        if first.returncode != 0:
+            print(f"first import exited with {first.returncode}; importing again")
+        done = subprocess.run(command, capture_output=True, text=True, timeout=600)
         listed = ROOT / "client" / ".godot" / "extension_list.cfg"
         if done.returncode != 0 or not listed.exists():
             print(done.stdout[-2000:], done.stderr[-2000:], sep="\n", file=sys.stderr)

@@ -9,6 +9,7 @@ with `cargo build --release`. Exits with status 1 if any step differs.
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,15 +28,6 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as folder:
         folder = Path(folder)
         client_out, runner_out = folder / "client.csv", folder / "runner.csv"
-        client = subprocess.run(
-            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/scripted_run.gd",
-             "--", f"--out={client_out}"],
-            capture_output=True, text=True, timeout=600)
-        print(client.stdout.strip())
-        if client.returncode != 0 or not client_out.exists():
-            print(client.stderr.strip(), file=sys.stderr)
-            print("the client's scripted run failed", file=sys.stderr)
-            return 1
         runner = subprocess.run(
             [str(args.runner), "run", str(ROOT / "models" / "toy" / "scenarios" / "client_check.toml"),
              "--columns", "step,hash", "--out", str(runner_out)],
@@ -43,17 +35,42 @@ def main() -> int:
         if runner.returncode != 0:
             print(runner.stderr.strip(), file=sys.stderr)
             return 1
-        ours = client_out.read_text().splitlines()
         theirs = runner_out.read_text().splitlines()
-        if ours != theirs:
-            for number, (a, b) in enumerate(zip(ours, theirs)):
-                if a != b:
-                    print(f"first difference at line {number + 1}:\n  client {a}\n  runner {b}", file=sys.stderr)
-                    break
-            else:
-                print(f"different lengths: client {len(ours)} lines, runner {len(theirs)}", file=sys.stderr)
+        # The bridge driven directly, then the real interface driven through its controls.
+        for script, extra in (("res://tests/scripted_run.gd", []),
+                              ("res://tests/ui_run.gd", ["--scenario=models/toy/scenarios/baseline.toml"])):
+            client_out.unlink(missing_ok=True)
+            client = subprocess.run(
+                [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
+                 "--", f"--out={client_out}", *extra],
+                capture_output=True, text=True, timeout=900)
+            print(client.stdout.strip().splitlines()[-1] if client.stdout.strip() else "")
+            if client.returncode != 0 or not client_out.exists():
+                print(client.stderr.strip()[-3000:], file=sys.stderr)
+                print(f"{script} failed", file=sys.stderr)
+                return 1
+            ours = client_out.read_text().splitlines()
+            if ours != theirs:
+                for number, (a, b) in enumerate(zip(ours, theirs)):
+                    if a != b:
+                        print(f"{script}: first difference at line {number + 1}:\n  client {a}\n  runner {b}", file=sys.stderr)
+                        break
+                else:
+                    print(f"{script}: client {len(ours)} lines, runner {len(theirs)}", file=sys.stderr)
+                return 1
+            print(f"{script}: client and runner agree on all {len(ours) - 1} steps")
+        # Hot reload, on a copy of Valmora so the repository's files are never edited.
+        copy = folder / "valmora"
+        shutil.copytree(ROOT / "models" / "valmora", copy)
+        reload = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/reload_run.gd",
+             "--", f"--model-dir={copy}", f"--scenario={copy / 'scenarios' / 'term.toml'}"],
+            capture_output=True, text=True, timeout=900)
+        if reload.returncode != 0:
+            print(reload.stdout.strip()[-2000:], reload.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/reload_run.gd failed", file=sys.stderr)
             return 1
-        print(f"client and runner agree on all {len(ours) - 1} steps")
+        print(reload.stdout.strip().splitlines()[-1])
         return 0
 
 

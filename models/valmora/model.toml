@@ -1,0 +1,78 @@
+# Valmora (an invented country), generated from the toy model by
+# tools/make_valmora.py. The toy model's notes follow.
+#
+# Toy three-sector economy: households, firms and a government that issues the only
+# financial asset. It exists to exercise every part of model format 0 with the smallest
+# model that still behaves like an economy. Nothing in it describes a real country.
+#
+# Money values in these files are written in pounds. The loader stores them as whole
+# pence, so every total in a run is exact.
+
+[model]
+id = "valmora"
+format = 0
+title = "Valmora"
+currency = "VLC"
+minor_units = 100
+step = "month"
+phases = ["labour", "income", "spending", "firms", "government"]
+files = ["economy.toml"]
+
+# ---------------------------------------------------------------- sectors and accounts
+
+[sector.households]
+entity = "household"        # this sector's accounts are held record by record
+
+[sector.firms]
+
+[sector.government]
+
+[instrument.money]
+unit = "VLC"
+issuer = "government"       # the issuer's balance is minus everyone else's holdings
+
+[account.hh_money]
+label = "Household savings"
+sector = "households"
+instrument = "money"
+initial = { column = "money0" }
+range = [0, inf]            # no household credit in this model
+doc = "Money held by each household"
+
+[account.firm_money]
+label = "Firms' cash"
+sector = "firms"
+instrument = "money"
+initial = 27_520_000_000
+doc = "Money held by firms: profits not yet paid out"
+
+[account.gov_money]
+label = "Government's money position"
+sector = "government"
+instrument = "money"
+doc = "Government's position: minus the money it has issued"
+
+# ---------------------------------------------------------------- the household sample
+
+[entity.household]
+data = "data/households.csv"
+id = "id"
+weight = "weight"           # real households each record stands for
+
+[entity.household.columns.wage]
+label = "Wage when employed"
+type = "money"
+unit = "VLC/month/household"
+doc = "Gross monthly wage when employed"
+
+[entity.household.columns.equity_units]
+label = "Shares owned"
+type = "int"
+unit = "share/household"
+doc = "Shares in the firm sector owned by each household"
+
+# ---------------------------------------------------------------- random streams
+
+[stream.separation]
+
+[stream.hiring]

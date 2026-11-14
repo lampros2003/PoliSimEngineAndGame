@@ -1,0 +1,168 @@
+extends PanelContainer
+## "Why did this change?" Shows what moved a figure last month, input by input, and lets
+## the player follow any input to its own causes.
+
+const Palette := preload("res://scripts/palette.gd")
+const Bar := preload("res://scripts/bar.gd")
+
+signal follow(name: String)
+signal back
+signal chart(row: String)
+
+var fmt: RefCounted
+var entries := {}  # name -> catalogue entry
+var trail: PackedStringArray = []
+
+var _title: Label
+var _crumbs: Label
+var _summary: Label
+var _rows: VBoxContainer
+var _note: Label
+var _back: Button
+
+
+func _ready() -> void:
+	add_theme_stylebox_override("panel", Palette.panel_style())
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	add_child(box)
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	_title = Label.new()
+	_title.text = "Why did it change?"
+	_title.add_theme_font_size_override("font_size", Palette.TITLE)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_title)
+	_back = Button.new()
+	_back.text = "Back"
+	_back.disabled = true
+	_back.pressed.connect(func() -> void: back.emit())
+	head.add_child(_back)
+	_crumbs = Label.new()
+	_crumbs.add_theme_color_override("font_color", Palette.MUTED)
+	_crumbs.add_theme_font_size_override("font_size", Palette.SMALL)
+	_crumbs.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(_crumbs)
+	_summary = Label.new()
+	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_summary.text = "Press Why next to any figure to see what moved it last month."
+	box.add_child(_summary)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	_rows = VBoxContainer.new()
+	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rows.add_theme_constant_override("separation", 4)
+	scroll.add_child(_rows)
+	_note = Label.new()
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note.add_theme_color_override("font_color", Palette.MUTED)
+	_note.add_theme_font_size_override("font_size", Palette.SMALL)
+	box.add_child(_note)
+
+
+func label_of(name: String) -> String:
+	return str(entries.get(name, {}).get("label", name))
+
+
+func show_waiting(name: String) -> void:
+	_title.text = label_of(name)
+	_summary.text = "Working it out…"
+
+
+func show_error(name: String, message: String) -> void:
+	_title.text = label_of(name)
+	_clear()
+	if message.contains("not enough history"):
+		_summary.text = "Advance at least two months to see why figures change."
+	else:
+		_summary.text = message
+	_note.text = ""
+
+
+func _clear() -> void:
+	for child in _rows.get_children():
+		child.queue_free()
+
+
+func show_explanation(e: Dictionary) -> void:
+	var name: String = e["name"]
+	var entry: Dictionary = entries.get(name, {})
+	_back.disabled = trail.size() <= 1
+	_crumbs.text = " › ".join(Array(trail).map(func(n): return label_of(n))) if trail.size() > 1 else ""
+	_title.text = label_of(name)
+	var month: String = fmt.month_name(int(e["step"]))
+	var total_note := ""
+	if str(e.get("entity", "")) != "":
+		total_note = " (all %ss together)" % e["entity"]
+	_summary.text = "%s%s: %s, from %s the month before (%s)." % [
+		month, total_note, fmt.value(entry, e["now"]), fmt.value(entry, e["before"], true, false), fmt.change(entry, e["change"])]
+	_clear()
+	var biggest := 0.0
+	for part in e["parts"]:
+		if part["effect"] != null:
+			biggest = maxf(biggest, absf(float(part["effect"])))
+	if e["remainder"] != null:
+		biggest = maxf(biggest, absf(float(e["remainder"])))
+	var shown := 0
+	var unchanged := PackedStringArray()
+	for part in e["parts"]:
+		var effect: Variant = part["effect"]
+		var symbol: String = part["symbol"]
+		if effect != null and float(effect) == 0.0:
+			unchanged.append(part["label"] if symbol == "" else label_of(symbol))
+			continue
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var name_button := Button.new()
+		name_button.text = part["label"] if symbol == "" else label_of(symbol) + (" (last month)" if part["lagged"] else "")
+		name_button.flat = true
+		name_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		name_button.custom_minimum_size = Vector2(190, 0)
+		name_button.size_flags_horizontal = Control.SIZE_FILL
+		name_button.clip_text = true
+		var input_entry: Dictionary = entries.get(symbol, {})
+		var followable := symbol != "" and str(input_entry.get("kind", "")) in ["var", "flow", "state", "account"]
+		name_button.disabled = not followable
+		if symbol != "":
+			name_button.tooltip_text = "%s\nnow %s, before %s" % [str(input_entry.get("doc", "")), fmt.value(input_entry, part["now"]), fmt.value(input_entry, part["before"])]
+		if followable:
+			name_button.pressed.connect(func() -> void: follow.emit(symbol))
+		row.add_child(name_button)
+		var bar := Bar.new()
+		bar.custom_minimum_size = Vector2(120, 18)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.fraction = 0.0 if effect == null or biggest == 0.0 else float(effect) / biggest
+		row.add_child(bar)
+		var amount := Label.new()
+		amount.custom_minimum_size = Vector2(110, 0)
+		amount.clip_text = true
+		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		amount.text = "not separable" if effect == null else fmt.change(entry, effect)
+		row.add_child(amount)
+		if symbol != "" and str(input_entry.get("row", "")) != "":
+			var plot := Button.new()
+			plot.text = "Chart"
+			var input_row: String = input_entry["row"]
+			plot.pressed.connect(func() -> void: chart.emit(input_row))
+			row.add_child(plot)
+		_rows.add_child(row)
+		shown += 1
+	if not unchanged.is_empty():
+		var quiet := Label.new()
+		quiet.text = "Unchanged last month: " + ", ".join(unchanged)
+		quiet.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		quiet.add_theme_color_override("font_color", Palette.MUTED)
+		quiet.add_theme_font_size_override("font_size", Palette.SMALL)
+		_rows.add_child(quiet)
+	var notes := PackedStringArray()
+	if str(e.get("note", "")) != "":
+		notes.append("This is %s." % e["note"])
+	if shown > 0 or not unchanged.is_empty():
+		if e["exact"]:
+			notes.append("These parts add up exactly to the change.")
+		else:
+			notes.append("Not explained by any single input on its own (inputs acting together): %s." % fmt.change(entry, e["remainder"]))
+		notes.append("Each part is how far that input's own change moved the figure, everything else as it was this month.")
+	_note.text = "\n".join(notes)
