@@ -4,3 +4,4 @@ target*/
 /out/
 .godot-bin/
 dist/
+.cache/

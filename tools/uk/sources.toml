@@ -1,0 +1,48 @@
+# Where the United Kingdom's data come from. Every dataset is downloaded whole into
+# .cache/uk/ by `python tools/uk/pipeline.py fetch`; only the series listed in
+# series.toml are extracted into models/uk/data/.
+
+[dataset.ukea]
+title = "UK Economic Accounts"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/grossdomesticproductgdp/datasets/unitedkingdomeconomicaccounts/current/ukea.csv"
+page = "https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/unitedkingdomeconomicaccounts"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_timeseries"
+
+[dataset.qna]
+title = "Quarterly National Accounts"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/grossdomesticproductgdp/datasets/quarterlynationalaccounts/current/qna.csv"
+page = "https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/quarterlynationalaccounts"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_timeseries"
+
+[dataset.pusf]
+title = "Public Sector Finances"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/economy/governmentpublicsectorandtaxes/publicsectorfinance/datasets/publicsectorfinances/current/pusf.csv"
+page = "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicsectorfinance/datasets/publicsectorfinances"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_timeseries"
+
+[dataset.lms]
+title = "Labour Market Statistics"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/labourmarketstatistics/current/lms.csv"
+page = "https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/labourmarketstatistics"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_timeseries"
+
+[dataset.bankrate]
+title = "Bank Rate, monthly average (IUMABEDR)"
+publisher = "Bank of England"
+url = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/1995&Dateto=31/Dec/2025&SeriesCodes=IUMABEDR&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
+page = "https://www.bankofengland.co.uk/boeapps/database"
+licence = "Open Government Licence v3.0 (Bank of England Database)"
+attribution = "Contains Bank of England data licensed under the Open Government Licence v3.0"
+format = "boe_monthly"
