@@ -126,6 +126,12 @@ type = "money"
 unit = "GBP/month"
 value = 1.25
 
+[table.rc]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{{ x = "-10.0", y = "-3.0" }}, {{ x = "0.0", y = "0.0" }}, {{ x = "k1", y = "1.0" }}, {{ x = "50.0", y = "2.0" }}]
+
 [state.tick]
 type = "int"
 unit = "1"
@@ -192,6 +198,7 @@ class Model:
                 lambda: f"ln(1.0 + abs({e('real')}))", lambda: f"sqrt(abs({e('real')}))",
                 lambda: f"pow(1.0 + abs(clamp({e('real')}, -1.0, 1.0)), clamp({e('real')}, -3.0, 3.0))",
                 lambda: f"pow({e('real')}, 2)", lambda: f"({e('real')} / 4.0)",
+                lambda: f"curve({e('real')}, rc)",
             ]
             previous = self.readable("real", scope, 10, prev=True)
             if previous:

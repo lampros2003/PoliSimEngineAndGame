@@ -496,6 +496,67 @@ def quantile_cases() -> list[tuple[str, str, str, str]]:
     return cases
 
 
+def curve_cases() -> list[tuple[str, str, str, str]]:
+    """Stage S11.1: curves, at and between their points, beyond their ends, with whole
+    numbers, money, infinities and not-a-number, per record, and refused: the wrong table,
+    unit or count, true/false values, points that do not ascend. Drawn from their own
+    generator, after quantile's, so the cases before them do not change."""
+    rng = random.Random(111)
+    cases = [(ctx, "real", "1", f"curve({x}, tc)") for ctx, x in [
+        ("-", "-5.0"), ("-", "-1.0"), ("-", "-0.5"), ("-", "0.0"), ("-", "-0.0"), ("-", "0"), ("-", "0.25"),
+        ("-", "r1"), ("-", "1"), ("-", "2.0"), ("-", "1e299"), ("-", "1e300"), ("-", "1e301"), ("-", "rtiny"),
+        ("-", "-rtiny"), ("-", "1.0 / 0.0"), ("-", "-1.0 / 0.0"), ("-", "0.0 / 0.0"), ("-", "imax"),
+        ("-", "i3"), ("rec", "cf1"), ("rec", "cf2"), ("rec", "ci2")]]
+    cases += [
+        ("rec", "real", "1", "curve(cm, tcm)"),
+        ("rec", "real", "1", "curve(cm + allow, tcm) * 2.0"),
+        ("-", "real", "1", "curve(curve(r1, tc), tc)"),
+        ("-", "int", "1", "round(curve(r2, tc) * 100.0)"),
+        ("-", "real", "1", "curve(0.5, tcd)"),
+        ("rec", "real", "1", "curve(cf1, tcd)"),
+        ("-", "real", "1", "curve(m1, tc)"),
+        ("-", "real", "1", "curve(r1, tcm)"),
+        ("-", "real", "1", "curve(r1, tb)"),
+        ("-", "int", "1", "marginal(i1, tc)"),
+        ("-", "real", "1", "curve(r1, nothing)"),
+        ("-", "real", "1", "curve(r1)"),
+        ("-", "real", "1", "curve(bt, tc)"),
+        ("-", "int", "1", "curve(r1, tc)"),
+        ("-", "real", "GBP", "curve(r1, tc)"),
+    ]
+    for _ in range(150):
+        x = rng.choice([repr(rng.uniform(-3.0, 3.0)), repr(rng.uniform(-0.1, 0.6)), repr(float(rng.randint(-2, 3))),
+                        repr(rng.uniform(1.9, 2.1)), repr(rng.choice([-1.0, 0.0, 0.5, 2.0]))])
+        cases.append(("-", "real", "1", f"curve({x}, tc)"))
+    return cases
+
+
+def counted_quantile_cases() -> list[tuple[str, str, str, str]]:
+    """Stage S11.2: quantile with a count per record (people in a household), including
+    counts of zero, a count that tips the median, and refused counts: below zero, real,
+    with a unit, true/false. After the curves' cases, so those before do not change."""
+    rng = random.Random(112)
+    cases = [
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, 1)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, ci2)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, select(ci2 > 0, ci2, 0))"),
+        ("-", "real", "1", "quantile(rec, cf2, 0.25, abs(ci1) * 0)"),
+        ("-", "real", "1", "quantile(rec, cf2, 0.5, select(cb1, 1000000000, 1))"),
+        ("-", "int", "1", "quantile(rec, ci1, 1.0, select(ci2 >= 0, ci2, 0))"),
+        ("-", "int", "1", "quantile(rec, ci2, 0.0, select(cb1, 0, 3))"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, ci2 - 10)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, cf2)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, cm)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, cb1)"),
+        ("-", "real", "1", "quantile(rec, cf1, 0.5, 1, 1)"),
+    ]
+    for _ in range(80):
+        share = rng.choice(["0.5", "0.1", "0.9", repr(rng.random())])
+        times = rng.choice(["1", "abs(ci2)", "select(cb1, 2, 1)", "abs(ci1) * 0 + 3", "select(ci2 > 0, ci2, 0)"])
+        cases.append(("-", "real", "1", f"quantile(rec, {rng.choice(['cf1', 'cf2', 'cf1 + cf2', 'cf2 * 2.0'])}, {share}, {times})"))
+    return cases
+
+
 def warmed_up_simulation() -> Simulation:
     sim = Simulation(load_model(ROOT / "conformance" / "model"), seed=SEED)
     sim.run(WARM_UP_STEPS)
@@ -517,6 +578,8 @@ def main() -> None:
     cases += exp_cases()
     cases += power_cases()
     cases += quantile_cases()
+    cases += curve_cases()
+    cases += counted_quantile_cases()
 
     sim = warmed_up_simulation()
     counts = {"value": 0, "E:static": 0, "E:runtime": 0}

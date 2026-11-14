@@ -4295,3 +4295,283 @@ rec	real	1	quantile(rec, cf1, 0.5)	E:static
 -	int	1	quantile(rec, (div(4611686018427387904, counter) - round(r4) - 3) * (div(counter, t2) - ci1) * ci2, 0.5)	E:runtime
 -	real	1	quantile(rec, abs(0.0 - ci1), 0.9)	43e0000000000000
 -	int	1	quantile(rec, t2, 1.0)	100
+-	real	1	curve(-5.0, tc)	4000000000000000
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(-0.5, tc)	3ff0000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(-0.0, tc)	0000000000000000
+-	real	1	curve(0, tc)	0000000000000000
+-	real	1	curve(0.25, tc)	3fc0000000000000
+-	real	1	curve(r1, tc)	3fd0000000000000
+-	real	1	curve(1, tc)	3ff2aaaaaaaaaaaa
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(1e299, tc)	fe031cfd3999f7b0
+-	real	1	curve(1e300, tc)	fe37e43c8800759c
+-	real	1	curve(1e301, tc)	fe37e43c8800759c
+-	real	1	curve(rtiny, tc)	0000000000000000
+-	real	1	curve(-rtiny, tc)	0000000000000000
+-	real	1	curve(1.0 / 0.0, tc)	fe37e43c8800759c
+-	real	1	curve(-1.0 / 0.0, tc)	4000000000000000
+-	real	1	curve(0.0 / 0.0, tc)	nan
+-	real	1	curve(imax, tc)	c3e0000000000000
+-	real	1	curve(i3, tc)	4000000000000000
+rec	real	1	curve(cf1, tc)	0000000000000000,0000000000000000,3fd0000000000000,4000aaaaaaaaaaaa,4004000000000000,4000000000000000,fe37e43c8800759c
+rec	real	1	curve(cf2, tc)	3fa999999999999a,3fb999999999999a,3fc3333333333333,00000000000003f4,c19d6f3440800000,3ff8000000000000,4000000000000000
+rec	real	1	curve(ci2, tc)	4000000000000000,0000000000000000,c000000000000000,4000000000000000,c057c00000000000,3ff2aaaaaaaaaaaa,4000000000000000
+rec	real	1	curve(cm, tcm)	0000000000000000,0000000000000000,3fe0000000000000,0000000000000000,3ff0000000000000,3ff0000000000000,3ff0000000000000
+rec	real	1	curve(cm + allow, tcm) * 2.0	0000000000000000,3f7cac083126e979,3ffaaaaaaaaaaaab,3fe555475a31a4be,4000000000000000,4000000000000000,4000000000000000
+-	real	1	curve(curve(r1, tc), tc)	3fc0000000000000
+-	int	1	round(curve(r2, tc) * 100.0)	200
+-	real	1	curve(0.5, tcd)	E:runtime
+rec	real	1	curve(cf1, tcd)	E:runtime
+-	real	1	curve(m1, tc)	E:static
+-	real	1	curve(r1, tcm)	E:static
+-	real	1	curve(r1, tb)	E:static
+-	int	1	marginal(i1, tc)	E:static
+-	real	1	curve(r1, nothing)	E:static
+-	real	1	curve(r1)	E:static
+-	real	1	curve(bt, tc)	E:static
+-	int	1	curve(r1, tc)	E:static
+-	real	GBP	curve(r1, tc)	E:static
+-	real	1	curve(1.998783943346454, tc)	4007fb6f220129bf
+-	real	1	curve(0.018740590220779257, tc)	3f8330bbb86c8728
+-	real	1	curve(0.19136207383164347, tc)	3fb87e8d6c669c57
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(1.9903275972715675, tc)	4007dbaef0263ed3
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(1.9601749982528422, tc)	40076a786bb45913
+-	real	1	curve(2.165358669598609, tc)	4006ad586f0fb614
+-	real	1	curve(1.0, tc)	3ff2aaaaaaaaaaaa
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(0.46678540224407694, tc)	3fcddfcfe138dd70
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(2.096287091851899, tc)	40073acdd54bc0cf
+-	real	1	curve(-0.014951750554395335, tc)	3f9e9f05fd314fc0
+-	real	1	curve(-1.8641104173452197, tc)	4000000000000000
+-	real	1	curve(-1.7855419419684808, tc)	4000000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.903697039225781, tc)	3fefaefdc3a36218
+-	real	1	curve(-0.6300192551559749, tc)	3ff4291e2417d89c
+-	real	1	curve(0.9618000482629463, tc)	3ff18bcf7ca65d12
+-	real	1	curve(1.1956934143055467, tc)	3ff8683199538e9e
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(1.9257392655606254, tc)	4006e92cfa65afec
+-	real	1	curve(1.9498106977832486, tc)	4007438e4f756d33
+-	real	1	curve(0.27461204485945745, tc)	3fc1933e65f0945a
+-	real	1	curve(0.44729059684103056, tc)	3fcca068bd4f6520
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(1.9584978872031822, tc)	4007642c63f9668a
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(3.0, tc)	4000000000000000
+-	real	1	curve(0.4355272561809207, tc)	3fcbdfadb6741324
+-	real	1	curve(1.9928378478806552, tc)	4007e51bc70f8ce7
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(2.3668059520871996, tc)	400510c80a7e756c
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(1.3561537413940155, tc)	3ffd1d24d1f54da1
+-	real	1	curve(1.904505397439267, tc)	4006997318ea2bda
+-	real	1	curve(1.981340878473462, tc)	4007b9f0f3affb21
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(1.9401057281892127, tc)	40071f1df203df53
+-	real	1	curve(1.945853351938986, tc)	400734b287d9b808
+-	real	1	curve(2.0371389967004943, tc)	4007b3f0783e1efa
+-	real	1	curve(-2.7140396441004273, tc)	4000000000000000
+-	real	1	curve(0.4312975033270873, tc)	3fcb9a60d7e8b8fe
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(0.3529850975193978, tc)	3fc6974ece748e48
+-	real	1	curve(0.24200768847299672, tc)	3fbefa1ba1afa039
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(1.5646271246921764, tc)	40019d51ea0bd0bc
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(2.077297353560218, tc)	400761b1ecd321d2
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(0.2201578955739452, tc)	3fbc2e2248b91fa1
+-	real	1	curve(1.2425593740548084, tc)	3ff9c82038552c5a
+-	real	1	curve(0.2901688937694017, tc)	3fc292208d4396ca
+-	real	1	curve(-2.6491425572587666, tc)	4000000000000000
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(0.09620296754055077, tc)	3fa8a0c1f75d6486
+-	real	1	curve(0.3540267328495874, tc)	3fc6a85fbddfead0
+-	real	1	curve(-1.8099040065325769, tc)	4000000000000000
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(0.488525944602506, tc)	3fcf440252d42d66
+-	real	1	curve(2.080790964297585, tc)	40075a8a44543c8f
+-	real	1	curve(3.0, tc)	4000000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(2.0530744702469024, tc)	4007934db1304bd6
+-	real	1	curve(0.8604701145027134, tc)	3fed25c7ce63d6cc
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(2.0847171664115884, tc)	4007527fce66d1cb
+-	real	1	curve(0.30048349414430353, tc)	3fc33b1f1f159b18
+-	real	1	curve(2.0417680129669638, tc)	4007aa7588324dcc
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(1.905743842765792, tc)	40069e197bff68bf
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.4647531366000044, tc)	3fcdbe83f09a44a4
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(3.0, tc)	4000000000000000
+-	real	1	curve(-2.0, tc)	4000000000000000
+-	real	1	curve(1.9723259609065293, tc)	40079817dc78cc4a
+-	real	1	curve(2.075463964879153, tc)	4007657326168a55
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(2.0723633427125554, tc)	40076bccc48cf672
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(1.98644980751327, tc)	4007cd1fa0936b7b
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(-2.257589696702878, tc)	4000000000000000
+-	real	1	curve(-0.26276488807379783, tc)	3fe0d123d2341998
+-	real	1	curve(1.9836530755363633, tc)	4007c29f6c633b36
+-	real	1	curve(0.45626581782397035, tc)	3fcd33758b758b9e
+-	real	1	curve(0.07513445549544989, tc)	3fa33c02fd27dd94
+-	real	1	curve(1.9627763813715629, tc)	4007743cdb367f4d
+-	real	1	curve(0.47957892994078877, tc)	3fceb16bd2fc9136
+-	real	1	curve(0.5391930430728322, tc)	3fd4994126dad08c
+-	real	1	curve(-1.0, tc)	4000000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(0.5223941903184035, tc)	3fd2a0a9690f1e5f
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(1.9876338207152928, tc)	4007d191b1c5cdc3
+-	real	1	curve(1.8522357181572735, tc)	4005d531c2a789f7
+-	real	1	curve(1.0, tc)	3ff2aaaaaaaaaaaa
+-	real	1	curve(0.3871789420221119, tc)	3fc8c78a2f6bd498
+-	real	1	curve(-0.09337365846026692, tc)	3fc7e75609650c60
+-	real	1	curve(-0.05414697769655081, tc)	3fbbb92714c49220
+-	real	1	curve(2.0930596537416166, tc)	40074169f0b4d246
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(1.9663501670251238, tc)	400781a7f5c33c95
+-	real	1	curve(0.41705636434533955, tc)	3fcab10d2d5cebd4
+-	real	1	curve(-1.6734410211031425, tc)	4000000000000000
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(-0.016378918606350018, tc)	3fa0c5a29f085060
+-	real	1	curve(2.3656907594622147, tc)	40051310b91d4878
+-	real	1	curve(0.45324465883394927, tc)	3fcd01f5e2b1d2c6
+-	real	1	curve(1.9952040572078695, tc)	4007edfe2a557698
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(2.4326556259032444, tc)	400489ebd8e28570
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(0.3212554315006595, tc)	3fc48f72f0fd4af8
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(0.3774224287012722, tc)	3fc827b067032074
+-	real	1	curve(-0.2582408103353231, tc)	3fe0870476b87f00
+-	real	1	curve(2.0, tc)	4008000000000000
+-	real	1	curve(0.4171690727911399, tc)	3fcab2e5e9229904
+-	real	1	curve(-0.11138328033453515, tc)	3fcc839d5a5ba7c0
+-	real	1	curve(0.5, tc)	3fd0000000000000
+-	real	1	curve(0.03984016257540943, tc)	3f9465ee06a84c3c
+-	real	1	curve(0.5851351431055711, tc)	3fd9fd3b9061c4b5
+-	real	1	curve(1.9054677308454864, tc)	40069d1016499d93
+-	real	1	curve(1.9237424627758215, tc)	4006e1ada9740c00
+-	real	1	curve(3.0, tc)	4000000000000000
+-	real	1	curve(0.006761637202623655, tc)	3f6bb2172a716660
+-	real	1	curve(0.2387800937364307, tc)	3fbe90589ac4530b
+-	real	1	curve(-2.8721956339837353, tc)	4000000000000000
+-	real	1	curve(0.0, tc)	0000000000000000
+-	real	1	curve(-1.3060962627105421, tc)	4000000000000000
+-	real	1	quantile(rec, cf1, 0.5, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.5, ci2)	E:runtime
+-	real	1	quantile(rec, cf1, 0.5, select(ci2 > 0, ci2, 0))	4004000000000000
+-	real	1	quantile(rec, cf2, 0.25, abs(ci1) * 0)	E:runtime
+-	real	1	quantile(rec, cf2, 0.5, select(cb1, 1000000000, 1))	4008000000000000
+-	int	1	quantile(rec, ci1, 1.0, select(ci2 >= 0, ci2, 0))	1000000
+-	int	1	quantile(rec, ci2, 0.0, select(cb1, 0, 3))	0
+-	real	1	quantile(rec, cf1, 0.5, ci2 - 10)	E:runtime
+-	real	1	quantile(rec, cf1, 0.5, cf2)	E:static
+-	real	1	quantile(rec, cf1, 0.5, cm)	E:static
+-	real	1	quantile(rec, cf1, 0.5, cb1)	E:static
+-	real	1	quantile(rec, cf1, 0.5, 1, 1)	E:static
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.1, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf2, 0.5, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1 + cf2, 0.7287220690849914, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1 + cf2, 0.1, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1, 0.4075494677536403, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.1, select(cb1, 2, 1))	4018000000000000
+-	real	1	quantile(rec, cf1, 0.5, select(ci2 > 0, ci2, 0))	4004000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.1, select(cb1, 2, 1))	4018000000000000
+-	real	1	quantile(rec, cf2, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1, 0.2893061380836286, abs(ci2))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.9, abs(ci2))	4008000000000000
+-	real	1	quantile(rec, cf2, 0.1, select(ci2 > 0, ci2, 0))	419d6f3454800000
+-	real	1	quantile(rec, cf1, 0.9, select(ci2 > 0, ci2, 0))	4004000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, 1)	4018000000000000
+-	real	1	quantile(rec, cf1, 0.1, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1 + cf2, 0.5, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.2772206395199175, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf2, 0.5, 1)	4008000000000000
+-	real	1	quantile(rec, cf1, 0.7670552202527319, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.13768367709607188, select(ci2 > 0, ci2, 0))	419d6f3454800000
+-	real	1	quantile(rec, cf2, 0.41149797532857046, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf1, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1, 0.9, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1 + cf2, 0.5648817408137375, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1 + cf2, 0.9, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.6064967171464991, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2 * 2.0, 0.1, select(ci2 > 0, ci2, 0))	41ad6f3454800000
+-	real	1	quantile(rec, cf1 + cf2, 0.9, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.1, abs(ci2))	4018000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, 1)	4018000000000000
+-	real	1	quantile(rec, cf1, 0.9, select(ci2 > 0, ci2, 0))	4004000000000000
+-	real	1	quantile(rec, cf1, 0.9, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.1, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.6389065400302446, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2 * 2.0, 0.6794003906293405, 1)	4018000000000000
+-	real	1	quantile(rec, cf1, 0.1879139467655997, abs(ci2))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.1, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1, 0.5, abs(ci2))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, 1)	4018000000000000
+-	real	1	quantile(rec, cf1 + cf2, 0.9, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.9, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.1, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.1, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.1, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1 + cf2, 0.1, select(ci2 > 0, ci2, 0))	419d6f345e800000
+-	real	1	quantile(rec, cf1, 0.8824793469052582, abs(ci2))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.5046654706546676, abs(ci2))	4018000000000000
+-	real	1	quantile(rec, cf1 + cf2, 0.5, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf1, 0.9, 1)	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2, 0.1, abs(ci2))	4008000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, select(cb1, 2, 1))	4018000000000000
+-	real	1	quantile(rec, cf2, 0.5, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.5718886187590662, select(ci2 > 0, ci2, 0))	419d6f3454800000
+-	real	1	quantile(rec, cf2, 0.5, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf1 + cf2, 0.1, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.9, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf1, 0.23606059060453177, abs(ci2))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1, 0.5, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2 * 2.0, 0.1, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2 * 2.0, 0.5, 1)	4018000000000000
+-	real	1	quantile(rec, cf1 + cf2, 0.5, select(ci2 > 0, ci2, 0))	419d6f345e800000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.5514883307397321, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf1, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2, 0.5, select(ci2 > 0, ci2, 0))	419d6f3454800000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, select(ci2 > 0, ci2, 0))	41ad6f3454800000
+-	real	1	quantile(rec, cf1, 0.9, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf1 + cf2, 0.9, select(cb1, 2, 1))	7fe1ccf385ebc8a0
+-	real	1	quantile(rec, cf2 * 2.0, 0.9726546907785641, 1)	4018000000000000
+-	real	1	quantile(rec, cf2, 0.40058202035875967, 1)	4008000000000000
+-	real	1	quantile(rec, cf2, 0.622062476273822, abs(ci2))	4008000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.5, abs(ci2))	4018000000000000
+-	real	1	quantile(rec, cf2, 0.5, abs(ci2))	4008000000000000
+-	real	1	quantile(rec, cf2, 0.9, select(cb1, 2, 1))	4008000000000000
+-	real	1	quantile(rec, cf2, 0.9, abs(ci1) * 0 + 3)	E:runtime
+-	real	1	quantile(rec, cf2 * 2.0, 0.15925182317013253, select(cb1, 2, 1))	4018000000000000
+-	real	1	quantile(rec, cf2 * 2.0, 0.9, 1)	4018000000000000

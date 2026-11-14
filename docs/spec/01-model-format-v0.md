@@ -110,10 +110,26 @@ like any other lever.
 
 ### `[table.<name>]`
 
-`kind = "marginal"` is the only kind in format 0. `unit` is the unit of the thresholds.
-`bands` is a list of `{ from = "<formula>", rate = "<formula>" }` in ascending order of
-`from`; both are national formulas, so they can name parameters and levers. Used by
-`marginal()`.
+`kind = "marginal"`: `unit` is the unit of the thresholds. `bands` is a list of
+`{ from = "<formula>", rate = "<formula>" }` in ascending order of `from`; both are national
+formulas, so they can name parameters and levers. Used by `marginal()`.
+
+`kind = "curve"` (stage S11.1): an effect curve, used by `curve()`. `x_unit` is the unit
+of its input and `unit` that of its output. `points` is a list of at least two
+`{ x = "<formula>", y = "<formula>" }`, national formulas (or numbers) of those units, in
+ascending order of `x`; the order is checked whenever the curve is used, since a point may
+name a parameter or a lever. Between two points the curve is a straight line, and beyond
+the first and the last it is level, so a few points give a saturating, S-shaped or
+asymmetric response, and points written from parameters keep their presets:
+
+```toml
+[table.treatments_response]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.5, y = "1.0 - 0.6 * treatment_response" }, { x = 1.0, y = 1.0 },
+          { x = 1.5, y = "1.0 + 0.38 * treatment_response" }]
+```
 
 ### `[stream.<name>]`
 

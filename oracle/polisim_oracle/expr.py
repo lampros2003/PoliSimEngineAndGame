@@ -297,6 +297,25 @@ _LN_COEFFICIENTS = (0.6666666666666735, 0.3999999999940942, 0.2857142874366239,
                     0.14798198605116586)
 
 
+def curve_value(x: float, xs: list[float], ys: list[float], table: str) -> float:
+    """Stage S11.1: a curve through the points (xs[k], ys[k]), xs strictly ascending:
+    ys[0] at or below xs[0], the last y at or above the last x, and between them
+    y_k + (y_k+1 - y_k) * ((x - x_k) / (x_k+1 - x_k)) on the segment where x_k <= x < x_k+1."""
+    for k in range(len(xs) - 1):
+        if not xs[k] < xs[k + 1]:
+            raise SimError(f"table {table!r}: a curve's points must have ascending x")
+    if x != x:
+        return x
+    if x <= xs[0]:
+        return ys[0]
+    if x >= xs[-1]:
+        return ys[-1]
+    k = 0
+    while not x < xs[k + 1]:
+        k += 1
+    return ys[k] + (ys[k + 1] - ys[k]) * ((x - xs[k]) / (xs[k + 1] - xs[k]))
+
+
 def ln_fixed(x: float) -> float:
     """The natural logarithm by the fixed algorithm of docs/spec/02-formula-language-v0.md
     (stage S10.6): the same bits on every machine (only rounded + - * / and an exact split
@@ -929,6 +948,8 @@ class _Builder:
         if args[1][0] != "name" or args[1][1] not in self.scope.tables:
             raise FormulaError("marginal(): the second argument must be the name of a table")
         table = self.scope.tables[args[1][1]]
+        if table.x_unit is not None:
+            raise FormulaError(f"marginal(): table {table.name!r} is a curve")
         U.unify(x.unit, table.unit, f"marginal() with table {table.name!r}")
         lows, rates = [], []
         for low_src, rate_src in table.bands:
@@ -945,6 +966,34 @@ class _Builder:
         def fn(i):
             return marginal_amount(fx(i), [f(0) for f in lows], [f(0) for f in rates], name)
         return Built("int", x.unit, fn)
+
+    def _fn_curve(self, args, ctx):
+        """Stage S11.1: the curve's value at x, in straight lines between its points (whose
+        coordinates are national formulas) and level beyond the first and the last."""
+        self._args("curve", args, 2)
+        x = self._number(self.build(args[0], ctx), "curve()")
+        if args[1][0] != "name" or args[1][1] not in self.scope.tables:
+            raise FormulaError("curve(): the second argument must be the name of a table")
+        table = self.scope.tables[args[1][1]]
+        if table.x_unit is None:
+            raise FormulaError(f"curve(): table {table.name!r} is not a curve")
+        if x.unit is not None:
+            U.unify(x.unit, table.x_unit, f"curve() with table {table.name!r}")
+        xs, ys = [], []
+        for x_src, y_src in table.bands:
+            px = self._number(self.build(parse(x_src), None), f"table {table.name!r} point")
+            py = self._number(self.build(parse(y_src), None), f"table {table.name!r} point")
+            if px.unit is not None:
+                U.unify(px.unit, table.x_unit, f"table {table.name!r} point x")
+            if py.unit is not None:
+                U.unify(py.unit, table.unit, f"table {table.name!r} point y")
+            xs.append(_as_real(px))
+            ys.append(_as_real(py))
+        fx, name = x.fn, table.name
+
+        def fn(i):
+            return curve_value(float(fx(i)), [f(0) for f in xs], [f(0) for f in ys], name)
+        return Built("real", table.unit, fn)
 
     def _fn_prev(self, args, ctx):
         self._args("prev", args, 1)
@@ -1011,7 +1060,8 @@ class _Builder:
         """Stage S10.9: the value below which a share p of the records' weight lies. The
         records with a weight are ordered by value (ties by record order) and the result is
         the value of the first at which the weight so far reaches p times the total."""
-        self._args("quantile", args, 3)
+        if len(args) != 4:
+            self._args("quantile", args, 3)
         if ctx is not None:
             raise FormulaError(f"quantile() cannot be used inside a per-{ctx} formula")
         if args[0][0] != "name" or args[0][1] not in self.scope.entities:
@@ -1021,26 +1071,38 @@ class _Builder:
         try:
             inner = self._number(self.build(args[1], entity.name), "quantile()")
             share = self._number(self.build(args[2], None), "quantile() share")
+            # Stage S11.2: a fourth argument, a whole number per record, multiplies its weight.
+            times = self.build(args[3], entity.name) if len(args) == 4 else None
         finally:
             self.in_scope = saved
         if share.unit is not None:
             U.unify(share.unit, U.ONE, "quantile() share")
+        if times is not None:
+            if times.type != "int":
+                raise FormulaError("quantile(): the count must be a whole number")
+            if times.unit is not None:
+                U.unify(times.unit, U.ONE, "quantile() count")
         weights, count, f, fp = self._weights(entity), len(entity.ids), inner.fn, share.fn
+        fn_times = times.fn if times is not None else None
 
         def fn(i):
             values = [f(r) for r in range(count)]
+            counts = [fn_times(r) for r in range(count)] if fn_times is not None else [1] * count
             p = float(fp(i))
             if not 0.0 <= p <= 1.0:
                 raise SimError("quantile(): the share must be from 0 to 1")
             if any(v != v for v in values):
                 raise SimError("quantile(): a record's value is not a number")
-            total = sum(weights)
+            if any(c < 0 for c in counts):
+                raise SimError("quantile(): a record's count is below zero")
+            each = [weights[r] * counts[r] for r in range(count)]
+            total = sum(each)
             if total <= 0:
                 raise SimError("quantile(): the records' weights add to nothing")
             target = p * float(total)
             so_far = 0
-            for r in sorted((r for r in range(count) if weights[r] != 0), key=lambda r: (values[r], r)):
-                so_far += weights[r]
+            for r in sorted((r for r in range(count) if each[r] != 0), key=lambda r: (values[r], r)):
+                so_far += each[r]
                 if float(so_far) >= target:
                     return values[r]
             raise SimError("quantile(): internal error")

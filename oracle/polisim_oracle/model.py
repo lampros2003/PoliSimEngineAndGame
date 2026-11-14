@@ -104,6 +104,8 @@ class Table:
     name: str
     unit: U.Unit
     bands: list[tuple[str, str]]  # (lower threshold formula, rate formula), ascending
+    # Stage S11.1: a curve's input unit; its `bands` are then its points, (x formula, y formula).
+    x_unit: U.Unit | None = None
 
 
 @dataclass
@@ -259,7 +261,7 @@ class ModInfo:
 
 _MOD_ID = re.compile(r"[a-z][a-z0-9_]*\Z")
 _MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma",
-                 "lag")
+                 "lag", "table")
 _PATCH_KINDS = ("param", "lever", "var", "state", "flow", "account")
 
 
@@ -689,8 +691,17 @@ def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
 
     tables = {}
     for name, spec in merged["table"].items():
+        if spec.get("kind") == "curve":
+            # Stage S11.1: points through which the curve runs in straight lines.
+            points = spec.get("points")
+            if not isinstance(points, list) or len(points) < 2 or not all(
+                    isinstance(p, dict) and "x" in p and "y" in p for p in points):
+                raise ModelError(f"table {name}: a curve needs at least two points, each with 'x' and 'y'")
+            tables[name] = Table(name, _unit(spec, f"table {name}"), [(str(p["x"]), str(p["y"])) for p in points],
+                                 _unit({"unit": spec.get("x_unit")}, f"table {name} x_unit"))
+            continue
         if spec.get("kind") != "marginal":
-            raise ModelError(f"table {name}: only kind = \"marginal\" exists in format 0")
+            raise ModelError(f"table {name}: kind must be \"marginal\" or \"curve\"")
         bands = [(str(band["from"]), str(band["rate"])) for band in spec["bands"]]
         if not bands:
             raise ModelError(f"table {name}: needs at least one band")

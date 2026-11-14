@@ -98,6 +98,8 @@ thread_local! {
 struct Prepared {
     aggs: Vec<Val>,
     tables: Vec<(Vec<i64>, Vec<f64>)>,
+    /// Stage S11.1: each curve's points, (xs, ys).
+    curves: Vec<(Vec<f64>, Vec<f64>)>,
     /// Format 1: each sub-program's result, one value per cell of this program's domain.
     subs: Vec<Col>,
     /// Format 1: each grouped aggregate, one value per member of its dimension.
@@ -131,6 +133,20 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
         }
         tables.push((lows, rates));
     }
+    let mut curves = Vec::with_capacity(prog.curves.len());
+    for curve in &prog.curves {
+        let mut axes = [Vec::with_capacity(curve.lows.len()), Vec::with_capacity(curve.rates.len())];
+        for (axis, programs) in axes.iter_mut().zip([&curve.lows, &curve.rates]) {
+            for point in programs {
+                match eval_scalar(point, cx)? {
+                    Val::F(v) => axis.push(v),
+                    _ => return internal("a curve's point is not a real"),
+                }
+            }
+        }
+        let [xs, ys] = axes;
+        curves.push((xs, ys));
+    }
     let mut aggs = Vec::with_capacity(prog.aggs.len());
     for agg in &prog.aggs {
         aggs.push(eval_agg(agg, cx)?);
@@ -150,7 +166,7 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
     for agg in &prog.aggs_by {
         aggs_by.push(eval_agg_by(agg, cx)?);
     }
-    Ok(Prepared { aggs, tables, subs, aggs_by })
+    Ok(Prepared { aggs, tables, curves, subs, aggs_by })
 }
 
 /// `wsum_by` and `wcount_by`: like `wsum` and `wcount`, but each record's term goes to the
@@ -529,7 +545,7 @@ fn eval_range(
 /// is not a number, weights that add to something), then the records with a weight in
 /// order of value (ties by record order): the value of the first at which the weight so
 /// far reaches the share of the total.
-fn quantile(agg: &Agg, terms: &Col, weights: &[i64], cx: &EvalCtx) -> Check<Val> {
+fn quantile(agg: &Agg, terms: &Col, weights: &[i64], counts: Option<&[i64]>, cx: &EvalCtx) -> Check<Val> {
     let Some(share) = &agg.share else { return internal("a quantile without its share") };
     let p = match eval_scalar(share, cx)? {
         Val::F(p) => p,
@@ -543,12 +559,19 @@ fn quantile(agg: &Agg, terms: &Col, weights: &[i64], cx: &EvalCtx) -> Check<Val>
             return Err("quantile(): a record's value is not a number".to_string());
         }
     }
-    let total: i128 = weights.iter().map(|w| *w as i128).sum();
+    if counts.is_some_and(|c| c.iter().any(|n| *n < 0)) {
+        return Err("quantile(): a record's count is below zero".to_string());
+    }
+    let each: Vec<i128> = match counts {
+        Some(c) => weights.iter().zip(c).map(|(w, n)| *w as i128 * *n as i128).collect(),
+        None => weights.iter().map(|w| *w as i128).collect(),
+    };
+    let total: i128 = each.iter().sum();
     if total <= 0 {
         return Err("quantile(): the records' weights add to nothing".to_string());
     }
     let target = p * total as f64;
-    let mut order: Vec<usize> = (0..weights.len()).filter(|r| weights[*r] != 0).collect();
+    let mut order: Vec<usize> = (0..weights.len()).filter(|r| each[*r] != 0).collect();
     match terms {
         Col::I(v) => order.sort_by(|a, b| v[*a].cmp(&v[*b]).then(a.cmp(b))),
         Col::F(v) => order.sort_by(|a, b| v[*a].partial_cmp(&v[*b]).expect("no NaN").then(a.cmp(b))),
@@ -556,7 +579,7 @@ fn quantile(agg: &Agg, terms: &Col, weights: &[i64], cx: &EvalCtx) -> Check<Val>
     }
     let mut so_far: i128 = 0;
     for r in order {
-        so_far += weights[r] as i128;
+        so_far += each[r];
         if so_far as f64 >= target {
             return Ok(match terms {
                 Col::I(v) => Val::I(v[r]),
@@ -578,7 +601,19 @@ fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {
         if let Some((_, e)) = failure {
             return Err(e);
         }
-        return quantile(agg, &terms, weights, cx);
+        // Stage S11.2: each record's count, then its weight times its count.
+        let counts = match &agg.times {
+            Some(times) => {
+                let prepared = prepare(times, cx)?;
+                match eval_all(times, cx, Some(agg.entity), count, &prepared) {
+                    Ok(Col::I(v)) => Some(v),
+                    Ok(_) => return internal("a quantile's count is not a whole number"),
+                    Err((_, e, _)) => return Err(e),
+                }
+            }
+            None => None,
+        };
+        return quantile(agg, &terms, weights, counts.as_deref(), cx);
     }
     let mut whole: i128 = 0;
     let mut real: f64 = 0.0;
@@ -640,6 +675,27 @@ pub fn marginal_amount(x: i64, lows: &[i64], rates: &[f64]) -> Check<i64> {
         acc += rates[k] * part as f64;
     }
     real_to_int(acc, Rounding::Round)
+}
+
+/// Stage S11.1: a curve through the points (xs[k], ys[k]), xs strictly ascending (checked by
+/// the caller), as the oracle's `curve_value`.
+pub fn curve_value(x: f64, xs: &[f64], ys: &[f64]) -> f64 {
+    let last = xs.len() - 1;
+    if x.is_nan() {
+        return x;
+    }
+    if x <= xs[0] {
+        return ys[0];
+    }
+    if x >= xs[last] {
+        return ys[last];
+    }
+    let mut k = 0;
+    // x is a number and the points ascend, so this is "x is not below the next point".
+    while x >= xs[k + 1] {
+        k += 1;
+    }
+    ys[k] + (ys[k + 1] - ys[k]) * ((x - xs[k]) / (xs[k + 1] - xs[k]))
 }
 
 /// `round` is half to even, `floor` is toward minus infinity, `ceil` toward plus infinity.
@@ -1077,6 +1133,17 @@ fn run_block(
                 let (d, x) = pick!(regs.i, len, d, x);
                 for (d, x) in d.iter_mut().zip(x) {
                     *d = marginal_amount(*x, lows, rates)?;
+                }
+            }
+            Op::Curve(d, x, k) => {
+                let (xs, ys) = &prepared.curves[k as usize];
+                // A point that is not a number fails too.
+                if xs.windows(2).any(|w| w[0].partial_cmp(&w[1]) != Some(std::cmp::Ordering::Less)) {
+                    return Err("curve(): a curve's points must have ascending x".to_string());
+                }
+                let (d, x) = pick!(regs.f, len, d, x);
+                for (d, x) in d.iter_mut().zip(x) {
+                    *d = curve_value(*x, xs, ys);
                 }
             }
             Op::Rand(d, stream, per_record) => {

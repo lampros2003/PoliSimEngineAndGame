@@ -31,8 +31,9 @@ mods/wealth_tax/
 The sections a model file may hold, except that a mod may add only to `[dim]`, `[param]`,
 `[lever]`, `[var]`, `[state]`, `[flow]`, `[account]`, `[renamed]`, `[situation]`,
 `[dilemma]` (stage S9.1: a dilemma's answers may change the model's own formulas, as
-patches do, but only while chosen) and `[lag]` (stage S10.5; `mods/year_on_year` is an
-example), plus one of its own, `[patch]`:
+patches do, but only while chosen), `[lag]` (stage S10.5; `mods/year_on_year` is an
+example) and `[table]` (stage S11.1, so that a mod may bring its own curves), plus one of
+its own, `[patch]`:
 
 - **Adding.** Each element (and each dimension, and each old name in `[renamed]`) is named
   after the mod: `wealth_tax_rate` in the mod `wealth_tax`. A name declared twice, by the

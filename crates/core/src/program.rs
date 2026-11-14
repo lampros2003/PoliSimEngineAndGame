@@ -163,6 +163,8 @@ pub enum Op {
     ModI(R, R, R),
     /// destination, amount, index into the program's table uses
     Marginal(R, R, u16),
+    /// Stage S11.1: destination, input, index into the program's curve uses.
+    Curve(R, R, u16),
     /// destination, stream id, one draw per record (`true`) or the national draw
     Rand(R, u32, bool),
     /// Format 1. destination, source, gather: the value of a dimensioned element at
@@ -294,6 +296,9 @@ pub struct Agg {
     pub prog: Program,
     /// Stage S10.9: for `quantile`, the national program giving the share, a real.
     pub share: Option<Program>,
+    /// Stage S11.2: for `quantile` with a fourth argument, the per-record whole number
+    /// that multiplies each record's weight.
+    pub times: Option<Program>,
 }
 
 /// One use of a marginal-rate table: a national program per threshold and per rate.
@@ -316,6 +321,8 @@ pub struct Program {
     pub ty: Ty,
     pub aggs: Vec<Agg>,
     pub tables: Vec<TableUse>,
+    /// Stage S11.1: the curves it reads, each point's x and y a national program (real).
+    pub curves: Vec<TableUse>,
     /// Format 1: maps from this program's cells to cells of dimensioned elements.
     pub gathers: Vec<Vec<u32>>,
     pub coords: Vec<Vec<i64>>,
@@ -387,6 +394,7 @@ fn writes(op: &Op) -> (Ty, R) {
         | Ln(d, _)
         | Sqrt(d, _)
         | Pow(d, ..)
+        | Curve(d, ..)
         | SelF(d, ..)
         | SafeDiv(d, ..)
         | Rand(d, ..)
@@ -425,7 +433,9 @@ fn reads(op: &Op, prog: &Program) -> (Vec<(Ty, R)>, bool) {
             (prog.indexes[u as usize].fixed.iter().map(|f| (I, f.reg)).collect(), false)
         }
         NegI(_, a) | AbsI(_, a) | IToF(_, a) => (vec![(I, a)], true),
-        NegF(_, a) | AbsF(_, a) | Exp(_, a) | Ln(_, a) | Sqrt(_, a) | ToInt(_, _, a) => (vec![(F, a)], true),
+        NegF(_, a) | AbsF(_, a) | Exp(_, a) | Ln(_, a) | Sqrt(_, a) | ToInt(_, _, a) | Curve(_, a, _) => {
+            (vec![(F, a)], true)
+        }
         NotB(_, a) => (vec![(B, a)], true),
         Marginal(_, x, _) => (vec![(I, x)], true),
         AddI(_, a, b)
@@ -498,8 +508,22 @@ impl Program {
     /// Instructions in this program and everything it evaluates on the way.
     pub fn op_count(&self) -> usize {
         self.ops.len()
-            + self.aggs.iter().map(|a| a.prog.op_count() + a.share.as_ref().map_or(0, Program::op_count)).sum::<usize>()
-            + self.tables.iter().flat_map(|t| t.lows.iter().chain(&t.rates)).map(Program::op_count).sum::<usize>()
+            + self
+                .aggs
+                .iter()
+                .map(|a| {
+                    a.prog.op_count()
+                        + a.share.as_ref().map_or(0, Program::op_count)
+                        + a.times.as_ref().map_or(0, Program::op_count)
+                })
+                .sum::<usize>()
+            + self
+                .tables
+                .iter()
+                .chain(&self.curves)
+                .flat_map(|t| t.lows.iter().chain(&t.rates))
+                .map(Program::op_count)
+                .sum::<usize>()
             + self.subs.iter().map(|s| s.prog.op_count() + s.by.as_ref().map_or(0, |b| b.key.op_count())).sum::<usize>()
             + self.aggs_by.iter().map(|a| a.value.op_count() + a.key.op_count()).sum::<usize>()
     }

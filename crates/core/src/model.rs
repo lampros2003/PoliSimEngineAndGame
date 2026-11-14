@@ -16,12 +16,13 @@ use crate::rng::fnv1a32;
 use crate::units::{self, Unit};
 
 /// Function names of the formula language. With the five keywords they are reserved.
-pub const FUNCTIONS: [&str; 32] = [
+pub const FUNCTIONS: [&str; 33] = [
     "abs",
     "ceil",
     "clamp",
     "cohort_shift",
     "coord",
+    "curve",
     "div",
     "exp",
     "floor",
@@ -258,8 +259,11 @@ impl Entity {
 pub struct Table {
     pub name: String,
     pub unit: Unit,
-    /// (lower threshold formula, rate formula), ascending.
+    /// (lower threshold formula, rate formula), ascending; for a curve, its points.
     pub bands: Vec<(String, String)>,
+    /// Stage S11.1: a curve's input unit (`unit` is then its output's); `None` for a
+    /// marginal-rate table.
+    pub x_unit: Option<Unit>,
 }
 
 #[derive(Clone, Debug)]
@@ -1044,8 +1048,8 @@ pub fn read_mod(dir: &Path) -> Result<(ModInfo, Vec<String>, Vec<u8>)> {
 }
 
 /// The sections a mod's files may add to, besides `[patch]`.
-const MOD_SECTIONS: [&str; 11] =
-    ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma", "lag"];
+const MOD_SECTIONS: [&str; 12] =
+    ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma", "lag", "table"];
 /// The kinds of element a `[patch.<kind>.<name>]` may change.
 const PATCH_KINDS: [&str; 6] = ["param", "lever", "var", "state", "flow", "account"];
 
@@ -1396,8 +1400,39 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
     for (name, spec) in &merged[section("table")] {
         let what = format!("table {name}");
         let spec = table_of(spec, &what)?;
+        if text_of(spec, "kind") == Some("curve") {
+            // Stage S11.1: points through which the curve runs in straight lines.
+            let mut points = Vec::new();
+            if let Some(Value::Array(items)) = spec.get("points") {
+                for point in items {
+                    match point.as_table().map(|p| (p.get("x"), p.get("y"))) {
+                        Some((Some(x), Some(y))) => points.push((formula_text(x), formula_text(y))),
+                        _ => points.clear(),
+                    }
+                    if points.is_empty() {
+                        break;
+                    }
+                }
+            }
+            if points.len() < 2 {
+                return model_err(format!("{what}: a curve needs at least two points, each with 'x' and 'y'"));
+            }
+            let mut x_spec = Toml::new();
+            if let Some(x_unit) = spec.get("x_unit") {
+                x_spec.insert("unit".to_string(), x_unit.clone());
+            }
+            let x_unit = unit_of(&x_spec, &format!("{what} x_unit"), None)?;
+            table_index.insert(name.clone(), tables.len());
+            tables.push(Table {
+                name: name.clone(),
+                unit: unit_of(spec, &what, None)?,
+                bands: points,
+                x_unit: Some(x_unit),
+            });
+            continue;
+        }
         if text_of(spec, "kind") != Some("marginal") {
-            return model_err(format!("{what}: only kind = \"marginal\" exists in format 0"));
+            return model_err(format!("{what}: kind must be \"marginal\" or \"curve\""));
         }
         let mut bands = Vec::new();
         if let Some(Value::Array(items)) = spec.get("bands") {
@@ -1413,7 +1448,7 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
             return model_err(format!("{what}: needs at least one band"));
         }
         table_index.insert(name.clone(), tables.len());
-        tables.push(Table { name: name.clone(), unit: unit_of(spec, &what, None)?, bands });
+        tables.push(Table { name: name.clone(), unit: unit_of(spec, &what, None)?, bands, x_unit: None });
     }
 
     // ---- declarations

@@ -194,3 +194,24 @@ unit = "1"
 phase = "only"
 initial = 5
 expr = "prev(counter) + i1"
+
+# Stage S11.1: curves. tc has a point at each awkward spot; tcm takes money and gives a
+# share; tcd has points that do not ascend once r1 is read (a run-time error).
+
+[table.tc]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = "-1.0", y = "2.0" }, { x = "0", y = "0.0" }, { x = "r1", y = "rate2" }, { x = "2.0", y = "3" }, { x = "1e300", y = "-1e300" }]
+
+[table.tcm]
+kind = "curve"
+x_unit = "GBP/month/rec"
+unit = "1"
+points = [{ x = "allow", y = "0.0" }, { x = "allow * 4", y = "1.0" }]
+
+[table.tcd]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = "1.0", y = "0.0" }, { x = "r1", y = "1.0" }]

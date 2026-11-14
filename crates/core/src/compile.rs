@@ -32,6 +32,7 @@ struct Builder<'a> {
     n_b: u32,
     aggs: Vec<Agg>,
     tables: Vec<TableUse>,
+    curves: Vec<TableUse>,
     /// Format 1: the dimensions in scope, which are the program's domain in this order.
     scope: Vec<usize>,
     gathers: Vec<Vec<u32>>,
@@ -74,6 +75,7 @@ impl<'a> Builder<'a> {
             n_b: 0,
             aggs: Vec::new(),
             tables: Vec::new(),
+            curves: Vec::new(),
             scope: Vec::new(),
             gathers: Vec::new(),
             coords: Vec::new(),
@@ -94,6 +96,7 @@ impl<'a> Builder<'a> {
             ty: result.ty,
             aggs: self.aggs,
             tables: self.tables,
+            curves: self.curves,
             gathers: self.gathers,
             coords: self.coords,
             indexes: self.indexes,
@@ -682,6 +685,7 @@ impl<'a> Builder<'a> {
                 Ok(Built { ty: a.ty, unit: Some(unit), reg: a.reg })
             }
             "marginal" => self.marginal(args, ctx),
+            "curve" => self.curve(args, ctx),
             "prev" => {
                 arg_count(fname, args, 1)?;
                 let Node::Name(name) = &args[0] else {
@@ -724,7 +728,10 @@ impl<'a> Builder<'a> {
             }
             "quantile" => {
                 // Stage S10.9: quantile(entity, x, share); the share is national and real.
-                arg_count(fname, args, 3)?;
+                // Stage S11.2: an optional count per record multiplies its weight.
+                if args.len() != 4 {
+                    arg_count(fname, args, 3)?;
+                }
                 let (entity, inner, sub) = self.aggregate(fname, &args[..2], ctx)?;
                 number(&inner, "quantile()")?;
                 let prog = sub.finish(&inner)?;
@@ -736,8 +743,23 @@ impl<'a> Builder<'a> {
                 }
                 let reg = part.as_real(&share);
                 let share = part.finish(&Built { ty: Ty::Real, unit: share.unit, reg })?;
+                let times = match args.get(3) {
+                    Some(node) => {
+                        let mut each = Builder::new(self.model, self.deps, self.lagged);
+                        let times = each.build(node, Some(entity))?;
+                        if times.ty != Ty::Int {
+                            return Err("quantile(): the count must be a whole number".to_string());
+                        }
+                        if times.unit.is_some() {
+                            units::unify(&times.unit, &Some(Unit::one()), "quantile() count")?;
+                        }
+                        Some(each.finish(&times)?)
+                    }
+                    None => None,
+                };
                 let index = self.push_agg(AggKind::Quantile, entity, prog)?;
                 self.aggs[index as usize].share = Some(share);
+                self.aggs[index as usize].times = times;
                 let d = self.reg(inner.ty);
                 self.ops.push(if inner.ty == Ty::Int { Op::LoadAggI(d, index) } else { Op::LoadAggF(d, index) });
                 Ok(Built { ty: inner.ty, unit: inner.unit, reg: d })
@@ -906,6 +928,9 @@ impl<'a> Builder<'a> {
         };
         let model = self.model;
         let spec = &model.tables[table];
+        if spec.x_unit.is_some() {
+            return Err(format!("marginal(): table {:?} is a curve", spec.name));
+        }
         let table_unit = Some(spec.unit.clone());
         units::unify(&x.unit, &table_unit, &format!("marginal() with table {:?}", spec.name))?;
         let (mut lows, mut rates) = (Vec::new(), Vec::new());
@@ -934,6 +959,51 @@ impl<'a> Builder<'a> {
         Ok(Built { ty: Ty::Int, unit: x.unit, reg: d })
     }
 
+    /// Stage S11.1: `curve(x, table)`; mirrors the oracle's `_fn_curve`.
+    fn curve(&mut self, args: &[Node], ctx: Option<usize>) -> Check<Built> {
+        arg_count("curve", args, 2)?;
+        let x = self.build(&args[0], ctx)?;
+        number(&x, "curve()")?;
+        let table = match &args[1] {
+            Node::Name(name) => self.model.table_index.get(name.as_str()).copied(),
+            _ => None,
+        };
+        let Some(table) = table else {
+            return Err("curve(): the second argument must be the name of a table".to_string());
+        };
+        let model = self.model;
+        let spec = &model.tables[table];
+        let Some(x_unit) = spec.x_unit.clone() else {
+            return Err(format!("curve(): table {:?} is not a curve", spec.name));
+        };
+        if x.unit.is_some() {
+            units::unify(&x.unit, &Some(x_unit.clone()), &format!("curve() with table {:?}", spec.name))?;
+        }
+        let x_reg = self.as_real(&x);
+        let (mut xs, mut ys) = (Vec::new(), Vec::new());
+        for (x_src, y_src) in &spec.bands {
+            // A point's coordinates are national formulas, whatever the caller's context.
+            let mut point = Vec::with_capacity(2);
+            for (src, unit, axis) in [(x_src, &x_unit, "x"), (y_src, &spec.unit, "y")] {
+                let mut builder = Builder::new(model, self.deps, self.lagged);
+                let value = builder.build(&parse(src)?, None)?;
+                number(&value, &format!("table {:?} point", spec.name))?;
+                if value.unit.is_some() {
+                    units::unify(&value.unit, &Some(unit.clone()), &format!("table {:?} point {axis}", spec.name))?;
+                }
+                let reg = builder.as_real(&value);
+                point.push(builder.finish(&Built { ty: Ty::Real, unit: None, reg })?);
+            }
+            ys.push(point.pop().expect("two"));
+            xs.push(point.pop().expect("two"));
+        }
+        let index = u16::try_from(self.curves.len()).map_err(|_| "formula is too large".to_string())?;
+        self.curves.push(TableUse { table, lows: xs, rates: ys });
+        let d = self.reg(Ty::Real);
+        self.ops.push(Op::Curve(d, x_reg, index));
+        Ok(Built { ty: Ty::Real, unit: Some(spec.unit.clone()), reg: d })
+    }
+
     fn aggregate(&mut self, fname: &str, args: &[Node], ctx: Option<usize>) -> Check<(usize, Built, Builder<'_>)> {
         arg_count(fname, args, 2)?;
         if let Some(entity) = ctx {
@@ -956,7 +1026,7 @@ impl<'a> Builder<'a> {
 impl Builder<'_> {
     fn push_agg(&mut self, kind: AggKind, entity: usize, prog: Program) -> Check<u16> {
         let index = u16::try_from(self.aggs.len()).map_err(|_| "formula is too large".to_string())?;
-        self.aggs.push(Agg { kind, entity, prog, share: None });
+        self.aggs.push(Agg { kind, entity, prog, share: None, times: None });
         Ok(index)
     }
 }
