@@ -658,7 +658,8 @@ impl<'a> Builder<'a> {
                 if key_unit.is_some() {
                     units::unify(&key_unit, &Some(Unit::one()), &format!("{fname}() key"))?;
                 }
-                let entity_unit = Some(Unit::base(&self.model.entities[entity].name));
+                let entity_base = Unit::base(&self.model.entities[entity].name);
+                let entity_unit = Some(entity_base.clone());
                 let (kind, ty, unit) = if fname == "wsum_by" {
                     if value_ty == Ty::Bool {
                         return Err("wsum_by() needs a number, not a true/false value".to_string());
@@ -669,7 +670,7 @@ impl<'a> Builder<'a> {
                     if value_ty != Ty::Bool {
                         return Err("wcount_by() needs a true/false value, not a number".to_string());
                     }
-                    (AggKind::Count, Ty::Int, entity_unit.expect("an entity unit"))
+                    (AggKind::Count, Ty::Int, entity_base)
                 };
                 let info = &self.model.dims[dim];
                 let agg = AggBy {
