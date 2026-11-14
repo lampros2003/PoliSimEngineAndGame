@@ -196,7 +196,42 @@ pub struct Entity {
     pub weight_state: Option<String>,
     header: Vec<String>,
     /// Every CSV column as text, in header order.
-    raw: Vec<Vec<String>>,
+    raw: Vec<TextColumn>,
+}
+
+/// Stage S10: a column of text cells in one buffer, so that a model with many records is
+/// quick to load, copy and drop (one allocation a column, not one a cell).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextColumn {
+    text: String,
+    /// Where each cell ends in `text`.
+    ends: Vec<u32>,
+}
+
+impl TextColumn {
+    fn push(&mut self, cell: &str) -> Result<()> {
+        self.text.push_str(cell);
+        let end = u32::try_from(self.text.len()).map_err(|_| Error::Model("a data column is too large".to_string()))?;
+        self.ends.push(end);
+        Ok(())
+    }
+
+    pub fn len(&self) -> usize {
+        self.ends.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ends.is_empty()
+    }
+
+    pub fn get(&self, i: usize) -> &str {
+        let start = if i == 0 { 0 } else { self.ends[i - 1] as usize };
+        &self.text[start..self.ends[i] as usize]
+    }
+
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &str> {
+        (0..self.len()).map(|i| self.get(i))
+    }
 }
 
 impl Entity {
@@ -208,9 +243,9 @@ impl Entity {
         self.ids.is_empty()
     }
 
-    pub fn column(&self, name: &str) -> Option<&[String]> {
+    pub fn column(&self, name: &str) -> Option<&TextColumn> {
         // The last of two columns with one name wins, as in the oracle's dictionary.
-        self.header.iter().rposition(|h| h == name).map(|i| self.raw[i].as_slice())
+        self.header.iter().rposition(|h| h == name).map(|i| &self.raw[i])
     }
 }
 
@@ -441,7 +476,12 @@ pub fn convert(raw: Raw, ty: Ty, money: bool, minor: i64, what: &str) -> Result<
             if scaled.is_nan() || scaled.abs() > 9.0e18 {
                 return model_err(format!("{what}: {} is out of range", show(raw)));
             }
-            match exact_minor_units(f, minor) {
+            // Stage S10: a plain decimal is read as typed, without printing the number back.
+            let exact = match text.and_then(|t| exact_minor_units_of_text(t.trim(), minor)) {
+                Some(exact) => exact,
+                None => exact_minor_units(f, minor),
+            };
+            match exact {
                 Some(v) => v,
                 None => return model_err(format!("{what}: {} has more decimal places than the currency", show(raw))),
             }
@@ -456,6 +496,30 @@ pub fn convert(raw: Raw, ty: Ty, money: bool, minor: i64, what: &str) -> Result<
 /// shortest decimal that gives this float (Python's `repr`), which is what was typed, and
 /// scaled exactly: 2301745961.03 pounds is 230174596103 pence, although
 /// `2301745961.03 * 100.0` is 230174596102.99997.
+/// Stage S10: what [`exact_minor_units`] gives for the number this text reads as, worked out
+/// from the text itself when it is a plain decimal (a sign, digits, a point and digits) of at
+/// most 15 significant digits; `None` for any other text. For such a decimal the shortest
+/// text that reads back as the same float has the same digits (any shorter decimal differs by
+/// more than half a unit in the last place), so the two agree; the other is far slower.
+fn exact_minor_units_of_text(text: &str, minor: i64) -> Option<Option<i64>> {
+    let negative = text.starts_with('-');
+    let body = text.strip_prefix(['-', '+']).unwrap_or(text);
+    let (whole, fraction) = body.split_once('.').unwrap_or((body, ""));
+    let digits_only = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if whole.is_empty() || (body.contains('.') && fraction.is_empty()) || !digits_only(whole) || !digits_only(fraction)
+    {
+        return None;
+    }
+    let digits = format!("{whole}{fraction}");
+    if digits.trim_start_matches('0').len() > 15 {
+        return None;
+    }
+    let value: i128 = digits.parse().ok()?;
+    let scaled = (if negative { -value } else { value }).checked_mul(minor as i128)?;
+    let Some(divisor) = 10i128.checked_pow(fraction.len() as u32) else { return Some(None) };
+    Some(if scaled % divisor != 0 { None } else { i64::try_from(scaled / divisor).ok() })
+}
+
 fn exact_minor_units(f: f64, minor: i64) -> Option<i64> {
     let text = crate::pyfmt::float_repr(f);
     let (mantissa, exponent) = match text.split_once('e') {
@@ -572,6 +636,66 @@ fn parse_csv(text: &str) -> Vec<Vec<String>> {
     rows
 }
 
+/// Stage S10: the records of a CSV text, as `parse_csv` reads them, given one at a time with
+/// its fields (one buffer, reused).
+fn each_csv_row(text: &str, mut row: impl FnMut(&[String]) -> Result<()>) -> Result<()> {
+    let mut fields: Vec<String> = Vec::new();
+    let mut used = 0usize;
+    let mut quoted = false;
+    let mut chars = text.chars().peekable();
+    // The field being filled: fields[used], cleared when first used.
+    fn field(fields: &mut Vec<String>, used: usize) -> &mut String {
+        if fields.len() <= used {
+            fields.resize_with(used + 1, String::new);
+        }
+        &mut fields[used]
+    }
+    let mut started = false;
+    let mut end_row = |fields: &mut Vec<String>, used: &mut usize, started: &mut bool| -> Result<()> {
+        if !*started {
+            field(fields, *used).clear();
+        }
+        let n = *used + 1;
+        let blank = n == 1 && fields[0].is_empty();
+        *used = 0;
+        *started = false;
+        if blank { Ok(()) } else { row(&fields[..n]) }
+    };
+    while let Some(c) = chars.next() {
+        if !started {
+            field(&mut fields, used).clear();
+            started = true;
+        }
+        if quoted {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                    fields[used].push('"');
+                } else {
+                    quoted = false;
+                }
+            } else {
+                fields[used].push(c);
+            }
+        } else if c == '"' && fields[used].is_empty() {
+            quoted = true;
+        } else if c == ',' {
+            used += 1;
+            started = false;
+        } else if c == '\n' {
+            end_row(&mut fields, &mut used, &mut started)?;
+        } else if c == '\r' && chars.peek() == Some(&'\n') {
+            // handled by the line feed that follows
+        } else {
+            fields[used].push(c);
+        }
+    }
+    if started || used > 0 {
+        end_row(&mut fields, &mut used, &mut started)?;
+    }
+    Ok(())
+}
+
 fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>, String)> {
     let what = format!("entity {name}");
     let state = match spec.get("weight") {
@@ -589,24 +713,31 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
     let bytes =
         std::fs::read(&path).map_err(|e| Error::Model(format!("{what}: cannot read {}: {e}", path.display())))?;
     let text = std::str::from_utf8(&bytes).map_err(|_| Error::Model(format!("{what}: {data} is not UTF-8")))?;
-    let mut rows = parse_csv(text);
-    if rows.len() < 2 {
-        return model_err(format!("{what}: {} has no rows", path.display()));
-    }
-    let header = rows.remove(0);
-    let mut raw: Vec<Vec<String>> = vec![Vec::with_capacity(rows.len()); header.len()];
-    for (line, row) in rows.into_iter().enumerate() {
+    let mut header: Option<Vec<String>> = None;
+    let mut raw: Vec<TextColumn> = Vec::new();
+    let mut line = 1usize;
+    each_csv_row(text, |row| {
+        let Some(header) = &header else {
+            header = Some(row.to_vec());
+            raw = vec![TextColumn::default(); row.len()];
+            return Ok(());
+        };
+        line += 1;
         if row.len() != header.len() {
             return model_err(format!(
-                "{what}: row {} of {data} has {} fields, expected {}",
-                line + 2,
+                "{what}: row {line} of {data} has {} fields, expected {}",
                 row.len(),
                 header.len()
             ));
         }
         for (column, cell) in raw.iter_mut().zip(row) {
-            column.push(cell);
+            column.push(cell)?;
         }
+        Ok(())
+    })?;
+    let header = header.unwrap_or_default();
+    if line < 2 {
+        return model_err(format!("{what}: {} has no rows", path.display()));
     }
     let mut entity =
         Entity { name: name.to_string(), ids: Vec::new(), weights: Vec::new(), weight_state: state, header, raw };
@@ -2214,5 +2345,67 @@ mod tests {
             assert_eq!(exact_minor_units(raw, 100), None, "{raw}");
         }
         assert_eq!(exact_minor_units(1.5, 1), None);
+    }
+}
+
+#[cfg(test)]
+mod money_tests {
+    use super::{exact_minor_units, exact_minor_units_of_text};
+
+    /// Stage S10: reading a plain decimal's digits gives what printing the float back gives.
+    #[test]
+    fn money_from_text_matches_money_from_the_float() {
+        let mut texts: Vec<String> = [
+            "0",
+            "0.0",
+            "-0.0",
+            "1",
+            "1.5",
+            "1.50",
+            "-2.25",
+            "2301745961.03",
+            "0.01",
+            "0.001",
+            "0.005",
+            "123456789012.34",
+            "999999999999999",
+            "99999999999999.9",
+            "0.1",
+            "0.30",
+            "+7.07",
+            "00012.50",
+            "1234567.891",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        // Many more: random decimals of up to 15 significant digits.
+        let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+        for _ in 0..20_000 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            let digits = 1 + (x % 15) as usize;
+            let point = (x >> 8) as usize % (digits + 1);
+            let mut number: String = (0..digits).map(|k| char::from(b'0' + ((x >> (k * 4 % 60)) % 10) as u8)).collect();
+            if point > 0 && point < digits {
+                number.insert(point, '.');
+            }
+            if x & 1 == 1 {
+                number.insert(0, '-');
+            }
+            texts.push(number);
+        }
+        for text in &texts {
+            let f: f64 = text.parse().unwrap();
+            for minor in [1, 100, 1000] {
+                if let Some(fast) = exact_minor_units_of_text(text, minor) {
+                    assert_eq!(fast, exact_minor_units(f, minor), "{text} in units of 1/{minor}");
+                }
+            }
+        }
+        assert_eq!(exact_minor_units_of_text("1e5", 100), None);
+        assert_eq!(exact_minor_units_of_text("1234567890123456", 100), None);
+        assert_eq!(exact_minor_units_of_text("5.", 100), None);
     }
 }

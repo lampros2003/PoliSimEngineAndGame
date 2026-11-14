@@ -1,6 +1,6 @@
 """How long a month of the UK model takes with more households (stage S4.4).
 
-    python tools/uk/bench_households.py [--records 100000] [--months 24]
+    python tools/uk/bench_households.py [--records 100000] [--months 24] [--profile N]
 
 Builds the households afresh at the size asked for (tools/uk/households.py), writes a copy
 of the UK model that uses them into a temporary folder (tools/uk/calibrate.py), and runs it
@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--records", type=int, default=100_000)
     parser.add_argument("--months", type=int, default=24)
     parser.add_argument("--engine", type=Path, default=ROOT / "target" / "release" / EXE)
+    parser.add_argument("--profile", type=int, default=0, help="also list the N slowest formulas (stage S10)")
     args = parser.parse_args()
     import calibrate
     import households
@@ -38,7 +39,8 @@ def main() -> int:
             return 1
         calibrate.write_model(calibrate.DEFAULT_BASE, model, households=model / "households")
         run = subprocess.run([str(args.engine), "run", str(model / "scenarios" / "2025.toml"), "--steps",
-                              str(args.months), "--columns", "step", "--time"], capture_output=True, text=True)
+                              str(args.months), "--columns", "step", "--time"]
+                             + (["--profile", str(args.profile)] if args.profile else []), capture_output=True, text=True)
         print(run.stderr.strip())
         return run.returncode
 

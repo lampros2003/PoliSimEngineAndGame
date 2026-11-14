@@ -381,7 +381,7 @@ impl Simulation {
                             _ => d.spec.get("column").and_then(Value::as_str).unwrap_or("value").to_string(),
                         };
                         let texts = d.data_column(&column).expect("read by the loader");
-                        let column = text_column(texts, d, minor, &what)?;
+                        let column = text_column(texts.iter().map(String::as_str), d, minor, &what)?;
                         simulation.store(id, Computed::Each(column))?;
                         continue;
                     }
@@ -399,7 +399,7 @@ impl Simulation {
                 Kind::Column => {
                     let entity = &m.entities[d.entity.expect("columns belong to an entity")];
                     let cells = entity.column(&d.name).expect("checked by the loader");
-                    let column = text_column(cells, d, minor, &format!("column {}", d.name))?;
+                    let column = text_column(cells.iter(), d, minor, &format!("column {}", d.name))?;
                     simulation.store(id, Computed::Each(column))?;
                 }
                 _ => {}
@@ -559,7 +559,7 @@ impl Simulation {
             if let Value::Table(table) = raw {
                 let column = table.get("column").and_then(Value::as_str).unwrap_or("value");
                 let texts = d.data_column(column).expect("read by the loader");
-                return Ok(Computed::Each(text_column(texts, d, minor, &what)?));
+                return Ok(Computed::Each(text_column(texts.iter().map(String::as_str), d, minor, &what)?));
             }
             let value = convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?;
             return Ok(Computed::Each(Col::filled(value, self.model.cell_count(&d.dims))));
@@ -573,7 +573,7 @@ impl Simulation {
                 Some(cells) => cells,
                 None => return model_err(format!("{what}: needs {{ column = \"...\" }} naming a column of the data")),
             };
-            return Ok(Computed::Each(text_column(cells, d, minor, &what)?));
+            return Ok(Computed::Each(text_column(cells.iter(), d, minor, &what)?));
         }
         Ok(Computed::Each(Col::filled(convert(Raw::Toml(raw), d.ty, d.money, minor, &what)?, entity.len())))
     }
@@ -1546,7 +1546,7 @@ fn too_large() -> Error {
     Error::Sim("a weighted total is too large to represent".to_string())
 }
 
-fn text_column(cells: &[String], d: &Decl, minor: i64, what: &str) -> Result<Col> {
+fn text_column<'a>(cells: impl ExactSizeIterator<Item = &'a str>, d: &Decl, minor: i64, what: &str) -> Result<Col> {
     let mut column = match d.ty {
         Ty::Int => Col::I(Vec::with_capacity(cells.len())),
         Ty::Real => Col::F(Vec::with_capacity(cells.len())),
