@@ -1634,6 +1634,45 @@ fn is_option_name(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+/// Stage S9.1: a var computing `formula`, an element's formula before a dilemma's effects:
+/// of the element's type, unit, dimensions, entity and phase (a national flow's: money, its
+/// instrument's unit a step). Mirrors the oracle's `_carrier`.
+fn carrier(merged: &[Toml], kind: &str, element: &Toml, formula: &str, dilemma: &str, what: &str) -> Result<Toml> {
+    let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
+    let mut out = Toml::new();
+    if kind == "flow" {
+        for side in ["from", "to"] {
+            let sector = element.get(side).and_then(Value::as_str).and_then(|s| merged[section("sector")].get(s));
+            if sector.and_then(|s| s.get("entity")).is_some() {
+                return model_err(format!("{what}: an effect on a flow held record by record is not supported"));
+            }
+        }
+        let instruments = &merged[section("instrument")];
+        let instrument =
+            element.get("instrument").and_then(Value::as_str).or_else(|| instruments.keys().next().map(String::as_str));
+        let unit = instrument
+            .and_then(|i| instruments.get(i))
+            .and_then(|i| i.get("unit"))
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let step = merged[0].get("step").and_then(Value::as_str).unwrap_or_default();
+        out.insert("type".to_string(), Value::String("money".to_string()));
+        out.insert("unit".to_string(), Value::String(format!("{unit}/{step}")));
+    } else {
+        for key in ["type", "unit", "dims", "entity"] {
+            if let Some(v) = element.get(key) {
+                out.insert(key.to_string(), v.clone());
+            }
+        }
+    }
+    if let Some(phase) = element.get("phase") {
+        out.insert("phase".to_string(), phase.clone());
+    }
+    out.insert("expr".to_string(), Value::String(formula.to_string()));
+    out.insert("dilemma".to_string(), Value::String(dilemma.to_string()));
+    Ok(out)
+}
+
 /// Stage S9.1: each dilemma becomes a lever for the answer given this month, vars for the
 /// answer in force and its age, and states for the answer, the months since and whether the
 /// dilemma is open; each answer's effects then wrap the formulas they name. Mirrors the
@@ -1787,6 +1826,10 @@ fn expand_dilemmas(merged: &mut [Toml]) -> Result<Vec<DilemmaInfo>> {
     }
 
     for Checked { name, options, .. } in &checked {
+        // Each element this dilemma's answers change, in order of first mention, with the
+        // answers' effects in order: (what, when, formula).
+        type Effects = Vec<(String, String, String)>;
+        let mut per_target: Vec<(String, Effects)> = Vec::new();
         for (k, option) in options.iter().enumerate() {
             let k = k + 1;
             let what = format!("dilemma {name}, answer {}", text_of(option, "name").unwrap());
@@ -1796,26 +1839,46 @@ fn expand_dilemmas(merged: &mut [Toml]) -> Result<Vec<DilemmaInfo>> {
             };
             let Some(Value::Table(effect)) = option.get("effect") else { continue };
             for (target, formula) in effect {
-                let formula = formula.as_str().unwrap();
-                let mut found = None;
-                if !made.contains(target) {
-                    for (kind, key) in [("var", "expr"), ("flow", "expr"), ("state", "next")] {
-                        if matches!(merged[section(kind)].get(target), Some(Value::Table(_))) {
-                            found = Some((section(kind), key));
-                            break;
-                        }
+                let entry = (what.clone(), when.clone(), formula.as_str().unwrap().to_string());
+                match per_target.iter_mut().find(|(t, _)| t == target) {
+                    Some((_, effects)) => effects.push(entry),
+                    None => per_target.push((target.clone(), vec![entry])),
+                }
+            }
+        }
+        for (target, effects) in per_target {
+            let what = &effects[0].0;
+            let mut found = None;
+            if !made.contains(&target) {
+                for (kind, key) in [("var", "expr"), ("flow", "expr"), ("state", "next")] {
+                    if matches!(merged[section(kind)].get(&target), Some(Value::Table(_))) {
+                        found = Some((kind, key));
+                        break;
                     }
                 }
-                let Some((index, key)) = found else {
-                    return model_err(format!("{what}: the model has no var, flow or state {target} of its own"));
-                };
-                let Some(Value::Table(element)) = merged[index].get_mut(target) else { unreachable!() };
-                let Some(old) = element.get(key).and_then(Value::as_str).map(str::to_string) else {
-                    return model_err(format!("{what}: {target} has no formula to change"));
-                };
-                let changed = formula.replace("{base}", &format!("({old})"));
-                element.insert(key.to_string(), Value::String(format!("select({when}, ({changed}), ({old}))")));
             }
+            let Some((kind, key)) = found else {
+                return model_err(format!("{what}: the model has no var, flow or state {target} of its own"));
+            };
+            let Some(Value::Table(element)) = merged[section(kind)].get(&target).cloned() else { unreachable!() };
+            let Some(old) = element.get(key).and_then(Value::as_str).map(str::to_string) else {
+                return model_err(format!("{what}: {target} has no formula to change"));
+            };
+            // The formula so far goes into a var of its own, which each answer's effect reads
+            // once, so formulas grow by the effects, not by doubling.
+            let before = format!("{target}_before_{name}");
+            if merged[section("var")].contains_key(&before) || made.contains(&before) {
+                return model_err(format!("var.{before} is declared twice"));
+            }
+            made.insert(before.clone());
+            let carrier = carrier(merged, kind, &element, &old, name, what)?;
+            merged[section("var")].insert(before.clone(), Value::Table(carrier));
+            let mut body = before.clone();
+            for (_, when, formula) in effects.iter().rev() {
+                body = format!("select({when}, ({}), ({body}))", formula.replace("{base}", &before));
+            }
+            let Some(Value::Table(element)) = merged[section(kind)].get_mut(&target) else { unreachable!() };
+            element.insert(key.to_string(), Value::String(body));
         }
     }
     Ok(out)

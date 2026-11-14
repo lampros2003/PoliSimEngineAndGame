@@ -279,6 +279,40 @@ once and high unemployment from the sixth month, both over within two years. (Th
 written when purchases were one lever; with spending by function, cutting health spending by
 a third does the same, with unemployment above 6% at once.)
 
+## Dilemmas (stage S9.2)
+
+`dilemmas.toml` puts twelve questions to the government (model format 1's dilemmas: each
+opens when its start holds, waits for an answer, and each answer changes formulas the model
+already has). Every size is a judgement. Costs are shares of an existing payment: 1% of
+procurement is about £3.3bn a year, of public investment £1.4bn, of subsidies £0.4bn, of
+public pay £2.9bn, of benefits £3.1bn. What an answer does to voters goes through
+`government_standing` (politics.toml), by voter type: a standing of -0.02 weighs on a voter
+type as much as about a third of a point more unemployment in its region, or ten months
+more in office.
+
+| Dilemma | Opens | Answers |
+|---|---|---|
+| Public sector pay claim | July 2025's pay round (the end of the sixth month) | Meet it: pay 4% higher for good. Offer half: 2% for good, 5% fewer treatments for three months. Hold to the plans: a tenth fewer treatments and schools 5% worse for six months, standing -0.01 |
+| NHS winter crisis | the waiting list above its record, from the tenth month; again a year after an answer | Emergency funding: 1% more procurement and 5% more treatments for six months. Private hospitals: 0.5% and 3% for a year. Ride it out: standing -0.04 over 65, -0.02 50 to 64, for six months |
+| A bank in trouble | a recession with unemployment above 5.5% | Rescue: subsidies doubled for six months, standing -0.02 for two years. Protect savers only: business investment 7% lower for six months. Let it fail: business investment 15% and consumption 2% lower, standing -0.02 among those in work, for nine months |
+| Steelworks to close | a 3% chance a month from the eleventh, 15% while growth is below 1% | Subsidise: 5% more subsidies for two years, standing +0.02 in Wales and Yorkshire. Nationalise: 3% more public investment for a year, +0.04 there and -0.01 for the richest fifth, for two years. Let it close: exports 0.3% lower for good, -0.05 in Wales and Yorkshire for two years |
+| A chip maker looks for a site | 2% a month from the fourth | A grant: 2% more subsidies for two years, business investment 1% and exports 0.2% higher for good. Nothing special: nothing |
+| Energy prices jump | 1.5% a month from the seventh; again three years after an answer | Cap bills: subsidies up half and inflation 0.5 points a year higher for six months. Help poorer households: benefits 2% higher, inflation 3 points, standing +0.01 for the poorest two fifths. Let prices rise: inflation 3 points, standing -0.02 |
+| A water company fails | 1% a month from the thirteenth | Special administration: public investment 1% higher for a year. Customers pay: inflation 0.1 points higher and standing -0.01 for a year |
+| Allies ask for more on defence | the alliance summit, June 2026 | Pledge: 1% more procurement for good, standing +0.01 over 50 for a year. Current plans: -0.02 over 65 for a year |
+| Prisons are full | police, courts and prisons below 99% of their first month's service, from the seventh; again 18 months after | Early release: -0.03 over 50 for a year. Emergency places: public investment 0.5% higher and the service 3% better for a year. Community sentences: the service 2% better, -0.01 over 65 |
+| Universities near bankruptcy | 3% a month from the tenth | Emergency money: 0.2% more procurement for two years. Higher fees: -0.03 under 35 for two years. Mergers and closures: exports 0.2% lower for good, -0.02 under 25 for a year |
+| Floods in the north | 1% a month from the third; again two years after | Repairs and defences: public investment 2% higher, +0.02 in the north of England, for a year. Leave it to councils: -0.04 there for a year |
+| Off track for net zero | emissions above their path, from the nineteenth month | The committee's plan: 0.2% more procurement and emissions per pound falling 1.2% a year faster, for good, +0.02 under 35 for a year. Later: -0.02 under 35 for a year. Drop the target: -0.05 under 35, +0.01 over 65, for two years |
+
+The chances draw from random streams of their own, so a game's seed decides when they come:
+with the 2025 scenario's seed and policy unchanged, nine open in five years (the pay claim
+in the sixth month, the steelworks in the eleventh, the summit, prisons and net zero in the
+seventeenth and eighteenth, the chip maker in the nineteenth, energy prices in the twenty-
+sixth, the NHS winter crisis in the thirtieth and floods in the thirty-second); the bank
+needs a slump. `crates/core/tests/uk_dilemmas.rs` gives every answer and checks that each
+element it names moves the way its text says.
+
 ## Known weaknesses
 
 These are what version 0 does not do. The hindcast (below) shows which of them matter.

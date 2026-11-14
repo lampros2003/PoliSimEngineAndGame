@@ -56,12 +56,19 @@ Proposed here, and taken as decided unless the owner changes them.
 | Four elections cannot pin down many reactions | Wide errors, unstable fit | Fit few parameters (the economy and time in office, not per voter type), and say how wide the errors are |
 | Price pass-through double counts the Phillips curve | Inflation runs away after a VAT rise | Pass-through is a level shift spread over months; the curve sees it only through pay |
 
+## Open questions for the play test
+
+| Question | Now |
+|---|---|
+| Should each new game have its own random seed, so that chance dilemmas come at different times? | Every new game of a scenario has the scenario's seed |
+| Are the dilemmas' political costs the right size? | Judgements: -0.02 to -0.05 on a group's standing, a third to most of a point of unemployment |
+
 ## Status
 
 | # | Status |
 |---|---|
 | S9.0 | Done. `tools/uk/nhs.py` reads NHS England's referral-to-treatment overview series (OGL; new source `nhs_rtt`, fetched from the site's file store, since its pages answer automated requests with a browser check). In 2024 about 1.74 million referrals joined the list a month and 1.50 million treatments left it, and 3.3% of the list a month left for other reasons. `nhs.toml`: referrals grow with the population weighted by need, treatments follow real health spending (`treatment_response`, presets 0.5 and 1.5); the list starts at December 2024's 7.46 million. With unchanged money it passes the record (7.77 million, September 2023) in the 30th month and reaches 8.8 million by the 2029 election; a tenth off health spending leaves it about 2 million longer after two years. Two situations; the list is the sixth headline figure, checked by the client test against the runner |
 | S9.1 | Done. `[dilemma.x]` in model format 1 (spec 06): a lever for the answer, `x_choice` and `x_age`, and states `x_answer`, `x_months` and `x_open`; each answer's `effect` wraps the formulas it names while chosen, for `months` or for good; `again_after` puts it again. An answer is a command, legal only while the dilemma is open, never a bill; the lever is back to 0 when the step ends, so saves and hashes hold it at 0. The oracle and the engine expand and check it the same way: 36 shared cases (`conformance/dilemma_cases.toml`). The catalogue lists dilemmas, translated by `[dilemma.x]` in text files. The client asks in a dialog, holds the months until an answer (a year's run stops at the month a dilemma opens), and shows "Decide" and the answer on the strip; `polisim play` asks too. An example mod, a dock strike for Valmora (`mods/dock_strike`, with French), and a client test of it |
-| S9.2 | |
+| S9.2 | Done. Twelve UK dilemmas in `dilemmas.toml` (from `tools/uk/template/`): the pay round, an NHS winter crisis, a bank in trouble, a steelworks, a chip maker, an energy shock, a failing water company, the defence summit, full prisons, universities, floods and a climate warning. Answers change pay, procurement, subsidies, public investment, benefits, exports, investment, consumption, inflation, treatments, service targets, emissions per pound and, through a new `government_standing` by voter type, how voters see the government. Six are chances from random streams of their own. To keep formulas small when many answers change one element, the loader now moves an element's formula into a var `<element>_before_<dilemma>` before each dilemma's effects (spec 06; two new shared cases, one with 24 dilemmas on one formula). `crates/core/tests/uk_dilemmas.rs` gives every answer and checks each element moves the way the answer says |
 | S9.3 | |
 | S9.4 | |

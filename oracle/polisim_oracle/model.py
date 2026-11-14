@@ -428,6 +428,27 @@ def _whole_at_least_one(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 1
 
 
+def _carrier(merged: dict[str, dict], section: str, element: dict, formula: str, dilemma: str, what: str) -> dict:
+    """Stage S9.1: a var computing `formula`, an element's formula before a dilemma's
+    effects: of the element's type, unit, dimensions, entity and phase (a national flow's:
+    money, its instrument's unit a step)."""
+    if section == "flow":
+        for side in ("from", "to"):
+            sector = merged["sector"].get(element.get(side))
+            if isinstance(sector, dict) and sector.get("entity") is not None:
+                raise ModelError(f"{what}: an effect on a flow held record by record is not supported")
+        instruments = merged["instrument"]
+        instrument = element.get("instrument", next(iter(instruments), None))
+        unit = instruments.get(instrument, {}).get("unit", "") if isinstance(instruments.get(instrument), dict) else ""
+        carrier = {"type": "money", "unit": f"{unit}/{merged['model'].get('step', '')}"}
+    else:
+        carrier = {key: element[key] for key in ("type", "unit", "dims", "entity") if key in element}
+    if "phase" in element:
+        carrier["phase"] = element["phase"]
+    carrier.update({"expr": formula, "dilemma": dilemma})
+    return carrier
+
+
 def _expand_dilemmas(merged: dict[str, dict]) -> list[dict]:
     """Stage S9.1: each dilemma becomes a lever for the answer given this month, vars for the
     answer in force and its age, and states for the answer, the months since and whether the
@@ -502,24 +523,39 @@ def _expand_dilemmas(merged: dict[str, dict]) -> list[dict]:
                                  "months": o.get("months")} for o in options]})
 
     for name, spec, start, again, options in checked:
+        # Each element this dilemma's answers change, with the answers' effects in order.
+        per_target: dict[str, list[tuple[str, str, str]]] = {}
         for k, option in enumerate(options, 1):
             what = f"dilemma {name}, answer {option['name']}"
             months = option.get("months")
             when = f"{name}_choice == {k}" + (f" and {name}_age < {months}" if months is not None else "")
             for target, formula in option.get("effect", {}).items():
-                found = None
-                if target not in made:
-                    for section, key in (("var", "expr"), ("flow", "expr"), ("state", "next")):
-                        if isinstance(merged[section].get(target), dict):
-                            found = (merged[section][target], key)
-                            break
-                if found is None:
-                    raise ModelError(f"{what}: the model has no var, flow or state {target} of its own")
-                element, key = found
-                old = element.get(key)
-                if not isinstance(old, str):
-                    raise ModelError(f"{what}: {target} has no formula to change")
-                element[key] = f"select({when}, ({formula.replace('{base}', f'({old})')}), ({old}))"
+                per_target.setdefault(target, []).append((what, when, formula))
+        for target, effects in per_target.items():
+            what = effects[0][0]
+            found = None
+            if target not in made:
+                for section, key in (("var", "expr"), ("flow", "expr"), ("state", "next")):
+                    if isinstance(merged[section].get(target), dict):
+                        found = (section, merged[section][target], key)
+                        break
+            if found is None:
+                raise ModelError(f"{what}: the model has no var, flow or state {target} of its own")
+            section, element, key = found
+            old = element.get(key)
+            if not isinstance(old, str):
+                raise ModelError(f"{what}: {target} has no formula to change")
+            # The formula so far goes into a var of its own, which each answer's effect
+            # reads once, so formulas grow by the effects, not by doubling.
+            before = f"{target}_before_{name}"
+            if before in merged["var"] or before in made:
+                raise ModelError(f"var.{before} is declared twice")
+            made.add(before)
+            merged["var"][before] = _carrier(merged, section, element, old, name, what)
+            body = before
+            for _, when, formula in reversed(effects):
+                body = f"select({when}, ({formula.replace('{base}', before)}), ({body}))"
+            element[key] = body
     return out
 
 

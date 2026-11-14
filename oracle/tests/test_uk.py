@@ -506,6 +506,25 @@ class WaitingList(unittest.TestCase):
         self.assertFalse(row["waiting_list_record"])
 
 
+class Dilemmas(unittest.TestCase):
+    """Stage S9.2: the UK's dilemmas (models/uk/dilemmas.toml). The engine's
+    crates/core/tests/uk_dilemmas.rs gives every answer and checks what it changes."""
+
+    def test_the_dilemmas_and_the_pay_round(self):
+        self.assertEqual([d["name"] for d in model().dilemmas], [
+            "pay_claim", "nhs_winter", "bank_rescue", "steelworks", "investor", "energy_shock", "water_company",
+            "defence_summit", "prisons_full", "universities", "floods", "net_zero_warning"])
+        for d in model().dilemmas:
+            self.assertTrue(2 <= len(d["options"]) <= 3, d["name"])
+            self.assertTrue(d["doc"] and all(o["doc"] for o in d["options"]), d["name"])
+        sim = Simulation(model(), seed=SEED)
+        rows = [sim.step() for _ in range(7)]
+        # Nothing is answered, so the government's standing is untouched; the pay round
+        # opens at the end of June 2025, the sixth month, to be answered in July.
+        self.assertEqual(set(sim.rt.C["government_standing"]), {0.0})
+        self.assertEqual([r["pay_claim_open"] for r in rows], [False] * 5 + [True, True])
+
+
 class Issues(unittest.TestCase):
     """Stage S8.3: voters weigh health, education, policing and the environment for the
     government, each as its change since the last election."""

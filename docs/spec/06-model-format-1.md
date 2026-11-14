@@ -392,17 +392,24 @@ order the dilemmas are declared:
 
 The states are updated in the dilemma's `phase`. The lever carries `label` and `doc` from
 the dilemma, and every element made carries `dilemma = "d"`, which the catalogue passes on.
-Each answer `k` with effects then rewrites each element it names, in the order written:
-the element's formula `F` becomes
+
+Then, dilemma by dilemma, each element `T` that any of `d`'s answers names (in the order
+first named) is rewritten. Its formula `F` as it stands (a state's `next`) moves into a new
+var `T_before_d`, with `T`'s type, unit, dimensions, entity and phase (for a flow: `money`,
+in its instrument's unit a step; an effect on a flow held record by record is an error),
+and `T`'s formula becomes, for the answers `k1, k2, …` that name it, in order,
 
 ```text
-select(d_choice == k, (E), (F))                       without months
-select(d_choice == k and d_age < m, (E), (F))         with months = m
+select(<when k1>, (E1), select(<when k2>, (E2), … T_before_d))
 ```
 
-where `E` is the effect with every `{base}` replaced by `(F)`. So effects of later answers
-and later dilemmas wrap those of earlier ones, and an element's formula without effects in
-force is its own.
+where `<when k>` is `d_choice == k`, or `d_choice == k and d_age < m` with `months = m`, and
+`Ek` is answer `k`'s effect with every `{base}` replaced by `T_before_d`. So a later
+dilemma's effects apply to the result of an earlier one's (`T_before_e` is the formula with
+`d`'s effects), formulas grow with the number of effects rather than doubling, and the
+chain shows in a trace: `T` reads `T_before_e`, which reads `T_before_d`. An effect may read
+the dilemma's own `d_age` to fade on its own clock, so one answer can change one thing for
+good and another for a few months.
 
 **Answering.** A dilemma's lever is set by a command, like any lever, but is never a bill.
 In part 1 of a step, a command to it is an error unless its dilemma is open (`d_open` is
@@ -418,7 +425,7 @@ error, in the dilemma or an option, as are: an `option` that is not an array of 
 tables; a missing, repeated or non-identifier `name`; `months` or `again_after` that is
 not a whole number of at least 1; an effect naming anything but a declared `var`, `flow`
 or `state`, or one without a formula; an effect that is not a formula; and any name the
-dilemma would make that the model already has. The oracle and the engine expand dilemmas
+dilemma would make (its own six, and each `T_before_d`) that the model already has. The oracle and the engine expand dilemmas
 and check answers the same way; the shared cases are in `conformance/dilemma_cases.toml`.
 The section is accepted in format 0 models too.
 

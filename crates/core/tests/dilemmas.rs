@@ -135,7 +135,7 @@ fn the_model_keeps_each_dilemma() {
         .map(|s| s.name.as_str())
         .collect();
     made.sort();
-    assert_eq!(made, ["d", "d_age", "d_answer", "d_choice", "d_months", "d_open"]);
+    assert_eq!(made, ["cost_before_d", "d", "d_age", "d_answer", "d_choice", "d_months", "d_open"]);
 }
 
 #[test]

@@ -115,3 +115,13 @@ drift above their path, so the government polls a little lower: 352 seats in Jul
 and a half points within seven months, with the recession it brings. The figures for later elections
 above were measured before stage S8.
 
+
+## Answers to dilemmas (stage S9.2)
+
+`government_standing`, by voter type, is added to each type's fundamentals for the blocs in
+government. It is zero until the government answers one of the questions in
+`dilemmas.toml` in a way that changes it: an NHS left to ride out a winter crisis costs
+0.04 among voters of 65 and over for six months, a steelworks left to close 0.05 in Wales
+and Yorkshire for two years, and so on (`models/uk/README.md`, Dilemmas). The voter types'
+quintile and work (`type_quintile`, `type_in_work`) are there for these effects. The base
+month and the 2024 shares are unchanged.

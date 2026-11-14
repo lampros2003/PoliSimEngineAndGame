@@ -57,8 +57,13 @@ Sometimes the government must decide: a strike, a crisis. A dialog puts the ques
 two or more answers, each saying what it does. No month runs until you answer; you can
 close the dialog to look at the figures first, and **Decide** under the headline asks
 again. Your answer takes effect the next month, for good or for the months it says, and
-shows under the headline while it lasts. (The UK's own questions come in a later build;
-the dock strike mod shows how one works in Valmora.)
+shows under the headline while it lasts. The UK has twelve: the public sector pay round in
+July 2025, an NHS winter crisis once the waiting list breaks its record, the allies' defence
+summit, full prisons, a climate warning, and chances (a steelworks closing, a chip maker
+choosing a site, an energy price shock, floods, a failing water company or universities)
+whose months the game's random seed decides; a bank in trouble comes only with a slump. In
+this build every new game of a scenario has the same seed, so the chances come in the same
+months each time.
 
 ## Things to try
 
@@ -79,7 +84,7 @@ the dock strike mod shows how one works in Valmora.)
 5. **Set a carbon price of £100 a tonne** (Policy, Environment) and watch emissions by
    industry (Who gains, who loses) and the budget: about £48bn a year in revenue, and
    emissions falling faster, though not yet on the path to net zero.
-6. **Leave policy alone and advance to July 2029.** Time in office wears the government
+6. **Leave policy alone and advance to July 2029**, answering the questions as they come. Time in office wears the government
    down, but with an economy that holds up it keeps a majority. Then try the same with
    a slump of your own making.
 

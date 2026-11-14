@@ -1,0 +1,317 @@
+# The questions put to the government (stage S9.2), model format 1 (docs/spec/06-model-
+# format-1.md, Dilemmas). GENERATED: copied from tools/uk/template/dilemmas.toml by
+# tools/uk/calibrate.py.
+#
+# Each dilemma opens when its start holds and stays open until it is answered; each answer
+# changes formulas the model already has, for some months or for good. An effect that
+# reads the dilemma's own `_age` can fade on its own clock while the rest of the answer
+# lasts. The sizes are judgements, listed in models/uk/README.md. Costs are shares of an
+# existing payment, at 2024 sizes: 1% of procurement is about £3.3bn a year, of public
+# investment £1.4bn, of subsidies £0.4bn, of public pay £2.9bn, of benefits £3.1bn.
+#
+# What an answer does to how voters see the government goes through government_standing
+# (politics.toml), by voter type: type_region (0 North East, 1 North West, 2 Yorkshire and
+# The Humber ... 9 Wales, 10 Scotland, 11 Northern Ireland), type_age (0 for 18 to 24 ... 4
+# for 65 and over), type_quintile (0 for the poorest fifth) and type_in_work. A standing of
+# -0.02 weighs on a voter type as much as about a third of a point more unemployment in its
+# region, or ten months more in office.
+#
+# Chance events draw from their own random streams, so the same seed brings them in the
+# same month.
+
+[stream.energy_shock_chance]
+
+[stream.investor_chance]
+
+[stream.floods_chance]
+
+[stream.steel_chance]
+
+[stream.universities_chance]
+
+[stream.water_chance]
+
+# ---------------------------------------------------------------- the pay round
+
+[dilemma.pay_claim]
+label = "Public sector pay claim"
+doc = "The pay review bodies report, and unions for nurses, teachers and civil servants ask for a rise well above plans after years of pay falling behind prices; several ballot for strikes"
+start = "months_elapsed >= 6"
+
+[[dilemma.pay_claim.option]]
+name = "meet"
+label = "Meet the claim"
+doc = "Public sector pay rises 4% above plans, for good: about £12bn a year. No strikes"
+effect = { public_pay = "round({base} * 1.04)" }
+
+[[dilemma.pay_claim.option]]
+name = "split"
+label = "Offer half"
+doc = "Pay rises 2% above plans, for good. Some unions strike for three months: hospitals treat 5% fewer patients"
+effect = { public_pay = "round({base} * 1.02)", treatments = "{base} * select(pay_claim_age < 3, 0.95, 1.0)" }
+
+[[dilemma.pay_claim.option]]
+name = "refuse"
+label = "Hold to the plans"
+doc = "No more than planned. Doctors, nurses and teachers strike on and off for six months: hospitals treat a tenth fewer patients and schools lose days, and voters tire of the disruption"
+months = 6
+effect = { treatments = "{base} * 0.9", service_target = "select(coord(function) == 1, {base} * 0.95, {base})", government_standing = "{base} - 0.01" }
+
+# ---------------------------------------------------------------- the NHS
+
+[dilemma.nhs_winter]
+label = "NHS winter crisis"
+doc = "The waiting list is the longest there has ever been, ambulances queue outside hospitals and the NHS asks for emergency help"
+start = "waiting_list > record_waiting_list and months_elapsed >= 9"
+again_after = 12
+
+[[dilemma.nhs_winter.option]]
+name = "fund"
+label = "Emergency funding"
+doc = "About £3.3bn a year more for six months: hospitals treat 5% more patients"
+months = 6
+effect = { procurement = "round({base} * 1.01)", treatments = "{base} * 1.05" }
+
+[[dilemma.nhs_winter.option]]
+name = "private"
+label = "Buy operations from private hospitals"
+doc = "About £1.6bn a year for a year: 3% more patients treated"
+months = 12
+effect = { procurement = "round({base} * 1.005)", treatments = "{base} * 1.03" }
+
+[[dilemma.nhs_winter.option]]
+name = "wait"
+label = "Ride it out"
+doc = "No new money. Older voters, who use the NHS most, hold it against the government for six months"
+months = 6
+effect = { government_standing = "{base} - select(type_age == 4, 0.04, select(type_age == 3, 0.02, 0.0))" }
+
+# ---------------------------------------------------------------- the economy
+
+[dilemma.bank_rescue]
+label = "A bank in trouble"
+doc = "With the economy shrinking and bad loans mounting, one of the large banks cannot raise money and savers start to queue"
+start = "recession and unemployment_rate > 0.055"
+
+[[dilemma.bank_rescue.option]]
+name = "rescue"
+label = "Rescue it with public money"
+doc = "Subsidies double for six months, about £19bn in all, and the bank keeps lending; voters resent the bail-out for two years"
+effect = { subsidies = "round({base} * select(bank_rescue_age < 6, 2.0, 1.0))", government_standing = "{base} - select(bank_rescue_age < 24, 0.02, 0.0)" }
+
+[[dilemma.bank_rescue.option]]
+name = "savers"
+label = "Protect savers only"
+doc = "Deposits are guaranteed, shareholders lose; the bank lends less and business investment falls 7% for six months"
+months = 6
+effect = { business_investment = "round({base} * 0.93)" }
+
+[[dilemma.bank_rescue.option]]
+name = "fail"
+label = "Let it fail"
+doc = "Credit dries up: business investment falls 15% and households spend 2% less for nine months, and people in work blame the government"
+months = 9
+effect = { business_investment = "round({base} * 0.85)", consumption = "round({base} * 0.98)", government_standing = "{base} - 0.02 * type_in_work" }
+
+[dilemma.steelworks]
+label = "Steelworks to close"
+doc = "The last big steelworks says it will close within months, with thousands of jobs in Wales and Yorkshire, unless the government steps in"
+start = "months_elapsed >= 10 and rand(steel_chance) < select(output_growth < 0.01, 0.15, 0.03)"
+
+[[dilemma.steelworks.option]]
+name = "subsidise"
+label = "Subsidise it"
+doc = "5% more in subsidies, about £1.9bn a year, for two years; Wales and Yorkshire welcome it"
+effect = { subsidies = "round({base} * select(steelworks_age < 24, 1.05, 1.0))", government_standing = "{base} + select(steelworks_age < 24 and (type_region == 9 or type_region == 2), 0.02, 0.0)" }
+
+[[dilemma.steelworks.option]]
+name = "nationalise"
+label = "Take it into public ownership"
+doc = "3% more public investment, about £4.3bn a year, for a year; Wales and Yorkshire welcome it, the richest fifth do not"
+effect = { public_investment = "round({base} * select(steelworks_age < 12, 1.03, 1.0))", government_standing = "{base} + select(steelworks_age < 24, select(type_region == 9 or type_region == 2, 0.04, 0.0) - select(type_quintile == 4, 0.01, 0.0), 0.0)" }
+
+[[dilemma.steelworks.option]]
+name = "close"
+label = "Let it close"
+doc = "Exports fall 0.3% for good, and voters in Wales and Yorkshire hold it against the government for two years"
+effect = { exports = "round({base} * 0.997)", government_standing = "{base} - select(steelworks_age < 24 and (type_region == 9 or type_region == 2), 0.05, 0.0)" }
+
+[dilemma.investor]
+label = "A chip maker looks for a site"
+doc = "A large maker of microchips will build a plant in the UK, or elsewhere, depending on what the government offers"
+start = "months_elapsed >= 3 and rand(investor_chance) < 0.02"
+
+[[dilemma.investor.option]]
+name = "grant"
+label = "Offer a grant"
+doc = "2% more in subsidies, about £0.7bn a year, for two years; business investment 1% and exports 0.2% higher for good"
+effect = { subsidies = "round({base} * select(investor_age < 24, 1.02, 1.0))", business_investment = "round({base} * 1.01)", exports = "round({base} * 1.002)" }
+
+[[dilemma.investor.option]]
+name = "decline"
+label = "Offer nothing special"
+doc = "The plant goes elsewhere; nothing changes"
+
+[dilemma.energy_shock]
+label = "Energy prices jump"
+doc = "A conflict abroad sends gas and electricity prices soaring; household bills will rise by a third this winter"
+start = "months_elapsed >= 6 and rand(energy_shock_chance) < 0.015"
+again_after = 36
+
+[[dilemma.energy_shock.option]]
+name = "cap"
+label = "Cap household bills"
+doc = "Subsidies rise by half for six months, about £9bn; inflation rises half a point a year while it lasts"
+months = 6
+effect = { subsidies = "round({base} * 1.5)", inflation = "{base} + 0.0004" }
+
+[[dilemma.energy_shock.option]]
+name = "target"
+label = "Help poorer households"
+doc = "Benefits rise 2% for six months, about £3bn; inflation rises 3 points a year while it lasts, and the poorest two fifths are grateful"
+months = 6
+effect = { benefits = "round({base} * 1.02)", inflation = "{base} + 0.0025", government_standing = "{base} + select(type_quintile <= 1, 0.01, 0.0)" }
+
+[[dilemma.energy_shock.option]]
+name = "market"
+label = "Let prices rise"
+doc = "No help: inflation rises 3 points a year for six months, and every voter feels it"
+months = 6
+effect = { inflation = "{base} + 0.0025", government_standing = "{base} - 0.02" }
+
+[dilemma.water_company]
+label = "A water company fails"
+doc = "A large water company, deep in debt, cannot pay its lenders; its pipes and treatment works still need running"
+start = "months_elapsed >= 12 and rand(water_chance) < 0.01"
+
+[[dilemma.water_company.option]]
+name = "administer"
+label = "Put it into special administration"
+doc = "The state runs it for a year: public investment 1% higher, about £1.4bn"
+months = 12
+effect = { public_investment = "round({base} * 1.01)" }
+
+[[dilemma.water_company.option]]
+name = "customers"
+label = "Let customers pay"
+doc = "Bills rise to pay the debts: inflation a tenth of a point a year higher for a year, and voters notice"
+months = 12
+effect = { inflation = "{base} + 0.0001", government_standing = "{base} - 0.01" }
+
+# ---------------------------------------------------------------- the state's other duties
+
+[dilemma.defence_summit]
+label = "Allies ask for more on defence"
+doc = "At the alliance's summit, allies press every member to raise defence spending, and the UK must say what it will do"
+start = "months_elapsed >= 17"
+
+[[dilemma.defence_summit.option]]
+name = "pledge"
+label = "Pledge more"
+doc = "1% more procurement for good, about £3.3bn a year; voters of 50 and over approve for a year"
+effect = { procurement = "round({base} * 1.01)", government_standing = "{base} + select(defence_summit_age < 12 and type_age >= 3, 0.01, 0.0)" }
+
+[[dilemma.defence_summit.option]]
+name = "plans"
+label = "Keep to current plans"
+doc = "Nothing changes in the budget; voters of 65 and over think less of the government for a year"
+months = 12
+effect = { government_standing = "{base} - select(type_age == 4, 0.02, 0.0)" }
+
+[dilemma.prisons_full]
+label = "Prisons are full"
+doc = "Prisons have run out of places; courts are told to delay sentences"
+start = "service_level[function: public_order] < 0.99 and months_elapsed >= 6"
+again_after = 18
+
+[[dilemma.prisons_full.option]]
+name = "release"
+label = "Release some prisoners early"
+doc = "Places free up at once; voters of 50 and over are angry for a year"
+months = 12
+effect = { government_standing = "{base} - select(type_age >= 3, 0.03, 0.0)" }
+
+[[dilemma.prisons_full.option]]
+name = "build"
+label = "Build emergency places"
+doc = "Public investment 0.5% higher for a year, about £0.7bn, and police, courts and prisons work 3% better"
+months = 12
+effect = { public_investment = "round({base} * 1.005)", service_target = "select(coord(function) == 3, {base} * 1.03, {base})" }
+
+[[dilemma.prisons_full.option]]
+name = "community"
+label = "Send more to community sentences"
+doc = "Police, courts and prisons work 2% better for a year; voters of 65 and over are uneasy"
+months = 12
+effect = { service_target = "select(coord(function) == 3, {base} * 1.02, {base})", government_standing = "{base} - select(type_age == 4, 0.01, 0.0)" }
+
+[dilemma.universities]
+label = "Universities near bankruptcy"
+doc = "With fees frozen for years and fewer students from abroad, several universities say they cannot pay their staff"
+start = "months_elapsed >= 9 and rand(universities_chance) < 0.03"
+
+[[dilemma.universities.option]]
+name = "bail_out"
+label = "Give them emergency money"
+doc = "Procurement 0.2% higher, about £0.7bn a year, for two years"
+effect = { procurement = "round({base} * select(universities_age < 24, 1.002, 1.0))" }
+
+[[dilemma.universities.option]]
+name = "fees"
+label = "Let them raise fees"
+doc = "Students pay more; voters under 35 hold it against the government for two years"
+months = 24
+effect = { government_standing = "{base} - select(type_age <= 1, 0.03, 0.0)" }
+
+[[dilemma.universities.option]]
+name = "merge"
+label = "Let some merge or close"
+doc = "Fewer students come from abroad: exports 0.2% lower for good; voters under 25 are unhappy for a year"
+effect = { exports = "round({base} * 0.998)", government_standing = "{base} - select(universities_age < 12 and type_age == 0, 0.02, 0.0)" }
+
+# ---------------------------------------------------------------- the environment
+
+[dilemma.floods]
+label = "Floods in the north"
+doc = "Storms flood towns across the north of England; thousands of homes are under water"
+start = "months_elapsed >= 2 and rand(floods_chance) < 0.01"
+again_after = 24
+
+[[dilemma.floods.option]]
+name = "defend"
+label = "Fund repairs and new defences"
+doc = "Public investment 2% higher for a year, about £2.8bn; the north notices"
+months = 12
+effect = { public_investment = "round({base} * 1.02)", government_standing = "{base} + select(type_region <= 2, 0.02, 0.0)" }
+
+[[dilemma.floods.option]]
+name = "councils"
+label = "Leave it to councils and insurers"
+doc = "No new money; voters in the north hold it against the government for a year"
+months = 12
+effect = { government_standing = "{base} - select(type_region <= 2, 0.04, 0.0)" }
+
+[dilemma.net_zero_warning]
+label = "Off track for net zero"
+doc = "The independent climate committee reports that emissions are well above the path to net zero in 2050 and asks what the government will do"
+start = "emissions_above_path and months_elapsed >= 18"
+
+[[dilemma.net_zero_warning.option]]
+name = "plan"
+label = "Adopt the committee's plan"
+doc = "Procurement 0.2% higher for good, about £0.7bn a year, and emissions per pound fall a further 1.2% a year; voters under 35 approve for a year"
+effect = { procurement = "round({base} * 1.002)", emission_intensity = "{base} * 0.999", government_standing = "{base} + select(net_zero_warning_age < 12 and type_age <= 1, 0.02, 0.0)" }
+
+[[dilemma.net_zero_warning.option]]
+name = "later"
+label = "Promise to catch up later"
+doc = "Nothing changes now; voters under 35 are unimpressed for a year"
+months = 12
+effect = { government_standing = "{base} - select(type_age <= 1, 0.02, 0.0)" }
+
+[[dilemma.net_zero_warning.option]]
+name = "drop"
+label = "Drop the 2050 target"
+doc = "Voters under 35 turn against the government for two years; some of 65 and over approve"
+months = 24
+effect = { government_standing = "{base} - select(type_age <= 1, 0.05, 0.0) + select(type_age == 4, 0.01, 0.0)" }
