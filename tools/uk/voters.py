@@ -70,6 +70,21 @@ ASSUMPTIONS = {
     "inflation_effect": {"low": -1.5, "central": -3.0, "high": -4.5},  # per unit of annual inflation
     "tenure_effect": {"low": -0.0125, "central": -0.025, "high": -0.05},  # per year in office
     "months_in_office": 6,  # the government took office in July 2024; the model starts in January 2025
+    # Stage S8.3: the issues voters weigh beyond the economy, for the blocs in government:
+    # each a change since the last election in a measure where 1 is how things stood (the
+    # health, education and policing service levels, and the path to net zero over actual
+    # emissions). Utility per unit of change, by age band (18-24, 25-34, 35-49, 50-64, 65+).
+    # Judgements, sized so that a 10% fall in the health service costs the government about
+    # as much among people over 65 as a point of unemployment (0.06); the young weigh the
+    # environment most, people of an age to have children education, older people health
+    # and policing. The voter types do not know their bloc, so age stands in for leaning.
+    "issue_weight": {
+        "health": [0.3, 0.3, 0.4, 0.5, 0.6],
+        "education": [0.15, 0.3, 0.4, 0.2, 0.1],
+        "policing": [0.15, 0.15, 0.2, 0.25, 0.3],
+        "environment": [0.5, 0.4, 0.3, 0.2, 0.15],
+    },
+    "issue_scale": {"low": 0.5, "central": 1.0, "high": 1.5},
     "governing": ["centre_left"],
     # Stage S5.3. Positions on a left (-1) to right (+1) axis, for forming governments and
     # (S5.4) voting on bills: a judgement of where each bloc stands on tax and spending.
@@ -174,6 +189,8 @@ def write(out_dir: Path, households: Path) -> tuple[str, float]:
     table("quintiles.csv", "decile,value", [f"{d},{(d - 1) // 2}" for d in range(1, 11)])
     table("governing.csv", "bloc,value", [f"{b},{str(b in ASSUMPTIONS['governing']).lower()}" for b in BLOCS])
     table("positions.csv", "bloc,value", [f"{b},{ASSUMPTIONS['position'][b]!r}" for b in BLOCS])
+    table("issue_weights.csv", "voter_age,issue,value",
+          [f"{AGES[g][0]},{i},{w[g]!r}" for g in range(len(AGES)) for i, w in ASSUMPTIONS["issue_weight"].items()])
     with open(ROOT / "models" / "uk" / "data" / "labour_regions.csv", newline="", encoding="utf-8") as handle:
         labour = {r["region"]: (int(r["employed"]), int(r["unemployed"])) for r in csv.DictReader(handle)}
     national = sum(u for _, u in labour.values()) / sum(e + u for e, u in labour.values())
@@ -222,6 +239,8 @@ def rules(seats: list[dict]) -> str:
     blocs = ", ".join(f'"{b}"' for b in BLOCS)
     bloc_labels = ", ".join(f'"{x}"' for x in BLOC_LABELS)
     ages = ", ".join(f'"{g[0]}"' for g in AGES)
+    issues = ", ".join(f'"{i}"' for i in ASSUMPTIONS["issue_weight"])
+    scale_low, scale_central, scale_high = (ASSUMPTIONS["issue_scale"][k] for k in ("low", "central", "high"))
     codes = ", ".join(f'"{c["code"]}"' for c in seats)
     names = ", ".join('"' + c["name"].replace('"', "'") + '"' for c in seats)
     age_labels = ", ".join(f'"{g[1]}"' for g in AGES)
@@ -427,13 +446,52 @@ dims = ["region"]
 initial = -1.0
 next = "select(regional_unemployment_at_election < 0.0 or election_now, regional_unemployment, regional_unemployment_at_election)"
 
+# ---- stage S8.3: the issues voters weigh beyond the economy
+
+[dim.issue]
+members = [{issues}]
+labels = ["Health", "Education", "Policing", "The environment"]
+
+[param.issue_weight]
+doc = "How much each age band weighs each issue: utility for the government per unit of change since the last election (a judgement)"
+type = "real"
+unit = "1"
+dims = ["voter_age", "issue"]
+data = "politics/issue_weights.csv"
+
+[param.issue_weight_scale]
+doc = "How much the issues count at all, against the central judgement"
+type = "real"
+unit = "1"
+low = {scale_low!r}
+central = {scale_central!r}
+high = {scale_high!r}
+
+[var.issue_measure]
+label = "The issues, by measure"
+doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels, and the path to net zero over actual emissions"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["issue"]
+expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3], net_zero_path / emissions)))"
+
+[state.issue_at_election]
+doc = "Each issue's measure at the last election; the base month's stands in for July 2024's (-1 until it is known)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["issue"]
+initial = -1.0
+next = "select(issue_at_election < 0.0 or election_now, issue_measure, issue_at_election)"
+
 [var.voter_fundamentals]
-doc = "The fundamentals for each voter type: inflation, time in office, and its own region's unemployment"
+doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, and the issues it weighs"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region]))"
+expr = "fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * (issue_measure - issue_at_election)), issue)"
 
 [var.utility]
 type = "real"

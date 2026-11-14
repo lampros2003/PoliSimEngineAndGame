@@ -2,7 +2,8 @@ extends PanelContainer
 ## Politics (stage S5.5): the polls, the House of Commons by bloc, the next election. All
 ## from the scenario's `[play.politics]` table, which names the model's values: voting
 ## intention, seats and the projection by bloc, which blocs govern, the government's poll
-## rating, turnout, the election flag and the months to the next election.
+## rating, turnout, the election flag and the months to the next election; and (stage S8.3)
+## the issues voters weigh, each against where it stood at the last election.
 
 const Palette := preload("res://scripts/palette.gd")
 
@@ -13,6 +14,7 @@ const BLOC_COLOURS := [Color("#d6534f"), Color("#4f86d6"), Color("#e8a948"), Col
 var fmt: RefCounted
 var settings := {}
 var _summary: Label
+var _issues: Label
 var _election: Label
 var _bar: Control
 var _grid: GridContainer
@@ -40,6 +42,13 @@ func _ready() -> void:
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_summary.custom_minimum_size = Vector2(600, 0)
 	box.add_child(_summary)
+	_issues = Label.new()
+	_issues.name = "issues"
+	_issues.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_issues.custom_minimum_size = Vector2(600, 0)
+	_issues.add_theme_color_override("font_color", Palette.MUTED)
+	_issues.visible = false
+	box.add_child(_issues)
 	_bar = Control.new()
 	_bar.custom_minimum_size = Vector2(600, 22)
 	_bar.draw.connect(_draw_bar)
@@ -160,8 +169,31 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable, months_do
 	if turnout != null:
 		text += " Turnout if an election were held now: %s." % fmt.percent(float(turnout))
 	_summary.text = text
+	_show_issues(cells_of)
 	_bar.set_meta("majority", majority)
 	_bar.queue_redraw()
+
+
+## Stage S8.3: "What voters weigh, against the last election: Health −8%, ...", from the
+## measures named by `issues` and `issues_at_election` (1 where things stood).
+func _show_issues(cells_of: Callable) -> void:
+	var now: Dictionary = cells_of.call(str(settings.get("issues", "")))
+	var then: Dictionary = cells_of.call(str(settings.get("issues_at_election", "")))
+	var labels: PackedStringArray = now.get("labels", PackedStringArray())
+	var values: PackedFloat64Array = now.get("values", PackedFloat64Array())
+	var before: PackedFloat64Array = then.get("values", PackedFloat64Array())
+	_issues.visible = not labels.is_empty() and values.size() == labels.size() and before.size() == labels.size()
+	if not _issues.visible:
+		return
+	var parts := PackedStringArray()
+	for i in labels.size():
+		if before[i] <= 0.0:
+			parts.append("%s –" % labels[i])
+			continue
+		var d := (values[i] / before[i] - 1.0) * 100.0
+		parts.append("%s %s%.1f%%" % [labels[i], "+" if d >= 0.0 else "−", absf(d)])
+	_issues.text = "What voters weigh, against the last election: " + ", ".join(parts) + "."
+	_issues.tooltip_text = "Health, education and policing: real spending per person served. The environment: the path to net zero over actual emissions. A fall costs the government votes, most among the age groups that care most."
 
 
 ## "A", "A and B", "A, B and C".

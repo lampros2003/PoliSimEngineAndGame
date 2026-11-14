@@ -33,7 +33,10 @@ func _initialize() -> void:
 			return _fail("the summary reads: " + panel._summary.text)
 		if main.lost or main._advance[0].disabled:
 			return _fail("the game stopped")
-		print("politics: the 2024 House, the government's poll rating and the July 2029 election shown")
+		# Stage S8.3: the issues, nothing changed yet since the stand-in election.
+		if not panel._issues.visible or not panel._issues.text.begins_with("What voters weigh, against the last election: Health +0.0%"):
+			return _fail("the issues read: " + panel._issues.text)
+		print("politics: the 2024 House, the government's poll rating, the July 2029 election and the issues shown")
 	else:
 		if main._dialog == null or not main._dialog.visible or not main._dialog.title.contains("lost office"):
 			return _fail("election night was not announced")

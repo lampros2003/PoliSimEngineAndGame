@@ -475,6 +475,27 @@ class Emissions(unittest.TestCase):
         self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))
 
 
+class Issues(unittest.TestCase):
+    """Stage S8.3: voters weigh health, education, policing and the environment for the
+    government, each as its change since the last election."""
+
+    def test_the_issues_start_where_things_stood_and_a_health_cut_costs_votes(self):
+        names = model().dims["issue"].members
+        self.assertEqual(names, ["health", "education", "policing", "environment"])
+        cut = {1: {"spending_health": model().symbols["spending_health"].spec["default"] * 3 // 4}}
+        weighed = Simulation(model(), seed=SEED, commands=cut)
+        ignored = Simulation(model(), seed=SEED, commands=cut, params={"issue_weight_scale": 0.0})
+        first, first_ignored = weighed.step(), ignored.step()
+        # Nothing has changed since the stand-in election: the polls are as without issues.
+        self.assertEqual(first["government_support"], first_ignored["government_support"])
+        self.assertEqual(weighed.column("issue_at_election")[:3], [1.0, 1.0, 1.0])
+        for _ in range(6):
+            row, row_ignored = weighed.step(), ignored.step()
+        self.assertLess(weighed.column("issue_measure")[0], 0.9)
+        # The health service's decline costs the government on top of the economy.
+        self.assertLess(row["government_support"], row_ignored["government_support"] - 0.003)
+
+
 class Trade(unittest.TestCase):
     """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
 

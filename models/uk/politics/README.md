@@ -94,3 +94,24 @@ times each region's relative rate in the 2024 Annual Population Survey
 (`regional_unemployment_ratio`: the North East's is about 1.2 times the UK's, Northern
 Ireland's about half). Voters weigh their own region's change since the last election, so
 a rise in unemployment costs the government more where unemployment is high.
+
+## Issues beyond the economy (stage S8.3)
+
+Voters also weigh, for the blocs in government, four issues, each as its change since the
+last election in a measure where 1 is how things stood: health, education and policing
+(their service levels, `../functions.toml`: real spending per person served) and the
+environment (the path to net zero over actual emissions, `../emissions.toml`). How much
+each age band cares is a judgement (`issue_weights.csv`, in `tools/uk/voters.py`), sized so
+that a 10% fall in the health service costs the government about as much among people
+over 65 as a point of unemployment; the young weigh the environment most, people of an age
+to have children education, older people health and policing. Voter types do not know
+their party, so age stands in for leaning. `issue_weight_scale` (presets 0.5 and 1.5)
+scales them all, for screening.
+
+The issues start at zero in the base month, so the intercepts and the 2024 shares are
+unchanged. With unchanged policy services wear down as the population ages and emissions
+drift above their path, so the government polls a little lower: 352 seats in July 2029
+(373 before the issues), still a majority. A third off health spending costs it about six
+and a half points within seven months, with the recession it brings. The figures for later elections
+above were measured before stage S8.
+

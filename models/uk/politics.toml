@@ -200,13 +200,52 @@ dims = ["region"]
 initial = -1.0
 next = "select(regional_unemployment_at_election < 0.0 or election_now, regional_unemployment, regional_unemployment_at_election)"
 
+# ---- stage S8.3: the issues voters weigh beyond the economy
+
+[dim.issue]
+members = ["health", "education", "policing", "environment"]
+labels = ["Health", "Education", "Policing", "The environment"]
+
+[param.issue_weight]
+doc = "How much each age band weighs each issue: utility for the government per unit of change since the last election (a judgement)"
+type = "real"
+unit = "1"
+dims = ["voter_age", "issue"]
+data = "politics/issue_weights.csv"
+
+[param.issue_weight_scale]
+doc = "How much the issues count at all, against the central judgement"
+type = "real"
+unit = "1"
+low = 0.5
+central = 1.0
+high = 1.5
+
+[var.issue_measure]
+label = "The issues, by measure"
+doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels, and the path to net zero over actual emissions"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["issue"]
+expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3], net_zero_path / emissions)))"
+
+[state.issue_at_election]
+doc = "Each issue's measure at the last election; the base month's stands in for July 2024's (-1 until it is known)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["issue"]
+initial = -1.0
+next = "select(issue_at_election < 0.0 or election_now, issue_measure, issue_at_election)"
+
 [var.voter_fundamentals]
-doc = "The fundamentals for each voter type: inflation, time in office, and its own region's unemployment"
+doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, and the issues it weighs"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region]))"
+expr = "fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * (issue_measure - issue_at_election)), issue)"
 
 [var.utility]
 type = "real"
