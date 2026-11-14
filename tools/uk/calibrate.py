@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import tomllib
 from fractions import Fraction
 from pathlib import Path
@@ -179,6 +180,50 @@ def growth(annual: float) -> float:
     return round((1 + annual) ** (1 / 12) - 1, 12)
 
 
+def write_population(out_dir: Path, a: dict) -> dict[str, str]:
+    """Format 1: the people block's rates, derived from ONS's mid-2024 population, its
+    components of change and the 2022-2024 life table. Returns the template's fills."""
+    data_dir = ROOT / "models" / "uk" / "data"
+
+    def table(name):
+        return list(csv.DictReader((data_dir / name).read_text(encoding="utf-8").splitlines()))
+
+    pop = {(r["region"], r["sex"], int(r["age"])): float(r["people"]) for r in table("population.csv")}
+    change = {r["region"]: r for r in table("population_change.csv")}
+    qx = {(r["sex"], int(r["age"])): float(r["qx"]) for r in table("life_table.csv")}
+    p = a["population"]
+    ages = range(0, 91)
+    lo, hi = p["fertility_ages"]
+    fertility = {age: (math.exp(-((age - p["fertility_peak_age"]) / p["fertility_spread"]) ** 2) if lo <= age <= hi else 0.0)
+                 for age in ages}
+    migration = {age: math.exp(-((age - p["migration_peak_age"]) / p["migration_spread"]) ** 2) for age in ages}
+    migration_total = 2 * sum(migration.values())
+    folder = out_dir / "population"
+    folder.mkdir(parents=True, exist_ok=True)
+    monthly = {key: 1 - (1 - q) ** (1 / MONTHS) for key, q in qx.items()}
+    rows = ["sex,age,mortality,migration_profile"]
+    for sex in ("female", "male"):
+        for age in ages:
+            rows.append(f"{sex},{age},{r12(monthly[(sex, age)])},{r12(migration[age] / migration_total)}")
+    (folder / "by_age.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    rows = ["age,fertility_profile"] + [f"{age},{r12(fertility[age])}" for age in ages]
+    (folder / "by_age_women.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    rows = ["region,death_factor,fertility_scale,net_migration"]
+    for region, c in change.items():
+        # A month's deaths at the life table's rates, times twelve, against the year's deaths.
+        expected_deaths = MONTHS * sum(pop[(region, sex, age)] * monthly[(sex, age)]
+                                       for sex in ("female", "male") for age in ages)
+        women = sum(pop[(region, "female", age)] * fertility[age] for age in ages)
+        net = (int(c["internal_net"]) + int(c["international_net"]) + int(c["other"])) / MONTHS
+        rows.append(f"{region},{r12(int(c['deaths']) / expected_deaths)},{r12(int(c['births']) / MONTHS / women)},{r12(net)}")
+    (folder / "by_region.csv").write_text("\n".join(rows) + "\n", encoding="utf-8", newline="\n")
+    # The population starts from the pipeline's own file.
+    (out_dir / "data").mkdir(parents=True, exist_ok=True)
+    if (out_dir / "data").resolve() != data_dir.resolve():
+        (out_dir / "data" / "population.csv").write_bytes((data_dir / "population.csv").read_bytes())
+    return {"boy_share": r12(p["boy_share"])}
+
+
 def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | None = None) -> SimpleNamespace:
     a = a if a is not None else load_assumptions()
     v = derive(year, data, a)
@@ -318,10 +363,17 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f"# opening.{k} = {val}")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
-    for name in ("model.toml", "economy.toml"):
+    # The people block starts from mid-2024, so only a 2024 base year has it.
+    people = year == STOCKS_YEAR
+    files = ["calibration.toml", "economy.toml"] + (["population.toml"] if people else [])
+    fills = write_population(out_dir, a) if people else {}
+    for name in ("model.toml", "economy.toml") + (("population.toml",) if people else ()):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))
+        for k, val in fills.items():
+            text = text.replace("{{%s}}" % k, str(val))
+        text = text.replace("{{files}}", "[" + ", ".join(f'"{f}"' for f in files) + "]")
         text = text.replace("{{base_year}}", year)
         if "{{" in text.replace("{{double braces}}", ""):
             raise SystemExit(f"{name}: a placeholder was not filled")

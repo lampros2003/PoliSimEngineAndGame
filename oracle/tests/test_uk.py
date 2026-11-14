@@ -171,6 +171,45 @@ class UnchangedPolicy(unittest.TestCase):
             self.assertEqual(len(rows), 120)
 
 
+class Population(unittest.TestCase):
+    """The people block (S3.6): ONS's mid-2024 population by region, sex and age, moved on
+    month by month."""
+
+    @staticmethod
+    def table(name):
+        with open(UK / "data" / name, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def test_the_first_month_starts_from_the_published_population(self):
+        sim = Simulation(model(), seed=SEED)
+        cells = self.table("population.csv")
+        regions = model().dims["region"].members
+        sexes = model().dims["sex"].members
+        for row in cells[:: 17]:
+            flat = (regions.index(row["region"]) * 2 + sexes.index(row["sex"])) * 91 + int(row["age"])
+            self.assertEqual(sim.rt.C["population"][flat], float(row["people"]))
+        self.assertEqual(run()[0]["population_total"], float(sum(int(r["people"]) for r in cells)))
+        self.assertEqual(run()[0]["population_total"], 69_281_437)
+
+    def test_the_first_months_births_and_deaths_are_a_twelfth_of_the_published_year(self):
+        change = self.table("population_change.csv")
+        first = run()[0]
+        self.assertAlmostEqual(first["births_total"] * 12, sum(int(c["births"]) for c in change), delta=1)
+        self.assertAlmostEqual(first["deaths_total"] * 12, sum(int(c["deaths"]) for c in change), delta=1)
+
+    def test_a_year_on_the_population_has_grown_by_about_the_published_change(self):
+        change = self.table("population_change.csv")
+        published = sum(int(c["population_2024"]) - int(c["population_2023"]) for c in change)
+        grown = run()[12]["population_total"] - run()[0]["population_total"]
+        self.assertLess(abs(grown / published - 1), 0.05)
+
+    def test_thirty_years_stay_plausible(self):
+        rows = run()
+        self.assertTrue(70e6 < rows[-1]["population_total"] < 95e6)
+        share_old = rows[-1]["pension_age_population"] / rows[-1]["population_total"]
+        self.assertTrue(0.17 < share_old < 0.35)
+
+
 class Reproducibility(unittest.TestCase):
     def test_matches_the_recorded_hashes(self):
         # Recorded with:

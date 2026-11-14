@@ -57,6 +57,19 @@ benefit_per_unemployed = 450
 # rest to households; chosen so that the sector's 2024 net lending is reproduced.
 match_financial_net_lending = true
 
+[population]
+# Shapes the published data do not give directly. Each is scaled by region so that the
+# region's births and net migration in the year to mid-2024 are reproduced.
+# Births by the mother's age: a bell around this age, this wide, between these ages.
+fertility_peak_age = 31
+fertility_spread = 5.5
+fertility_ages = [15, 45]
+# Net arrivals by age: a bell around this age, this wide, the same for women and men.
+migration_peak_age = 27
+migration_spread = 9
+# Boys among births (about 105 boys to 100 girls).
+boy_share = 0.512
+
 [statutory]
 # Statutory rates with the date each took effect, for any base year and for the hindcast.
 # A year's figure is the average of the rate in force on the 15th of each month.

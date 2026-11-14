@@ -15,13 +15,13 @@
 
 [model]
 id = "uk"
-format = 0
+format = 1
 title = "United Kingdom"
 currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "income", "spending", "finance", "accounts"]
-files = ["calibration.toml", "economy.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml"]
 
 [sector.households]
 label = "Households"
