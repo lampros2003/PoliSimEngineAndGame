@@ -1,0 +1,25 @@
+# The lever changes made by client/tests/scripted_run.gd, written as scheduled commands.
+# The client's run must give the same state hash on every step as this file run by the
+# command-line runner (tools/check_client.py compares them).
+
+[scenario]
+model = ".."
+seed = 20261113
+steps = 60
+preset = "central"
+
+[[command]]
+step = 6
+set = { basic_rate = 0.25 }
+
+[[command]]
+step = 15
+set = { gov_purchases = 1_550_000_000 }
+
+[[command]]
+step = 30
+set = { benefit_rate = 900, vat_rate = 0.175 }
+
+[[command]]
+step = 42
+set = { personal_allowance = 1100.50 }

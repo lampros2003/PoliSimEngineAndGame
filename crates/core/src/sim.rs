@@ -10,8 +10,9 @@
 //!
 //! After any error the simulation is in an undefined state and must be discarded.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
 use toml::Value;
@@ -82,6 +83,24 @@ pub struct Simulation {
     flow_totals: Vec<i64>,
     row_names: Vec<String>,
     row_sources: Vec<RowSource>,
+    /// Per symbol with a formula: what it reads this step, and what it reads through prev().
+    pub(crate) deps: Vec<Vec<usize>>,
+    pub(crate) lagged_deps: Vec<Vec<usize>>,
+    /// Keep end-of-step copies of the whole state so results can be explained.
+    tracing: bool,
+    /// End-of-step states, newest first: at most three (the last step and the two before).
+    pub(crate) snapshots: VecDeque<Snapshot>,
+    /// Time spent in each phase, then in posting, since the run started.
+    phase_time: Vec<Duration>,
+}
+
+/// The whole state at the end of a step, kept only while tracing.
+#[derive(Clone)]
+pub(crate) struct Snapshot {
+    /// Steps completed when it was taken: 0 is the state before the first step.
+    pub(crate) steps_done: u64,
+    pub(crate) scal: Vec<Val>,
+    pub(crate) cols: Vec<Col>,
 }
 
 fn as_int(value: &Val) -> i64 {
@@ -158,6 +177,11 @@ impl Simulation {
             flow_totals: vec![0; model.flows.len()],
             row_names: Vec::new(),
             row_sources: Vec::new(),
+            deps: vec![Vec::new(); count],
+            lagged_deps: vec![Vec::new(); count],
+            tracing: false,
+            snapshots: VecDeque::new(),
+            phase_time: vec![Duration::ZERO; model.phases.len() + 1],
         };
         let m = &*model;
         let minor = m.minor;
@@ -242,13 +266,15 @@ impl Simulation {
             let Some(expr) = &d.expr else { continue };
             let label = format!("{} {}{}", d.kind.name(), d.name, if d.kind == Kind::State { " (next)" } else { "" });
             let compiled = compile_formula(m, expr, d.entity, d.ty, &d.unit, &label)?;
-            for lagged in compiled.lagged {
+            for &lagged in &compiled.lagged {
                 simulation.lagged[lagged] = true;
             }
             deps[id] = compiled.deps;
+            simulation.lagged_deps[id] = compiled.lagged;
             simulation.progs[id] = Some(compiled.prog);
         }
         simulation.plan = plan(m, &deps)?;
+        simulation.deps = deps;
 
         // ---- values that prev() sees during the first step
         let mut lagged: Vec<usize> = (0..count).filter(|id| simulation.lagged[*id]).collect();
@@ -398,20 +424,7 @@ impl Simulation {
     /// Checks that `raw` is a legal setting for the lever `name` without applying it.
     /// Returns the value as it would be stored.
     pub fn check_lever(&self, name: &str, raw: &Value) -> Result<Val> {
-        let d = match self.model.sym(name) {
-            Some(d) if d.kind == Kind::Lever => d,
-            _ => return model_err(format!("{name:?} is not a lever")),
-        };
-        let value = convert(Raw::Toml(raw), d.ty, d.money, self.model.minor, &format!("lever {name}"))?;
-        let as_real = match value {
-            Val::I(v) => v as f64,
-            Val::F(v) => v,
-            Val::B(v) => v as u8 as f64,
-        };
-        if !as_real.is_finite() || d.range.is_some_and(|(lo, hi)| !(lo <= as_real && as_real <= hi)) {
-            return sim_err(format!("lever {name}: the value is outside its declared range"));
-        }
-        Ok(value)
+        check_lever(&self.model, name, raw)
     }
 
     fn set_lever(&mut self, name: &str, raw: &Value) -> Result<()> {
@@ -445,6 +458,7 @@ impl Simulation {
             entities: &self.model.entities,
             seed: self.seed,
             step: self.step as u32,
+            swap: None,
         }
     }
 
@@ -470,7 +484,41 @@ impl Simulation {
         }
         self.remember();
         self.step += 1;
+        if self.tracing {
+            self.take_snapshot();
+        }
         self.record()
+    }
+
+    fn take_snapshot(&mut self) {
+        let snapshot = Snapshot { steps_done: self.step, scal: self.scal.clone(), cols: self.cols.clone() };
+        self.snapshots.push_front(snapshot);
+        self.snapshots.truncate(3);
+    }
+
+    /// Keeps copies of the state at the end of each step so that [`Simulation::explain`]
+    /// can say why a value changed. It costs one copy of the state per step and changes no
+    /// result. Explanations become available two steps after it is turned on.
+    pub fn set_tracing(&mut self, on: bool) {
+        self.tracing = on;
+        self.snapshots.clear();
+        if on {
+            self.take_snapshot();
+        }
+    }
+
+    pub fn is_tracing(&self) -> bool {
+        self.tracing
+    }
+
+    pub(crate) fn progs_of(&self, id: usize) -> Option<&Program> {
+        self.progs[id].as_ref()
+    }
+
+    /// Time spent so far in each phase, by name, then in posting.
+    pub fn phase_times(&self) -> Vec<(String, Duration)> {
+        let names = self.model.phases.iter().cloned().chain(std::iter::once("posting".to_string()));
+        names.zip(self.phase_time.iter().copied()).collect()
     }
 
     fn step_inner(&mut self) -> Result<()> {
@@ -480,6 +528,7 @@ impl Simulation {
             }
         }
         for phase in 0..self.plan.len() {
+            let started = Instant::now();
             for position in 0..self.plan[phase].order.len() {
                 let id = self.plan[phase].order[position];
                 let value = self.compute(id)?;
@@ -492,8 +541,13 @@ impl Simulation {
             for (id, value) in pending {
                 self.store(id, value)?;
             }
+            self.phase_time[phase] += started.elapsed();
         }
-        self.post_flows()
+        let started = Instant::now();
+        let posted = self.post_flows();
+        let last = self.phase_time.len() - 1;
+        self.phase_time[last] += started.elapsed();
+        posted
     }
 
     /// Double entry: every flow leaves one account and enters another (contract, section 4).
@@ -652,6 +706,96 @@ impl Simulation {
         }
     }
 
+    /// The same run on a changed model: the new model's formulas and parameters, with the
+    /// lever settings, balances, states and remembered values carried across by name.
+    ///
+    /// A value is carried when the new model has a symbol of the same name, kind, type
+    /// and shape. The names of persistent values that could not be carried, and so start
+    /// from the new model's initial values, are returned with the new simulation.
+    /// Commands still to come are carried too. Reloading an unchanged model gives a run
+    /// identical to the one that was never reloaded.
+    pub fn reload(
+        &self,
+        model: Arc<Model>,
+        preset: &str,
+        params: Vec<(String, Value)>,
+    ) -> Result<(Simulation, Vec<String>)> {
+        let mut commands = Vec::new();
+        for (step, list) in &self.commands {
+            for (lever, raw) in list {
+                if model.sym(lever).is_some_and(|d| d.kind == Kind::Lever) {
+                    commands.push((*step, lever.clone(), raw.clone()));
+                }
+            }
+        }
+        let source = Params::Scenario { preset: preset.to_string(), overrides: params };
+        let mut next = Simulation::build(Arc::clone(&model), self.seed, source, Vec::new(), commands)?;
+        let family = |kind: Kind| match kind {
+            Kind::Var | Kind::Flow => 0,
+            Kind::Lever => 1,
+            Kind::Account => 2,
+            Kind::State => 3,
+            Kind::Param | Kind::Column => 4,
+        };
+        let mut values = Vec::new();
+        let mut reset = Vec::new();
+        for &id in &next.hashed {
+            let d = &model.symbols[id];
+            let carried = self.model.sym_index.get(&d.name).and_then(|&old| {
+                let o = &self.model.symbols[old];
+                let same_shape = match (o.entity, d.entity) {
+                    (None, None) => true,
+                    (Some(a), Some(b)) => {
+                        self.model.entities[a].name == model.entities[b].name
+                            && self.model.entities[a].ids == model.entities[b].ids
+                    }
+                    _ => false,
+                };
+                let value = match o.entity {
+                    None => Computed::One(self.scal[old]),
+                    Some(_) => Computed::Each(self.cols[old].clone()),
+                };
+                let ty_ok = match &value {
+                    Computed::One(v) => type_of(v) == d.ty,
+                    Computed::Each(c) => {
+                        matches!((c, d.ty), (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool))
+                    }
+                };
+                // A var or flow that was never computed holds a placeholder; only carry real values.
+                let computed = !matches!(o.kind, Kind::Var | Kind::Flow) || self.step > 0 || self.lagged[old];
+                (family(o.kind) == family(d.kind) && same_shape && ty_ok && computed).then_some(value)
+            });
+            match carried {
+                Some(value) => values.push((d.name.clone(), value)),
+                None => {
+                    reset.push(d.name.clone());
+                    values.push((d.name.clone(), next.value_now(id)));
+                }
+            }
+        }
+        next.restore(self.step, values)?;
+        next.set_tracing(self.tracing);
+        Ok((next, reset))
+    }
+
+    fn value_now(&self, id: usize) -> Computed {
+        match self.model.symbols[id].entity {
+            None => Computed::One(self.scal[id]),
+            Some(_) => Computed::Each(self.cols[id].clone()),
+        }
+    }
+
+    /// Commands still scheduled, in step order.
+    pub fn commands(&self) -> Vec<(u64, String, Value)> {
+        let mut out = Vec::new();
+        for (step, list) in &self.commands {
+            for (lever, raw) in list {
+                out.push((*step, lever.clone(), raw.clone()));
+            }
+        }
+        out
+    }
+
     /// Current parameter values, in declaration order.
     pub(crate) fn params(&self) -> Vec<(&str, Val)> {
         let symbols = self.model.symbols.iter().enumerate();
@@ -738,6 +882,25 @@ impl crate::model::Scenario {
             commands: self.commands.clone(),
         }
     }
+}
+
+/// Checks that `raw` is a legal setting for the lever `name` of `model` without applying
+/// it. Returns the value as it would be stored.
+pub fn check_lever(model: &Model, name: &str, raw: &Value) -> Result<Val> {
+    let d = match model.sym(name) {
+        Some(d) if d.kind == Kind::Lever => d,
+        _ => return model_err(format!("{name:?} is not a lever")),
+    };
+    let value = convert(Raw::Toml(raw), d.ty, d.money, model.minor, &format!("lever {name}"))?;
+    let as_real = match value {
+        Val::I(v) => v as f64,
+        Val::F(v) => v,
+        Val::B(v) => v as u8 as f64,
+    };
+    if !as_real.is_finite() || d.range.is_some_and(|(lo, hi)| !(lo <= as_real && as_real <= hi)) {
+        return sim_err(format!("lever {name}: the value is outside its declared range"));
+    }
+    Ok(value)
 }
 
 fn too_large() -> Error {

@@ -937,6 +937,9 @@ pub struct Scenario {
     /// Columns an interactive session shows after each step (`[play] watch`). Not part
     /// of the run: the oracle ignores it.
     pub watch: Vec<String>,
+    /// The whole `[play]` table: presentation settings for a game client (country name,
+    /// start date, which sector is the government). Not part of the run.
+    pub play: Toml,
 }
 
 pub fn load_scenario(path: &Path) -> Result<Scenario> {
@@ -988,6 +991,10 @@ pub fn load_scenario(path: &Path) -> Result<Scenario> {
         watch: match doc.get("play").and_then(|p| p.get("watch")) {
             Some(Value::Array(items)) => items.iter().filter_map(|v| v.as_str().map(str::to_string)).collect(),
             _ => Vec::new(),
+        },
+        play: match doc.get("play") {
+            Some(Value::Table(table)) => table.clone(),
+            _ => Toml::new(),
         },
     })
 }

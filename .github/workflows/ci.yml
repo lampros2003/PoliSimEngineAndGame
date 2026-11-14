@@ -51,6 +51,51 @@ jobs:
       - name: Random scenarios through oracle and engine
         run: python tools/diff_engine.py --count 150
 
+  client:
+    # The game client: build the engine library, let Godot register it, play 60 scripted
+    # months through the bridge and compare every state hash with the runner. On Windows,
+    # also assemble the downloadable test build.
+    name: Client (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Cache Godot
+        uses: actions/cache@v4
+        with:
+          path: .godot-bin
+          key: godot-4.7.2-${{ runner.os }}
+      - name: Get Godot
+        id: godot
+        shell: bash
+        run: echo "exe=$(python tools/get_godot.py --to .godot-bin | tail -1)" >> "$GITHUB_OUTPUT"
+      - name: Build the engine library and runner
+        run: cargo build --release -p polisim-godot -p polisim-cli
+      - name: Register the library with Godot
+        run: python tools/build_client.py --godot "${{ steps.godot.outputs.exe }}"
+      - name: Scripted client run against the runner
+        run: python tools/check_client.py --godot "${{ steps.godot.outputs.exe }}"
+      - name: Build the benchmark
+        if: runner.os == 'Windows'
+        run: cargo build --release --manifest-path bench/s0/Cargo.toml
+      - name: Assemble the Windows test build
+        if: runner.os == 'Windows'
+        run: python tools/package_windows.py --godot-dir .godot-bin --out dist/PoliSim
+      - name: Upload the Windows test build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoliSim-windows
+          path: dist/
+          retention-days: 30
+
   bench-self-check:
     # Builds the S0 benchmark and runs its checks: the three rule-set variants must agree
     # with each other, and the random generator must agree with the oracle.

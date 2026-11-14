@@ -175,7 +175,11 @@ fn run(options: Options) -> Result<ExitCode, String> {
         }
     }
     if options.time && !rows.is_empty() {
-        eprintln!("{:.3} ms per step over {} steps", elapsed.as_secs_f64() * 1e3 / rows.len() as f64, rows.len());
+        let steps = rows.len() as f64;
+        eprintln!("{:.3} ms per step over {} steps", elapsed.as_secs_f64() * 1e3 / steps, rows.len());
+        for (phase, spent) in sim.phase_times() {
+            eprintln!("  {phase:<12} {:>9.3} ms per step", spent.as_secs_f64() * 1e3 / steps);
+        }
     }
     Ok(ExitCode::SUCCESS)
 }

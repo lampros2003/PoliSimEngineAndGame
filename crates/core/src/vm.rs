@@ -26,6 +26,18 @@ pub struct EvalCtx<'a> {
     pub seed: u64,
     /// Index of the step being computed.
     pub step: u32,
+    /// Read one input from somewhere else. Used only to explain results, never to step.
+    pub swap: Option<Swap<'a>>,
+}
+
+/// Replaces one input of a formula: reads of `sym` (through `prev()` when `lagged`) come
+/// from these slices instead.
+#[derive(Clone, Copy)]
+pub struct Swap<'a> {
+    pub sym: u32,
+    pub lagged: bool,
+    pub scal: &'a [Val],
+    pub cols: &'a [Col],
 }
 
 struct Regs {
@@ -213,10 +225,16 @@ pub fn real_to_int(x: f64, mode: Rounding) -> Check<i64> {
 }
 
 fn scalar<'a>(cx: &'a EvalCtx, src: Src) -> &'a Val {
+    if let Some(swap) = cx.swap.filter(|s| s.sym == src.sym && s.lagged == src.lagged) {
+        return &swap.scal[src.sym as usize];
+    }
     if src.lagged { &cx.prev_scal[src.sym as usize] } else { &cx.scal[src.sym as usize] }
 }
 
 fn column<'a>(cx: &'a EvalCtx, src: Src) -> &'a Col {
+    if let Some(swap) = cx.swap.filter(|s| s.sym == src.sym && s.lagged == src.lagged) {
+        return &swap.cols[src.sym as usize];
+    }
     if src.lagged { &cx.prev_cols[src.sym as usize] } else { &cx.cols[src.sym as usize] }
 }
 

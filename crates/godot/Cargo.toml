@@ -1,0 +1,14 @@
+[package]
+name = "polisim-godot"
+description = "Godot extension that runs the PoliSim engine inside the game client"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.94"
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+polisim-core = { path = "../core" }
+godot = { version = "0.5.5", default-features = false, features = ["api-4-7"] }

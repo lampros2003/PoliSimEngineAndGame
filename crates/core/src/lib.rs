@@ -16,21 +16,27 @@
 //! ```
 
 pub mod compile;
+pub mod describe;
 pub mod error;
+pub mod explain;
 pub mod model;
 pub mod program;
 pub mod pyfmt;
 pub mod rng;
 pub mod save;
+pub mod session;
 pub mod sim;
 pub mod syntax;
 pub mod units;
 pub mod vm;
 
+pub use describe::Catalogue;
 pub use error::{Error, Result};
+pub use explain::{Explanation, Num, Part};
 pub use model::{Model, Scenario, load_model, load_scenario};
 pub use program::{Col, Ty, Val};
-pub use sim::{Computed, Row, RunConfig, Simulation};
+pub use session::Session;
+pub use sim::{Computed, Row, RunConfig, Simulation, check_lever};
 /// A raw value as written in a model or scenario file, before it is given a type.
 pub use toml::Value as RawValue;
 
