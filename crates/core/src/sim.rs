@@ -606,6 +606,11 @@ impl Simulation {
         Ok(passed)
     }
 
+    /// Stage S6.1: per symbol, what its formula reads this step and through `prev()`.
+    pub fn dependencies(&self) -> (&[Vec<usize>], &[Vec<usize>]) {
+        (&self.deps, &self.lagged_deps)
+    }
+
     /// Format 1 (S5.4): every vote on a lever change since the run started (or resumed).
     pub fn votes(&self) -> &[Vote] {
         &self.votes

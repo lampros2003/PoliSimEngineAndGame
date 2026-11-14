@@ -8,6 +8,7 @@ const Palette := preload("res://scripts/palette.gd")
 const Format := preload("res://scripts/format.gd")
 const Chart := preload("res://scripts/chart.gd")
 const TracePanel := preload("res://scripts/trace_panel.gd")
+const WebPanel := preload("res://scripts/web_panel.gd")
 const LeverPanel := preload("res://scripts/lever_panel.gd")
 const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
@@ -60,6 +61,8 @@ var lost := false
 var levers: LeverPanel
 var chart: Chart
 var trace: TracePanel
+var web: WebPanel
+var tabs: TabContainer
 var _message: PanelContainer
 var _message_text: RichTextLabel
 var _dialog: AcceptDialog
@@ -207,7 +210,18 @@ func _build_layout() -> void:
 	trace.follow.connect(func(name: String) -> void: explain(name, true))
 	trace.back.connect(_trace_back)
 	trace.chart.connect(func(row: String) -> void: add_to_chart(row))
-	right.add_child(trace)
+	# "Why did it change?" and the icon web (stage S6.1) share the lower right.
+	tabs = TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.custom_minimum_size = Vector2(420, 300)
+	right.add_child(tabs)
+	tabs.add_child(trace)
+	tabs.set_tab_title(0, "Why did it change?")
+	web = WebPanel.new()
+	web.fmt = fmt
+	web.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_child(web)
+	tabs.set_tab_title(1, "Connections")
 
 	_message = PanelContainer.new()
 	_message.add_theme_stylebox_override("panel", Palette.panel_style(Palette.PANEL_RAISED))
@@ -250,6 +264,7 @@ func _model_changed() -> void:
 		if entry["kind"] == "lever" and entry.get("player", true):
 			lever_entries.append(entry)
 	trace.entries = entries
+	web.build(entries)
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	breakdown.build(play, entries)
 	politics.build(play)
@@ -362,6 +377,7 @@ func _refresh() -> void:
 		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
 		game.steps_done())
 	levers.refresh(func(name: String) -> Variant: return game.latest(name), game.pending())
+	web.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
 	_refresh_chart()
 	_set_controls(not failed and not lost)
 
@@ -452,6 +468,7 @@ func explain(name: String, push: bool) -> void:
 			trace.trail.append(name)
 	trace.show_waiting(name)
 	game.request_explanation(name)
+	web.show_value(name)
 
 
 func _trace_back() -> void:

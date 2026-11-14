@@ -90,6 +90,16 @@ def main() -> int:
             print("res://tests/bill_vote.gd failed", file=sys.stderr)
             return 1
         print(bill.stdout.strip().splitlines()[-1])
+        # Stage S6.1: the icon web, walked from a lever to the poll rating.
+        walk = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/web_walk.gd",
+             "--", "--scenario=models/uk/scenarios/2025.toml"],
+            capture_output=True, text=True, timeout=900)
+        if walk.returncode != 0:
+            print(walk.stdout.strip()[-2000:], walk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/web_walk.gd failed", file=sys.stderr)
+            return 1
+        print(walk.stdout.strip().splitlines()[-1])
         # Stage S5.5: the politics panel, and losing an election.
         for scenario, expect in (("2025", "office"), ("early_election", "lost")):
             run = subprocess.run(

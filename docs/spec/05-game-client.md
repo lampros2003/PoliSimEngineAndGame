@@ -41,6 +41,17 @@ client's labels and tooltips. A `real` whose unit starts with the currency (an a
 income, `GBP/month/household`) is shown as money: it is held in minor units like money
 itself ([model format](01-model-format-v0.md)).
 
+## Connections: the icon web
+
+Stage S6.1. The catalogue gives each entry its `inputs` (the names its formula reads this
+step) and `lagged_inputs` (through `prev()`); an account's inputs are the flows into and
+out of it. The lower right has two tabs, "Why did it change?" and "Connections": the web
+puts a value in the middle, what it depends on to the left and what depends on it to the
+right, each as a tile with its value and last month's change (bordered green for a rise,
+red for a fall), the ten that moved most on each side and a count of the rest. Data
+columns and parameters are left out: they never change. Pressing a tile moves the web to
+it; Back returns. Pressing Why anywhere moves the web as well as the explanation.
+
 ## Politics
 
 With a `[play] politics` table, a panel under "Who gains, who loses" shows the House of
@@ -136,7 +147,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs eight scripted sessions in Godot without a display and
+`tools/check_client.py` runs nine scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -146,6 +157,7 @@ compares them with the command-line runner or with published figures:
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
 | `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month the panel shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
+| `tests/web_walk.gd` | Stage S6.1: in `2025.toml`, the icon web walked by pressing tiles from the basic rate to the government's poll rating along the model's own chain (eleven steps, through each household's income tax and income change and the voter types' choice), and Back |
 | `tests/bill_vote.gd` | Stage S5.4: in the UK's hung-parliament test scenario the player's coalition raises the basic rate and is voted down 324 to 326: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
 | `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel. Then the "Who gains, who loses" panel, every breakdown, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 

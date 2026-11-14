@@ -301,6 +301,8 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("group", e.group.as_str());
         d.set("leaning", e.leaning.as_str());
         d.set("dims", &strings(&e.dims));
+        d.set("inputs", &strings(&e.inputs));
+        d.set("lagged_inputs", &strings(&e.lagged_inputs));
         entries.push(&d.to_variant());
     }
     let mut sectors = VarArray::new();

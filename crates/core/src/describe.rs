@@ -45,6 +45,10 @@ pub struct Entry {
     pub leaning: String,
     /// Format 1: the value's dimensions, by name.
     pub dims: Vec<String>,
+    /// Stage S6.1: what this value's formula reads this step, and through `prev()`; for an
+    /// account, the flows into and out of it. Filled by [`Catalogue::link`].
+    pub inputs: Vec<String>,
+    pub lagged_inputs: Vec<String>,
 }
 
 /// Format 1: a dimension and its members' labels.
@@ -91,6 +95,23 @@ pub fn humanise(name: &str) -> String {
 }
 
 impl Catalogue {
+    /// Stage S6.1: fills each entry's inputs from a simulation of the same model: the
+    /// values its formula reads (`deps`, `lagged` by symbol, as the simulation compiled
+    /// them) and, for an account, the flows into and out of it. The icon web draws them.
+    pub fn link(&mut self, model: &Model, deps: &[Vec<usize>], lagged: &[Vec<usize>]) {
+        let names = |ids: &[usize]| ids.iter().map(|i| model.symbols[*i].name.clone()).collect::<Vec<String>>();
+        for entry in &mut self.entries {
+            let Some(&id) = model.sym_index.get(&entry.name) else { continue };
+            entry.inputs = names(deps.get(id).map(Vec::as_slice).unwrap_or_default());
+            entry.lagged_inputs = names(lagged.get(id).map(Vec::as_slice).unwrap_or_default());
+            if model.symbols[id].kind == Kind::Account {
+                let flows: Vec<usize> =
+                    model.flows.iter().filter(|f| f.src_account == id || f.dst_account == id).map(|f| f.sym).collect();
+                entry.inputs = names(&flows);
+            }
+        }
+    }
+
     pub fn of(model: &Model) -> Catalogue {
         let sector_name = |account: usize| {
             let account = model.accounts.iter().find(|a| a.sym == account).expect("flows use accounts");
@@ -138,6 +159,8 @@ impl Catalogue {
                 group: text("group").unwrap_or_default(),
                 leaning: text("leaning").unwrap_or_default(),
                 dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
+                inputs: Vec::new(),
+                lagged_inputs: Vec::new(),
             });
         }
         let sectors = model

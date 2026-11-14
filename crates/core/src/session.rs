@@ -133,7 +133,9 @@ impl Session {
     }
 
     fn assemble(path: &Path, scenario: Scenario, model: Arc<Model>, sim: Simulation) -> Session {
-        let catalogue = Catalogue::of(&model);
+        let mut catalogue = Catalogue::of(&model);
+        let (deps, lagged) = sim.dependencies();
+        catalogue.link(&model, deps, lagged);
         let mut session = Session {
             scenario_path: path.to_path_buf(),
             scenario,
@@ -307,6 +309,8 @@ impl Session {
         let (sim, reset) = self.sim.reload(Arc::clone(&model), &self.scenario.preset, self.scenario.params.clone())?;
         self.scenario.model = (*model).clone();
         self.catalogue = Catalogue::of(&model);
+        let (deps, lagged) = sim.dependencies();
+        self.catalogue.link(&model, deps, lagged);
         self.model = model;
         self.sim = sim;
         Ok(reset)

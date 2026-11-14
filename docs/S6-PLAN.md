@@ -41,7 +41,7 @@ Proposed here, and taken as decided unless the owner changes them.
 | # | Status |
 |---|---|
 | S6.0 | Done. Fourteen behavioural parameters and the voters' four fundamentals have low, central and high presets (`tools/uk/assumptions.toml`, `tools/uk/voters.py`); each preset derives its own share of income spent and fits its own regional intercepts, so every preset reproduces the base month, polls included, and the central one is unchanged. `tools/uk/screen.py` runs 191 five-year runs on the engine in about 90 seconds and writes `models/uk/SENSITIVITY.md`: world demand and productivity growth drive GDP, borrowing and debt; the natural rate drives unemployment; time in office drives the polls and the 2029 seats (some 30 seats a level), so it is the first to calibrate |
-| S6.1 | Not started |
+| S6.1 | Done. The catalogue lists each value's inputs (from the compiled formulas; flows for accounts), the bridge passes them on, and a "Connections" tab beside "Why did it change?" shows the web around any value as tiles with their values and changes, pressing one to move (`client/scripts/web_panel.gd`). The client test walks from the basic rate to the poll rating in eleven steps, the model's own chain: each household's income tax, net and real income, its change, the voter types' utility and choice, the electorate's shares, voting intention (`client/tests/web_walk.gd`) |
 | S6.2 | Not started |
 | S6.3 | Not started |
 | S6.4 | Not started |

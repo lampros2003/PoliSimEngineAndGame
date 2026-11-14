@@ -203,3 +203,22 @@ fn dimensioned_cells_after_each_step() {
     let age = catalogue.dims.iter().find(|d| d.name == "age").unwrap();
     assert_eq!((age.labels[0].as_str(), age.labels[100].as_str()), ("0", "100"));
 }
+
+/// Stage S6.1: the catalogue lists what each value reads, for the icon web.
+#[test]
+fn catalogue_lists_each_values_inputs() {
+    let session = Session::open(&baseline()).unwrap();
+    let catalogue = session.catalogue();
+    let entry = |name: &str| catalogue.entries.iter().find(|e| e.name == name).unwrap().clone();
+    let gdp = entry("gdp");
+    assert!(!gdp.inputs.is_empty(), "gdp reads something");
+    for name in gdp.inputs.iter().chain(&gdp.lagged_inputs) {
+        assert!(catalogue.entries.iter().any(|e| &e.name == name), "{name} is in the catalogue");
+    }
+    // A lever reads nothing; an account's inputs are its flows.
+    assert!(entry("basic_rate").inputs.is_empty());
+    let account = catalogue.entries.iter().find(|e| e.kind == Kind::Account && !e.inputs.is_empty()).unwrap();
+    for flow in &account.inputs {
+        assert_eq!(entry(flow).kind, Kind::Flow);
+    }
+}
