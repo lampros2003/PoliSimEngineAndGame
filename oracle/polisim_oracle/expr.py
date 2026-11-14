@@ -842,6 +842,20 @@ class _Builder:
             return out
         return weights, count, f, dim, positions
 
+    def _per_member(self, totals_of):
+        """The totals of every member at once, kept while one formula is being evaluated:
+        records do not change in that time, so each cell's total is what a pass of its own
+        would give (the same terms, in the same order), and the records are read once, not
+        once per cell. `rt.generation` changes before every evaluation of a formula."""
+        rt, cache = self.rt, {"generation": None, "totals": None}
+
+        def lookup(p):
+            if cache["generation"] != rt.generation or cache["generation"] is None:
+                cache["totals"] = totals_of()
+                cache["generation"] = rt.generation
+            return cache["totals"][p]
+        return lookup
+
     def _fn_wsum_by(self, args, ctx):
         """wsum over the records whose key is the current cell's member of a dimension."""
         entity, D, inner, key = self._grouped("wsum_by", args, ctx)
@@ -849,36 +863,37 @@ class _Builder:
         weights, count, f, dim, positions = self._group_fn("wsum_by", entity, D, inner, key, None)
         unit = U.mul(inner.unit, ((entity.name, 1),))
         if inner.type == "int":
-            def fn(i):
-                p, pos, total = i[dim], positions(), 0
+            def totals():
+                pos, out = positions(), [0] * D.size
                 for r in range(count):
                     v = f(r)
-                    if pos[r] == p:
-                        total += weights[r] * v
-                return checked(total)
-            return Built("int", unit, fn)
+                    out[pos[r]] += weights[r] * v
+                return [checked(t) for t in out]
+            lookup = self._per_member(totals)
+            return Built("int", unit, lambda i: lookup(i[dim]))
 
-        def fn_real(i):
-            p, pos, acc = i[dim], positions(), 0.0
+        def totals_real():
+            pos, out = positions(), [0.0] * D.size
             for r in range(count):
                 v = f(r)
-                if pos[r] == p:
-                    acc = acc + float(weights[r]) * v
-            return acc
-        return Built("real", unit, fn_real)
+                out[pos[r]] = out[pos[r]] + float(weights[r]) * v
+            return out
+        lookup_real = self._per_member(totals_real)
+        return Built("real", unit, lambda i: lookup_real(i[dim]))
 
     def _fn_wcount_by(self, args, ctx):
         entity, D, inner, key = self._grouped("wcount_by", args, ctx)
         self._boolean(inner, "wcount_by()")
         weights, count, f, dim, positions = self._group_fn("wcount_by", entity, D, inner, key, None)
 
-        def fn(i):
-            p, pos, total = i[dim], positions(), 0
+        def totals():
+            pos, out = positions(), [0] * D.size
             for r in range(count):
-                if f(r) and pos[r] == p:
-                    total += weights[r]
-            return checked(total)
-        return Built("int", ((entity.name, 1),), fn)
+                if f(r):
+                    out[pos[r]] += weights[r]
+            return [checked(t) for t in out]
+        lookup = self._per_member(totals)
+        return Built("int", ((entity.name, 1),), lambda i: lookup(i[dim]))
 
     def _fn_wcount(self, args, ctx):
         entity, inner = self._aggregate("wcount", args, ctx)

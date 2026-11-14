@@ -443,7 +443,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f"# opening.{k} = {val}")
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
-    detail = ("population.toml", "industries.toml", "households.toml") if people else ()
+    detail = ("population.toml", "industries.toml", "households.toml", "politics.toml") if people else ()
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
     if people:
@@ -459,13 +459,18 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
             make_rules.build(True, opening["private_pay_per_worker"], alignment)[1], encoding="utf-8", newline="\n")
         if (out_dir / "households" / "households.csv").resolve() != source.resolve():
             (out_dir / "households" / "households.csv").write_bytes(source.read_bytes())
+        import voters
+        politics, fit = voters.write(out_dir, source)
+        if fit > 1e-9:
+            raise SystemExit(f"the voters' intercepts do not reproduce the 2024 election: error {fit}")
+        (out_dir / "politics.toml").write_text(politics, encoding="utf-8", newline="\n")
     fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income)" if people
                                 else "round(income_tax_rate * (wages + public_pay + benefits + other_income))")
     fills["nics_expr"] = ("round(ni_scale * (employee_ni_total + employer_ni_total))" if people
                           else "round(nics_rate * (wages + public_pay))")
     fills["benefits_expr"] = ("round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index) + child_benefit_total + universal_credit_total"
                               if people else "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index)")
-    for name in ("model.toml", "economy.toml", *(d for d in detail if d != "households.toml")):
+    for name in ("model.toml", "economy.toml", *(d for d in detail if d not in ("households.toml", "politics.toml"))):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))

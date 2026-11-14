@@ -32,6 +32,7 @@ class Runtime:
         self.PS: dict[str, object] = {}  # scalars at the end of the previous step
         self.PC: dict[str, list] = {}  # columns at the end of the previous step
         self.W: dict[str, list[int]] = {}  # each entity's current weights, updated in place
+        self.generation = 0  # changes before each evaluation of a formula (see expr._per_member)
         self.seed = seed
         self.step = 0  # index of the step being computed
 
@@ -305,6 +306,7 @@ class Simulation:
         return plan
 
     def _evaluate(self, d):
+        self.rt.generation += 1
         if d.name in self.rakes:
             return self.rakes[d.name]()
         fn = self.fn[d.name]
@@ -423,6 +425,7 @@ class Simulation:
         step that would run next.
         """
         fn, _, _ = compile_formula(src, self.model, self.rt, entity, type, parse_unit(unit), "evaluate")
+        self.rt.generation += 1
         if entity is None:
             return fn(0)
         return [fn(i) for i in range(len(self.model.entities[entity].ids))]
