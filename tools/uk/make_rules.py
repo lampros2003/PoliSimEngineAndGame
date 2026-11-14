@@ -79,6 +79,23 @@ unit = "1"
 [entity.household.columns.youngest_child]
 type = "int"
 unit = "1"
+
+[entity.household.columns.income_decile]
+doc = "Decile of equivalised gross income in the base year, 1 to 10"
+type = "int"
+unit = "1"
+'''
+
+# Dimensions for "who gains, who loses": the household's income decile and type.
+BREAKDOWNS = '''
+[dim.decile]
+doc = "Tenths of households by equivalised gross income in the base year, poorest first"
+range = [1, 10]
+labels = ["Poorest tenth", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Richest tenth"]
+
+[dim.household_type]
+members = ["one_under_65", "one_65_plus", "unrelated_adults", "couple_no_children", "couple_one_or_two", "couple_three_plus", "couple_grown_children", "lone_parent", "lone_parent_grown", "multi_family"]
+labels = ["One adult under 65", "One adult 65 or over", "Unrelated adults", "Couple, no children", "Couple, one or two children", "Couple, three or more children", "Couple with grown-up children", "Lone parent", "Lone parent with grown-up children", "Two or more families"]
 '''
 
 
@@ -317,6 +334,9 @@ unit = "GBP/month"
 phase = "{tp}"
 expr = "{expr}"
 '''
+    adults_net = " + ".join(f"earn{i} + pens{i} - income_tax{i} - employee_ni{i}" for i in range(1, ADULTS + 1))
+    rules += var("net_income", f"round(({adults_net} + child_benefit_year - hicbc_year) / year) + universal_credit",
+                 unit=m_unit, doc="Income after income tax and National Insurance, with Child Benefit and Universal Credit, a month")
     rules += total("income_tax_total", "round(wsum(household, income_tax_year) / year / household_unit)", "Income tax")
     rules += total("employee_ni_total", "round(wsum(household, employee_ni_year) / year / household_unit)", "National Insurance, employees and self-employed")
     rules += total("employer_ni_total", "round(wsum(household, employer_ni_year) / year / household_unit)", "National Insurance, employers")
@@ -335,6 +355,26 @@ unit = "GBP/month"
 phase = "{tp}"
 dims = ["region"]
 expr = "wsum_by(household, income_tax_year, region, region_code) / year / household_unit"
+'''
+    rules += BREAKDOWNS
+    rules += f'''
+[var.net_income_average]
+label = "Net income per household, all households"
+type = "real"
+unit = "GBP/month/household"
+phase = "{tp}"
+expr = "wsum(household, net_income) / wcount(household, true)"
+'''
+    for dim, key, label in (("decile", "income_decile", "by income decile"), ("household_type", "type", "by household type"),
+                            ("region", "region_code", "by region")):
+        rules += f'''
+[var.net_income_by_{dim}]
+label = "Net income per household, {label}"
+type = "real"
+unit = "GBP/month/household"
+phase = "{tp}"
+dims = ["{dim}"]
+expr = "wsum_by(household, net_income, {dim}, {key}) / wcount_by(household, true, {dim}, {key})"
 '''
     return (None if integrated else MODEL + model), rules
 

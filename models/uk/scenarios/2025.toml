@@ -17,3 +17,6 @@ government = "government"
 amounts = "year"
 headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual"]
+# "Who gains, who loses": net income per household by group, from the households.
+breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region"]
+breakdown_all = "net_income_average"

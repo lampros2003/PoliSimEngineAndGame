@@ -41,6 +41,15 @@ pub struct Entry {
     pub player: bool,
     /// The `group` key: where a policy panel lists it (empty for none).
     pub group: String,
+    /// Format 1: the value's dimensions, by name.
+    pub dims: Vec<String>,
+}
+
+/// Format 1: a dimension and its members' labels.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DimEntry {
+    pub name: String,
+    pub labels: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -64,6 +73,7 @@ pub struct Catalogue {
     pub instruments: Vec<String>,
     pub entries: Vec<Entry>,
     pub sectors: Vec<SectorEntry>,
+    pub dims: Vec<DimEntry>,
 }
 
 /// `income_tax_total` becomes `Income tax total`.
@@ -122,6 +132,7 @@ impl Catalogue {
                 financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
                 player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
                 group: text("group").unwrap_or_default(),
+                dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
             });
         }
         let sectors = model
@@ -162,6 +173,7 @@ impl Catalogue {
             instruments: model.instruments.iter().map(|i| i.name.clone()).collect(),
             entries,
             sectors,
+            dims: model.dims.iter().map(|d| DimEntry { name: d.name.clone(), labels: d.labels.clone() }).collect(),
         }
     }
 

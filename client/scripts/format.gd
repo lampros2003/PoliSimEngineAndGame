@@ -131,6 +131,14 @@ func unit_words(unit: String) -> String:
 	return "" if words.is_empty() else " " + " ".join(words)
 
 
+## True for an amount of money: a `money` value, or a real whose unit is the currency (an
+## average income, say), which the engine also holds in minor units.
+func is_money(entry: Dictionary) -> bool:
+	if entry.get("money", false):
+		return true
+	return currency != "" and entry.get("type", "") == "real" and str(entry.get("unit", "")).split("/")[0] == currency
+
+
 ## True for a dimensionless real, which reads best as a percentage.
 static func is_rate(entry: Dictionary) -> bool:
 	return entry.get("type", "") == "real" and str(entry.get("unit", "")) == "1"
@@ -149,7 +157,7 @@ func value(entry: Dictionary, v: Variant, shown := true, with_unit := true, scal
 			v = v * int(k) if typeof(v) == TYPE_INT else float(v) * k
 	if typeof(v) == TYPE_BOOL:
 		text = "yes" if v else "no"
-	elif entry.get("money", false):
+	elif is_money(entry):
 		text = money(float(v))
 	elif is_rate(entry):
 		return percent(float(v))
@@ -169,7 +177,7 @@ func change(entry: Dictionary, delta: Variant) -> String:
 	if d == 0.0:
 		return "no change"
 	var sign := "+" if d > 0.0 else MINUS
-	if entry.get("money", false):
+	if is_money(entry):
 		return sign + with_symbol(compact(absf(d) / float(minor)))
 	if is_rate(entry):
 		return sign + String.num(absf(d) * 100.0, 2) + " pts"

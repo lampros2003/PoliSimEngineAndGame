@@ -10,6 +10,7 @@ const Chart := preload("res://scripts/chart.gd")
 const TracePanel := preload("res://scripts/trace_panel.gd")
 const LeverPanel := preload("res://scripts/lever_panel.gd")
 const BudgetPanel := preload("res://scripts/budget_panel.gd")
+const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
 
 const DEFAULT_SCENARIO := "models/valmora/scenarios/term.toml"
 const MAX_SERIES := 4
@@ -49,6 +50,7 @@ var _per_year: Button
 var _headline: HBoxContainer
 var _cards := {}  # key -> {value, change}
 var budget: BudgetPanel
+var breakdown: BreakdownPanel
 var levers: LeverPanel
 var chart: Chart
 var trace: TracePanel
@@ -167,6 +169,9 @@ func _build_layout() -> void:
 	budget.chart_requested.connect(func(row: String, _label: String) -> void: add_to_chart(row))
 	budget.explain_requested.connect(func(name: String) -> void: explain(name, true))
 	left.add_child(budget)
+	breakdown = BreakdownPanel.new()
+	breakdown.fmt = fmt
+	left.add_child(breakdown)
 	levers = LeverPanel.new()
 	levers.fmt = fmt
 	levers.lever_changed.connect(_lever_typed)
@@ -237,6 +242,7 @@ func _model_changed() -> void:
 			lever_entries.append(entry)
 	trace.entries = entries
 	budget.build(catalogue, entries, str(play.get("government", "government")))
+	breakdown.build(play, entries)
 	levers.build(lever_entries)
 	_build_headline()
 
@@ -339,6 +345,8 @@ func _refresh() -> void:
 			card["change"].text = "no change yet"
 		card["change"].add_theme_color_override("font_color", Palette.MUTED)
 	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
+	breakdown.refresh(func(name: String) -> Dictionary: return game.cells(name),
+		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
 	levers.refresh(func(name: String) -> Variant: return game.latest(name), game.pending())
 	_refresh_chart()
 	_set_controls(not failed)
@@ -402,10 +410,10 @@ func add_to_chart(key: String) -> void:
 	var entry := _key_entry(key)
 	if entry.is_empty() or chart.has_row(key):
 		return
-	var unit := [entry.get("shown_unit", ""), entry.get("money", false), fmt.is_rate(entry)]
+	var unit := [entry.get("shown_unit", ""), fmt.is_money(entry), fmt.is_rate(entry)]
 	if not chart.series.is_empty():
 		var first := chart.entry
-		if [first.get("shown_unit", ""), first.get("money", false), fmt.is_rate(first)] != unit:
+		if [first.get("shown_unit", ""), fmt.is_money(first), fmt.is_rate(first)] != unit:
 			chart.series.clear()
 			_status.text = "chart cleared: different unit"
 	if chart.series.is_empty():

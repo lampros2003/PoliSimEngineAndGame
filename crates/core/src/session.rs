@@ -31,10 +31,12 @@ use crate::describe::Catalogue;
 use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
 use crate::model::{Kind, Model, Scenario, load_model, load_scenario};
-use crate::program::Val;
+use crate::program::{Col, Val};
 use crate::sim::Simulation;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
+/// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them).
+const SAVE_VERSION: u32 = 1;
 
 /// A lever change that has taken effect.
 #[derive(Clone, Debug, PartialEq)]
@@ -106,6 +108,9 @@ pub struct Session {
     history: History,
     latest: BTreeMap<String, Val>,
     previous: BTreeMap<String, Val>,
+    /// Format 1: each dimensioned var's and state's cells after the last step and the one before.
+    latest_cells: BTreeMap<String, Vec<f64>>,
+    previous_cells: BTreeMap<String, Vec<f64>>,
     /// A step failed part-way and its changes could not be undone.
     broken: bool,
 }
@@ -133,6 +138,8 @@ impl Session {
             latest: BTreeMap::new(),
             previous: BTreeMap::new(),
             broken: false,
+            latest_cells: BTreeMap::new(),
+            previous_cells: BTreeMap::new(),
         };
         // Lever settings are known before any step.
         for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
@@ -181,6 +188,16 @@ impl Session {
     }
 
     /// The same value one step earlier.
+    /// Format 1: a dimensioned value's cells after the last step (row-major), as reals.
+    pub fn cells(&self, name: &str) -> Option<&[f64]> {
+        self.latest_cells.get(name).map(Vec::as_slice)
+    }
+
+    /// The same cells one step earlier.
+    pub fn previous_cells(&self, name: &str) -> Option<&[f64]> {
+        self.previous_cells.get(name).map(Vec::as_slice)
+    }
+
     pub fn previous(&self, name: &str) -> Option<Val> {
         self.previous.get(name).copied()
     }
@@ -209,6 +226,17 @@ impl Session {
         let named: Vec<(String, Val)> = self.sim.row_names().iter().cloned().zip(row.values.iter().copied()).collect();
         self.history.push(row.step, row.hash, &named);
         self.previous = std::mem::take(&mut self.latest);
+        self.previous_cells = std::mem::take(&mut self.latest_cells);
+        for d in self.model.symbols.iter().filter(|d| !d.dims.is_empty() && matches!(d.kind, Kind::Var | Kind::State)) {
+            if let Some(column) = self.sim.column(&d.name) {
+                let values = match column {
+                    Col::I(v) => v.iter().map(|x| *x as f64).collect(),
+                    Col::F(v) => v.clone(),
+                    Col::B(v) => v.iter().map(|x| *x as i64 as f64).collect(),
+                };
+                self.latest_cells.insert(d.name.clone(), values);
+            }
+        }
         self.latest = named.into_iter().collect();
         // Remove duplicates of one lever in one step: the last one is what applied.
         let mut seen: Vec<String> = Vec::new();
@@ -280,7 +308,7 @@ impl Session {
     pub fn save(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(MAGIC);
-        out.extend_from_slice(&0u32.to_le_bytes());
+        out.extend_from_slice(&SAVE_VERSION.to_le_bytes());
         let engine = self.sim.save();
         out.extend_from_slice(&(engine.len() as u64).to_le_bytes());
         out.extend_from_slice(&engine);
@@ -320,6 +348,17 @@ impl Session {
                 put_val(&mut out, value);
             }
         }
+        // Version 1: dimensioned values' cells after the last step and the one before.
+        for map in [&self.latest_cells, &self.previous_cells] {
+            out.extend_from_slice(&(map.len() as u32).to_le_bytes());
+            for (name, cells) in map {
+                put_text(&mut out, name);
+                out.extend_from_slice(&(cells.len() as u64).to_le_bytes());
+                for v in cells {
+                    out.extend_from_slice(&v.to_bits().to_le_bytes());
+                }
+            }
+        }
         out
     }
 
@@ -330,7 +369,8 @@ impl Session {
         if r.take(8)? != MAGIC {
             return model_err("this is not a PoliSim saved game");
         }
-        if r.u32()? != 0 {
+        let version = r.u32()?;
+        if version > SAVE_VERSION {
             return model_err("this saved game was made by a newer version");
         }
         let length = usize::try_from(r.u64()?).map_err(|_| damaged())?;
@@ -388,6 +428,26 @@ impl Session {
                 session.latest = map;
             } else {
                 session.previous = map;
+            }
+        }
+        for which in 0..u32::from(version >= 1) * 2 {
+            let mut map = BTreeMap::new();
+            for _ in 0..r.u32()? {
+                let name = r.text()?;
+                let count = usize::try_from(r.u64()?).map_err(|_| damaged())?;
+                if count > bytes.len() {
+                    return Err(damaged());
+                }
+                let mut cells = Vec::with_capacity(count);
+                for _ in 0..count {
+                    cells.push(f64::from_bits(r.u64()?));
+                }
+                map.insert(name, cells);
+            }
+            if which == 0 {
+                session.latest_cells = map;
+            } else {
+                session.previous_cells = map;
             }
         }
         if r.pos != bytes.len() {

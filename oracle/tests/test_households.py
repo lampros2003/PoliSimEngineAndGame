@@ -53,10 +53,6 @@ class Households(unittest.TestCase):
             self.assertLess(abs(share_hh / share_pop - 1), 0.02, region)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Rules(unittest.TestCase):
     """The 2024-25 tax and benefit rules on the households (milestone S4.2)."""
 
@@ -91,3 +87,63 @@ class Rules(unittest.TestCase):
     def test_a_lower_universal_credit_taper_costs_money(self):
         gentler = self.Simulation(self.model, seed=1, levers={"uc_taper": 0.45}).step()
         self.assertGreater(gentler["universal_credit_total"], self.first["universal_credit_total"])
+
+
+class Breakdowns(unittest.TestCase):
+    """Who gains, who loses (milestone S4.5): net income per household by income decile,
+    household type and region, which must add up to the national figures."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sys
+        sys.path.insert(0, str(ROOT / "oracle"))
+        from polisim_oracle import Simulation, load_model
+        cls.Simulation = Simulation
+        cls.model = load_model(ROOT / "models" / "uk" / "households")
+        cls.sim = Simulation(cls.model, seed=1)
+        cls.row = cls.sim.step()
+        cls.records = rows()
+
+    def weights_by(self, key: str, size: int, first: int = 0) -> list[int]:
+        out = [0] * size
+        for r in self.records:
+            out[int(r[key]) - first] += int(r["weight"])
+        return out
+
+    def test_each_decile_holds_a_tenth_of_households(self):
+        weights = self.weights_by("income_decile", 10, first=1)
+        for w in weights:
+            self.assertLess(abs(w / (sum(weights) / 10) - 1), 0.01)
+
+    def test_the_groups_add_up_to_the_national_figures(self):
+        net = self.sim.column("net_income")
+        weight = [int(r["weight"]) for r in self.records]
+        total = sum(w * v for w, v in zip(weight, net))
+        self.assertAlmostEqual(self.row["net_income_average"] * sum(weight) / total, 1.0, places=9)
+        for name, key, size, first in (("net_income_by_decile", "income_decile", 10, 1),
+                                       ("net_income_by_household_type", "type", 10, 0),
+                                       ("net_income_by_region", "region_code", 12, 0)):
+            means, weights = self.sim.column(name), self.weights_by(key, size, first)
+            self.assertEqual(len(means), size)
+            self.assertAlmostEqual(sum(m * w for m, w in zip(means, weights)) / total, 1.0, places=9, msg=name)
+
+    def test_net_income_rises_with_the_decile(self):
+        means = self.sim.column("net_income_by_decile")
+        self.assertEqual(means, sorted(means))
+        # About £10,000 a year in the poorest tenth and £105,000 in the richest (pence a month).
+        self.assertTrue(9_000 < means[0] * 12 / 100 < 12_000, means[0])
+        self.assertTrue(90_000 < means[-1] * 12 / 100 < 120_000, means[-1])
+
+    def test_a_basic_rate_rise_takes_most_from_the_upper_deciles(self):
+        sim = self.Simulation(self.model, seed=1, levers={"basic_rate": 0.21})
+        sim.step()
+        change = [a - b for a, b in zip(sim.column("net_income_by_decile"), self.sim.column("net_income_by_decile"))]
+        self.assertTrue(all(c <= 0 for c in change), change)
+        self.assertLess(change[8], change[0])
+        regions = [a - b for a, b in zip(sim.column("net_income_by_region"), self.sim.column("net_income_by_region"))]
+        self.assertEqual(regions[10], 0.0)  # Scotland sets its own rates
+        self.assertTrue(all(c < 0 for i, c in enumerate(regions) if i != 10), regions)
+
+
+if __name__ == "__main__":
+    unittest.main()

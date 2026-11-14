@@ -48,7 +48,12 @@ struct View {
     changes: Vec<Change>,
     history: History,
     failed: Option<String>,
+    /// Format 1: one-dimensional values' cells after the last step and the one before.
+    cells: BTreeMap<String, (Vec<f64>, Vec<f64>)>,
 }
+
+/// Cells of dimensions longer than this are not mirrored to the interface each step.
+const MIRRORED_CELLS: usize = 64;
 
 /// Sent when the model changes: on opening, loading and reloading.
 struct ModelInfo {
@@ -75,6 +80,14 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
     let catalogue = session.catalogue();
     let mut latest = BTreeMap::new();
     let mut previous = BTreeMap::new();
+    let mut cells = BTreeMap::new();
+    for entry in catalogue.entries.iter().filter(|e| e.dims.len() == 1) {
+        let short = catalogue.dims.iter().any(|d| d.name == entry.dims[0] && d.labels.len() <= MIRRORED_CELLS);
+        if let (true, Some(now)) = (short, session.cells(&entry.name)) {
+            let before = session.previous_cells(&entry.name).map(<[f64]>::to_vec).unwrap_or_default();
+            cells.insert(entry.name.clone(), (now.to_vec(), before));
+        }
+    }
     for entry in &catalogue.entries {
         let Some(row) = &entry.row else { continue };
         if let Some(v) = session.latest(row) {
@@ -92,6 +105,7 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
         changes: session.changes().to_vec(),
         history: session.history().clone(),
         failed: failed.clone(),
+        cells,
     }
 }
 
@@ -285,6 +299,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("financial", e.financial);
         d.set("player", e.player);
         d.set("group", e.group.as_str());
+        d.set("dims", &strings(&e.dims));
         entries.push(&d.to_variant());
     }
     let mut sectors = VarArray::new();
@@ -297,8 +312,16 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("accounts", &strings(&s.accounts));
         sectors.push(&d.to_variant());
     }
+    let mut dims = VarArray::new();
+    for x in &catalogue.dims {
+        let mut d = VarDictionary::new();
+        d.set("name", x.name.as_str());
+        d.set("labels", &strings(&x.labels));
+        dims.push(&d.to_variant());
+    }
     let mut out = VarDictionary::new();
     out.set("id", catalogue.id.as_str());
+    out.set("dims", &dims);
     out.set("currency", catalogue.currency.as_str());
     out.set("minor", catalogue.minor);
     out.set("step_unit", catalogue.step_unit.as_str());
@@ -628,6 +651,25 @@ impl PoliSim {
     #[func]
     fn previous(&self, row: GString) -> Variant {
         Self::row_value(&self.view.previous, &row.to_string())
+    }
+
+    /// Format 1: a one-dimensional value's cells after the last step, with the cells one
+    /// step earlier (empty before the second step), the dimension's name and its members'
+    /// labels. Empty if the value is unknown, has other than one dimension or more than 64
+    /// cells, or no step has run.
+    #[func]
+    fn cells(&self, name: GString) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let name = name.to_string();
+        let Some((now, before)) = self.view.cells.get(&name) else { return d };
+        let catalogue = self.catalogue.as_ref();
+        let dim = catalogue.and_then(|c| c.entries.iter().find(|e| e.name == name)).map(|e| e.dims[0].clone());
+        let labels = dim.as_ref().and_then(|n| catalogue.and_then(|c| c.dims.iter().find(|x| &x.name == n)));
+        d.set("values", &PackedFloat64Array::from(now.as_slice()));
+        d.set("previous", &PackedFloat64Array::from(before.as_slice()));
+        d.set("dim", dim.unwrap_or_default().as_str());
+        d.set("labels", &strings(labels.map(|x| x.labels.as_slice()).unwrap_or_default()));
+        d
     }
 
     /// Lever changes waiting for the next step: lever name to stored value.

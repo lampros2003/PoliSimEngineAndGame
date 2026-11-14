@@ -30,6 +30,24 @@ profit. Per household: Child Benefit less the High Income Child Benefit Charge; 
 Credit for working-age benefit units (standard allowance, child elements with the two-child
 limit, work allowance, 55% taper, pensions deducted in full).
 
+## Who gains, who loses
+
+Each record carries `income_decile`: its tenth of households by equivalised gross income in
+the base year (pay and pensions over the modified OECD scale: 1 for the first adult, 0.5
+for each other adult, 0.3 for each child), poorest first, each tenth holding a tenth of the
+weighted households. The rules give each household's net income a month (pay and pensions
+after income tax and National Insurance, with Child Benefit net of the charge and Universal
+Credit) and average it by decile, household type and region (`net_income_by_decile`,
+`net_income_by_household_type`, `net_income_by_region`) and over all households
+(`net_income_average`). The groups' averages, weighted by their households, add up to the
+national average (tested in `oracle/tests/test_households.py`). In the first month net
+income runs from about £10,200 a year in the poorest tenth to £105,000 in the richest; all
+households average £41,800.
+
+Deciles are fixed in the base year: a household keeps its decile when its income changes,
+so the panel compares the same households before and after a policy. The client shows the
+three breakdowns in its "Who gains, who loses" panel (`docs/spec/05-game-client.md`).
+
 ## First month against published totals (a year)
 
 | | Households | Published | Note |
@@ -47,6 +65,6 @@ Weekly National Insurance thresholds are applied to annual pay (52 weeks). The b
 is the first two adults of a couple household, or the first adult otherwise. A first child
 counts as born before April 2017 when the youngest child is seven or older. There are no
 rents, so no housing element; no savings or investment income; no disability benefits;
-everyone entitled to Universal Credit claims it. The records do not change from month to
-month yet: households joining the national model (S4.3) and changing weights (S4.4) come
-next.
+everyone entitled to Universal Credit claims it. In the national model
+(`models/uk/households.toml`) the records' pay follows the economy's pay level and the
+thresholds rise with prices; their employment and weights do not change yet (S4.4).

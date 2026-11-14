@@ -40,6 +40,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.income_decile]
+doc = "Decile of equivalised gross income in the base year, 1 to 10"
+type = "int"
+unit = "1"
+
 [entity.household.columns.age1]
 type = "int"
 unit = "1"

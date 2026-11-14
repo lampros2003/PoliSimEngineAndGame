@@ -25,6 +25,11 @@ unit = "1"
 type = "int"
 unit = "1"
 
+[entity.household.columns.income_decile]
+doc = "Decile of equivalised gross income in the base year, 1 to 10"
+type = "int"
+unit = "1"
+
 [entity.household.columns.age1]
 type = "int"
 unit = "1"
@@ -883,6 +888,14 @@ entity = "household"
 expr = "select(age1 < state_pension_age, max(uc_standard + uc_children - round(uc_taper * max(uc_net_earnings - uc_work_allowed, 0)) - uc_unearned, 0), 0)"
 doc = "Universal Credit, a month (no housing element)"
 
+[var.net_income]
+type = "money"
+unit = "GBP/month/household"
+phase = "income"
+entity = "household"
+expr = "round((earn1 + pens1 - income_tax1 - employee_ni1 + earn2 + pens2 - income_tax2 - employee_ni2 + earn3 + pens3 - income_tax3 - employee_ni3 + earn4 + pens4 - income_tax4 - employee_ni4 + child_benefit_year - hicbc_year) / year) + universal_credit"
+doc = "Income after income tax and National Insurance, with Child Benefit and Universal Credit, a month"
+
 [var.income_tax_total]
 label = "Income tax"
 type = "money"
@@ -930,3 +943,43 @@ unit = "GBP/month"
 phase = "income"
 dims = ["region"]
 expr = "wsum_by(household, income_tax_year, region, region_code) / year / household_unit"
+
+[dim.decile]
+doc = "Tenths of households by equivalised gross income in the base year, poorest first"
+range = [1, 10]
+labels = ["Poorest tenth", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Richest tenth"]
+
+[dim.household_type]
+members = ["one_under_65", "one_65_plus", "unrelated_adults", "couple_no_children", "couple_one_or_two", "couple_three_plus", "couple_grown_children", "lone_parent", "lone_parent_grown", "multi_family"]
+labels = ["One adult under 65", "One adult 65 or over", "Unrelated adults", "Couple, no children", "Couple, one or two children", "Couple, three or more children", "Couple with grown-up children", "Lone parent", "Lone parent with grown-up children", "Two or more families"]
+
+[var.net_income_average]
+label = "Net income per household, all households"
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "wsum(household, net_income) / wcount(household, true)"
+
+[var.net_income_by_decile]
+label = "Net income per household, by income decile"
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+dims = ["decile"]
+expr = "wsum_by(household, net_income, decile, income_decile) / wcount_by(household, true, decile, income_decile)"
+
+[var.net_income_by_household_type]
+label = "Net income per household, by household type"
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+dims = ["household_type"]
+expr = "wsum_by(household, net_income, household_type, type) / wcount_by(household, true, household_type, type)"
+
+[var.net_income_by_region]
+label = "Net income per household, by region"
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+dims = ["region"]
+expr = "wsum_by(household, net_income, region, region_code) / wcount_by(household, true, region, region_code)"

@@ -255,6 +255,23 @@ def build(rng: random.Random, pop, counts, pay_region, pay_age):
     return records
 
 
+def income_deciles(records, weights) -> dict[int, int]:
+    """Each household's decile (1 to 10) of equivalised gross income in the base year, by
+    weight: pay and pensions over the modified OECD scale (1 for the first adult, 0.5 for
+    each other adult, 0.3 for each child). Ties go by record number."""
+    def equivalised(r):
+        gross = sum(p["earnings"] + p["pension"] for p in r["people"])
+        return gross / (1 + 0.5 * (r["adults"] - 1) + 0.3 * r["children"])
+
+    order = sorted(zip(records, weights), key=lambda rw: (equivalised(rw[0]), rw[0]["id"]))
+    total = sum(weights)
+    out, below = {}, 0
+    for r, w in order:
+        out[r["id"]] = min(10, int(below * 10 // total) + 1)
+        below += w
+    return out
+
+
 def calibrate(records, targets, households):
     """Exponential (raking) calibration: w = d exp(x.lambda), solved by Newton's method so that
     the weighted totals of every target column equal the target; d spreads the households
@@ -376,6 +393,8 @@ def main() -> int:
     columns = ["id", "weight", "region_code", "type", "adults", "children", "youngest_child"]
     columns += [f"{f}{i}" for i in range(1, 5) for f in ("age", "sex")]
     columns += [f"{f}{i}" for f in ("earnings", "self_employed", "pension") for i in range(1, 5)]
+    columns += ["income_decile"]
+    deciles = income_deciles(records, whole)
     writer.writerow(columns)
     for r, w in zip(records, whole):
         adults = [p for p in r["people"]][: r["adults"]]
@@ -394,6 +413,7 @@ def main() -> int:
                     cells.append(1 if p and p["self_employed"] else 0)
                 else:
                     cells.append(fmt.format(p[field]) if p else "0.00")
+        cells.append(deciles[r["id"]])
         writer.writerow(cells)
     (OUT / "households.csv").write_text(buffer.getvalue(), encoding="utf-8", newline="\n")
 

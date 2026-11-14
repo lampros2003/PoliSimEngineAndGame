@@ -32,9 +32,27 @@ Presentation settings. The engine ignores them and they never affect a run.
 | `headline` | Up to six result-row names for the headline strip; a leading `-` shows the value negated (an account held as a negative number, such as public debt) | `watch` |
 | `watch` | Values `polisim play` prints after each step | none |
 | `labels` | Overrides of labels by key, including negated keys such as `"-gov_money"` | none |
+| `breakdowns` | Names of values with one dimension for the "Who gains, who loses" panel, in the order of its menu (format 1; see below) | none: no panel |
+| `breakdown_all` | The national value the breakdowns average to, shown as their last line, "All households" | none |
 
 Any model element may carry `label` (a short name) and `doc` (a sentence) for the
-client's labels and tooltips.
+client's labels and tooltips. A `real` whose unit starts with the currency (an average
+income, `GBP/month/household`) is shown as money: it is held in minor units like money
+itself ([model format](01-model-format-v0.md)).
+
+## Who gains, who loses
+
+A panel under the budget shows each breakdown named in `[play] breakdowns`: one line per
+member of the value's dimension, labelled with the dimension's `labels`, giving this
+month's value and its change on last month in money, in percent and as a bar (green for a
+rise, red for a fall; the longest bar is the largest change, or 0.5% if every change is
+smaller). A menu picks the breakdown. The value's label names the panel's note, up to its
+last comma ("Net income per household, by income decile" gives "Net income per household"
+and the menu item "By income decile"). Amounts follow the "Amounts a year" choice.
+
+The UK scenario shows net income per household (pay and pensions after income tax and
+National Insurance, with Child Benefit and Universal Credit) by income decile, household
+type and region, from the synthetic households (`models/uk/households/README.md`).
 
 ## Explaining a change
 
@@ -72,8 +90,10 @@ error is shown. Reloading unchanged files gives exactly the run that was never r
 ## Saved games
 
 A saved game is the engine save (save format 0) plus the commands still to come, the
-policy changes made, the full history of every result and the last two steps' values, in
-one file (`crates/core/src/session.rs` documents the layout). Loading continues exactly
+policy changes made, the full history of every result and the last two steps' values,
+dimensioned values' cells included, in one file (`crates/core/src/session.rs` documents the
+layout). Version 1 added the cells; a version 0 file still loads, and its panels by
+dimension fill from the next month. Loading continues exactly
 and brings the charts back. A saved game belongs to the model files it was made with.
 
 ## The bridge
@@ -82,9 +102,16 @@ GDScript creates `PoliSim.new()` and calls `open(scenario_path)`. Requests (`adv
 `set_lever`, `cancel_lever`, `request_explanation`, `save_game`, `load_game`,
 `reload_model`) go to a worker thread in order; `poll()` returns what has finished, as
 dictionaries with a `kind` key. Everything the screen reads (`latest`, `previous`,
-`pending`, `series`, `changes`, `hashes`, `catalogue`, `play_settings`) comes from a
-mirror the worker refreshes after each request, so reading never waits for the
+`pending`, `series`, `changes`, `hashes`, `catalogue`, `play_settings`, `cells`) comes
+from a mirror the worker refreshes after each request, so reading never waits for the
 simulation. No Godot object is touched off the main thread.
+
+Format 1: the catalogue gives each entry's `dims` (dimension names) and a `dims` list of
+every dimension with its members' `labels`. `cells(name)` returns a value with one
+dimension: `values` and `previous` (the cells after the last step and the one before, in
+member order; `previous` is empty after the first step), `dim` and `labels`. Only values
+of one dimension of at most 64 members are mirrored, so the mirror stays small; others
+return an empty dictionary.
 
 Values come back as the engine stores them (money in minor units). Lever settings go in
 as a person types them (money in major units, rates as fractions), and are checked
@@ -101,7 +128,7 @@ compares them with the command-line runner or with published figures:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
-| `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel |
+| `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel. Then the "Who gains, who loses" panel, every breakdown, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 
 `tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one
 screenshot of any scenario (`--scenario`, `--months`, `--chart=a,b`, `--why=name`,

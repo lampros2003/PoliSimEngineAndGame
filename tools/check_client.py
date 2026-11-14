@@ -81,10 +81,10 @@ def main() -> int:
             return 1
         print(second.stdout.strip().splitlines()[-1])
         # The UK's budget screen, as the player reads it, against the 2024 public finances.
-        dump = folder / "uk_budget.csv"
+        dump, breakdowns = folder / "uk_budget.csv", folder / "uk_breakdowns.tsv"
         uk = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/budget_dump.gd",
-             "--", "--scenario=models/uk/scenarios/2025.toml", f"--out={dump}"],
+             "--", "--scenario=models/uk/scenarios/2025.toml", f"--out={dump}", f"--breakdowns={breakdowns}"],
             capture_output=True, text=True, timeout=900)
         if uk.returncode != 0 or not dump.exists():
             print(uk.stdout.strip()[-2000:], uk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
@@ -95,6 +95,11 @@ def main() -> int:
             print("\n".join(problems), file=sys.stderr)
             return 1
         print("UK budget screen: every line within 1% of the 2024 public finances")
+        problems = check_uk_breakdowns(breakdowns.read_text(encoding="utf-8") if breakdowns.exists() else "", args.runner)
+        if problems:
+            print("\n".join(problems), file=sys.stderr)
+            return 1
+        print("UK who gains, who loses: every group shown; a basic rate rise hits the upper deciles, not Scotland")
         return 0
 
 
@@ -121,7 +126,7 @@ UK_INTEREST = ("Debt interest to UK holders", "Debt interest to holders abroad")
 def parse_money(text: str) -> float:
     """'£310.70bn' or '−£148.56bn' (with a true minus sign) -> pounds."""
     sign = -1.0 if text.startswith(("-", "\u2212")) else 1.0
-    number = text.lstrip("-\u2212\u2060").lstrip("£").replace(",", "")
+    number = text.lstrip("+-\u2212\u2060").lstrip("£").replace(",", "")
     for suffix, size in (("tn", 1e12), ("bn", 1e9), ("m", 1e6)):
         if number.endswith(suffix):
             return sign * float(number[: -len(suffix)]) * size
@@ -148,6 +153,55 @@ def compare_uk_budget(text: str) -> list[str]:
             problems.append(f"UK budget: no line {label!r} on the screen")
         elif abs(got / want - 1) > slack:
             problems.append(f"UK budget: {label} shows {got / 1e9:,.2f}bn, 2024 was {want / 1e9:,.2f}bn")
+    return problems
+
+
+# Breakdown on the "who gains, who loses" panel -> the groups it must show, in order.
+UK_GROUPS = {
+    "By income decile": ["Poorest tenth", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth",
+                         "Richest tenth"],
+    "By household type": ["One adult under 65", "One adult 65 or over", "Unrelated adults", "Couple, no children",
+                          "Couple, one or two children", "Couple, three or more children", "Couple with grown-up children",
+                          "Lone parent", "Lone parent with grown-up children", "Two or more families"],
+    "By region": ["North East", "North West", "Yorkshire and The Humber", "East Midlands", "West Midlands",
+                  "East of England", "London", "South East", "South West", "Wales", "Scotland", "Northern Ireland"],
+}
+
+
+def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
+    """The panel after month 1, and after month 2 with the basic rate (rest of the UK) one
+    point higher: every group shown; the all-households line equal to the runner's average;
+    the rise taking most from the upper deciles and nothing from Scotland."""
+    import csv
+    rows = list(csv.DictReader(text.splitlines(), delimiter="\t"))
+    problems = []
+    for month in ("1", "2"):
+        for breakdown, groups in UK_GROUPS.items():
+            shown = [r["group"] for r in rows if r["month"] == month and r["breakdown"] == breakdown]
+            if shown != groups + ["All households"]:
+                problems.append(f"UK breakdowns: month {month}, {breakdown} shows {shown}")
+    if problems:
+        return problems
+    line = {(r["month"], r["breakdown"], r["group"]): r for r in rows}
+    out = subprocess.run([str(runner), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"), "--steps", "1",
+                          "--columns", "net_income_average"], capture_output=True, text=True, timeout=600)
+    average = float(out.stdout.splitlines()[1]) * 12 / 100  # pence a month to pounds a year
+    shown = parse_money(line[("1", "By region", "All households")]["now"])
+    if abs(shown - average) > 0.5:
+        problems.append(f"UK breakdowns: all households show £{shown:,.0f} a year, the runner £{average:,.2f}")
+
+    def change(breakdown: str, group: str) -> float:
+        return parse_money(line[("2", breakdown, group)]["change"])
+
+    deciles = [change("By income decile", g) for g in UK_GROUPS["By income decile"]]
+    # The fifth decile up loses; each of the top three loses £100 a year more than the poorest.
+    if not all(d < 0 for d in deciles[4:]) or not all(d < deciles[0] - 100 for d in deciles[7:]):
+        problems.append(f"UK breakdowns: a basic rate rise should take most from the upper deciles: {deciles}")
+    regions = {g: change("By region", g) for g in UK_GROUPS["By region"]}
+    if not regions["Scotland"] > 0 or any(v >= 0 for g, v in regions.items() if g != "Scotland"):
+        problems.append(f"UK breakdowns: the rise should fall on every region but Scotland: {regions}")
+    if not change("By income decile", "All households") < 0:
+        problems.append("UK breakdowns: average net income should fall")
     return problems
 
 

@@ -170,3 +170,36 @@ fn a_failed_step_is_undone_and_a_corrected_model_carries_on() {
     assert_eq!(game.history().hashes, clean.history().hashes);
     std::fs::remove_dir_all(&base).ok();
 }
+
+/// Format 1: the session keeps each dimensioned value's cells after a step and the step
+/// before, and the catalogue names the dimensions and their members' labels.
+#[test]
+fn dimensioned_cells_after_each_step() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/cohort/scenarios/base.toml");
+    let mut session = Session::open(&path).unwrap();
+    assert!(session.cells("population").is_none(), "no cells before the first step");
+    session.step().unwrap();
+    let cells = session.cells("population").unwrap().to_vec();
+    assert_eq!(cells.len(), 3 * 2 * 101);
+    assert!(session.previous_cells("population").is_none());
+    let Some(Val::F(total)) = session.latest("total_population") else { panic!("total_population") };
+    let summed: f64 = cells.iter().sum();
+    assert!((summed - total).abs() <= total * 1e-12, "{summed} against {total}");
+    assert!(session.cells("total_population").is_none(), "a national value has no cells");
+    assert!(session.cells("mortality").is_none(), "parameters are not kept");
+    session.step().unwrap();
+    assert_eq!(session.previous_cells("population").unwrap(), cells.as_slice());
+    assert_eq!(session.cells("births").unwrap().len(), 3 * 2);
+
+    let saved = Session::load(&path, &session.save()).unwrap();
+    assert_eq!(saved.cells("births"), session.cells("births"));
+    assert_eq!(saved.previous_cells("population"), session.previous_cells("population"));
+
+    let catalogue = session.catalogue();
+    let births = catalogue.entries.iter().find(|e| e.name == "births").unwrap();
+    assert_eq!(births.dims, ["region", "sex"]);
+    let region = catalogue.dims.iter().find(|d| d.name == "region").unwrap();
+    assert_eq!(region.labels.len(), 3);
+    let age = catalogue.dims.iter().find(|d| d.name == "age").unwrap();
+    assert_eq!((age.labels[0].as_str(), age.labels[100].as_str()), ("0", "100"));
+}
