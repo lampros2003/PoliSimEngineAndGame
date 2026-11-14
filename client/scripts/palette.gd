@@ -303,7 +303,75 @@ static func make_theme() -> Theme:
 	theme.set_stylebox("hover", "CheckBox", _empty(2, 4))
 	theme.set_stylebox("pressed", "CheckBox", _empty(2, 4))
 	theme.set_stylebox("hover_pressed", "CheckBox", _empty(2, 4))
+
+	# Stage S12: tiles (policy areas) and the page navigation under the masthead.
+	theme.set_type_variation("Tile", "Button")
+	var tile := panel_style(PANEL, 0, 14)
+	tile.border_width_left = 4
+	tile.border_color = LINE
+	var tile_hover := tile.duplicate()
+	tile_hover.bg_color = Color("#f4f7fa")
+	tile_hover.border_color = ACCENT
+	var tile_down := tile_hover.duplicate()
+	tile_down.bg_color = Color("#e8eef4")
+	_button_states(theme, "Tile", tile, tile_hover, tile_down, tile, TEXT, TEXT, MUTED)
+	theme.set_constant("h_separation", "Tile", 14)
+	theme.set_constant("icon_max_width", "Tile", 32)
+	theme.set_color("icon_normal_color", "Tile", ACCENT)
+	theme.set_color("icon_hover_color", "Tile", ACCENT)
+	theme.set_color("icon_pressed_color", "Tile", ACCENT)
+	theme.set_type_variation("NavBar", "PanelContainer")
+	var bar := StyleBoxFlat.new()
+	bar.bg_color = PANEL
+	bar.border_color = LINE
+	bar.border_width_bottom = 1
+	bar.content_margin_left = 20
+	bar.content_margin_right = 20
+	theme.set_stylebox("panel", "NavBar", bar)
+	theme.set_type_variation("NavItem", "Button")
+	var item := _empty(14, 12)
+	var item_on := StyleBoxFlat.new()
+	item_on.bg_color = PANEL
+	item_on.border_color = ACCENT
+	item_on.border_width_bottom = 4
+	item_on.content_margin_left = 14
+	item_on.content_margin_right = 14
+	item_on.content_margin_top = 12
+	item_on.content_margin_bottom = 8
+	var item_hover := item_on.duplicate()
+	item_hover.border_color = LINE
+	_button_states(theme, "NavItem", item, item_hover, item_on, item, LINK, LINK_HOVER, MUTED)
+	theme.set_color("font_pressed_color", "NavItem", TEXT)
+	theme.set_color("font_hover_pressed_color", "NavItem", TEXT)
+	theme.set_font("font", "NavItem", sans_bold)
+	theme.set_constant("h_separation", "NavItem", 8)
+	theme.set_constant("icon_max_width", "NavItem", 18)
+	# The policy web's nodes: small white boxes with a hairline, navy when pointed at.
+	theme.set_type_variation("WebNode", "Button")
+	var node := panel_style(PANEL, 0, 8)
+	node.content_margin_top = 4
+	node.content_margin_bottom = 4
+	var node_hover := node.duplicate()
+	node_hover.border_color = ACCENT
+	node_hover.set_border_width_all(2)
+	_button_states(theme, "WebNode", node, node_hover, node_hover, node, TEXT, TEXT, MUTED)
+	theme.set_font_size("font_size", "WebNode", SMALL + 1)
+	theme.set_constant("icon_max_width", "WebNode", 18)
+	theme.set_constant("h_separation", "WebNode", 8)
+	for key in ["icon_normal_color", "icon_hover_color", "icon_pressed_color"]:
+		theme.set_color(key, "WebNode", ACCENT)
+	for key in ["icon_normal_color", "icon_hover_color"]:
+		theme.set_color(key, "NavItem", LINK)
+	for key in ["icon_pressed_color", "icon_hover_pressed_color"]:
+		theme.set_color(key, "NavItem", TEXT)
 	return theme
+
+
+## Stage S12.2: an icon from client/icons by name (Lucide, drawn white so a theme colour
+## can tint it); a plain square for a name that has none.
+static func icon(name: String) -> Texture2D:
+	var path := "res://icons/%s.svg" % name
+	return load(path if name != "" and ResourceLoader.exists(path) else "res://icons/square.svg")
 
 
 ## Hairlines between the rows of a table laid out as a GridContainer.

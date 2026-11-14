@@ -41,7 +41,7 @@ pub use model::{
 pub use program::{Col, Ty, Val};
 pub use save::Migration;
 pub use session::Session;
-pub use sim::{Computed, Row, RunConfig, Simulation, Vote, check_lever};
+pub use sim::{Computed, Row, RunConfig, Simulation, Vote, bill_cost, check_lever};
 pub use text::{Text, languages, load_text};
 /// A parsed TOML document, for clients that read scenario files themselves.
 pub use toml::Table as RawTable;

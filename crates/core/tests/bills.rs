@@ -20,7 +20,10 @@ enum Outcome {
 
 fn outcome(cases: &toml::Table, case: &toml::Table, index: usize) -> Outcome {
     let mut text = cases["base"].as_str().unwrap().to_string();
-    for pair in case.get("replace").and_then(Value::as_array).into_iter().flatten() {
+    // Stage S12.4: a case with `capital = true` gives the legislature political capital first.
+    let capital = case.get("capital").and_then(Value::as_bool).unwrap_or(false);
+    let pairs = cases["capital"].as_array().unwrap().iter().filter(|_| capital);
+    for pair in pairs.chain(case.get("replace").and_then(Value::as_array).into_iter().flatten()) {
         let pair = pair.as_array().unwrap();
         let old = pair[0].as_str().unwrap().replace("\\n", "\n");
         let new = pair[1].as_str().unwrap().replace("\\n", "\n");
@@ -85,18 +88,19 @@ fn shared_cases_match_the_oracles_expectations() {
                 for (lever, want) in case["levers"].as_table().unwrap() {
                     assert!(same(sim.scalar(lever), want), "{name}: {lever} is {:?}, not {want:?}", sim.scalar(lever));
                 }
-                let votes: Vec<(String, i64, bool)> =
-                    sim.votes().iter().map(|v| (v.lever.clone(), v.votes_for, v.passed)).collect();
-                let want: Vec<(String, i64, bool)> = case["votes"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| {
-                        let v = v.as_array().unwrap();
-                        (v[0].as_str().unwrap().to_string(), v[1].as_integer().unwrap(), v[2].as_bool().unwrap())
-                    })
-                    .collect();
-                assert_eq!(votes, want, "{name}");
+                // Stage S12.4: an expected vote may also give its cost and whether it was refused.
+                let want = case["votes"].as_array().unwrap();
+                assert_eq!(sim.votes().len(), want.len(), "{name}: {:?}", sim.votes());
+                for (v, w) in sim.votes().iter().zip(want) {
+                    let w = w.as_array().unwrap();
+                    let got = (v.lever.as_str(), v.votes_for, v.passed);
+                    let expected = (w[0].as_str().unwrap(), w[1].as_integer().unwrap(), w[2].as_bool().unwrap());
+                    assert_eq!(got, expected, "{name}");
+                    if w.len() == 5 {
+                        assert_eq!(v.cost, w[3].as_float(), "{name}: the cost of {}", v.lever);
+                        assert_eq!(v.refused, w[4].as_bool().unwrap(), "{name}: {} refused", v.lever);
+                    }
+                }
             }
             (Outcome::Refused(_), "refused") | (Outcome::Runtime(_), "runtime") => {}
             (Outcome::Refused(e), _) => panic!("{name}: refused ({e}), expected {expect}"),
@@ -118,6 +122,33 @@ fn a_coalition_loses_a_bill_as_the_oracle_recorded() {
     }
     let votes: Vec<(&str, i64, bool)> = sim.votes().iter().map(|v| (v.lever.as_str(), v.votes_for, v.passed)).collect();
     assert_eq!(votes, [("basic_rate", 283, false), ("personal_allowance", 283, false), ("vat_rate", 627, true)]);
+}
+
+/// Stage S12.4: in the UK, two big bills in one month: the first is paid for, the second
+/// costs more than is left and is refused unvoted; the costs and the refusal survive a save.
+#[test]
+fn a_game_refuses_a_bill_it_cannot_pay_for_and_keeps_it_through_a_save() {
+    use polisim_core::Session;
+    let path = root().join("models/uk/scenarios/2025.toml");
+    let mut session = Session::open(&path).unwrap();
+    session.step().unwrap();
+    let Some(Val::F(capital)) = session.latest("political_capital") else { panic!("no political capital") };
+    session.set_lever("basic_rate", Value::Float(0.8)).unwrap();
+    session.set_lever("vat_rate", Value::Float(0.5)).unwrap();
+    session.step().unwrap();
+    let changes = session.changes();
+    // 5 + 60 * 0.6 / 1 and 5 + 60 * 0.3 / 0.5: 41 each, against about 45 to spend.
+    let find = |lever: &str| changes.iter().find(|c| c.lever == lever).unwrap();
+    let (first, second) = (find("basic_rate"), find("vat_rate"));
+    assert!((first.lever.as_str(), first.passed, first.refused) == ("basic_rate", true, false), "{first:?}");
+    assert!((second.lever.as_str(), second.passed, second.refused) == ("vat_rate", false, true), "{second:?}");
+    assert!((first.cost.unwrap() - 41.0).abs() < 1e-9 && (second.cost.unwrap() - 41.0).abs() < 1e-9);
+    assert!(capital > 41.0 && capital < 82.0, "capital {capital}");
+    assert_eq!(session.latest("capital_spent"), Some(Val::F(first.cost.unwrap())));
+    assert_eq!(session.latest("vat_rate"), Some(Val::F(0.2)));
+    assert!(session.set_lever("capital_spent", Value::Float(0.0)).is_err(), "the player set what bills spent");
+    let loaded = Session::load(&path, &session.save()).unwrap();
+    assert_eq!(loaded.changes(), session.changes());
 }
 
 #[test]

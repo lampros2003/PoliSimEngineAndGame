@@ -310,6 +310,49 @@ So a government with a majority of its own passes every bill; without one, a mov
 the left needs enough seats to the leader's left, and a move to the right enough to its
 right.
 
+### Political capital (stage S12.4)
+
+A legislature may make bills cost political capital. The four names come together or not
+at all:
+
+```toml
+[legislature]
+seats = "seats"
+governing = "governing"
+position = "bloc_position"
+capital = "political_capital"  # a real state: what the government has to spend
+spent = "capital_spent"        # a real lever the engine sets: what the step's bills spent
+bill_cost = "capital_bill"     # a real parameter: what any bill costs
+swing_cost = "capital_swing"   # a real parameter: what moving a lever across its range costs
+
+[lever.vat_rate]
+leaning = "left"
+capital_weight = 1.5           # optional, a number of at least 0: scales swing_cost
+```
+
+All four are national (no dimension, no entity), real, not money, and in one unit;
+`spent` has no leaning. `capital_weight` is allowed only on a lever with a leaning.
+
+A bill's **cost** is `bill_cost + swing_cost * capital_weight * (abs(new - old) / (max - min))`,
+computed in real numbers in that order (the multiplications left to right), where `new`
+and `old` are the values the change would store and the lever holds (whole numbers are
+subtracted exactly, then made real), `max` and `min` its range as stored, and
+`capital_weight` 1 when not given. A lever without a range, or with `max` not above
+`min`, costs `bill_cost`.
+
+In part 1 of a step, the step's spending starts at 0. Before each bill is voted on, its
+cost is compared with what is left: the capital's start-of-step value less the step's
+spending so far. A bill that costs **more** than is left is **refused**: it is not voted
+on, changes nothing, is not range-checked, counts as no defeat, and is not an error; it is
+kept with the votes, with no seats for it, its cost and the mark that it was refused.
+Otherwise it is voted on as above, its cost kept with the vote; if it passes, its cost
+is added to the step's spending. After the last change, the engine stores the step's
+spending in `spent` (0 if there were no bills). A command that sets `spent` is an error.
+
+The model says how capital is earned and that spending reduces it, in the capital's own
+`next` formula, which reads `spent`; for example
+`clamp(political_capital - capital_spent + capital_earned, 0.0, 100.0)`.
+
 ## Renames (stage S7.0)
 
 A model that renames an element says so, so that games saved before the rename carry the
@@ -505,7 +548,11 @@ a unit that does not match the target's. For bills: a `leaning` other than `"lef
 `"right"`, or on a true/false lever; a `[legislature]` in format 0, without exactly the
 keys `seats`, `governing` and `position`, naming something that is not a whole-number
 state, a true/false state and a real parameter respectively, each with one dimension, or
-with different dimensions. For renames: an old name that is still a name in the model; a
+with different dimensions. For political capital: some but not all of `capital`, `spent`,
+`bill_cost` and `swing_cost`; any of them not naming a national real state, lever,
+parameter and parameter respectively, or in money, or in another unit than the capital; a
+`spent` lever with a leaning; a `capital_weight` that is not a number of at least 0, or on
+a lever without a leaning. For renames: an old name that is still a name in the model; a
 new name that is not text, or that leads, through the chain, to no element or round in a
 circle.
 

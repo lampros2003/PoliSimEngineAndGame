@@ -239,9 +239,37 @@ column.
 
 ## Lever inputs
 
-A lever's optional `group` (a name) places it under that heading in the policy panel, in
-the order the groups first appear; groups other than Spending, Taxes and Income tax start
-folded, with the number of levers they hold.
+A lever's optional `group` (a name) is its policy area (stage S12.1). The Policy page
+opens on a tile per area, in the order the areas first appear (levers without one are
+"Other"), with the number of policies and changes waiting; pressing a tile shows that
+area's policies, with a link back to all areas.
+
+## Pages, the policy web, political capital and the map (stage S12)
+
+A strip under the masthead names the pages: Policy, Budget, Who gains, who loses,
+Politics, Policy web and Map (the last only when the scenario has a map). The headline
+figures stay above every page, and the chart and "Why did it change?" to its right.
+
+The scenario's `[play]` table may add:
+
+| Key | Meaning |
+|---|---|
+| `[play.icons]` | An icon name (a file in `client/icons`, Lucide) per policy area; an area without one gets a plain square |
+| `[play.map]` | `dim`, the dimension the map draws; `statistics`, values with that one dimension to choose from; `tiles`, a `[column, row]` per member in the dimension's order |
+
+The **policy web** has three bands: the policy areas (or one area's policies), the
+outcomes `[play]` names (`headline`, `watch`, `breakdown_all` and the
+`breakdown_totals`), and the model's situations with the government's support and
+turnout from `[play.politics]`. A link means a lever reaches the node through formulas
+that pass through no other node on the web.
+
+With **political capital** (format 1, stage S12.4) the page strip shows the capital, last
+month's change and what the bills waiting will cost; each waiting change shows its cost,
+from the bridge's `bill_cost(lever, value)`, which applies the engine's formula to the
+lever's current value (-1 when the change would be no bill). A bill refused for want of
+capital is announced. The catalogue gives `capital` and `capital_spent` (the state and
+the lever, "" without capital), and `changes()` gives each change's `cost` (-1 for none)
+and `refused`. Saved games keep both (session file version 4).
 
 Rates are typed in percent. Money is typed in major units, or in millions (`m`) or
 billions (`bn`) when the top of the lever's range is at least ten million or ten billion

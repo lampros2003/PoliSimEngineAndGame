@@ -89,6 +89,10 @@ pub struct Catalogue {
     pub sectors: Vec<SectorEntry>,
     /// Format 1 (S5.4): the model has a legislature that votes on lever changes.
     pub legislature: bool,
+    /// Stage S12.4: the state holding the government's political capital ("" without it),
+    /// and the lever the engine sets to what each step's bills spent.
+    pub capital: String,
+    pub capital_spent: String,
     pub dims: Vec<DimEntry>,
     /// Stage S9.1: the questions put to the player, in order, with their answers. A
     /// dilemma `d` is answered by setting the lever `d` to the answer's position, from 1,
@@ -222,6 +226,7 @@ impl Catalogue {
                 }
             })
             .collect();
+        let capital = model.legislature.and_then(|l| l.capital);
         Catalogue {
             id: model.id.clone(),
             currency: model.currency.clone(),
@@ -231,6 +236,8 @@ impl Catalogue {
             entries,
             sectors,
             legislature: model.legislature.is_some(),
+            capital: capital.map(|c| model.symbols[c.capital].name.clone()).unwrap_or_default(),
+            capital_spent: capital.map(|c| model.symbols[c.spent].name.clone()).unwrap_or_default(),
             dims: model.dims.iter().map(|d| DimEntry { name: d.name.clone(), labels: d.labels.clone() }).collect(),
             dilemmas: model.dilemmas.clone(),
         }

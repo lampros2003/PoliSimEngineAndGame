@@ -7,6 +7,11 @@
 seats = "seats"
 governing = "governing"
 position = "bloc_position"
+# Stage S12.4: bills cost political capital (capital.toml).
+capital = "political_capital"
+spent = "capital_spent"
+bill_cost = "capital_bill"
+swing_cost = "capital_swing"
 
 [dim.option]
 members = ["centre_left", "centre_right", "liberal", "populist_right", "green", "scottish_nationalist", "welsh_nationalist", "northern_ireland", "other", "abstain"]

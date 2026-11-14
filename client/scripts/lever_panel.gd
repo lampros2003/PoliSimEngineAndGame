@@ -9,13 +9,20 @@ signal lever_cancelled(name: String)
 signal explain_requested(name: String)
 
 var hint: Label
+var capital_note: Label
 var fmt: RefCounted
 var _rows := {}  # name -> {entry, spin, now, pending, cancel}
 var _units := {}  # name -> amount one unit of a money input stands for: 1, 1e6 or 1e9
-var _groups := {}  # group -> {button, rows, open}
-## Groups shown open at the start; the rest start folded (a model can have dozens of levers).
-const OPEN_GROUPS := ["", "Spending", "Taxes", "Income tax"]
+var _groups := {}  # group -> {tile, rows, levers}
+## Stage S12.1: the policies come in categories (the levers' `group`); the panel shows a
+## grid of them, or the policies of one. "" is the grid.
+var category := ""
+var _tiles: GridContainer
+var _back: Button
 var _list: VBoxContainer
+var _title: Label
+## Icons by category name, from the scenario's [play] icons (stage S12.2).
+var icons := {}
 
 
 func _ready() -> void:
@@ -23,16 +30,36 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	add_child(box)
-	var title := Label.new()
-	title.text = "Policy"
-	title.theme_type_variation = "Title"
-	box.add_child(title)
+	_back = Button.new()
+	_back.name = "categories"
+	_back.text = "‹ All policy areas"
+	_back.theme_type_variation = "Link"
+	_back.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_back.pressed.connect(func() -> void: open_category(""))
+	box.add_child(_back)
+	_title = Label.new()
+	_title.text = "Policy"
+	_title.theme_type_variation = "Title"
+	box.add_child(_title)
 	hint = Label.new()
 	hint.text = "Changes take effect from next month."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_color_override("font_color", Palette.MUTED)
 	hint.add_theme_font_size_override("font_size", Palette.SMALL)
 	box.add_child(hint)
+	# Stage S12.5: what the bills waiting will cost, against the political capital there is.
+	capital_note = Label.new()
+	capital_note.name = "capital_note"
+	capital_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	capital_note.visible = false
+	box.add_child(capital_note)
+	_tiles = GridContainer.new()
+	_tiles.name = "policy_areas"
+	_tiles.columns = 3
+	_tiles.add_theme_constant_override("h_separation", 12)
+	_tiles.add_theme_constant_override("v_separation", 12)
+	box.add_child(_tiles)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 6)
 	box.add_child(_list)
@@ -68,24 +95,17 @@ func set_legislature(on: bool) -> void:
 
 
 func build(levers: Array) -> void:
-	for child in _list.get_children():
+	for child in _list.get_children() + _tiles.get_children():
 		child.queue_free()
 	_rows.clear()
 	_units.clear()
 	_groups.clear()
 	for entry in levers:
 		var name: String = entry["name"]
-		var group := str(entry.get("group", ""))
-		if group != "" and not _groups.has(group):
-			var header := Button.new()
-			header.flat = true
-			header.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			header.name = "group_" + group.replace(" ", "_")
-			header.theme_type_variation = "Link"
-			header.add_theme_font_size_override("font_size", Palette.FONT_SIZE + 1)
-			_list.add_child(header)
-			_groups[group] = {"button": header, "rows": [], "open": OPEN_GROUPS.has(group)}
-			header.pressed.connect(func() -> void: _toggle(group))
+		var group := str(entry.get("group", "")) if str(entry.get("group", "")) != "" else "Other"
+		if not _groups.has(group):
+			_groups[group] = {"rows": [], "levers": []}
+		_groups[group]["levers"].append(name)
 		if entry.get("money", false):
 			_units[name] = _money_unit(entry)
 		var row := VBoxContainer.new()
@@ -155,23 +175,38 @@ func build(levers: Array) -> void:
 		row.add_child(line)
 		_list.add_child(row)
 		_rows[name] = {"entry": entry, "spin": spin, "now": now, "pending": pending, "cancel": cancel}
-		if _groups.has(group):
-			_groups[group]["rows"].append(row)
+		_groups[group]["rows"].append(row)
 	for group in _groups:
-		_show_group(group)
+		var tile := Button.new()
+		tile.name = "area_" + group.replace(" ", "_")
+		tile.theme_type_variation = "Tile"
+		tile.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tile.custom_minimum_size = Vector2(220, 76)
+		tile.icon = icons.get(group)
+		tile.expand_icon = false
+		tile.pressed.connect(func() -> void: open_category(group))
+		_tiles.add_child(tile)
+		_groups[group]["tile"] = tile
+	if category != "" and not _groups.has(category):
+		category = ""
+	open_category(category)
 
 
-func _toggle(group: String) -> void:
-	_groups[group]["open"] = not _groups[group]["open"]
-	_show_group(group)
+## Shows the grid of policy areas (""), or the policies of one area.
+func open_category(group: String) -> void:
+	category = group
+	_tiles.visible = group == ""
+	_back.visible = group != ""
+	_title.text = "Policy" if group == "" else group
+	for g in _groups:
+		for row in _groups[g]["rows"]:
+			row.visible = g == group
 
 
-func _show_group(group: String) -> void:
-	var g: Dictionary = _groups[group]
-	var rows: Array = g["rows"]
-	g["button"].text = ("▾ " if g["open"] else "▸ ") + group + ("" if g["open"] else "  (%d)" % rows.size())
-	for row in rows:
-		row.visible = g["open"]
+## The policy areas, in the order the model first names them.
+func categories() -> Array:
+	return _groups.keys()
 
 
 func _typed(name: String, value: float) -> void:
@@ -188,7 +223,9 @@ func _typed(name: String, value: float) -> void:
 
 
 ## Shows current settings and changes waiting for next month.
-func refresh(current: Callable, pending: Dictionary) -> void:
+## `costs`: each waiting change's cost in political capital (stage S12.5); `capital`: what
+## there is to spend, or -1 for a model without it.
+func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.0) -> void:
 	for name in _rows:
 		var row: Dictionary = _rows[name]
 		var entry: Dictionary = row["entry"]
@@ -199,11 +236,29 @@ func refresh(current: Callable, pending: Dictionary) -> void:
 		if shown != null and not spin.get_line_edit().has_focus():
 			spin.set_value_no_signal(float(shown) * _scale(entry))
 		if pending.has(name):
-			row["pending"].text = "→ %s from next month" % fmt.value(entry, pending[name], false, false)
+			var cost: float = costs.get(name, -1.0)
+			row["pending"].text = "→ %s from next month%s" % [fmt.value(entry, pending[name], false, false),
+				"" if cost < 0.0 else " · costs %.1f political capital" % cost]
 			row["cancel"].visible = true
 		else:
 			row["pending"].text = ""
 			row["cancel"].visible = false
+	for group in _groups:
+		var g: Dictionary = _groups[group]
+		var waiting: int = g["levers"].filter(func(n): return pending.has(n)).size()
+		var count: int = g["levers"].size()
+		g["tile"].text = "%s\n%d %s%s" % [group, count, "policy" if count == 1 else "policies",
+			"" if waiting == 0 else " · %d change%s waiting" % [waiting, "" if waiting == 1 else "s"]]
+	capital_note.visible = capital >= 0.0
+	if capital >= 0.0:
+		var total := 0.0
+		for name in costs:
+			total += maxf(float(costs[name]), 0.0)
+		var short := total > capital
+		capital_note.text = ("Political capital: %.1f to spend. Each bill costs some, more the further it moves a policy." % capital
+			if costs.is_empty() else "The bills waiting cost %.1f of the %.1f political capital there is.%s" % [total, capital,
+			" Not all of them can be put to the Commons: those that cost more than is left when their turn comes are refused." if short else ""])
+		capital_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.TEXT)
 
 
 ## For tests: types a value into a lever's input as a player would. The value is in the

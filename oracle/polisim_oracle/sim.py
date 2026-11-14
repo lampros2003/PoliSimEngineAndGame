@@ -47,6 +47,7 @@ class Simulation:
         self.flow_totals: dict[str, int] = {}
         self.votes: list[dict] = []  # format 1 (S5.4): every vote on a lever change
         self.defeated = 0  # bills defeated in the step being computed
+        self.spent = 0.0  # stage S12.4: political capital the step's bills have spent so far
         m, minor = model, model.minor
         sym = m.symbols
         for name, entity in m.entities.items():
@@ -287,6 +288,16 @@ class Simulation:
         left = (new > old) == (d.spec["leaning"] == "left")
         seats, governing = rt.C[m.legislature["seats"]], rt.C[m.legislature["governing"]]
         position = rt.C[m.legislature["position"]]
+        everyone = sum(seats)
+        # Stage S12.4: a bill costs political capital; one that costs more than is left is
+        # refused before any vote.
+        cost = None
+        if "capital" in m.legislature:
+            cost = self._bill_cost(d, new, old)
+            if cost > rt.S[m.legislature["capital"]] - self.spent:
+                self.votes.append({"step": rt.step, "lever": name, "value": new, "for": 0, "seats": everyone,
+                                   "passed": False, "cost": cost, "refused": True})
+                return False
         leader, most = -1, None
         for b, (n, g) in enumerate(zip(seats, governing)):
             if g and (most is None or n > most):
@@ -294,13 +305,25 @@ class Simulation:
         here = position[leader] if leader >= 0 else 0.0
         votes_for = sum(n for b, (n, p) in enumerate(zip(seats, position))
                         if b == leader or (p < here if left else p > here))
-        everyone = sum(seats)
         passed = 2 * votes_for > everyone
         self.votes.append({"step": rt.step, "lever": name, "value": new, "for": votes_for, "seats": everyone,
-                           "passed": passed})
+                           "passed": passed, "cost": cost, "refused": False})
         if not passed:
             self.defeated += 1
+        elif cost is not None:
+            self.spent = self.spent + cost
         return passed
+
+    def _bill_cost(self, d, new, old) -> float:
+        """Stage S12.4: `bill_cost + swing_cost * capital_weight * abs(new - old) / (max - min)`,
+        left to right in real numbers; a lever without a range costs `bill_cost`."""
+        leg, S = self.model.legislature, self.rt.S
+        cost = S[leg["bill_cost"]]
+        if d.range is None or not d.range[1] > d.range[0]:
+            return cost
+        moved = float(abs(new - old))
+        weight = float(d.spec.get("capital_weight", 1.0))
+        return cost + S[leg["swing_cost"]] * weight * (moved / (d.range[1] - d.range[0]))
 
     def _check_answer(self, name: str, raw) -> None:
         """Stage S9.1: an answer to a dilemma is a whole number from 1 to the number of its
@@ -371,10 +394,16 @@ class Simulation:
         m, rt, sym = self.model, self.rt, self.model.symbols
         try:
             self.defeated = 0
+            self.spent = 0.0
+            leg = m.legislature or {}
             for name, raw in self.commands.get(rt.step, {}).items():
+                if name == leg.get("spent"):
+                    raise SimError(f"lever {name}: the engine sets it (the capital bills spent)")
                 self._check_answer(name, raw)
                 if self._passes(name, raw):
                     self._set_lever(name, raw)
+            if "spent" in leg:
+                self._store(sym[leg["spent"]], self.spent)
 
             for order, states in self.plan:
                 for name in order:

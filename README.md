@@ -33,7 +33,7 @@ a mod.
 | `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
 | `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
-| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S7-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
+| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S12-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
@@ -147,5 +147,7 @@ households, 600 voter types, 650 seats) now takes 17 to 20 ms a month on four th
 | An edited formula reloads without restarting the game | Met: tested with a typo and with a real change |
 | The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
 | The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
+
+Stage S12 (`docs/S12-PLAN.md`) adds pages, policy areas with icons, the policy web, political capital that bills cost (an engine rule, checked against the oracle) and a map of the regions.
 
 Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.6 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions, the population by region, sex and age, and 15 industries). The status is in `docs/S3-PLAN.md`.

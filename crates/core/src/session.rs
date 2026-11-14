@@ -8,12 +8,13 @@
 //! Session file, all integers little-endian, text as a `u16` length plus UTF-8:
 //!
 //! ```text
-//! "PSIMSESS"   format u32 (3)
+//! "PSIMSESS"   format u32 (4)
 //! mods         version 3: u32 count; each mod the player chose beyond the scenario's own,
 //!              as its folder (text)
 //! engine save  u64 length + bytes (see save.rs)
 //! commands     u32 count; step u64, lever text, raw value
-//! changes      u32 count; step u64, lever text, value
+//! changes      u32 count; step u64, lever text, value; version 2: passed u8, votes for
+//!              u64, seats u64; version 4: flags u8 (1 a cost, 2 refused), cost f64
 //! history      u32 name count, names; u32 step count; per step: step u64, hash 32 bytes;
 //!              then per name, one f64 per step (NaN where the value did not exist)
 //! latest       u32 count; name text, value          (values of the last step)
@@ -41,8 +42,9 @@ use crate::text::load_text;
 const MAGIC: &[u8; 8] = b"PSIMSESS";
 /// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them);
 /// 2 adds each policy change's vote in the legislature (S5.4; older games count every
-/// change as passed).
-const SAVE_VERSION: u32 = 3;
+/// change as passed). 3 adds the mods chosen; 4 each change's cost in political capital and whether
+/// it was refused (S12.4).
+const SAVE_VERSION: u32 = 4;
 
 /// A lever change that has taken effect.
 #[derive(Clone, Debug, PartialEq)]
@@ -55,6 +57,10 @@ pub struct Change {
     pub passed: bool,
     pub votes_for: i64,
     pub seats: i64,
+    /// Stage S12.4: what the bill cost in political capital (`None` without capital, or in
+    /// a game saved before version 4), and whether it was refused for want of it.
+    pub cost: Option<f64>,
+    pub refused: bool,
 }
 
 /// Every result of every step, by name. Money is in minor units; true/false is 1 or 0.
@@ -332,7 +338,8 @@ impl Session {
                 seen.push(lever.clone());
                 let vote = self.sim.votes().iter().rev().find(|v| v.step == index && v.lever == lever);
                 let (passed, votes_for, seats) = vote.map(|v| (v.passed, v.votes_for, v.seats)).unwrap_or((true, 0, 0));
-                self.changes.push(Change { step: index, lever, value, passed, votes_for, seats });
+                let (cost, refused) = vote.map(|v| (v.cost, v.refused)).unwrap_or((None, false));
+                self.changes.push(Change { step: index, lever, value, passed, votes_for, seats, cost, refused });
             }
         }
         Ok(())
@@ -347,6 +354,12 @@ impl Session {
         commands.push((next, name.to_string(), raw));
         self.sim.set_commands(commands);
         Ok(value)
+    }
+
+    /// Stage S12.4: what any bill costs and what moving a lever across its range costs, if
+    /// the model has political capital (see [`crate::bill_cost`]).
+    pub fn capital_prices(&self) -> Option<(f64, f64)> {
+        self.sim.capital_prices()
     }
 
     /// Withdraws a lever change scheduled for the next step.
@@ -445,6 +458,9 @@ impl Session {
             out.push(u8::from(change.passed));
             out.extend_from_slice(&change.votes_for.to_le_bytes());
             out.extend_from_slice(&change.seats.to_le_bytes());
+            // Version 4: whether it has a cost (bit 0) and was refused (bit 1), and the cost.
+            out.push(u8::from(change.cost.is_some()) | (u8::from(change.refused) << 1));
+            out.extend_from_slice(&change.cost.unwrap_or(0.0).to_bits().to_le_bytes());
         }
         let h = &self.history;
         out.extend_from_slice(&(h.names.len() as u32).to_le_bytes());
@@ -530,7 +546,14 @@ impl Session {
             let value = r.val()?;
             let (passed, votes_for, seats) =
                 if version >= 2 { (r.take(1)?[0] != 0, r.u64()? as i64, r.u64()? as i64) } else { (true, 0, 0) };
-            session.changes.push(Change { step, lever, value, passed, votes_for, seats });
+            let (cost, refused) = if version >= 4 {
+                let flags = r.take(1)?[0];
+                let cost = f64::from_bits(r.u64()?);
+                ((flags & 1 != 0).then_some(cost), flags & 2 != 0)
+            } else {
+                (None, false)
+            };
+            session.changes.push(Change { step, lever, value, passed, votes_for, seats, cost, refused });
         }
         let mut history = History::default();
         for _ in 0..r.u32()? {

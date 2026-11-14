@@ -25,12 +25,15 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 | Part | What it shows |
 |---|---|
 | Top bar | The month just finished; buttons to advance one month, a quarter or a year; **Amounts a year** (amounts at an annual rate, as the public finances are published, or per month); Save, Load, Reload model, Help |
+| Page strip | Under the top bar: the pages (Policy, Budget, Who gains, who loses, Politics, Policy web, Map) and, at the right, your **political capital**, last month's change and what your bills waiting will cost |
 | Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP, the government's poll rating and the NHS waiting list in England, each with last month's change, a **Chart** and a **Why** button |
 | Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus, a record NHS waiting list), each since the month it began. A new one is announced when it begins. Questions put to you, and your answers while they last, show here too |
-| Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
-| Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
-| Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, the months to the next election, and the issues voters weigh beyond the economy (health, education, policing, the environment) against the last election |
-| Policy | 64 levers in groups: public services (health, education, defence and six more), other spending, a carbon price, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
+| Budget page | Every payment into the government (revenue) and out of it (spending), this month and last |
+| Who gains, who loses page | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
+| Politics page | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, the months to the next election, and the issues voters weigh beyond the economy (health, education, policing, the environment) against the last election |
+| Policy page | A tile for each policy area; press one for its policies. 64 levers in all: public services (health, education, defence and six more), other spending, a carbon price, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
+| Policy web page | Every policy area, the outcomes on the screen, and the situations and the government's support, with a line wherever a policy reaches an outcome through the model. Point at anything to light its lines; press an area to see its policies one by one, anything else to see why it moved |
+| Map page | The twelve regions and nations as tiles, shaded from pale to dark by net income, unemployment or income tax |
 | Chart | Any figure over time. Dashed lines are your policy changes. Click a name in the legend to remove it |
 | Why did it change? | What moved a figure last month, input by input. Press an input to follow it; Back returns |
 | Connections | The web around a figure: what it depends on to the left, what it feeds to the right, each tile coloured by last month's change. Press a tile to move to it |
@@ -43,6 +46,13 @@ votes for its own bills; the others vote for a move towards where they stand (a 
 is a move to the left, a tax cut to the right). With 411 seats you pass everything. If
 you ever govern without a majority of your own, a bill can fail, and the game tells you
 the vote.
+
+Every bill also costs **political capital**: 5 for any bill, and up to 60 more the further
+it moves a policy (a point on the basic rate costs 5.6, five points of VAT 11). You start
+with 40 and earn some back each month, more while your poll rating is high and in the
+first year of a parliament, up to 100. The cost shows as you type a change; a bill that
+costs more than you have left when its turn comes is not put to the Commons, and the game
+tells you.
 
 The blocs are not real parties: they are named for where they stand (centre-left,
 centre-right, liberal, populist right, green, the Scottish and Welsh nationalists,

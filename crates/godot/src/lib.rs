@@ -50,6 +50,8 @@ struct View {
     failed: Option<String>,
     /// Format 1: one-dimensional values' cells after the last step and the one before.
     cells: BTreeMap<String, (Vec<f64>, Vec<f64>)>,
+    /// Stage S12.4: what any bill costs and what a whole-range move costs, with capital.
+    capital_prices: Option<(f64, f64)>,
 }
 
 /// Cells of dimensions longer than this are not mirrored to the interface each step.
@@ -106,6 +108,7 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
         history: session.history().clone(),
         failed: failed.clone(),
         cells,
+        capital_prices: session.capital_prices(),
     }
 }
 
@@ -438,6 +441,8 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
     out.set("dilemmas", &dilemmas);
     out.set("id", catalogue.id.as_str());
     out.set("legislature", catalogue.legislature);
+    out.set("capital", catalogue.capital.as_str());
+    out.set("capital_spent", catalogue.capital_spent.as_str());
     out.set("dims", &dims);
     out.set("currency", catalogue.currency.as_str());
     out.set("minor", catalogue.minor);
@@ -724,6 +729,24 @@ impl PoliSim {
         }
     }
 
+    /// Stage S12.4: what changing `name` to `value` next month would cost in political
+    /// capital, as the engine will reckon it (-1 when it would be no bill: no capital, no
+    /// leaning, no change, or a value the lever cannot take).
+    #[func]
+    fn bill_cost(&self, name: GString, value: Variant) -> f64 {
+        let (Some(model), Some((bill, swing))) = (&self.model, self.view.capital_prices) else { return -1.0 };
+        let name = name.to_string();
+        let Some(raw) = raw_from_variant(&value) else { return -1.0 };
+        let Some(d) = model.sym_index.get(&name).map(|&i| &model.symbols[i]) else { return -1.0 };
+        let (Ok(new), Some(&old)) = (check_lever(model, &name, &raw), self.view.latest.get(&name)) else {
+            return -1.0;
+        };
+        if d.spec.get("leaning").is_none() || new == old {
+            return -1.0;
+        }
+        polisim_core::bill_cost(bill, swing, d, new, old)
+    }
+
     #[func]
     fn cancel_lever(&mut self, name: GString) {
         let name = name.to_string();
@@ -926,6 +949,8 @@ impl PoliSim {
             d.set("passed", c.passed);
             d.set("votes_for", c.votes_for);
             d.set("seats", c.seats);
+            d.set("cost", c.cost.unwrap_or(-1.0));
+            d.set("refused", c.refused);
             out.push(&d.to_variant());
         }
         out

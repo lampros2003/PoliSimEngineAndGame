@@ -14,6 +14,8 @@ const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
 const PoliticsPanel := preload("res://scripts/politics_panel.gd")
 const StartScreen := preload("res://scripts/start_screen.gd")
+const PolicyWeb := preload("res://scripts/policy_web.gd")
+const MapPanel := preload("res://scripts/map_panel.gd")
 
 const MAX_SERIES := 4
 const HELP := """[b]How to play[/b]
@@ -49,6 +51,9 @@ var failed := false
 
 var _date: Label
 var _status: Label
+## Stage S12.5: the political capital in the masthead, and each waiting change's cost.
+var _capital: Label
+var _costs := {}
 var _advance: Array[Button] = []
 var _save: Button
 var _load: Button
@@ -76,6 +81,13 @@ var chart: Chart
 var trace: TracePanel
 var web: WebPanel
 var tabs: TabContainer
+## Stage S12.1: the pages on the left (or across the screen), and the strip that names them.
+var pages: TabContainer
+var policy_web: PolicyWeb
+var map_panel: MapPanel
+var _nav := {}  # key -> {button, index}
+var _nav_row: HBoxContainer
+var _nav_group := ButtonGroup.new()
 var _message: PanelContainer
 var _message_text: RichTextLabel
 var _dialog: AcceptDialog
@@ -187,6 +199,13 @@ func _build_layout() -> void:
 	var masthead := PanelContainer.new()
 	masthead.theme_type_variation = "Masthead"
 	frame.add_child(masthead)
+	# Stage S12.1: the pages, named in a strip under the masthead.
+	var nav := PanelContainer.new()
+	nav.theme_type_variation = "NavBar"
+	frame.add_child(nav)
+	_nav_row = HBoxContainer.new()
+	_nav_row.add_theme_constant_override("separation", 4)
+	nav.add_child(_nav_row)
 	var margin := MarginContainer.new()
 	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right", "top", "bottom"]:
@@ -206,6 +225,12 @@ func _build_layout() -> void:
 	_date.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_date.custom_minimum_size = Vector2(160, 0)
 	top.add_child(_date)
+	# Stage S12.5: the government's political capital, when the model has it.
+	_capital = Label.new()
+	_capital.name = "capital"
+	_capital.visible = false
+	_capital.mouse_filter = Control.MOUSE_FILTER_PASS
+	_capital.add_theme_font_override("font", Palette.font(Palette.SANS_FILE, 600))
 	for spec in [["Next month", 1], ["Next quarter", 3], ["Next year", 12]]:
 		var button := Button.new()
 		button.text = spec[0]
@@ -243,32 +268,42 @@ func _build_layout() -> void:
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	split.split_offset = 0
 	page.add_child(split)
-	var left_scroll := ScrollContainer.new()
-	left_scroll.custom_minimum_size = Vector2(735, 0)
-	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	split.add_child(left_scroll)
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 12)
-	left_scroll.add_child(left)
-	budget = BudgetPanel.new()
-	budget.fmt = fmt
-	budget.chart_requested.connect(func(row: String, _label: String) -> void: add_to_chart(row))
-	budget.explain_requested.connect(func(name: String) -> void: explain(name, true))
-	left.add_child(budget)
-	breakdown = BreakdownPanel.new()
-	breakdown.fmt = fmt
-	left.add_child(breakdown)
-	politics = PoliticsPanel.new()
-	politics.fmt = fmt
-	left.add_child(politics)
+	pages = TabContainer.new()
+	pages.name = "pages"
+	pages.tabs_visible = false
+	pages.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	pages.custom_minimum_size = Vector2(735, 0)
+	pages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.add_child(pages)
 	levers = LeverPanel.new()
 	levers.fmt = fmt
 	levers.lever_changed.connect(_lever_typed)
 	levers.lever_cancelled.connect(func(name: String) -> void:
 		game.cancel_lever(name)
 		_refresh())
-	left.add_child(levers)
+	_add_page("policy", "Policy", levers, "sliders-horizontal")
+	budget = BudgetPanel.new()
+	budget.fmt = fmt
+	budget.chart_requested.connect(func(row: String, _label: String) -> void: add_to_chart(row))
+	budget.explain_requested.connect(func(name: String) -> void: explain(name, true))
+	_add_page("budget", "Budget", budget, "scale")
+	breakdown = BreakdownPanel.new()
+	breakdown.fmt = fmt
+	_add_page("society", "Who gains, who loses", breakdown, "users")
+	politics = PoliticsPanel.new()
+	politics.fmt = fmt
+	_add_page("politics", "Politics", politics, "vote")
+	policy_web = PolicyWeb.new()
+	policy_web.fmt = fmt
+	policy_web.explain_requested.connect(func(name: String) -> void: explain(name, true))
+	_add_page("web", "Policy web", policy_web, "network")
+	map_panel = MapPanel.new()
+	map_panel.fmt = fmt
+	_add_page("map", "Map", map_panel, "map")
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_nav_row.add_child(spacer)
+	_nav_row.add_child(_capital)  # at the right of the page strip
 
 	var right := VSplitContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -323,6 +358,37 @@ func _build_layout() -> void:
 	message_row.add_child(close)
 
 
+## Stage S12.1: a page, scrolled, with its name in the strip under the masthead.
+func _add_page(key: String, title: String, panel: Control, icon := "") -> void:
+	var scroll := ScrollContainer.new()
+	scroll.name = "page_" + key
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(panel)
+	pages.add_child(scroll)
+	var button := Button.new()
+	button.name = "nav_" + key
+	button.text = title
+	button.theme_type_variation = "NavItem"
+	if icon != "":
+		button.icon = Palette.icon(icon)
+	button.toggle_mode = true
+	button.button_group = _nav_group
+	button.button_pressed = _nav.is_empty()
+	var index := pages.get_child_count() - 1
+	button.pressed.connect(func() -> void: show_page(key))
+	_nav_row.add_child(button)
+	_nav[key] = {"button": button, "index": index}
+
+
+## Shows a page by its key ("policy", "budget", "society", "politics"...).
+func show_page(key: String) -> void:
+	if not _nav.has(key):
+		return
+	pages.current_tab = _nav[key]["index"]
+	_nav[key]["button"].button_pressed = true  # through the group, so the others let go
+
+
 func _tool_button(parent: Control, text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -350,7 +416,14 @@ func _model_changed() -> void:
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	breakdown.build(play, entries)
 	politics.build(play)
+	var icon_names: Dictionary = play.get("icons", {})
+	levers.icons = {}
+	for entry in lever_entries:
+		var group := str(entry.get("group", ""))
+		levers.icons[group if group != "" else "Other"] = Palette.icon(str(icon_names.get(group, "")))
 	levers.build(lever_entries)
+	policy_web.build(entries, play, lever_entries, levers.icons)
+	_nav["map"]["button"].visible = map_panel.build(play, entries)
 	levers.set_legislature(bool(catalogue.get("legislature", false)))
 	_build_headline()
 	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
@@ -476,10 +549,41 @@ func _refresh() -> void:
 	politics.refresh(func(name: String) -> Dictionary: return game.cells(name),
 		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
 		game.steps_done())
-	levers.refresh(func(name: String) -> Variant: return game.latest(name), game.pending())
+	var pending: Dictionary = game.pending()
+	for name in _costs.keys():
+		if not pending.has(name):
+			_costs.erase(name)
+	var capital := _show_capital()
+	levers.refresh(func(name: String) -> Variant: return game.latest(name), pending, _costs, capital)
 	web.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
+	policy_web.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
+	map_panel.refresh(func(name: String) -> Dictionary: return game.cells(name))
 	_refresh_chart()
 	_set_controls(not failed and not lost)
+
+
+## Stage S12.5: shows the political capital in the masthead (with last month's change and
+## what the bills waiting will cost) and returns it, or -1 for a model without it.
+func _show_capital() -> float:
+	var name := str(catalogue.get("capital", ""))
+	var entry: Dictionary = entries.get(name, {})
+	var now: Variant = game.latest(str(entry.get("row", name))) if name != "" else null
+	_capital.visible = now != null
+	if now == null:
+		return -1.0
+	var before: Variant = game.previous(str(entry.get("row", name)))
+	var text := "Political capital %.1f" % float(now)
+	if before != null and float(now) != float(before):
+		text += " (%+.1f)" % (float(now) - float(before))
+	var waiting := 0.0
+	for cost in _costs.values():
+		waiting += float(cost)
+	if waiting > 0.0:
+		text += " · %.1f for bills waiting" % waiting
+	_capital.text = text
+	_capital.tooltip_text = str(entry.get("doc", ""))
+	_capital.add_theme_color_override("font_color", Palette.BAD if waiting > float(now) else Palette.ACCENT)
+	return float(now)
 
 
 func _refresh_chart() -> void:
@@ -538,7 +642,12 @@ func advance(months: int) -> void:
 
 
 func _lever_typed(name: String, raw: String) -> void:
+	var cost: float = game.bill_cost(name, raw)
 	var refused := game.set_lever(name, raw)
+	if refused == "" and cost >= 0.0:
+		_costs[name] = cost
+	else:
+		_costs.erase(name)
 	if refused != "":
 		_show_message("[b]%s was not changed[/b]: %s" % [entries.get(name, {}).get("label", name), refused], true)
 	_refresh()
@@ -884,18 +993,28 @@ func _announce_situations() -> void:
 func _announce_votes() -> void:
 	var changes := game.changes()
 	var lines := PackedStringArray()
+	var short := PackedStringArray()  # stage S12.5: refused for want of political capital
 	for i in range(_changes_seen, changes.size()):
 		var c: Dictionary = changes[i]
 		if c.get("passed", true):
 			continue
 		var entry: Dictionary = entries.get(c["lever"], {})
-		lines.append("%s to %s, in %s: %d for, %d against" % [entry.get("label", c["lever"]),
-			fmt.value(entry, c["value"], false, true), fmt.month_name(int(c["step"])),
-			int(c["votes_for"]), int(c["seats"]) - int(c["votes_for"])])
+		var what := "%s to %s, in %s" % [entry.get("label", c["lever"]), fmt.value(entry, c["value"], false, true),
+			fmt.month_name(int(c["step"]))]
+		if c.get("refused", false):
+			short.append("%s: it needed %.1f political capital" % [what, float(c["cost"])])
+		else:
+			lines.append("%s: %d for, %d against" % [what, int(c["votes_for"]), int(c["seats"]) - int(c["votes_for"])])
 	_changes_seen = changes.size()
+	var notes := PackedStringArray()
 	if not lines.is_empty():
-		_show_message("[b]The House of Commons voted down %s[/b]\n%s\nYour government lacks a majority of its own; its partners and the opposition vote by their side of politics." % [
+		notes.append("[b]The House of Commons voted down %s[/b]\n%s\nYour government lacks a majority of its own; its partners and the opposition vote by their side of politics." % [
 			"a bill" if lines.size() == 1 else "%d bills" % lines.size(), "\n".join(lines)])
+	if not short.is_empty():
+		notes.append("[b]Not enough political capital: %s not put to the Commons[/b]\n%s\nCapital comes back each month, faster while the government is popular." % [
+			"a bill was" if short.size() == 1 else "%d bills were" % short.size(), "\n".join(short)])
+	if not notes.is_empty():
+		_show_message("\n\n".join(notes))
 
 
 func _process(_delta: float) -> void:

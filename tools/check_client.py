@@ -165,6 +165,17 @@ def main() -> int:
                 print(f"res://tests/politics_check.gd ({expect}) failed", file=sys.stderr)
                 return 1
             print(run.stdout.strip().splitlines()[-1])
+        # Stage S12: the pages, the policy areas and the policy web; political capital.
+        for script in ("res://tests/policy_web_check.gd", "res://tests/capital_check.gd"):
+            run = subprocess.run(
+                [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
+                 "--", "--scenario=models/uk/scenarios/2025.toml"],
+                capture_output=True, encoding="utf-8", timeout=900)
+            if run.returncode != 0:
+                print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+                print(f"{script} failed", file=sys.stderr)
+                return 1
+            print(run.stdout.strip().splitlines()[-1])
         # The UK's budget screen, as the player reads it, against the 2024 public finances.
         dump, breakdowns = folder / "uk_budget.csv", folder / "uk_breakdowns.tsv"
         uk = subprocess.run(

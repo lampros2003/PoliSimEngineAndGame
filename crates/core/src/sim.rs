@@ -75,6 +75,10 @@ pub struct Vote {
     pub votes_for: i64,
     pub seats: i64,
     pub passed: bool,
+    /// Stage S12.4: what the bill cost in political capital (`None` without capital), and
+    /// whether it was refused for want of it, unvoted (then `votes_for` is 0).
+    pub cost: Option<f64>,
+    pub refused: bool,
 }
 
 struct Phase {
@@ -124,6 +128,8 @@ pub struct Simulation {
     /// Format 1 (S5.4): every vote on a lever change, and the defeats in the step running.
     votes: Vec<Vote>,
     defeated: i64,
+    /// Stage S12.4: political capital the step's bills have spent so far.
+    spent: f64,
     /// Per symbol: the compiled rake of a weight state that has one.
     rakes: Vec<Option<RakeProg>>,
 }
@@ -171,6 +177,31 @@ fn as_int(value: &Val) -> i64 {
         Val::I(v) => *v,
         _ => unreachable!("whole number expected"),
     }
+}
+
+fn as_real(value: &Val) -> f64 {
+    match value {
+        Val::F(v) => *v,
+        _ => unreachable!("real number expected"),
+    }
+}
+
+/// Stage S12.4: what a bill moving lever `d` from `old` to `new` costs in political capital:
+/// `bill + swing * capital_weight * abs(new - old) / (max - min)`, left to right in real
+/// numbers; a lever without a range costs `bill`.
+pub fn bill_cost(bill: f64, swing: f64, d: &Decl, new: Val, old: Val) -> f64 {
+    let Some((lo, hi)) = d.range.filter(|(lo, hi)| hi > lo) else { return bill };
+    let moved = match (new, old) {
+        (Val::I(a), Val::I(b)) => (a as i128 - b as i128).abs() as f64,
+        (Val::F(a), Val::F(b)) => (a - b).abs(),
+        _ => unreachable!("a bill moves a number"),
+    };
+    let weight = match d.spec.get("capital_weight") {
+        Some(Value::Integer(i)) => *i as f64,
+        Some(Value::Float(f)) => *f,
+        _ => 1.0,
+    };
+    bill + swing * weight * (moved / (hi - lo))
 }
 
 fn int_column(column: &Col) -> &[i64] {
@@ -331,6 +362,7 @@ impl Simulation {
             weights: model.entities.iter().map(|e| e.weights.clone()).collect(),
             votes: Vec::new(),
             defeated: 0,
+            spent: 0.0,
             rakes: (0..count).map(|_| None).collect(),
         };
         let m = &*model;
@@ -650,6 +682,9 @@ impl Simulation {
     /// Checks that `raw` is a legal setting for the lever `name` without applying it.
     /// Returns the value as it would be stored.
     pub fn check_lever(&self, name: &str, raw: &Value) -> Result<Val> {
+        if self.spent_lever().is_some_and(|id| self.model.symbols[id].name == name) {
+            return sim_err(format!("lever {name}: the engine sets it (the capital bills spent)"));
+        }
         self.check_answer(name, raw)?;
         check_lever(&self.model, name, raw)
     }
@@ -710,6 +745,28 @@ impl Simulation {
         else {
             unreachable!("checked by the loader")
         };
+        let everyone: i128 = seats.iter().map(|n| *n as i128).sum();
+        // Stage S12.4: a bill costs political capital; one that costs more than is left is
+        // refused before any vote.
+        let mut cost = None;
+        if let Some(capital) = legislature.capital {
+            let (bill, swing) = (as_real(&self.scal[capital.bill_cost]), as_real(&self.scal[capital.swing_cost]));
+            let price = bill_cost(bill, swing, d, new, old);
+            if price > as_real(&self.scal[capital.capital]) - self.spent {
+                self.votes.push(Vote {
+                    step: self.step,
+                    lever: name.to_string(),
+                    value: new,
+                    votes_for: 0,
+                    seats: fits(everyone, "seats")?,
+                    passed: false,
+                    cost: Some(price),
+                    refused: true,
+                });
+                return Ok(false);
+            }
+            cost = Some(price);
+        }
         let mut leader: Option<usize> = None;
         for (b, (n, g)) in seats.iter().zip(governing).enumerate() {
             if *g && leader.is_none_or(|l| *n > seats[l]) {
@@ -718,9 +775,7 @@ impl Simulation {
         }
         let here = leader.map_or(0.0, |l| position[l]);
         let mut votes_for: i128 = 0;
-        let mut everyone: i128 = 0;
         for (b, (n, p)) in seats.iter().zip(position).enumerate() {
-            everyone += *n as i128;
             if Some(b) == leader || (left && *p < here) || (!left && *p > here) {
                 votes_for += *n as i128;
             }
@@ -733,11 +788,27 @@ impl Simulation {
             votes_for: fits(votes_for, "seats")?,
             seats: fits(everyone, "seats")?,
             passed,
+            cost,
+            refused: false,
         });
         if !passed {
             self.defeated += 1;
+        } else if let Some(price) = cost {
+            self.spent += price;
         }
         Ok(passed)
+    }
+
+    /// Stage S12.4: the lever the engine sets to what the step's bills spent, if any.
+    fn spent_lever(&self) -> Option<usize> {
+        self.model.legislature.and_then(|l| l.capital).map(|c| c.spent)
+    }
+
+    /// Stage S12.4: what any bill costs and what moving a lever across its range costs, if
+    /// the model has political capital.
+    pub fn capital_prices(&self) -> Option<(f64, f64)> {
+        let capital = self.model.legislature.and_then(|l| l.capital)?;
+        Some((as_real(&self.scal[capital.bill_cost]), as_real(&self.scal[capital.swing_cost])))
     }
 
     /// Stage S6.1: per symbol, what its formula reads this step and through `prev()`.
@@ -1119,13 +1190,21 @@ impl Simulation {
 
     fn step_inner(&mut self) -> Result<()> {
         self.defeated = 0;
+        self.spent = 0.0;
+        let spent = self.spent_lever();
         if let Some(commands) = self.commands.get(&self.step).cloned() {
             for (lever, raw) in commands {
+                if spent.is_some_and(|id| self.model.symbols[id].name == lever) {
+                    return sim_err(format!("lever {lever}: the engine sets it (the capital bills spent)"));
+                }
                 self.check_answer(&lever, &raw)?;
                 if self.passes(&lever, &raw)? {
                     self.set_lever(&lever, &raw)?;
                 }
             }
+        }
+        if let Some(id) = spent {
+            self.store(id, Computed::One(Val::F(self.spent)))?;
         }
         for phase in 0..self.plan.len() {
             let started = Instant::now();

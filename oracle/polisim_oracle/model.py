@@ -1005,12 +1005,19 @@ def _check_legislature(spec: dict, symbols, fmt: int) -> dict[str, str] | None:
                 raise ModelError(f"lever {d.name}: 'leaning' is \"left\" or \"right\"")
             if d.type == "bool":
                 raise ModelError(f"lever {d.name}: a true/false lever has no leaning")
+        if d.kind == "lever" and "capital_weight" in d.spec:
+            w = d.spec["capital_weight"]
+            if "leaning" not in d.spec or isinstance(w, bool) or not isinstance(w, (int, float)) \
+                    or not (0.0 <= float(w) < float("inf")):
+                raise ModelError(f"lever {d.name}: 'capital_weight' is a number of at least 0, on a lever with a leaning")
     if not spec:
         return None
     if fmt != 1:
         raise ModelError("[legislature] needs format = 1")
-    if set(spec) != {"seats", "governing", "position"} or not all(isinstance(v, str) for v in spec.values()):
-        raise ModelError("[legislature] takes 'seats', 'governing' and 'position', each a name")
+    base, capital = {"seats", "governing", "position"}, {"capital", "spent", "bill_cost", "swing_cost"}
+    if set(spec) not in (base, base | capital) or not all(isinstance(v, str) for v in spec.values()):
+        raise ModelError("[legislature] takes 'seats', 'governing' and 'position', and optionally 'capital', "
+                         "'spent', 'bill_cost' and 'swing_cost' together, each a name")
     wanted = {"seats": ("state", "int"), "governing": ("state", "bool"), "position": ("param", "real")}
     dims = None
     for key, (kind, typ) in wanted.items():
@@ -1020,6 +1027,18 @@ def _check_legislature(spec: dict, symbols, fmt: int) -> dict[str, str] | None:
         if dims is not None and d.dims != dims:
             raise ModelError("[legislature]: seats, governing and position must have the same dimension")
         dims = d.dims
+    # Stage S12.4: political capital. Bills cost it; the engine sets `spent` each step.
+    if "capital" in spec:
+        unit = None
+        for key, kind in (("capital", "state"), ("spent", "lever"), ("bill_cost", "param"), ("swing_cost", "param")):
+            d = symbols.get(spec[key])
+            if d is None or d.kind != kind or d.type != "real" or d.money or d.dims or d.entity is not None:
+                raise ModelError(f"[legislature] {key}: must be a national {kind} of type real")
+            if unit is not None and d.unit != unit:
+                raise ModelError(f"[legislature] {key}: must have the same unit as the capital")
+            unit = d.unit
+        if "leaning" in symbols[spec["spent"]].spec:
+            raise ModelError("[legislature] spent: the engine sets it, so it is no bill")
     return dict(spec)
 
 

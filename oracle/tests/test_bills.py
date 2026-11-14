@@ -21,7 +21,7 @@ CASES = tomllib.loads((ROOT / "conformance" / "bill_cases.toml").read_text(encod
 
 def outcome(case: dict):
     text = CASES["base"]
-    for old, new in case.get("replace", []):
+    for old, new in (CASES["capital"] if case.get("capital") else []) + case.get("replace", []):
         old, new = old.replace("\\n", "\n"), new.replace("\\n", "\n")
         assert text.count(old) == 1, (case["name"], old)
         text = text.replace(old, new)
@@ -51,7 +51,11 @@ class SharedCases(unittest.TestCase):
                 if kind == "ran":
                     for lever, value in case["levers"].items():
                         self.assertEqual(detail.rt.S[lever], value, lever)
-                    self.assertEqual([[v["lever"], v["for"], v["passed"]] for v in detail.votes], case["votes"])
+                    # Stage S12.4: an expected vote may also give its cost and whether it was refused.
+                    got = [[v["lever"], v["for"], v["passed"], v["cost"], v["refused"]][:len(want)]
+                           for v, want in zip(detail.votes, case["votes"])]
+                    self.assertEqual(len(detail.votes), len(case["votes"]))
+                    self.assertEqual(got, case["votes"])
 
 
 class UnitedKingdom(unittest.TestCase):

@@ -367,6 +367,19 @@ pub struct Legislature {
     pub seats: usize,
     pub governing: usize,
     pub position: usize,
+    /// Stage S12.4: political capital, if the model has it.
+    pub capital: Option<Capital>,
+}
+
+/// Stage S12.4: symbol indices of the government's political capital (a real national
+/// state), what the step's bills spent (a real national lever the engine sets), and what
+/// a bill costs (real national parameters), all in one unit.
+#[derive(Clone, Copy, Debug)]
+pub struct Capital {
+    pub capital: usize,
+    pub spent: usize,
+    pub bill_cost: usize,
+    pub swing_cost: usize,
 }
 
 impl Model {
@@ -2241,6 +2254,19 @@ fn check_legislature(spec: &Toml, loader: &Loader, format: i64) -> Result<Option
                 return model_err(format!("lever {}: a true/false lever has no leaning", d.name));
             }
         }
+        if let Some(w) = d.spec.get("capital_weight") {
+            let number = match w {
+                Value::Integer(i) => Some(*i as f64),
+                Value::Float(f) => Some(*f),
+                _ => None,
+            };
+            if d.spec.get("leaning").is_none() || !number.is_some_and(|w| (0.0..f64::INFINITY).contains(&w)) {
+                return model_err(format!(
+                    "lever {}: 'capital_weight' is a number of at least 0, on a lever with a leaning",
+                    d.name
+                ));
+            }
+        }
     }
     if spec.is_empty() {
         return Ok(None);
@@ -2248,10 +2274,15 @@ fn check_legislature(spec: &Toml, loader: &Loader, format: i64) -> Result<Option
     if format != 1 {
         return model_err("[legislature] needs format = 1");
     }
-    let keys_ok =
-        spec.len() == 3 && ["seats", "governing", "position"].iter().all(|k| spec.get(*k).is_some_and(Value::is_str));
-    if !keys_ok {
-        return model_err("[legislature] takes 'seats', 'governing' and 'position', each a name");
+    const BASE: [&str; 3] = ["seats", "governing", "position"];
+    const CAPITAL: [&str; 4] = ["capital", "spent", "bill_cost", "swing_cost"];
+    let named = |keys: &[&str]| keys.iter().all(|k| spec.get(*k).is_some_and(Value::is_str));
+    let with_capital = spec.len() == 7 && named(&CAPITAL);
+    if !named(&BASE) || !(spec.len() == 3 || with_capital) {
+        return model_err(
+            "[legislature] takes 'seats', 'governing' and 'position', and optionally 'capital', 'spent', \
+             'bill_cost' and 'swing_cost' together, each a name",
+        );
     }
     let mut ids = [0usize; 3];
     let mut dims: Option<&Vec<usize>> = None;
@@ -2279,7 +2310,33 @@ fn check_legislature(spec: &Toml, loader: &Loader, format: i64) -> Result<Option
         dims = Some(&d.dims);
         ids[slot] = id;
     }
-    Ok(Some(Legislature { seats: ids[0], governing: ids[1], position: ids[2] }))
+    // Stage S12.4: political capital. Bills cost it; the engine sets `spent` each step.
+    let mut capital = None;
+    if with_capital {
+        let mut found = [0usize; 4];
+        let mut unit: Option<&Unit> = None;
+        for (slot, (key, kind)) in CAPITAL.iter().zip([Kind::State, Kind::Lever, Kind::Param, Kind::Param]).enumerate()
+        {
+            let name = spec[*key].as_str().expect("checked above");
+            let d =
+                loader.sym_index.get(name).map(|&i| &loader.symbols[i]).filter(|d| {
+                    d.kind == kind && d.ty == Ty::Real && !d.money && d.dims.is_empty() && d.entity.is_none()
+                });
+            let Some(d) = d else {
+                return model_err(format!("[legislature] {key}: must be a national {} of type real", kind.name()));
+            };
+            if unit.is_some_and(|u| *u != d.unit) {
+                return model_err(format!("[legislature] {key}: must have the same unit as the capital"));
+            }
+            unit = Some(&d.unit);
+            found[slot] = loader.sym_index[name];
+        }
+        if loader.symbols[found[1]].spec.get("leaning").is_some() {
+            return model_err("[legislature] spent: the engine sets it, so it is no bill");
+        }
+        capital = Some(Capital { capital: found[0], spent: found[1], bill_cost: found[2], swing_cost: found[3] });
+    }
+    Ok(Some(Legislature { seats: ids[0], governing: ids[1], position: ids[2], capital }))
 }
 
 /// Format 1 (S4.4): weight states and rakes.

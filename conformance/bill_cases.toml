@@ -82,6 +82,15 @@ phase = "one"
 expr = "tax + plain"
 """
 
+# Stage S12.4: a case with `capital = true` first applies these replacements, giving the
+# legislature political capital: 10 at the start, any bill costs 1, moving a lever across
+# its whole range 20 more (tax's range is 0 to 1; allowance has none, so it costs 1).
+# There `votes` entries may also give the cost and whether the bill was refused.
+capital = [
+    ['position = "position"\n\n[param.position]', 'position = "position"\ncapital = "capital"\nspent = "spent"\nbill_cost = "bill_cost"\nswing_cost = "swing_cost"\n\n[param.position]'],
+    ['expr = "tax + plain"', 'expr = "tax + plain"\n\n[state.capital]\ntype = "real"\nunit = "1"\nphase = "one"\ninitial = 10.0\nnext = "capital - spent"\n\n[lever.spent]\ntype = "real"\nunit = "1"\ndefault = 0.0\n\n[param.bill_cost]\ntype = "real"\nunit = "1"\nvalue = 1.0\n\n[param.swing_cost]\ntype = "real"\nunit = "1"\nvalue = 20.0'],
+]
+
 [files]
 "blocs.csv" = "bloc,seats,governing,position\na,300,true,0.0\nb,330,false,-0.5\nc,20,true,0.3\n"
 
@@ -270,4 +279,97 @@ expect = "refused"
 [[case]]
 name = "a rename of a dimension's name"
 replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nbloc = "seats"']]
+expect = "refused"
+
+# ---- political capital (stage S12.4)
+
+[[case]]
+name = "a bill within the capital passes and spends its cost"
+capital = true
+set = { tax = 0.5 }
+expect = "ran"
+levers = { tax = 0.5, spent = 7.0, capital = 3.0 }
+votes = [["tax", 630, true, 7.0, false]]
+
+[[case]]
+name = "a bill that costs more than is left is refused, not voted on"
+capital = true
+set = { tax = 1.0 }
+expect = "ran"
+levers = { tax = 0.2, spent = 0.0, capital = 10.0 }
+votes = [["tax", 0, false, 17.0, true]]
+
+[[case]]
+name = "each bill leaves less capital for the next in the step"
+capital = true
+replace = [['initial = 10.0', 'initial = 6.5']]
+set = { allowance = 900, tax = 0.45 }
+expect = "ran"
+levers = { allowance = 90000, tax = 0.2, spent = 1.0, capital = 5.5 }
+votes = [["allowance", 630, true, 1.0, false], ["tax", 0, false, 6.0, true]]
+
+[[case]]
+name = "a defeated bill spends nothing"
+capital = true
+# (Changes in a case are listed in the order both runners take them: by name.)
+replace = [['initial = 10.0', 'initial = 4.5']]
+set = { allowance = 900, tax = 0.1 }
+expect = "ran"
+levers = { tax = 0.2, allowance = 90000, spent = 1.0, capital = 3.5 }
+votes = [["allowance", 630, true, 1.0, false], ["tax", 320, false, 3.0, false]]
+
+[[case]]
+name = "capital_weight scales the cost of the move"
+capital = true
+replace = [['leaning = "left"', 'leaning = "left"\ncapital_weight = 0.5']]
+set = { tax = 0.45 }
+expect = "ran"
+levers = { tax = 0.45, spent = 3.5, capital = 6.5 }
+votes = [["tax", 630, true, 3.5, false]]
+
+[[case]]
+name = "a lever without a leaning costs nothing"
+capital = true
+set = { plain = 5.0 }
+expect = "ran"
+levers = { plain = 5.0, spent = 0.0, capital = 10.0 }
+votes = []
+
+[[case]]
+name = "the player cannot set what bills spent"
+capital = true
+set = { spent = 1.0 }
+expect = "runtime"
+
+[[case]]
+name = "capital without the rest"
+replace = [['position = "position"\n\n[param.position]', 'position = "position"\ncapital = "seats"\n\n[param.position]']]
+expect = "refused"
+
+[[case]]
+name = "capital that is not a state"
+capital = true
+replace = [['capital = "capital"', 'capital = "bill_cost"']]
+expect = "refused"
+
+[[case]]
+name = "spent in another unit"
+capital = true
+replace = [['[lever.spent]\ntype = "real"\nunit = "1"', '[lever.spent]\ntype = "real"\nunit = "seat"']]
+expect = "refused"
+
+[[case]]
+name = "spent with a leaning"
+capital = true
+replace = [['[lever.spent]\ntype = "real"', '[lever.spent]\nleaning = "left"\ntype = "real"']]
+expect = "refused"
+
+[[case]]
+name = "a capital_weight below zero"
+replace = [['leaning = "left"', 'leaning = "left"\ncapital_weight = -1.0']]
+expect = "refused"
+
+[[case]]
+name = "a capital_weight on a lever without a leaning"
+replace = [['[lever.plain]\ntype = "real"', '[lever.plain]\ncapital_weight = 2.0\ntype = "real"']]
 expect = "refused"

@@ -288,6 +288,11 @@ expr = "select(adults >= {i} and age{i} >= 18, person_each, 0)"
 seats = "seats"
 governing = "governing"
 position = "bloc_position"
+# Stage S12.4: bills cost political capital (capital.toml).
+capital = "political_capital"
+spent = "capital_spent"
+bill_cost = "capital_bill"
+swing_cost = "capital_swing"
 
 [dim.option]
 members = [{options}]

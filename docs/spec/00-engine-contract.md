@@ -56,7 +56,9 @@ Steps are numbered from 0. Step `t` does the following, in this order.
    lever's declared range is an error. In a model with a legislature (format 1, stage
    S5.4) a change to a lever with a `leaning` is first voted on, and applied only if it
    passes ([format 1](06-model-format-1.md#bills-stage-s54)); a defeated change is not an
-   error and is never range-checked.
+   error and is never range-checked. With political capital (stage S12.4) a bill that
+   costs more than the capital left is refused before the vote, in the same way, and the
+   engine then stores what the step's bills spent in the legislature's `spent` lever.
 2. **Phases**, in the order the model declares them. For each phase:
    1. evaluate every `var` and `flow` of the phase, in dependency order;
    2. evaluate the `next` formula of every `state` updated in the phase;
