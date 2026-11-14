@@ -5,8 +5,10 @@ an economy and a population simulated in real units. This repository holds the s
 engine, the specification it implements, a reference implementation it is tested against,
 and the research behind the design.
 
-There is no game client yet. What exists is a headless engine that runs a toy economy,
-and a terminal session for playing it.
+A first playable client exists: a Godot game in which you govern Valmora, an invented
+country of eight million households, for a five-year term, with a budget screen, policy
+levers, charts and a panel that explains why any figure changed. The economy behind it is
+still a small test model; the first real country, the United Kingdom, is the next stage.
 
 ## Layout
 
@@ -15,8 +17,12 @@ and a terminal session for playing it.
 | `docs/spec/` | The engine contract, model-file format 0, formula language 0, save format 0, and the toy model with its target patterns |
 | `crates/core/` | The engine (Rust): model loader, type and unit checker, bytecode compiler, block-wise interpreter, step loop, saves |
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
+| `crates/godot/` | The bridge that runs the engine inside the Godot client |
+| `client/` | The Godot 4.7 game client (GDScript) and its scripted tests |
 | `oracle/` | The reference evaluator: a deliberately naive Python implementation of the contract. It defines the behaviour; the engine is tested against it |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
+| `models/valmora/` | The same economy scaled to an invented country; the default game |
+| `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |
 | `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
 | `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
@@ -24,12 +30,28 @@ and a terminal session for playing it.
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
-## Play the toy economy
+## Play
 
-Needs a Rust toolchain (1.86 or later).
+**The game client.** On Windows, download `PoliSim-windows` from the latest CI run of the
+branch (Actions tab), unpack it and run `PoliSim.bat`. `docs/GUIDE.md` explains the screen.
+To run it from the repository instead, with Godot 4.7.2 installed:
 
 ```bash
-cargo run --release -p polisim-cli -- play models/toy/scenarios/baseline.toml
+cargo build --release -p polisim-godot
+```
+
+```bash
+python tools/build_client.py --godot godot
+```
+
+```bash
+godot --path client
+```
+
+**In a terminal**, with only a Rust toolchain (1.86 or later; the client's bridge needs 1.94):
+
+```bash
+cargo run --release -p polisim-cli -- play models/valmora/scenarios/term.toml
 ```
 
 Then, for example: `step 12`, `set basic_rate 0.25`, `step 24`, `levers`, `help`.
@@ -103,6 +125,13 @@ The oracle takes about 17 ms per step at 1,000 households. Each engine step incl
 posting, the identity checks and a SHA-256 hash of the state. Nothing has been optimised
 yet: no threads, no register reuse, no explicit SIMD.
 
-Next is stage S2: a Godot client over the engine, with a budget screen, one chart and one
-cause-and-effect view. The detailed plan, and what is needed from the owner at each
-point, is in `docs/PLAN.md`.
+**Stage S2 (the playable shell)**
+
+| Criterion | State |
+|---|---|
+| The client gives the same state hashes as the runner, on Windows and Linux, in CI | Met: four scripted sessions, see `docs/spec/05-game-client.md` |
+| An edited formula reloads without restarting the game | Met: tested with a typo and with a real change |
+| The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
+| The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
+
+Next is stage S3: the United Kingdom's national books. The plan is in `docs/PLAN.md`.

@@ -71,6 +71,15 @@ def main() -> int:
             print("res://tests/reload_run.gd failed", file=sys.stderr)
             return 1
         print(reload.stdout.strip().splitlines()[-1])
+        second = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/second_model.gd",
+             "--", "--scenario=models/mini/scenarios/island.toml"],
+            capture_output=True, text=True, timeout=900)
+        if second.returncode != 0:
+            print(second.stdout.strip()[-2000:], second.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/second_model.gd failed", file=sys.stderr)
+            return 1
+        print(second.stdout.strip().splitlines()[-1])
         return 0
 
 

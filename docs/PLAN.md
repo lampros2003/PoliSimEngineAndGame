@@ -12,8 +12,8 @@ in `README.md`. Update the status column here as milestones close.
 |---|---|
 | S0 Specification, oracle, data gate | Done except the data-licence check, which is recorded as not passed |
 | S1 Rust core | Done except the Python module, which was deferred |
-| S2 Playable shell | **Next.** Planned in detail below |
-| S3 to S7 | Outlined below; each gets its own detailed plan when it starts |
+| S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
+| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` |
 
 ## Decisions this plan rests on
 
@@ -26,7 +26,8 @@ Taken by the owner on 2026-11-14:
 | Who tests S2 | The owner alone. Outside testers move to stage S4 |
 | Branches | Create `main`; each stage arrives as one pull request |
 | First build target | Windows (the owner's machine); Linux is kept working by CI |
-| First real country | Deferred to the start of S3 |
+| First real country | The United Kingdom (owner, 2026-11-14) |
+| Owner testing | The owner cannot test builds or check licence pages for now (2026-11-14). Work continues; items that need the owner are listed as open, not skipped |
 
 Earlier decisions (the 22-question ballot) are in
 `research_notes/PoliSim engine architecture pathways/ballot_decisions.md`.
@@ -78,6 +79,10 @@ crates/core/         the engine, unchanged in behaviour
   different model should produce a different, working interface with no client change.
 
 ### Milestones
+
+Status on 2026-11-14: M2.0 to M2.6 are built. Every "done when" that a script can check
+passes in CI on Windows and Linux; the ones that need the owner at a Windows machine are
+open.
 
 | # | Milestone | What is built | Done when |
 |---|---|---|---|

@@ -24,7 +24,7 @@ start "" "%~dp0godot\\Godot_v{VERSION}_win64.exe" --path "%~dp0game"
 README = """PoliSim test build
 ==================
 
-Start the game with PoliSim.bat.
+Start the game with PoliSim.bat. GUIDE.md explains the screen and what to try.
 
 Windows may warn that the file is from an unknown publisher: the build is not signed.
 Choose "More info", then "Run anyway".
@@ -65,6 +65,7 @@ def main() -> int:
             shutil.copy2(exe, out / "tools" / exe.name)
         else:
             print(f"warning: {exe} not built, left out", file=sys.stderr)
+    shutil.copy2(ROOT / "docs" / "GUIDE.md", out / "GUIDE.md")
     (out / "PoliSim.bat").write_text(LAUNCHER, newline="\r\n")
     (out / "README.txt").write_text(README, newline="\r\n")
     if not (out / "game" / "bin" / "polisim_godot.dll").exists():
