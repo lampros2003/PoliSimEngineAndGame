@@ -56,7 +56,7 @@ range = [0.0, 0.5]
 doc = "Tariffs and other barriers on imports from this partner, as a share of their price; it retaliates in kind"
 
 [lever.trade_barrier_china]
-label = "Trade barriers with china"
+label = "Trade barriers with China"
 group = "Trade"
 type = "real"
 unit = "1"

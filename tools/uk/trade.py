@@ -75,7 +75,7 @@ def rules() -> str:
     for n, label, _ in PARTNERS:
         levers += f'''
 [lever.trade_barrier_{n}]
-label = "Trade barriers with {label[0].lower() + label[1:]}"
+label = "Trade barriers with {label.replace('The ', 'the ', 1)}"
 group = "Trade"
 type = "real"
 unit = "1"
