@@ -13,7 +13,7 @@ in `README.md`. Update the status column here as milestones close.
 | S0 Specification, oracle, data gate | Done except the data-licence check, which is recorded as not passed |
 | S1 Rust core | Done except the Python module, which was deferred |
 | S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
-| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done), S6 in `docs/S6-PLAN.md` (done) |
+| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done), S6 in `docs/S6-PLAN.md` (done), S7 in `docs/S7-PLAN.md` (under way) |
 
 ## Decisions this plan rests on
 
@@ -178,5 +178,5 @@ roadmap; the notes here record what has changed since it was written.
 | No benchmark on real hardware | S0 | Owner runs the bundled benchmark at M2.0 |
 | Python module not built | S1 | Built in S3, when calibration needs it |
 | No overflow checks in the S0 benchmark | S0 | Done in S4.4: with overflow checks and the 2024-25 rules, 100,000 households take 68 ms a month (`models/uk/households/README.md`) |
-| Saves break when any model file changes | S1 | Acceptable until S7, which adds migration |
+| Saves break when any model file changes | S1 | Done in S7.0: save format 1 follows the model when its files change (`docs/spec/04-save-format-v0.md`) |
 | Engine timings are for shallow rules only | S1 | Done in S4.4: the UK model with 20,000 households takes about 15 ms a month, with 100,000 about 68 ms, on a four-core server |

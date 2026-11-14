@@ -71,6 +71,11 @@ def main() -> int:
             print("res://tests/reload_run.gd failed", file=sys.stderr)
             return 1
         print(reload.stdout.strip().splitlines()[-1])
+        # Stage S7.0: a save outlives its model files (another copy of Valmora).
+        problem = check_migration(args.godot, folder)
+        if problem:
+            print(problem, file=sys.stderr)
+            return 1
         second = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/second_model.gd",
              "--", "--scenario=models/mini/scenarios/island.toml"],
@@ -133,6 +138,35 @@ def main() -> int:
         print("UK who gains, who loses: every group shown; a basic rate rise hits the upper deciles, not Scotland;"
               " jobs by industry start at 2024's")
         return 0
+
+
+def check_migration(godot: str, folder: Path) -> str:
+    """Saves a game on a copy of Valmora, changes its files (a new state, a narrower range
+    for the basic rate), and loads the save: res://tests/migrate_check.gd checks the rest."""
+    copy = folder / "valmora_migrate"
+    shutil.copytree(ROOT / "models" / "valmora", copy)
+    save = folder / "migrate.psave"
+    scenario = copy / "scenarios" / "term.toml"
+    for phase in ("save", "load"):
+        if phase == "load":
+            economy = copy / "economy.toml"
+            text = economy.read_text(encoding="utf-8")
+            old = '[lever.basic_rate]\nlabel = "Basic income tax rate"\ntype = "real"\nunit = "1"\ndefault = 0.20\nrange = [0, 1]'
+            if text.count(old) != 1:
+                return "migration check: the basic rate's range is not where expected in Valmora"
+            text = text.replace(old, old.replace("range = [0, 1]", "range = [0, 0.25]"))
+            text += ('\n[state.months_run]\nlabel = "Months run"\ntype = "int"\nunit = "1"\nphase = "labour"\n'
+                     'initial = 0\nnext = "months_run + 1"\n')
+            economy.write_text(text, encoding="utf-8", newline="\n")
+        run = subprocess.run(
+            [godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/migrate_check.gd",
+             "--", f"--scenario={scenario}", f"--save={save}", f"--phase={phase}"],
+            capture_output=True, text=True, timeout=900)
+        if run.returncode != 0:
+            return "\n".join([run.stdout.strip()[-2000:], run.stderr.strip()[-3000:],
+                              f"res://tests/migrate_check.gd ({phase}) failed"])
+        print(run.stdout.strip().splitlines()[-1])
+    return ""
 
 
 # Budget screen label -> the 2024 figures (columns of models/uk/data/annual.csv, £ million)

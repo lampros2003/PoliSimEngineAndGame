@@ -29,7 +29,7 @@ _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
 _SECTIONS = ("model", "legislature", "dim", "sector", "instrument", "entity", "stream", "table",
-             "param", "lever", "var", "state", "flow", "account")
+             "param", "lever", "var", "state", "flow", "account", "renamed")
 MAX_CELLS = 16_777_216
 
 
@@ -134,6 +134,7 @@ class Model:
     dims: dict[str, Dim] = field(default_factory=dict)
     format: int = 0
     legislature: dict[str, str] | None = None  # format 1 (S5.4): seats, governing, position
+    renamed: list[tuple[str, str]] = field(default_factory=list)  # S7.0: (old name, name now), sorted
 
     def cells(self, dims: tuple[str, ...]) -> list[dict[str, int]]:
         """Coordinates ({dimension: position}) of every cell, in row-major order."""
@@ -530,6 +531,7 @@ def load_model(path: str | Path) -> Model:
 
     _check_weights(entities, sectors, symbols, phases)
     legislature = _check_legislature(merged["legislature"], symbols, fmt)
+    renamed = _check_renamed(merged["renamed"], symbols, dims)
 
     for dim in dims.values():
         if dim.kind == "list":
@@ -543,7 +545,8 @@ def load_model(path: str | Path) -> Model:
         digest.update(Path(file).as_posix().encode() + b"\0" + (root / file).read_bytes() + b"\0")
 
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
-                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt, legislature)
+                 entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt, legislature,
+                 renamed)
 
 
 def _rake(spec, what: str) -> Rake:
@@ -574,6 +577,29 @@ def _rake(spec, what: str) -> Rake:
             parsed.append(Slot(slot["count"], list(slot["at"])))
         margins.append(Margin(margin["target"], parsed))
     return Rake(spec["when"], passes, margins)
+
+
+def _check_renamed(spec: dict, symbols, dims) -> list[tuple[str, str]]:
+    """Stage S7.0: `[renamed] old = "new"`. An old name is no longer a name in the model; the
+    new one is an element, or itself renamed again (the chain is followed to an element).
+    The oracle has no saves; it checks the section as the engine does."""
+    for old, new in spec.items():
+        if not isinstance(new, str):
+            raise ModelError(f"renamed.{old}: must be the element's new name, as text")
+        if old in symbols or old in dims:
+            raise ModelError(f"renamed.{old}: {old!r} is still a name in the model")
+    out = []
+    for old, name in spec.items():
+        seen = [old]
+        while name not in symbols:
+            if name not in spec:
+                raise ModelError(f"renamed.{old}: {name!r} is not an element of the model")
+            if name in seen:
+                raise ModelError(f"renamed.{old}: the renames go round in a circle")
+            seen.append(name)
+            name = spec[name]
+        out.append((old, name))
+    return sorted(out)
 
 
 def _check_legislature(spec: dict, symbols, fmt: int) -> dict[str, str] | None:

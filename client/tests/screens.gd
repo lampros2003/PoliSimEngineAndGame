@@ -1,6 +1,7 @@
 extends SceneTree
 ## Plays a short scripted session through the real interface and saves screenshots to
 ## the folder given by --shots=DIR. Needs a display (on a server, run under xvfb-run).
+## It uses Valmora's levers: run it with --scenario=models/valmora/scenarios/term.toml.
 
 var main: Control
 var shots := ""

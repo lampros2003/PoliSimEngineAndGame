@@ -42,7 +42,7 @@ pub const FUNCTIONS: [&str; 23] = [
     "wsum_by",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 14] = [
+const SECTIONS: [&str; 15] = [
     "model",
     "legislature",
     "dim",
@@ -57,6 +57,7 @@ const SECTIONS: [&str; 14] = [
     "state",
     "flow",
     "account",
+    "renamed",
 ];
 /// Format 1: the most cells one value may have.
 pub const MAX_CELLS: usize = 16_777_216;
@@ -274,6 +275,10 @@ pub struct Model {
     pub format: i64,
     /// Format 1 (S5.4): the legislature that votes on lever changes.
     pub legislature: Option<Legislature>,
+    /// Stage S7.0: names a value had in earlier versions of the model, each with the name it
+    /// has now (chains followed), sorted by the old name. Saves made before a rename carry
+    /// the value across.
+    pub renamed: Vec<(String, String)>,
 }
 
 /// Format 1 (S5.4): symbol indices of the seats each bloc holds (whole numbers), whether it
@@ -1296,6 +1301,7 @@ pub fn load_model(path: &Path) -> Result<Model> {
 
     check_weights(&entities, &sectors, &loader, &phases)?;
     let legislature = check_legislature(&merged[section("legislature")], &loader, format)?;
+    let renamed = check_renamed(&merged[section("renamed")], &loader)?;
 
     for dim in &loader.dims {
         if dim.first.is_none() {
@@ -1338,7 +1344,41 @@ pub fn load_model(path: &Path) -> Result<Model> {
         dim_index: loader.dim_index,
         format,
         legislature,
+        renamed,
     })
+}
+
+/// Stage S7.0: `[renamed] old = "new"`. An old name is no longer a name in the model; the
+/// new one is an element, or itself renamed again (the chain is followed to an element).
+fn check_renamed(spec: &Toml, loader: &Loader) -> Result<Vec<(String, String)>> {
+    let mut step: HashMap<&str, &str> = HashMap::new();
+    for (old, new) in spec {
+        let Some(new) = new.as_str() else {
+            return model_err(format!("renamed.{old}: must be the element's new name, as text"));
+        };
+        if loader.sym_index.contains_key(old) || loader.dim_index.contains_key(old) {
+            return model_err(format!("renamed.{old}: {old:?} is still a name in the model"));
+        }
+        step.insert(old.as_str(), new);
+    }
+    let mut out = Vec::new();
+    for (&old, &first) in &step {
+        let mut name = first;
+        let mut seen = vec![old];
+        while !loader.sym_index.contains_key(name) {
+            let Some(&next) = step.get(name) else {
+                return model_err(format!("renamed.{old}: {name:?} is not an element of the model"));
+            };
+            if seen.contains(&name) {
+                return model_err(format!("renamed.{old}: the renames go round in a circle"));
+            }
+            seen.push(name);
+            name = next;
+        }
+        out.push((old.to_string(), name.to_string()));
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// Format 1 (S4.4): the structure of a rake; names and formulas are checked later.

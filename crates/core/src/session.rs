@@ -32,6 +32,7 @@ use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
 use crate::model::{Kind, Model, Scenario, load_model, load_scenario};
 use crate::program::{Col, Val};
+use crate::save::Migration;
 use crate::sim::Simulation;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
@@ -120,6 +121,8 @@ pub struct Session {
     previous_cells: BTreeMap<String, Vec<f64>>,
     /// A step failed part-way and its changes could not be undone.
     broken: bool,
+    /// Stage S7.0: what loading the saved game into a changed model did, if it had changed.
+    migration: Option<Migration>,
 }
 
 impl Session {
@@ -149,6 +152,7 @@ impl Session {
             broken: false,
             latest_cells: BTreeMap::new(),
             previous_cells: BTreeMap::new(),
+            migration: None,
         };
         // Lever settings are known before any step.
         for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
@@ -161,6 +165,12 @@ impl Session {
 
     pub fn scenario(&self) -> &Scenario {
         &self.scenario
+    }
+
+    /// Stage S7.0: when this game was loaded from a save made with other model files, what
+    /// was carried across and what started again.
+    pub fn migration(&self) -> Option<&Migration> {
+        self.migration.as_ref()
     }
 
     pub fn scenario_path(&self) -> &Path {
@@ -379,8 +389,9 @@ impl Session {
         out
     }
 
-    /// Continues a saved game. `path` is the scenario the game was started from; its
-    /// model files must be the ones the game was saved with.
+    /// Continues a saved game. `path` is the scenario the game was started from. When its
+    /// model files have changed since the save, the game continues on the new model with
+    /// what still fits (stage S7.0; [`Session::migration`] says what).
     pub fn load(path: &Path, bytes: &[u8]) -> Result<Session> {
         let mut r = Reader { bytes, pos: 0 };
         if r.take(8)? != MAGIC {
@@ -394,21 +405,21 @@ impl Session {
         let engine = r.take(length)?;
         let scenario = load_scenario(path)?;
         let model = Arc::new(scenario.model.clone());
-        let mut sim = Simulation::resume(Arc::clone(&model), engine).map_err(|e| match e {
-            Error::Model(m) if m.contains("different model") => {
-                Error::Model("the model files have changed since this game was saved".to_string())
-            }
-            other => other,
-        })?;
+        let (mut sim, migration) =
+            Simulation::migrate(Arc::clone(&model), engine, &scenario.preset, scenario.params.clone())?;
         let mut commands = Vec::new();
         for _ in 0..r.u32()? {
             let step = r.u64()?;
             let lever = r.text()?;
-            commands.push((step, lever, r.raw()?));
+            let raw = r.raw()?;
+            // A lever the model no longer has drops its scheduled changes.
+            if model.sym(&lever).is_some_and(|d| d.kind == Kind::Lever) {
+                commands.push((step, lever, raw));
+            }
         }
         sim.set_commands(commands);
         sim.set_tracing(true);
-        let mut session = Session::assemble(path, scenario, model, sim);
+        let mut session = Session::assemble(path, scenario, Arc::clone(&model), sim);
         for _ in 0..r.u32()? {
             let step = r.u64()?;
             let lever = r.text()?;
@@ -473,6 +484,20 @@ impl Session {
         if r.pos != bytes.len() {
             return Err(damaged());
         }
+        if migration.is_some() {
+            // Shown values the model no longer has go; levers show their carried setting.
+            let known = |name: &String| model.sym_index.contains_key(name);
+            session.latest.retain(|name, _| known(name));
+            session.previous.retain(|name, _| known(name));
+            session.latest_cells.retain(|name, _| known(name));
+            session.previous_cells.retain(|name, _| known(name));
+            for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
+                if let Some(value) = session.sim.scalar(&entry.name) {
+                    session.latest.insert(entry.name.clone(), value);
+                }
+            }
+        }
+        session.migration = migration;
         Ok(session)
     }
 }

@@ -227,3 +227,47 @@ expect = "refused"
 name = "a legislature in format 0"
 replace = [['format = 1', 'format = 0'], ['[dim.bloc]\nmembers = ["a", "b", "c"]\n', ''], ['dims = ["bloc"]\ndata = "blocs.csv"\ncolumn = "position"', 'value = 0.0'], ['dims = ["bloc"]\ninitial = { data = "blocs.csv", column = "seats" }', 'initial = 1'], ['dims = ["bloc"]\ninitial = { data = "blocs.csv", column = "governing" }', 'initial = true']]
 expect = "refused"
+
+# Renames (stage S7.0, docs/spec/06-model-format-1.md): `[renamed]` on the same base. The
+# oracle has no saves, but both loaders accept and refuse the same sections.
+
+[[case]]
+name = "a rename to an element"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nchairs = "seats"']]
+set = { tax = 0.3 }
+expect = "ran"
+levers = { tax = 0.3 }
+votes = [["tax", 630, true]]
+
+[[case]]
+name = "a chain of renames"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nchairs = "benches"\nbenches = "seats"']]
+set = { tax = 0.2 }
+expect = "ran"
+levers = { tax = 0.2 }
+votes = []
+
+[[case]]
+name = "a rename of a name the model still has"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nseats = "governing"']]
+expect = "refused"
+
+[[case]]
+name = "a rename to nothing"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nchairs = "benches"']]
+expect = "refused"
+
+[[case]]
+name = "renames in a circle"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nchairs = "benches"\nbenches = "chairs"']]
+expect = "refused"
+
+[[case]]
+name = "a rename that is not text"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nchairs = 3']]
+expect = "refused"
+
+[[case]]
+name = "a rename of a dimension's name"
+replace = [['expr = "tax + plain"', 'expr = "tax + plain"\n\n[renamed]\nbloc = "seats"']]
+expect = "refused"

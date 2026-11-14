@@ -176,7 +176,7 @@ earlier it stops the cheaper the fix.
 Command logs; mods and patches; threads; lags longer than one step; moving averages;
 dimensions other than one entity (regions, industries); native operators (cohort ageing,
 alignment, seat allocation); transcendental functions. Each is planned; none is needed by
-the toy model. Snapshot saves exist and are described in [save format 0](04-save-format-v0.md).
+the toy model. Snapshot saves exist and are described in [save formats 0 and 1](04-save-format-v0.md); a format 1 save follows the model when its files change (stage S7.0).
 
 ## 12. Two implementations
 

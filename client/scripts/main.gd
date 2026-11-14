@@ -14,21 +14,24 @@ const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
 const PoliticsPanel := preload("res://scripts/politics_panel.gd")
 
-const DEFAULT_SCENARIO := "models/valmora/scenarios/term.toml"
+# The United Kingdom from January 2025; `--scenario=PATH` after `--` opens another.
+const DEFAULT_SCENARIO := "models/uk/scenarios/2025.toml"
 const MAX_SERIES := 4
 const HELP := """[b]How to play[/b]
 
 You run the government. Each month households work, earn, pay tax, receive benefits and spend; firms hire to meet demand; the government buys, taxes and pays benefits. Every amount is real money in the country's currency and every payment leaves one account and enters another.
 
-[b]Change policy[/b] in the Policy panel. A change waits (shown in amber) and takes effect from the next month. Undo removes it before then.
+[b]Change policy[/b] in the Policy panel. A change waits (shown in amber) and takes effect from the next month. Undo removes it before then. Where the country has a parliament, each change is a bill it votes on first, and a government without a majority of its own can lose one.
 
 [b]Advance time[/b] with Next month, Next quarter or Next year. A term is five years.
 
-[b]See why[/b]: press Why next to any figure. The panel lists what moved it last month and by how much; press an input to follow it to its own causes, and Back to return.
+[b]See why[/b]: press Why next to any figure. The panel lists what moved it last month and by how much; press an input to follow it to its own causes, and Back to return. [b]Connections[/b] shows the same figure with what it depends on and what depends on it; press a tile to move along.
+
+[b]Who gains, who loses[/b] breaks a figure down by group (income decile, region, industry). [b]Politics[/b] shows the polls and the seats; lose office at an election and the game is over.
 
 [b]Chart[/b] any figure over time. Dashed lines mark your policy changes. Click a name in the chart's legend to remove it.
 
-[b]Save[/b] and [b]Load[/b] keep one saved game. [b]Reload model[/b] reads the model files again, so an edited formula takes effect next month without restarting; a mistake in a file is shown at the bottom and the game carries on with the old model."""
+[b]Save[/b] and [b]Load[/b] keep one saved game; a game saved with older model files still loads, and says what changed. [b]Reload model[/b] reads the model files again, so an edited formula takes effect next month without restarting; a mistake in a file is shown at the bottom and the game carries on with the old model."""
 
 var game: PoliSim
 var fmt := Format.new()
@@ -492,6 +495,34 @@ func _reload_model() -> void:
 	_set_controls(true)
 
 
+## Stage S7.0: what loading a save made with other model files did, in the player's words.
+func _migration_note(event: Dictionary) -> String:
+	var label := func(name: String) -> String:
+		var entry: Dictionary = entries.get(name, {})
+		return str(entry.get("label", name)) if str(entry.get("label", "")) != "" else name.replace("_", " ")
+	var lines := PackedStringArray(["[b]This game was saved with an earlier version of the model.[/b] It carries on with the current one: %d values carried over." % int(event["carried"])])
+	var reset := PackedStringArray()
+	for name in event["reset"]:
+		reset.append(label.call(name))
+	if not reset.is_empty():
+		lines.append("New or changed, starting from their initial values: " + ", ".join(reset) + ".")
+	var clamped := PackedStringArray()
+	for name in event["clamped"]:
+		clamped.append(label.call(name))
+	if not clamped.is_empty():
+		lines.append("Policies outside their new limits, moved to the nearest limit: " + ", ".join(clamped) + ".")
+	var renamed := PackedStringArray()
+	for pair in event["renamed"]:
+		var parts := str(pair).split("\t")
+		renamed.append("%s (was %s)" % [label.call(parts[1]), parts[0].replace("_", " ")])
+	if not renamed.is_empty():
+		lines.append("Renamed: " + ", ".join(renamed) + ".")
+	var dropped: PackedStringArray = event["dropped"]
+	if not dropped.is_empty():
+		lines.append("No longer in the model: " + ", ".join(Array(dropped).map(func(n): return str(n).replace("_", " "))) + ".")
+	return "\n".join(lines)
+
+
 func _show_message(bbcode: String, problem := false) -> void:
 	_message_text.text = bbcode
 	_message.add_theme_stylebox_override("panel", Palette.panel_style(Palette.BAD.darkened(0.6) if problem else Palette.PANEL_RAISED))
@@ -606,6 +637,8 @@ func _process(_delta: float) -> void:
 					trace.trail.clear()
 					_model_changed()
 					_status.text = "loaded"
+					if event.get("migrated", false):
+						_show_message(_migration_note(event))
 			"reloaded":
 				if event["error"] != "":
 					_show_message("[b]The model files have a problem; the game carries on with the previous model.[/b]\n[code]%s[/code]" % event["error"], true)

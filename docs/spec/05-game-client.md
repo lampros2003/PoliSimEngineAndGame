@@ -119,12 +119,20 @@ error is shown. Reloading unchanged files gives exactly the run that was never r
 
 ## Saved games
 
-A saved game is the engine save (save format 0) plus the commands still to come, the
+A saved game is the engine save (save format 1) plus the commands still to come, the
 policy changes made (with their votes, from version 2), the full history of every result and the last two steps' values,
 dimensioned values' cells included, in one file (`crates/core/src/session.rs` documents the
 layout). Version 1 added the cells; a version 0 file still loads, and its panels by
 dimension fill from the next month. Loading continues exactly
-and brings the charts back. A saved game belongs to the model files it was made with.
+and brings the charts back.
+
+Stage S7.0: a game saved with other model files (an older version of the model, or one the
+player has edited) still loads. The game carries on with the current model, carrying every
+value that still fits ([save format 1](04-save-format-v0.md#loading-into-a-changed-model));
+scheduled changes to levers the model no longer has are dropped, the record of policy
+changes and the charts' history are kept, and the player is told how many values were
+carried, which started again, which policies were moved to their new limits, and what
+was renamed or is gone. A game saved before format 1 loads only with its own model files.
 
 ## The bridge
 
@@ -154,7 +162,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs nine scripted sessions in Godot without a display and
+`tools/check_client.py` runs eleven scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -162,15 +170,16 @@ compares them with the command-line runner or with published figures:
 | `tests/scripted_run.gd` | 60 months through the bridge with lever changes: the same state hash as the runner on every step |
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
+| `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
 | `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month the panel shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
 | `tests/web_walk.gd` | Stage S6.1: in `2025.toml`, the icon web walked by pressing tiles from the basic rate to the government's poll rating along the model's own chain (eleven steps, through each household's income tax and income change and the voter types' choice), and Back |
 | `tests/bill_vote.gd` | Stage S5.4: in the UK's hung-parliament test scenario the player's coalition raises the basic rate and is voted down 323 to 327: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
 | `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel. Then the "Who gains, who loses" panel, every breakdown, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 
-`tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one
+`tests/screens.gd` saves screenshots of a scripted Valmora session (`--scenario=models/valmora/scenarios/term.toml`), and `tests/look.gd` one
 screenshot of any scenario (`--scenario`, `--months`, `--chart=a,b`, `--why=name`,
-`--shot=FILE`), for a person to look at; on a server they need `xvfb-run`. Godot's
+`--tab=N`, `--breakdown=name`, `--shot=FILE`), for a person to look at; on a server they need `xvfb-run`. Godot's
 `--resolution 1440x2100` before `--path` gives a tall window that shows the whole left
 column.
 

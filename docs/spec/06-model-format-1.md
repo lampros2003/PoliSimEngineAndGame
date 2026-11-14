@@ -290,6 +290,22 @@ So a government with a majority of its own passes every bill; without one, a mov
 the left needs enough seats to the leader's left, and a move to the right enough to its
 right.
 
+## Renames (stage S7.0)
+
+A model that renames an element says so, so that games saved before the rename carry the
+value across ([save format 1](04-save-format-v0.md#loading-into-a-changed-model)):
+
+```toml
+[renamed]
+employed = "in_work"
+```
+
+Each key is a name the model no longer has (neither an element nor a dimension); each
+value is the name the element has now, or a name that was itself renamed later, in which
+case the chain is followed to an element. Keep the entries for as long as old saves
+should load. Formulas never see old names. The section is accepted in format 0 models
+too; the oracle checks it as the engine does, though it has no saves.
+
 ## Load-time checks
 
 Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot
@@ -308,7 +324,9 @@ a unit that does not match the target's. For bills: a `leaning` other than `"lef
 `"right"`, or on a true/false lever; a `[legislature]` in format 0, without exactly the
 keys `seats`, `governing` and `position`, naming something that is not a whole-number
 state, a true/false state and a real parameter respectively, each with one dimension, or
-with different dimensions.
+with different dimensions. For renames: an old name that is still a name in the model; a
+new name that is not text, or that leads, through the chain, to no element or round in a
+circle.
 
 ## Not in format 1
 

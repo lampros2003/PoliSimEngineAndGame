@@ -19,7 +19,7 @@ use godot::prelude::*;
 use polisim_core::describe::Catalogue;
 use polisim_core::model::Kind;
 use polisim_core::session::{Change, History};
-use polisim_core::{Explanation, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
+use polisim_core::{Explanation, Migration, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
 
 struct PoliSimExtension;
 
@@ -72,7 +72,7 @@ enum EventData {
     Failed(String),
     Explained { name: String, result: Result<Box<Explanation>, String> },
     Saved { path: String, error: Option<String> },
-    Loaded { error: Option<String> },
+    Loaded { migration: Option<Migration>, error: Option<String> },
     Reloaded { reset: Vec<String>, error: Option<String> },
 }
 
@@ -165,9 +165,9 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                         session = next;
                         failed = None;
                         let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
-                        Some(EventData::Loaded { error: None })
+                        Some(EventData::Loaded { migration: session.migration().cloned(), error: None })
                     }
-                    Err(message) => Some(EventData::Loaded { error: Some(message) }),
+                    Err(message) => Some(EventData::Loaded { migration: None, error: Some(message) }),
                 }
             }
             Request::Reload => match session.reload() {
@@ -394,9 +394,18 @@ fn event_dict(event: EventData) -> VarDictionary {
             d.set("path", path.as_str());
             d.set("error", error.unwrap_or_default().as_str());
         }
-        EventData::Loaded { error } => {
+        EventData::Loaded { migration, error } => {
             d.set("kind", "loaded");
             d.set("error", error.unwrap_or_default().as_str());
+            // Stage S7.0: a save made with other model files, and what loading it did.
+            d.set("migrated", migration.is_some());
+            let m = migration.unwrap_or_default();
+            d.set("carried", m.carried as i64);
+            d.set("reset", &strings(&m.reset));
+            d.set("clamped", &strings(&m.clamped));
+            d.set("dropped", &strings(&m.dropped));
+            let renamed: Vec<String> = m.renamed.iter().map(|(a, b)| format!("{a}\t{b}")).collect();
+            d.set("renamed", &strings(&renamed));
         }
         EventData::Reloaded { reset, error } => {
             d.set("kind", "reloaded");

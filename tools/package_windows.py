@@ -17,20 +17,29 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION = "4.7.2-stable"
 
 LAUNCHER = f"""@echo off
-rem Starts PoliSim. Godot runs the game project in the "game" folder.
+rem Starts PoliSim: the United Kingdom from January 2025. Godot runs the game project in
+rem the "game" folder.
 start "" "%~dp0godot\\Godot_v{VERSION}_win64.exe" --path "%~dp0game"
+"""
+
+VALMORA = f"""@echo off
+rem Starts PoliSim with Valmora, the small invented country the client was first built on.
+start "" "%~dp0godot\\Godot_v{VERSION}_win64.exe" --path "%~dp0game" -- --scenario=models/valmora/scenarios/term.toml
 """
 
 README = """PoliSim test build
 ==================
 
-Start the game with PoliSim.bat. GUIDE.md explains the screen and what to try.
+Start the game with PoliSim.bat: you govern the United Kingdom from January 2025.
+GUIDE.md explains the screen and what to try. PoliSim Valmora.bat starts the small
+invented country the client was first built on.
 
 Windows may warn that the file is from an unknown publisher: the build is not signed.
 Choose "More info", then "Run anyway".
 
 Contents
-  PoliSim.bat     starts the game
+  PoliSim.bat     starts the game (the United Kingdom)
+  PoliSim Valmora.bat  starts Valmora
   game\\           the game project, the engine library and the models
   godot\\          the Godot 4.7.2 engine that runs it (official build)
   tools\\          polisim.exe, the command-line runner, and polisim-s0-bench.exe
@@ -41,7 +50,7 @@ Optional: measure this computer's speed
   then send bench.txt back. It takes about a minute.
 
 Optional: play in the terminal instead
-      tools\\polisim.exe play game\\models\\toy\\scenarios\\baseline.toml
+      tools\\polisim.exe play game\\models\\uk\\scenarios\\2025.toml
 """
 
 
@@ -67,6 +76,7 @@ def main() -> int:
             print(f"warning: {exe} not built, left out", file=sys.stderr)
     shutil.copy2(ROOT / "docs" / "GUIDE.md", out / "GUIDE.md")
     (out / "PoliSim.bat").write_text(LAUNCHER, newline="\r\n")
+    (out / "PoliSim Valmora.bat").write_text(VALMORA, newline="\r\n")
     (out / "README.txt").write_text(README, newline="\r\n")
     if not (out / "game" / "bin" / "polisim_godot.dll").exists():
         print("the engine library is missing from game/bin", file=sys.stderr)

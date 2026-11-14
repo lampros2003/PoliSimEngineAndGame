@@ -195,6 +195,87 @@ fn schedule(commands: Vec<(u64, String, Value)>) -> BTreeMap<u64, Vec<(String, V
 }
 
 /// Where parameter values come from: a scenario's preset and overrides, or a save file.
+/// Stage S7.0: what a name held in an earlier run, for [`Simulation::carry`].
+pub(crate) struct Before {
+    /// [`family`] of the element's kind.
+    pub family: u8,
+    /// The entity's name and the hash of its record ids ([`ids_hash`]), for a per-record value.
+    pub entity: Option<(String, [u8; 32])>,
+    /// Each dimension's name and members, in order, for a dimensioned value.
+    pub dims: Vec<(String, Vec<String>)>,
+    pub value: Computed,
+}
+
+/// Stage S7.0: what carrying a run onto a changed model left behind.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Carry {
+    /// Values that started again from their initial value.
+    pub reset: Vec<String>,
+    /// Levers whose value was outside their new range and was moved to its nearer end.
+    pub clamped: Vec<String>,
+}
+
+/// The kinds of element whose values can stand in for each other across model versions.
+pub(crate) fn family(kind: Kind) -> u8 {
+    match kind {
+        Kind::Var | Kind::Flow => 0,
+        Kind::Lever => 1,
+        Kind::Account => 2,
+        Kind::State => 3,
+        Kind::Param | Kind::Column => 4,
+    }
+}
+
+/// SHA-256 of an entity's record ids, as little-endian u64s.
+pub(crate) fn ids_hash(ids: &[u64]) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    for id in ids {
+        digest.update(id.to_le_bytes());
+    }
+    digest.finalize().into()
+}
+
+enum Fit {
+    Inside(Computed),
+    Clamped(Computed),
+    Outside,
+}
+
+/// A carried value against its declared range: a lever's single value is clamped; any
+/// other value outside the range cannot be carried.
+fn fit_range(d: &Decl, value: Computed) -> Fit {
+    let Some((lo, hi)) = d.range else { return Fit::Inside(value) };
+    let inside = |v: f64| lo <= v && v <= hi;
+    match value {
+        Computed::One(v) => {
+            let x = match v {
+                Val::I(i) => i as f64,
+                Val::F(f) => f,
+                Val::B(b) => f64::from(u8::from(b)),
+            };
+            if inside(x) {
+                return Fit::Inside(Computed::One(v));
+            }
+            if d.kind != Kind::Lever {
+                return Fit::Outside;
+            }
+            match v {
+                Val::I(_) => Fit::Clamped(Computed::One(Val::I(if x < lo { lo.ceil() } else { hi.floor() } as i64))),
+                Val::F(_) if x.is_finite() => Fit::Clamped(Computed::One(Val::F(x.clamp(lo, hi)))),
+                _ => Fit::Outside,
+            }
+        }
+        Computed::Each(column) => {
+            let ok = match &column {
+                Col::I(c) => c.iter().all(|&v| inside(v as f64)),
+                Col::F(c) => c.iter().all(|&v| inside(v)),
+                Col::B(c) => c.iter().all(|&v| inside(f64::from(u8::from(v)))),
+            };
+            if ok { Fit::Inside(Computed::Each(column)) } else { Fit::Outside }
+        }
+    }
+}
+
 pub(crate) enum Params {
     Scenario { preset: String, overrides: Vec<(String, Value)> },
     Resolved(Vec<(String, Computed)>),
@@ -1112,57 +1193,71 @@ impl Simulation {
         }
         let source = Params::Scenario { preset: preset.to_string(), overrides: params };
         let mut next = Simulation::build(Arc::clone(&model), self.seed, source, Vec::new(), commands)?;
-        let family = |kind: Kind| match kind {
-            Kind::Var | Kind::Flow => 0,
-            Kind::Lever => 1,
-            Kind::Account => 2,
-            Kind::State => 3,
-            Kind::Param | Kind::Column => 4,
-        };
+        let old = &self.model;
+        let hashes: Vec<[u8; 32]> = old.entities.iter().map(|e| ids_hash(&e.ids)).collect();
+        let carry = next.carry(self.step, |name| {
+            let &id = old.sym_index.get(name)?;
+            let o = &old.symbols[id];
+            // A var or flow that was never computed holds a placeholder; only carry real values.
+            if matches!(o.kind, Kind::Var | Kind::Flow) && self.step == 0 && !self.lagged[id] {
+                return None;
+            }
+            Some(Before {
+                family: family(o.kind),
+                entity: o.entity.map(|e| (old.entities[e].name.clone(), hashes[e])),
+                dims: o.dims.iter().map(|&d| (old.dims[d].name.clone(), old.dims[d].members.clone())).collect(),
+                value: self.value_now(id),
+            })
+        })?;
+        next.set_tracing(self.tracing);
+        let mut reset = carry.reset;
+        reset.extend(carry.clamped);
+        Ok((next, reset))
+    }
+
+    /// Stage S7.0: fills a run just built for a model with the values of an earlier run, by
+    /// name: `before(name)` says what that name held. A value is carried when it is the same
+    /// kind of element (var or flow, lever, account, state), with the same entity and records
+    /// or the same dimensions and members, and the same type; a lever outside its new range is
+    /// clamped to it; anything else starts again from its initial value.
+    pub(crate) fn carry(&mut self, steps_done: u64, before: impl Fn(&str) -> Option<Before>) -> Result<Carry> {
+        let model = Arc::clone(&self.model);
+        let hashes: Vec<[u8; 32]> = model.entities.iter().map(|e| ids_hash(&e.ids)).collect();
         let mut values = Vec::new();
-        let mut reset = Vec::new();
-        for &id in &next.hashed {
+        let mut out = Carry::default();
+        for &id in &self.hashed {
             let d = &model.symbols[id];
-            let carried = self.model.sym_index.get(&d.name).and_then(|&old| {
-                let o = &self.model.symbols[old];
-                let same_entity = match (o.entity, d.entity) {
-                    (None, None) => true,
-                    (Some(a), Some(b)) => {
-                        self.model.entities[a].name == model.entities[b].name
-                            && self.model.entities[a].ids == model.entities[b].ids
-                    }
-                    _ => false,
-                };
-                // Format 1: the same dimensions, in the same order, with the same members.
-                let same_dims = o.dims.len() == d.dims.len()
-                    && o.dims.iter().zip(&d.dims).all(|(a, b)| {
-                        let (a, b) = (&self.model.dims[*a], &model.dims[*b]);
-                        a.name == b.name && a.members == b.members
-                    });
-                let same_shape = same_entity && same_dims;
-                let value =
-                    if o.columnar() { Computed::Each(self.cols[old].clone()) } else { Computed::One(self.scal[old]) };
-                let ty_ok = match &value {
-                    Computed::One(v) => type_of(v) == d.ty,
+            let dims: Vec<(String, Vec<String>)> =
+                d.dims.iter().map(|&i| (model.dims[i].name.clone(), model.dims[i].members.clone())).collect();
+            let carried = before(&d.name).and_then(|b| {
+                let entity = d.entity.map(|e| (model.entities[e].name.clone(), hashes[e]));
+                let ty_ok = match &b.value {
+                    Computed::One(v) => !d.columnar() && type_of(v) == d.ty,
                     Computed::Each(c) => {
-                        matches!((c, d.ty), (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool))
+                        d.columnar()
+                            && matches!((c, d.ty), (Col::I(_), Ty::Int) | (Col::F(_), Ty::Real) | (Col::B(_), Ty::Bool))
                     }
                 };
-                // A var or flow that was never computed holds a placeholder; only carry real values.
-                let computed = !matches!(o.kind, Kind::Var | Kind::Flow) || self.step > 0 || self.lagged[old];
-                (family(o.kind) == family(d.kind) && same_shape && ty_ok && computed).then_some(value)
+                (b.family == family(d.kind) && b.entity == entity && b.dims == dims && ty_ok).then_some(b.value)
             });
+            let carried = match carried.map(|value| fit_range(d, value)) {
+                Some(Fit::Inside(value)) => Some(value),
+                Some(Fit::Clamped(value)) => {
+                    out.clamped.push(d.name.clone());
+                    Some(value)
+                }
+                Some(Fit::Outside) | None => None,
+            };
             match carried {
                 Some(value) => values.push((d.name.clone(), value)),
                 None => {
-                    reset.push(d.name.clone());
-                    values.push((d.name.clone(), next.value_now(id)));
+                    out.reset.push(d.name.clone());
+                    values.push((d.name.clone(), self.value_now(id)));
                 }
             }
         }
-        next.restore(self.step, values)?;
-        next.set_tracing(self.tracing);
-        Ok((next, reset))
+        self.restore(steps_done, values)?;
+        Ok(out)
     }
 
     fn value_now(&self, id: usize) -> Computed {
@@ -1191,6 +1286,11 @@ impl Simulation {
     }
 
     /// The persistent state: every hashed symbol with its value(s), in hash order.
+    /// The symbols the state hash covers, in hash order.
+    pub(crate) fn hashed_ids(&self) -> &[usize] {
+        &self.hashed
+    }
+
     pub(crate) fn persistent(&self) -> Vec<(&str, Computed)> {
         self.hashed.iter().map(|id| (self.model.symbols[*id].name.as_str(), self.value_now(*id))).collect()
     }
