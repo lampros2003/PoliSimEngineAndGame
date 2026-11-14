@@ -14,6 +14,7 @@ in `README.md`. Update the status column here as milestones close.
 | S1 Rust core | Done except the Python module, which was deferred |
 | S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
 | S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done), S6 in `docs/S6-PLAN.md` (done), S7 in `docs/S7-PLAN.md` (its building milestones done; the business decisions are the owner's) |
+| S8 What government does | Added after S7: spending by function, what services deliver, emissions, the issues voters weigh (`docs/S8-PLAN.md`, done but for the NHS waiting list, whose source is not reachable from this environment) |
 
 ## Decisions this plan rests on
 
