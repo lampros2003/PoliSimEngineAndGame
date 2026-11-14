@@ -614,9 +614,121 @@ phase = "{tp}"
 dims = ["{dim}"]
 expr = "wsum_by(household, net_income, {dim}, {key}) / wcount_by(household, true, {dim}, {key})"
 '''
+    rules += POVERTY.replace("{tp}", tp).replace("{pensioners}", " + ".join(
+        f"select(adults >= {i} and age{i} >= state_pension_age, 1, 0)" for i in range(1, ADULTS + 1)))
     if integrated and alignment is not None:
         rules += alignment_rules(alignment)
     return (None if integrated else MODEL + model), rules
+
+
+# Stage S11.4: who is below the poverty line, as the government's Households Below Average
+# Income statistics count it (before housing costs): each household's net income divided
+# by the modified OECD scale, the median person's equivalised income, and the share of
+# people in households below 60% of it. The households know children under 16 and 16 or
+# 17, so children of 14 or 15 take a younger child's weight (docs/S11-PLAN.md).
+POVERTY = """
+[var.people]
+label = "People in the household"
+type = "int"
+unit = "1"
+entity = "household"
+phase = "{tp}"
+expr = "adults + children"
+
+[var.pensioners]
+label = "People over State Pension age in the household"
+type = "int"
+unit = "1"
+entity = "household"
+phase = "{tp}"
+expr = "{pensioners}"
+
+[var.equivalence]
+label = "Equivalence scale"
+type = "real"
+unit = "1"
+entity = "household"
+phase = "{tp}"
+expr = "0.67 + 0.33 * (adults - 1) + 0.33 * (older_girls + older_boys) + 0.2 * (girls + boys)"
+doc = "The modified OECD scale as the government rescales it: 0.67 for the first adult, 0.33 for each other adult and each child aged 14 or over, 0.2 for each younger child (here, children under 16), so that a couple without children counts 1"
+
+[var.equivalised_income]
+label = "Equivalised net income"
+type = "real"
+unit = "GBP/month/household"
+entity = "household"
+phase = "{tp}"
+expr = "net_income / equivalence"
+doc = "Net income, a month, as if the household were a couple without children"
+
+[var.median_income]
+label = "Median equivalised income"
+type = "real"
+unit = "GBP/month/household"
+phase = "{tp}"
+expr = "quantile(household, equivalised_income, 0.5, people)"
+doc = "The equivalised net income of the median person: half of all people live in households with less, before housing costs"
+
+[var.poverty_line]
+label = "Poverty line"
+type = "real"
+unit = "GBP/month/household"
+phase = "{tp}"
+expr = "0.6 * median_income"
+doc = "60% of the median equivalised income: the relative low income line"
+
+[var.in_poverty]
+label = "Below the poverty line"
+type = "bool"
+entity = "household"
+phase = "{tp}"
+expr = "equivalised_income < poverty_line"
+
+[var.poverty_rate]
+label = "People in poverty"
+type = "real"
+unit = "1"
+phase = "{tp}"
+expr = "wsum(household, select(in_poverty, people, 0)) / wsum(household, people)"
+doc = "Share of people in households below 60% of the median equivalised income, before housing costs"
+
+[var.child_poverty_rate]
+label = "Children in poverty"
+type = "real"
+unit = "1"
+phase = "{tp}"
+expr = "wsum(household, select(in_poverty, children, 0)) / wsum(household, children)"
+doc = "Share of children in households below the poverty line"
+
+[var.working_age_poverty_rate]
+label = "Working-age adults in poverty"
+type = "real"
+unit = "1"
+phase = "{tp}"
+expr = "wsum(household, select(in_poverty, adults - pensioners, 0)) / wsum(household, adults - pensioners)"
+doc = "Share of adults below State Pension age in households below the poverty line"
+
+[var.pensioner_poverty_rate]
+label = "Pensioners in poverty"
+type = "real"
+unit = "1"
+phase = "{tp}"
+expr = "wsum(household, select(in_poverty, pensioners, 0)) / wsum(household, pensioners)"
+doc = "Share of people over State Pension age in households below the poverty line"
+
+[dim.poverty_group]
+members = ["all_people", "child", "working_age_adult", "pensioner"]
+labels = ["Everyone", "Children", "Working-age adults", "Pensioners"]
+
+[var.poverty_by_group]
+label = "People in poverty, by group"
+type = "real"
+unit = "1"
+phase = "{tp}"
+dims = ["poverty_group"]
+expr = "select(coord(poverty_group) == 0, poverty_rate, select(coord(poverty_group) == 1, child_poverty_rate, select(coord(poverty_group) == 2, working_age_poverty_rate, pensioner_poverty_rate)))"
+doc = "Share of each group in households below 60% of the median equivalised income, before housing costs. The government's figures for 2023/24: everyone 17%, children 23%, working-age adults 15%, pensioners 19%; this model has no Pension Credit, housing or disability benefits, so it puts more pensioners below the line"
+"""
 
 
 def main() -> None:

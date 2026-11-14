@@ -24,9 +24,9 @@ watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_
 # pay by industry (stage S6.4).
 breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region",
               "industry_jobs", "industry_pay_per_employee", "service_level", "spending_by_function",
-              "industry_emissions"]
+              "industry_emissions", "poverty_by_group"]
 breakdown_all = "net_income_average"
-breakdown_totals = { industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job", service_level = "service_level_overall", spending_by_function = "public_services_spending", industry_emissions = "firm_emissions" }
+breakdown_totals = { poverty_by_group = "poverty_rate", industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job", service_level = "service_level_overall", spending_by_function = "public_services_spending", industry_emissions = "firm_emissions" }
 
 # Stage S5.5: the politics panel and election night.
 [play.politics]
