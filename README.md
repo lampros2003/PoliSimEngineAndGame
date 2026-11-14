@@ -20,6 +20,7 @@ and a terminal session for playing it.
 | `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
 | `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
+| `docs/PLAN.md` | The working plan: what is built next, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
@@ -103,4 +104,5 @@ posting, the identity checks and a SHA-256 hash of the state. Nothing has been o
 yet: no threads, no register reuse, no explicit SIMD.
 
 Next is stage S2: a Godot client over the engine, with a budget screen, one chart and one
-cause-and-effect view.
+cause-and-effect view. The detailed plan, and what is needed from the owner at each
+point, is in `docs/PLAN.md`.
