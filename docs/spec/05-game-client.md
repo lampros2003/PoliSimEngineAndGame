@@ -34,11 +34,23 @@ Presentation settings. The engine ignores them and they never affect a run.
 | `labels` | Overrides of labels by key, including negated keys such as `"-gov_money"` | none |
 | `breakdowns` | Names of values with one dimension for the "Who gains, who loses" panel, in the order of its menu (format 1; see below) | none: no panel |
 | `breakdown_all` | The national value the breakdowns average to, shown as their last line, "All households" | none |
+| `politics` | A table naming the model's politics for the politics panel and election night (stage S5.5): `intention`, `seats`, `projected` (values over one dimension of blocs: voting intention, seats held, seats if an election were held now), `governing` (true/false by bloc), `support` and `turnout` (national: the government's poll rating, turnout), `election` (true in a month with a general election), `months_to_election`, `player` (true while the player's bloc governs) and `majority` (seats) | none: no panel |
 
 Any model element may carry `label` (a short name) and `doc` (a sentence) for the
 client's labels and tooltips. A `real` whose unit starts with the currency (an average
 income, `GBP/month/household`) is shown as money: it is held in minor units like money
 itself ([model format](01-model-format-v0.md)).
+
+## Politics
+
+With a `[play] politics` table, a panel under "Who gains, who loses" shows the House of
+Commons as a bar of seats by bloc (the governing blocs first, a line at the majority),
+then for each bloc its voting intention and the change on last month, its seats, and its
+seats if an election were held now (blocs under half a percent with no seats are
+hidden), with the government, its seats, its poll rating and turnout above, and the next
+general election's month. In a month with an election, a dialog gives the results (votes,
+seats, change) and the new government. When the player's bloc is out of government the
+game is over: time stops, and a saved game can still be loaded.
 
 ## Who gains, who loses
 
@@ -124,7 +136,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs six scripted sessions in Godot without a display and
+`tools/check_client.py` runs eight scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -133,7 +145,8 @@ compares them with the command-line runner or with published figures:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
-| `tests/bill_vote.gd` | Stage S5.4: in the UK's early-election test scenario, the coalition's basic rate cut is voted down 283 to 367: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
+| `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month the panel shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
+| `tests/bill_vote.gd` | Stage S5.4: in the UK's hung-parliament test scenario the player's coalition raises the basic rate and is voted down 324 to 326: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
 | `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%); and no input marked `player = false` in the policy panel. Then the "Who gains, who loses" panel, every breakdown, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 
 `tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one

@@ -11,6 +11,7 @@ const TracePanel := preload("res://scripts/trace_panel.gd")
 const LeverPanel := preload("res://scripts/lever_panel.gd")
 const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const BreakdownPanel := preload("res://scripts/breakdown_panel.gd")
+const PoliticsPanel := preload("res://scripts/politics_panel.gd")
 
 const DEFAULT_SCENARIO := "models/valmora/scenarios/term.toml"
 const MAX_SERIES := 4
@@ -52,6 +53,10 @@ var _headline: HBoxContainer
 var _cards := {}  # key -> {value, change}
 var budget: BudgetPanel
 var breakdown: BreakdownPanel
+var politics: PoliticsPanel
+## Stage S5.5: the player's bloc lost office at an election; the game is over (a save can
+## still be loaded).
+var lost := false
 var levers: LeverPanel
 var chart: Chart
 var trace: TracePanel
@@ -173,6 +178,9 @@ func _build_layout() -> void:
 	breakdown = BreakdownPanel.new()
 	breakdown.fmt = fmt
 	left.add_child(breakdown)
+	politics = PoliticsPanel.new()
+	politics.fmt = fmt
+	left.add_child(politics)
 	levers = LeverPanel.new()
 	levers.fmt = fmt
 	levers.lever_changed.connect(_lever_typed)
@@ -244,6 +252,7 @@ func _model_changed() -> void:
 	trace.entries = entries
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	breakdown.build(play, entries)
+	politics.build(play)
 	levers.build(lever_entries)
 	levers.set_legislature(bool(catalogue.get("legislature", false)))
 	_build_headline()
@@ -349,9 +358,12 @@ func _refresh() -> void:
 	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
 	breakdown.refresh(func(name: String) -> Dictionary: return game.cells(name),
 		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
+	politics.refresh(func(name: String) -> Dictionary: return game.cells(name),
+		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
+		game.steps_done())
 	levers.refresh(func(name: String) -> Variant: return game.latest(name), game.pending())
 	_refresh_chart()
-	_set_controls(not failed)
+	_set_controls(not failed and not lost)
 
 
 func _refresh_chart() -> void:
@@ -397,7 +409,7 @@ func show_per_year(on: bool) -> void:
 
 
 func advance(months: int) -> void:
-	if failed or game.is_busy():
+	if failed or lost or game.is_busy():
 		return
 	game.advance(months)
 	_set_controls(true)
@@ -508,6 +520,22 @@ func _announce_term() -> void:
 
 # ---------------------------------------------------------------------------- events
 
+## Stage S5.5: true once the player's bloc is out of government.
+func _player_lost() -> bool:
+	var name := str(play.get("politics", {}).get("player", ""))
+	return name != "" and game.latest(name) == false
+
+
+## Stage S5.5: election night. The results, and the end of the game if the player lost.
+func _announce_election() -> void:
+	var settings: Dictionary = play.get("politics", {})
+	if settings.is_empty() or game.latest(str(settings.get("election", ""))) != true:
+		return
+	lost = _player_lost()
+	_show_dialog("Election night" if not lost else "Election night: you have lost office",
+		politics.election_report(func(name: String) -> Dictionary: return game.cells(name), not lost))
+
+
 ## Stage S5.4: says which bills the House of Commons voted down since the last message.
 func _announce_votes() -> void:
 	var changes := game.changes()
@@ -534,6 +562,7 @@ func _process(_delta: float) -> void:
 		match str(event["kind"]):
 			"stepped":
 				_announce_votes()
+				_announce_election()
 				if game.steps_done() >= term and not term_announced:
 					_announce_term.call_deferred()
 			"failed":
@@ -556,6 +585,7 @@ func _process(_delta: float) -> void:
 					failed = false
 					term_announced = game.steps_done() >= term
 					_changes_seen = game.changes().size()
+					lost = _player_lost()
 					trace.trail.clear()
 					_model_changed()
 					_status.text = "loaded"
@@ -573,4 +603,4 @@ func _process(_delta: float) -> void:
 	if not events.is_empty():
 		_refresh()
 	elif _status.text == "working…" and not game.is_busy():
-		_set_controls(not failed)
+		_set_controls(not failed and not lost)

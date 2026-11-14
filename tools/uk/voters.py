@@ -72,7 +72,7 @@ ASSUMPTIONS = {
     # Stage S5.3. Positions on a left (-1) to right (+1) axis, for forming governments and
     # (S5.4) voting on bills: a judgement of where each bloc stands on tax and spending.
     "position": {"centre_left": -0.4, "centre_right": 0.4, "liberal": -0.1, "populist_right": 0.8, "green": -0.7,
-                 "scottish_nationalist": -0.3, "welsh_nationalist": -0.35, "northern_ireland": 0.0, "other": 0.0},
+                 "scottish_nationalist": -0.5, "welsh_nationalist": -0.5, "northern_ireland": 0.0, "other": 0.0},
     "parliament_months": 60,  # a Parliament's longest life; the 2024 one ends in July 2029
     "months_since_election": 6,
 }
@@ -450,7 +450,7 @@ dims = ["region", "bloc"]
 expr = "sum(select(type_region == coord(region), voters * choice[option: coord(bloc)], 0.0), voter_type) / sum(select(type_region == coord(region), voters * (1.0 - choice[option: abstain]), 0.0), voter_type)"
 
 [var.government_support]
-label = "Government's voting intention"
+label = "Government's poll rating"
 type = "real"
 unit = "1"
 phase = "politics"
@@ -519,6 +519,13 @@ unit = "1"
 phase = "politics"
 initial = {a["months_since_election"]}
 next = "select(election_now, 1, months_since_election + 1)"
+
+[var.months_to_election]
+label = "Months to the next general election"
+type = "int"
+unit = "1"
+phase = "politics"
+expr = "parliament_months - months_since_election"
 
 [var.election_now]
 label = "A general election this month"

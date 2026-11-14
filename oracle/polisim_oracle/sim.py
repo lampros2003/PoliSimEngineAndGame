@@ -270,10 +270,10 @@ class Simulation:
 
     def _passes(self, name: str, raw) -> bool:
         """Format 1 (S5.4): a change to a lever with a leaning is a bill. The leading bloc (the
-        governing bloc with the most seats, the first on a tie) votes for it, and every other
-        bloc votes for it if the move is towards its side (position below zero for a move to
-        the left, above zero for a move to the right); it passes with more than half the
-        seats. Every vote is kept in `votes`."""
+        governing bloc with the most seats, the first on a tie) votes for it; every other bloc
+        votes for it if the move is towards it from the leader's position (from 0 with no
+        leader): a move to the left if its position is lower, to the right if higher. It
+        passes with more than half the seats. Every vote is kept in `votes`."""
         m, rt = self.model, self.rt
         d = m.symbols.get(name)
         if m.legislature is None or d is None or d.kind != "lever" or "leaning" not in d.spec:
@@ -289,7 +289,9 @@ class Simulation:
         for b, (n, g) in enumerate(zip(seats, governing)):
             if g and (most is None or n > most):
                 leader, most = b, n
-        votes_for = sum(n for b, (n, p) in enumerate(zip(seats, position)) if b == leader or (p < 0 if left else p > 0))
+        here = position[leader] if leader >= 0 else 0.0
+        votes_for = sum(n for b, (n, p) in enumerate(zip(seats, position))
+                        if b == leader or (p < here if left else p > here))
         everyone = sum(seats)
         passed = 2 * votes_for > everyone
         self.votes.append({"step": rt.step, "lever": name, "value": new, "for": votes_for, "seats": everyone,

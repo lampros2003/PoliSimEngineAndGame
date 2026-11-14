@@ -9,9 +9,9 @@
 #   refused  - loading or starting the model fails;
 #   runtime  - the model starts and step 0 fails.
 #
-# The base: three blocs, a (300 seats, governing, position -0.4), b (200, opposition, 0.0)
-# and c (150, governing, -0.1): a leads; c leans left; b supports nothing. 650 seats, so a
-# bill needs 326. A move to the left gets a and c (450); a move to the right only a (300).
+# The base: three blocs, a (300 seats, governing, position 0.0), b (330, opposition, -0.5)
+# and c (20, governing, 0.3): a leads, and policy stands at its position. 650 seats, so a
+# bill needs 326. A move to the left gets a and b (630); a move to the right a and c (320).
 
 base = """
 [model]
@@ -83,35 +83,35 @@ expr = "tax + plain"
 """
 
 [files]
-"blocs.csv" = "bloc,seats,governing,position\na,300,true,-0.4\nb,200,false,0.0\nc,150,true,-0.1\n"
+"blocs.csv" = "bloc,seats,governing,position\na,300,true,0.0\nb,330,false,-0.5\nc,20,true,0.3\n"
 
 [[case]]
-name = "a move to the left passes with the leader and the left"
+name = "a move to the left passes with the leader and the blocs to its left"
 set = { tax = 0.3 }
 expect = "ran"
 levers = { tax = 0.3 }
-votes = [["tax", 450, true]]
+votes = [["tax", 630, true]]
 
 [[case]]
-name = "a move to the right fails with only the leader"
+name = "a move to the right fails with only the leader and the blocs to its right"
 set = { tax = 0.1 }
 expect = "ran"
 levers = { tax = 0.2 }
-votes = [["tax", 300, false]]
+votes = [["tax", 320, false]]
 
 [[case]]
 name = "raising a lever that leans right is a move to the right"
 set = { allowance = 1100 }
 expect = "ran"
 levers = { allowance = 100000 }
-votes = [["allowance", 300, false]]
+votes = [["allowance", 320, false]]
 
 [[case]]
 name = "lowering it is a move to the left"
 set = { allowance = 900 }
 expect = "ran"
 levers = { allowance = 90000 }
-votes = [["allowance", 450, true]]
+votes = [["allowance", 630, true]]
 
 [[case]]
 name = "no change, no vote"
@@ -132,11 +132,11 @@ name = "votes in the order of the changes"
 set = { allowance = 1100, tax = 0.25, plain = 2.0 }
 expect = "ran"
 levers = { allowance = 100000, tax = 0.25, plain = 2.0 }
-votes = [["allowance", 300, false], ["tax", 450, true]]
+votes = [["allowance", 320, false], ["tax", 630, true]]
 
 [[case]]
 name = "exactly half is not a majority"
-files = { "blocs.csv" = "bloc,seats,governing,position\na,325,true,-0.4\nb,325,false,0.0\nc,0,false,-0.1\n" }
+files = { "blocs.csv" = "bloc,seats,governing,position\na,325,true,0.0\nb,325,false,0.0\nc,0,false,-0.1\n" }
 set = { tax = 0.3 }
 expect = "ran"
 levers = { tax = 0.2 }
@@ -144,7 +144,8 @@ votes = [["tax", 325, false]]
 
 [[case]]
 name = "the leader is the governing bloc with the most seats, the first on a tie"
-# b and c tie on 300; b comes first and leads; its position, 0.5, takes moves to the right.
+# b and c tie on 300; b comes first and leads, at 0.5: no bloc is to its right, so a move
+# to the right gets b alone. Had c (-0.1) led, b would have joined it.
 files = { "blocs.csv" = "bloc,seats,governing,position\na,50,false,-0.4\nb,300,true,0.5\nc,300,true,-0.1\n" }
 set = { tax = 0.1 }
 expect = "ran"
@@ -153,14 +154,14 @@ votes = [["tax", 300, false]]
 
 [[case]]
 name = "a government with a majority of its own passes everything"
-files = { "blocs.csv" = "bloc,seats,governing,position\na,400,true,-0.4\nb,200,false,0.0\nc,50,false,0.3\n" }
+files = { "blocs.csv" = "bloc,seats,governing,position\na,400,true,0.0\nb,200,false,-0.5\nc,50,false,0.3\n" }
 set = { tax = 0.1 }
 expect = "ran"
 levers = { tax = 0.1 }
 votes = [["tax", 450, true]]
 
 [[case]]
-name = "with no governing bloc there is no leader"
+name = "with no governing bloc there is no leader, and policy stands at zero"
 files = { "blocs.csv" = "bloc,seats,governing,position\na,300,false,-0.4\nb,200,false,0.0\nc,150,false,-0.1\n" }
 set = { tax = 0.3 }
 expect = "ran"
@@ -172,7 +173,7 @@ name = "a defeated change outside the lever's range is no error"
 set = { tax = -0.5 }
 expect = "ran"
 levers = { tax = 0.2 }
-votes = [["tax", 300, false]]
+votes = [["tax", 320, false]]
 
 [[case]]
 name = "a passed change outside the lever's range is an error"
@@ -219,7 +220,7 @@ expect = "refused"
 [[case]]
 name = "seats over another dimension"
 replace = [['[dim.bloc]\nmembers = ["a", "b", "c"]', '[dim.bloc]\nmembers = ["a", "b", "c"]\n\n[dim.party]\nmembers = ["x", "y", "z"]'], ['[state.seats]\ntype = "int"\nunit = "seat"\nphase = "one"\ndims = ["bloc"]', '[state.seats]\ntype = "int"\nunit = "seat"\nphase = "one"\ndims = ["party"]']]
-files = { "blocs.csv" = "bloc,party,seats,governing,position\na,x,300,true,-0.4\nb,y,200,false,0.0\nc,z,150,true,-0.1\n" }
+files = { "blocs.csv" = "bloc,party,seats,governing,position\na,x,300,true,0.0\nb,y,330,false,-0.5\nc,z,20,true,0.3\n" }
 expect = "refused"
 
 [[case]]

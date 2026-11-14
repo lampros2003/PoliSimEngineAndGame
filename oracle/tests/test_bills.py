@@ -59,15 +59,26 @@ class UnitedKingdom(unittest.TestCase):
         sim = from_scenario(load_scenario(ROOT / "models" / "uk" / "scenarios" / "coalition_bill.toml"))
         rows = sim.run(3)
         self.assertEqual([(v["lever"], v["for"], v["passed"]) for v in sim.votes],
-                         [("basic_rate", 283, False), ("personal_allowance", 283, False), ("vat_rate", 592, True)])
+                         [("basic_rate", 283, False), ("personal_allowance", 283, False), ("vat_rate", 627, True)])
         self.assertEqual([r["bills_defeated"] for r in rows], [0, 0, 2])
         self.assertEqual((rows[-1]["basic_rate"], rows[-1]["vat_rate"]), (0.2, 0.21))
+
+    def test_the_players_minority_coalition_loses_a_move_to_the_left(self):
+        path = ROOT / "models" / "uk" / "scenarios" / "hung_parliament.toml"
+        scenario = load_scenario(path)
+        sim = Simulation(scenario.model, scenario.seed, scenario.preset, scenario.params,
+                         commands={2: {"basic_rate": 0.21, "personal_allowance": 13000}})
+        rows = sim.run(3)
+        self.assertTrue(rows[-1]["player_governs"])
+        self.assertEqual([(v["lever"], v["for"], v["passed"]) for v in sim.votes],
+                         [("basic_rate", 324, False), ("personal_allowance", 620, True)])
 
     def test_the_majority_government_passes_its_bills(self):
         sim = Simulation(load_model(ROOT / "models" / "uk"), seed=2025, commands={0: {"basic_rate": 0.18}})
         row = sim.step()
         self.assertEqual(row["basic_rate"], 0.18)
-        self.assertEqual(sim.votes[0]["for"], 411 + 121 + 5)  # the leader and the blocs right of centre
+        # A move to the right: the leader and every bloc to its right.
+        self.assertEqual(sim.votes[0]["for"], 650 - 4 - 9 - 4)
 
 
 if __name__ == "__main__":

@@ -15,8 +15,21 @@ term = 60
 government = "government"
 # Amounts paid each month are shown at an annual rate, as the public finances are published.
 amounts = "year"
-headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp"]
+headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "government_support"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual"]
 # "Who gains, who loses": net income per household by group, from the households.
 breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region"]
 breakdown_all = "net_income_average"
+
+# Stage S5.5: the politics panel and election night.
+[play.politics]
+intention = "vote_intention"
+seats = "seats"
+projected = "projected_seats"
+governing = "governing"
+support = "government_support"
+turnout = "turnout"
+election = "election_now"
+months_to_election = "months_to_election"
+player = "player_governs"
+majority = 326

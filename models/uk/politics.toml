@@ -233,7 +233,7 @@ dims = ["region", "bloc"]
 expr = "sum(select(type_region == coord(region), voters * choice[option: coord(bloc)], 0.0), voter_type) / sum(select(type_region == coord(region), voters * (1.0 - choice[option: abstain]), 0.0), voter_type)"
 
 [var.government_support]
-label = "Government's voting intention"
+label = "Government's poll rating"
 type = "real"
 unit = "1"
 phase = "politics"
@@ -302,6 +302,13 @@ unit = "1"
 phase = "politics"
 initial = 6
 next = "select(election_now, 1, months_since_election + 1)"
+
+[var.months_to_election]
+label = "Months to the next general election"
+type = "int"
+unit = "1"
+phase = "politics"
+expr = "parliament_months - months_since_election"
 
 [var.election_now]
 label = "A general election this month"

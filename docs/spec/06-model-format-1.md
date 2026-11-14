@@ -272,8 +272,9 @@ value the change would store differs from the lever's current value, the change 
    it leans right; otherwise it is to the right.
 2. The **leader** is the governing bloc with the most seats (the first of the dimension on
    a tie); with no governing bloc there is none.
-3. A bloc votes for the bill if it is the leader, or if its position is below zero and the
-   move is to the left, or above zero and the move is to the right. The others vote
+3. Policy is taken to stand at the leader's position (at zero with no leader). A bloc votes
+   for the bill if it is the leader, or if the move is towards it: to the left and its
+   position is lower than the leader's, or to the right and higher. The others vote
    against. Seats, governing and positions are read at their start-of-step values.
 4. The bill **passes** if twice the seats of the blocs voting for it exceed the seats of
    all blocs (whole numbers, exactly). A bill that passes is applied, and its value then
@@ -285,8 +286,9 @@ the seats of all blocs, and whether it passed. A model with a legislature adds t
 result `bills_defeated` to each step's results: the number of bills defeated in it. A
 saved game (version 2) keeps each policy change's vote.
 
-So a government with a majority of its own passes every bill; a coalition's partners and
-the opposition vote by their side of politics, and can defeat it.
+So a government with a majority of its own passes every bill; without one, a move to
+the left needs enough seats to the leader's left, and a move to the right enough to its
+right.
 
 ## Load-time checks
 

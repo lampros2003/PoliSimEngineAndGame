@@ -62,9 +62,9 @@ centre-left, 121 centre-right, 72 liberal, 18 Northern Ireland, 9 Scottish natio
 A general election is held when `parliament_months` (60) have passed since the last: the
 first in July 2029. Then `seats` and `seat_holder` take the projection, and a government
 forms: the largest bloc, then the blocs nearest it on a left-right axis (`positions.csv`,
-a judgement of where each stands on tax and spending: green -0.7, centre-left -0.4, Welsh
-nationalist -0.35, Scottish nationalist -0.3, liberal -0.1, Northern Ireland and others
-0, centre-right 0.4, populist right 0.8), added until they hold 326 seats. Time in office
+a judgement of where each stands on tax and spending: green -0.7, Scottish and Welsh
+nationalists -0.5, centre-left -0.4, liberal -0.1, Northern Ireland and others 0,
+centre-right 0.4, populist right 0.8), added until they hold 326 seats. Time in office
 restarts when the governing blocs change; unemployment and inflation are measured from
 the new election.
 
@@ -80,8 +80,9 @@ is why 2044 goes well.
 Every change the player makes to a tax or spending lever is a bill: raising a tax rate, a
 benefit or a spending bill moves policy to the left; raising a threshold or an allowance,
 the Universal Credit taper or the State Pension age, to the right (`leaning` in
-`households.toml` and `calibration.toml`). The leading governing bloc votes for it; every
-other bloc votes for it if the move is towards its side of the axis above (Northern
-Ireland's and the others, at zero, vote against everything). More than 325 seats pass it.
-With 411 seats of its own the government passes everything; in a hung parliament its
-partners can defeat it.
+`households.toml` and `calibration.toml`). Policy is taken to stand where the leading
+governing bloc stands. It votes for its bills; every other bloc votes for a move to the
+left if it stands further left than the leader, and for a move to the right if further
+right. More than 325 seats pass a bill. With 411 seats of its own the government passes
+everything; in a hung parliament, a left-led government needs enough seats to its left to
+raise taxes (`scenarios/hung_parliament.toml`: 324 votes, one bloc too few).

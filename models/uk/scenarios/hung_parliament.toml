@@ -1,0 +1,34 @@
+# A test of bills under the player (stage S5.4): an election in the second month, with time
+# in office weighing against the government, leaves the centre-left short of a majority,
+# leading a coalition with the liberal, green and nationalist blocs. The liberals stand to
+# its right, so a rise in the basic rate (a move to the left) has only 324 votes and fails.
+# Not a scenario to play.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 3
+preset = "central"
+
+[params]
+parliament_months = 7
+vote_tenure_effect = -0.6
+
+[play]
+country = "United Kingdom"
+currency_symbol = "£"
+start = "2025-01"
+amounts = "year"
+headline = ["gdp", "unemployment_rate", "government_support"]
+
+[play.politics]
+intention = "vote_intention"
+seats = "seats"
+projected = "projected_seats"
+governing = "governing"
+support = "government_support"
+turnout = "turnout"
+election = "election_now"
+months_to_election = "months_to_election"
+player = "player_governs"
+majority = 326

@@ -13,7 +13,7 @@ in `README.md`. Update the status column here as milestones close.
 | S0 Specification, oracle, data gate | Done except the data-licence check, which is recorded as not passed |
 | S1 Rust core | Done except the Python module, which was deferred |
 | S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
-| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` |
+| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done) |
 
 ## Decisions this plan rests on
 

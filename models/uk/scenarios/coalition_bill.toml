@@ -1,7 +1,8 @@
 # A test of bills (stage S5.4): the early election of early_election.toml leaves the
-# centre-right leading a coalition, whose liberal partner votes against a cut in the basic
-# rate and the personal allowance's rise (moves to the right), which then fail; a VAT rise
-# (a move to the left) passes with the left-leaning opposition. Not a scenario to play.
+# centre-right leading a coalition. Only the populist right stands to its right, so a cut
+# in the basic rate and a rise in the personal allowance (moves to the right) get 283 votes
+# and fail; a VAT rise (a move to the left) passes with every bloc to its left. Not a
+# scenario to play.
 
 [scenario]
 model = ".."
@@ -16,3 +17,22 @@ vote_tenure_effect = -0.9
 [[command]]
 step = 2
 set = { basic_rate = 0.18, personal_allowance = 13000, vat_rate = 0.21 }
+
+[play]
+country = "United Kingdom"
+currency_symbol = "£"
+start = "2025-01"
+amounts = "year"
+headline = ["gdp", "unemployment_rate", "government_support"]
+
+[play.politics]
+intention = "vote_intention"
+seats = "seats"
+projected = "projected_seats"
+governing = "governing"
+support = "government_support"
+turnout = "turnout"
+election = "election_now"
+months_to_election = "months_to_election"
+player = "player_governs"
+majority = 326

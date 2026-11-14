@@ -117,7 +117,7 @@ fn a_coalition_loses_a_bill_as_the_oracle_recorded() {
         assert_eq!(pyfmt::hex(&row.hash), *want, "coalition bill state hash differs from the oracle at step {step}");
     }
     let votes: Vec<(&str, i64, bool)> = sim.votes().iter().map(|v| (v.lever.as_str(), v.votes_for, v.passed)).collect();
-    assert_eq!(votes, [("basic_rate", 283, false), ("personal_allowance", 283, false), ("vat_rate", 592, true)]);
+    assert_eq!(votes, [("basic_rate", 283, false), ("personal_allowance", 283, false), ("vat_rate", 627, true)]);
 }
 
 #[test]

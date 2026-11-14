@@ -11,3 +11,22 @@ preset = "central"
 [params]
 parliament_months = 7
 vote_tenure_effect = -0.9
+
+[play]
+country = "United Kingdom"
+currency_symbol = "£"
+start = "2025-01"
+amounts = "year"
+headline = ["gdp", "unemployment_rate", "government_support"]
+
+[play.politics]
+intention = "vote_intention"
+seats = "seats"
+projected = "projected_seats"
+governing = "governing"
+support = "government_support"
+turnout = "turnout"
+election = "election_now"
+months_to_election = "months_to_election"
+player = "player_governs"
+majority = 326

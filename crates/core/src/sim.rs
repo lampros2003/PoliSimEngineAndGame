@@ -551,9 +551,10 @@ impl Simulation {
     }
 
     /// Format 1 (S5.4): a change to a lever with a leaning is a bill. The leading bloc (the
-    /// governing bloc with the most seats, the first on a tie) votes for it, and every other
-    /// bloc votes for it if the move is towards its side of zero; it passes with more than
-    /// half the seats. Every vote is kept (see [`Simulation::votes`]).
+    /// governing bloc with the most seats, the first on a tie) votes for it; every other bloc
+    /// votes for it if the move is towards it from the leader's position (from 0 with no
+    /// leader). It passes with more than half the seats. Every vote is kept (see
+    /// [`Simulation::votes`]).
     fn passes(&mut self, name: &str, raw: &Value) -> Result<bool> {
         let model = Arc::clone(&self.model);
         let Some(legislature) = model.legislature else { return Ok(true) };
@@ -581,11 +582,12 @@ impl Simulation {
                 leader = Some(b);
             }
         }
+        let here = leader.map_or(0.0, |l| position[l]);
         let mut votes_for: i128 = 0;
         let mut everyone: i128 = 0;
         for (b, (n, p)) in seats.iter().zip(position).enumerate() {
             everyone += *n as i128;
-            if Some(b) == leader || (left && *p < 0.0) || (!left && *p > 0.0) {
+            if Some(b) == leader || (left && *p < here) || (!left && *p > here) {
                 votes_for += *n as i128;
             }
         }
