@@ -218,3 +218,62 @@ fn damaged_uk_files_are_refused_or_run_without_panicking() {
     let panics = fuzz_model("models/uk", 40, 1, 0x0b5e_55ed_0001);
     assert!(panics.is_empty(), "damaged UK files made the engine panic: {panics:?}");
 }
+
+#[test]
+fn damaged_lags_are_refused_or_run_without_panicking() {
+    // The shared lag cases' base, with lags of each kind of element, a lag of a lag, and a
+    // dilemma that changes a lag, as the source to damage.
+    let cases: toml::Table =
+        std::fs::read_to_string(root().join("conformance/lag_cases.toml")).unwrap().parse().unwrap();
+    let base = cases["base"].as_str().unwrap();
+    let extra = r#"
+[lag.back]
+label = "Back"
+of = "level"
+steps = 3
+initial = 0.0
+
+[lag.back_again]
+of = "back"
+steps = 2
+
+[lag.count_back]
+of = "count"
+steps = 2
+phase = "one"
+
+[lag.rate_back]
+of = "rate"
+steps = 4
+
+[lag.cells_back]
+of = "cells"
+steps = 2
+initial = 1.5
+
+[lag.paid_back]
+of = "payment"
+steps = 1
+initial = 0
+
+[dilemma.d]
+start = "count >= 1"
+
+[[dilemma.d.option]]
+name = "a"
+months = 2
+effect = { back = "{base} + 1.0" }
+
+[[dilemma.d.option]]
+name = "b"
+"#;
+    let source = std::env::temp_dir().join(format!("polisim-fuzz-lags-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&source);
+    std::fs::create_dir_all(&source).unwrap();
+    std::fs::write(source.join("model.toml"), format!("{base}\n{extra}")).unwrap();
+    load_model(&source).expect("the undamaged source loads");
+    let relative = source.strip_prefix(root()).map(|p| p.to_path_buf()).unwrap_or(source.clone());
+    let panics = fuzz_model(relative.to_str().unwrap(), 1200, 4, 0x1a95_0b5e);
+    let _ = std::fs::remove_dir_all(&source);
+    assert!(panics.is_empty(), "damaged lags made the engine panic: {panics:?}");
+}

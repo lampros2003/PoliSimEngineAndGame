@@ -66,6 +66,18 @@ func label_of(name: String) -> String:
 	return str(entries.get(name, {}).get("label", name))
 
 
+## Stage S10.5: for `x__k`, a state a lag `x` makes, what the lag follows and `k`: the
+## state holds that value as it was k months back. Empty for anything else.
+func lag_part(symbol: String) -> Array:
+	var lag := str(entries.get(symbol, {}).get("lag", ""))
+	if lag == "" or not symbol.begins_with(lag + "__"):
+		return []
+	var follows: PackedStringArray = entries.get(lag, {}).get("lagged_inputs", PackedStringArray())
+	if follows.is_empty():
+		return []
+	return [follows[0], int(symbol.substr(lag.length() + 2))]
+
+
 func show_waiting(name: String) -> void:
 	_title.text = label_of(name)
 	_summary.text = "Working it out…"
@@ -117,6 +129,12 @@ func show_explanation(e: Dictionary) -> void:
 		row.add_theme_constant_override("separation", 10)
 		var name_button := Button.new()
 		name_button.text = part["label"] if symbol == "" else label_of(symbol) + (" (last month)" if part["lagged"] else "")
+		# A lag's state is shown, and followed, as the value it holds from months back.
+		var lagged := lag_part(symbol)
+		if not lagged.is_empty():
+			var months: int = lagged[1] + (1 if part["lagged"] else 0)
+			name_button.text = "%s (%d month%s before)" % [label_of(lagged[0]), months, "" if months == 1 else "s"]
+			symbol = lagged[0]
 		name_button.flat = true
 		name_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		name_button.custom_minimum_size = Vector2(190, 0)

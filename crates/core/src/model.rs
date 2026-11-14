@@ -47,7 +47,7 @@ pub const FUNCTIONS: [&str; 28] = [
     "wsum_by",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 17] = [
+const SECTIONS: [&str; 18] = [
     "model",
     "legislature",
     "dim",
@@ -65,6 +65,7 @@ const SECTIONS: [&str; 17] = [
     "renamed",
     "situation",
     "dilemma",
+    "lag",
 ];
 /// Format 1: the most cells one value may have.
 pub const MAX_CELLS: usize = 16_777_216;
@@ -1039,8 +1040,8 @@ pub fn read_mod(dir: &Path) -> Result<(ModInfo, Vec<String>, Vec<u8>)> {
 }
 
 /// The sections a mod's files may add to, besides `[patch]`.
-const MOD_SECTIONS: [&str; 10] =
-    ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma"];
+const MOD_SECTIONS: [&str; 11] =
+    ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma", "lag"];
 /// The kinds of element a `[patch.<kind>.<name>]` may change.
 const PATCH_KINDS: [&str; 6] = ["param", "lever", "var", "state", "flow", "account"];
 
@@ -1244,6 +1245,7 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
         state.insert("situation".to_string(), Value::String(if good { "good" } else { "bad" }.to_string()));
         merged[section("state")].insert(name, Value::Table(state));
     }
+    expand_lags(&mut merged)?;
     let dilemmas = expand_dilemmas(&mut merged)?;
 
     let head = &merged[0];
@@ -1740,6 +1742,92 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
         renamed,
         dilemmas,
     })
+}
+
+const LAG_KEYS: [&str; 6] = ["of", "steps", "initial", "label", "doc", "phase"];
+
+/// Stage S10.5: each lag becomes a chain of `steps` states and a var, computed in the first
+/// phase, holding the value `of` had `steps` steps before. Mirrors the oracle's
+/// `_expand_lags`.
+fn expand_lags(merged: &mut [Toml]) -> Result<()> {
+    let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
+    let (first_phase, last_phase) = match merged[0].get("phases") {
+        Some(Value::Array(phases)) if !phases.is_empty() && phases.iter().all(Value::is_str) => {
+            (phases[0].as_str().unwrap().to_string(), phases[phases.len() - 1].as_str().unwrap().to_string())
+        }
+        _ => (String::new(), String::new()),
+    };
+    let lags = std::mem::take(&mut merged[section("lag")]);
+    for (name, spec) in lags {
+        let what = format!("lag {name}");
+        let Value::Table(spec) = spec else { return model_err(format!("{what} must be a table")) };
+        if let Some(key) = spec.keys().find(|k| !LAG_KEYS.contains(&k.as_str())) {
+            return model_err(format!("{what}: unknown key {key:?}"));
+        }
+        let of = spec.get("of").and_then(Value::as_str);
+        let found = of.and_then(|of| {
+            ["var", "flow", "state", "lever"]
+                .into_iter()
+                .find_map(|kind| merged[section(kind)].get(of).and_then(Value::as_table).map(|e| (kind, e.clone())))
+        });
+        let (Some(of), Some((kind, element))) = (of, found) else {
+            return model_err(format!("{what}: 'of' must name a var, flow, state or lever"));
+        };
+        let steps = match spec.get("steps") {
+            Some(Value::Integer(n)) if (1..=1200).contains(n) => *n,
+            _ => return model_err(format!("{what}: 'steps' must be a whole number from 1 to 1200")),
+        };
+        let mut shape = if kind == "flow" {
+            for side in ["from", "to"] {
+                let sector = element.get(side).and_then(Value::as_str).and_then(|s| merged[section("sector")].get(s));
+                if sector.and_then(|s| s.get("entity")).is_some() {
+                    return model_err(format!("{what}: a lag of a flow held record by record is not supported"));
+                }
+            }
+            let carrier = carrier(merged, "flow", &element, "", &name, &what)?;
+            ["type", "unit"].iter().filter_map(|k| carrier.get(*k).map(|v| (k.to_string(), v.clone()))).collect()
+        } else {
+            ["type", "unit", "dims", "entity"]
+                .iter()
+                .filter_map(|k| element.get(*k).map(|v| (k.to_string(), v.clone())))
+                .collect::<Toml>()
+        };
+        let initial = match (spec.get("initial"), element.get("initial"), element.get("default")) {
+            (Some(v), _, _) | (None, Some(v), _) => v.clone(),
+            (None, None, Some(v)) if kind == "lever" => v.clone(),
+            _ => return model_err(format!("{what}: needs 'initial', as {of} has none")),
+        };
+        let chain: Vec<String> = (1..=steps).map(|k| format!("{name}__{k}")).collect();
+        for made in std::iter::once(&name).chain(&chain) {
+            if ["param", "lever", "var", "state", "flow", "account"]
+                .iter()
+                .any(|kind| merged[section(kind)].contains_key(made))
+            {
+                return model_err(format!("{what}: {made} is already declared"));
+            }
+        }
+        shape.insert("initial".to_string(), initial);
+        shape.insert("lag".to_string(), Value::String(name.clone()));
+        let phase = spec.get("phase").cloned().unwrap_or(Value::String(last_phase.clone()));
+        let mut source = of.to_string();
+        for state in chain {
+            let mut out = shape.clone();
+            out.insert("phase".to_string(), phase.clone());
+            out.insert("next".to_string(), Value::String(source));
+            merged[section("state")].insert(state.clone(), Value::Table(out));
+            source = state;
+        }
+        let mut var = shape;
+        for key in ["label", "doc"] {
+            if let Some(v) = spec.get(key) {
+                var.insert(key.to_string(), v.clone());
+            }
+        }
+        var.insert("phase".to_string(), Value::String(first_phase.clone()));
+        var.insert("expr".to_string(), Value::String(source));
+        merged[section("var")].insert(name, Value::Table(var));
+    }
+    Ok(())
 }
 
 const DILEMMA_KEYS: [&str; 6] = ["label", "doc", "start", "again_after", "option", "phase"];

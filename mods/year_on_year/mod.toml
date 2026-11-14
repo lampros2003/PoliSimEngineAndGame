@@ -1,0 +1,8 @@
+# An example lag for Valmora (stage S10.5; docs/spec/06-model-format-1.md, Lags).
+[mod]
+id = "yoy"
+name = "Growth over the year"
+version = "1.0"
+model = "valmora"
+description = "Shows how much Valmora's output has grown over the last twelve months."
+files = ["growth.toml"]

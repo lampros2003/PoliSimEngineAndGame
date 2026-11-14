@@ -391,6 +391,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("leaning", e.leaning.as_str());
         d.set("situation", e.situation.as_str());
         d.set("dilemma", e.dilemma.as_str());
+        d.set("lag", e.lag.as_str());
         d.set("dims", &strings(&e.dims));
         d.set("inputs", &strings(&e.inputs));
         d.set("lagged_inputs", &strings(&e.lagged_inputs));

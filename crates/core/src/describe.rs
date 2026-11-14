@@ -48,6 +48,9 @@ pub struct Entry {
     /// Stage S9.1: for an element a dilemma makes (its lever, its states), the dilemma's
     /// name, else "".
     pub dilemma: String,
+    /// Stage S10.5: for an element a lag makes (its var and its chain of states), the
+    /// lag's name, else "". Interfaces show the var and may leave the states out.
+    pub lag: String,
     /// Format 1: the value's dimensions, by name.
     pub dims: Vec<String>,
     /// Stage S6.1: what this value's formula reads this step, and through `prev()`; for an
@@ -113,6 +116,17 @@ impl Catalogue {
             let Some(&id) = model.sym_index.get(&entry.name) else { continue };
             entry.inputs = names(deps.get(id).map(Vec::as_slice).unwrap_or_default());
             entry.lagged_inputs = names(lagged.get(id).map(Vec::as_slice).unwrap_or_default());
+            // A lag reads what it follows `steps` steps back: one lagged link, not its chain.
+            if !entry.lag.is_empty() {
+                entry.inputs.clear();
+                entry.lagged_inputs.clear();
+                if entry.name == entry.lag {
+                    let first = model.sym_index.get(&format!("{}__1", entry.lag)).map(|i| &model.symbols[*i]);
+                    if let Some(of) = first.and_then(|s| s.spec.get("next")).and_then(|v| v.as_str()) {
+                        entry.lagged_inputs.push(of.to_string());
+                    }
+                }
+            }
             if model.symbols[id].kind == Kind::Account {
                 let flows: Vec<usize> =
                     model.flows.iter().filter(|f| f.src_account == id || f.dst_account == id).map(|f| f.sym).collect();
@@ -172,6 +186,7 @@ impl Catalogue {
                 leaning: text("leaning").unwrap_or_default(),
                 situation: if d.kind == Kind::State { text("situation").unwrap_or_default() } else { String::new() },
                 dilemma: text("dilemma").unwrap_or_default(),
+                lag: text("lag").unwrap_or_default(),
                 dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
                 inputs: Vec::new(),
                 lagged_inputs: Vec::new(),

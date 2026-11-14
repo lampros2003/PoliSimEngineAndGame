@@ -356,6 +356,44 @@ applied (a mod may add situations); the shared cases are in
 `conformance/situation_cases.toml`. Any other key is an error. The section is accepted in
 format 0 models too.
 
+## Lags (stage S10.5)
+
+`prev(x)` reads a value as it was one step before. A lag reads it further back:
+
+```toml
+[lag.prices_a_year_ago]
+of = "price_index"
+steps = 12
+initial = 1.0
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `of` | The `var`, `flow`, `state` or `lever` followed | required |
+| `steps` | How many steps back, a whole number from 1 to 1,200 | required |
+| `initial` | What the lag holds until `steps` steps have passed, as a state's `initial` | `of`'s own `initial` (a lever's `default`), if it has one; else an error |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its states are updated in | the last phase |
+
+A lag is made by the loader, after situations and before dilemmas, from ordinary
+elements. For `[lag.x]` with `steps = n` it makes states `x__1` to `x__n` and a var `x`,
+each with `of`'s type, unit, dimensions and entity (a national flow's: money in its
+instrument's unit a step; a flow held record by record is an error), the lag's `initial`
+and `lag = "x"`. The states are updated in the lag's `phase`: `x__1` takes `next = "<of>"`
+and each later one the one before it. The var `x` is computed in the first phase, with
+`expr = "x__n"`, the label and doc, and the lag's `initial` (so `prev(x)` works).
+
+So, in step `t`, `x` holds what a formula in the lag's phase read as `of` in step `t - n`,
+and `initial` in the first `n` steps; in every phase, and in charts after the step. For a
+var, a flow or a lever that is simply its value then. For a state updated in an earlier
+phase than the lag's, it is its value after that step's update; for one updated in the
+lag's phase or later, before it, which is one step further back. A lag in a phase before
+the one its var or flow is computed in is an error, as for any formula. The states are
+ordinary states: a save keeps them, the state hash covers them, and formulas may read
+them. Any other key is an error, as is a name the lag would make that the model already
+has. The section is accepted in format 0 models and in mods; the shared cases are in
+`conformance/lag_cases.toml`.
+
 ## Dilemmas (stage S9.1)
 
 A dilemma is a question put to the player when a condition first holds, with two to six

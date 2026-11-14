@@ -1,0 +1,17 @@
+# Output twelve months back, as a lag (twelve states and a var, made by the loader), and
+# the growth of output over the year from it.
+
+[lag.yoy_gdp_a_year_before]
+label = "Output a year before"
+doc = "Output (GDP) twelve months earlier; nothing in the game's first year"
+of = "gdp"
+steps = 12
+initial = 0
+
+[var.yoy_growth]
+label = "Growth over the year"
+type = "real"
+unit = "1"
+phase = "government"
+expr = "select(yoy_gdp_a_year_before > 0, gdp / yoy_gdp_a_year_before - 1.0, 0.0)"
+doc = "How much more output Valmora makes a month than twelve months before; 0 in the game's first year"

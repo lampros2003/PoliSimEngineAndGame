@@ -91,6 +91,16 @@ def main() -> int:
             print("res://tests/dilemma_check.gd failed", file=sys.stderr)
             return 1
         print(dilemma.stdout.strip().splitlines()[-1])
+        # Stage S10.5: a lag in the catalogue, the icon web and Why (Valmora's year-on-year mod).
+        lag = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/lag_check.gd",
+             "--", "--scenario=models/valmora/scenarios/year_on_year.toml"],
+            capture_output=True, text=True, timeout=900)
+        if lag.returncode != 0:
+            print(lag.stdout.strip()[-2000:], lag.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/lag_check.gd failed", file=sys.stderr)
+            return 1
+        print(lag.stdout.strip().splitlines()[-1])
         # Stage S7.4: Valmora in French, through the start screen and a save.
         language = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/language_check.gd",

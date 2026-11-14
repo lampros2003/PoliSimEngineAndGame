@@ -29,7 +29,7 @@ _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
 _SECTIONS = ("model", "legislature", "dim", "sector", "instrument", "entity", "stream", "table",
-             "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma")
+             "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma", "lag")
 MAX_CELLS = 16_777_216
 
 
@@ -258,7 +258,8 @@ class ModInfo:
 
 
 _MOD_ID = re.compile(r"[a-z][a-z0-9_]*\Z")
-_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma")
+_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma",
+                 "lag")
 _PATCH_KINDS = ("param", "lever", "var", "state", "flow", "account")
 
 
@@ -414,6 +415,68 @@ def _expand_situations(merged: dict[str, dict]) -> None:
         state.update({"type": "bool", "unit": "1", "phase": spec.get("phase", last_phase), "initial": False,
                       "next": nxt, "situation": "good" if good else "bad"})
         merged["state"][name] = state
+
+
+_LAG_KEYS = ("of", "steps", "initial", "label", "doc", "phase")
+
+
+def _expand_lags(merged: dict[str, dict]) -> None:
+    """Stage S10.5: each lag becomes a chain of `steps` states and a var, computed in the
+    first phase, holding the value `of` had `steps` steps before."""
+    phases = merged["model"].get("phases")
+    named = isinstance(phases, list) and phases and all(isinstance(p, str) for p in phases)
+    first_phase, last_phase = (phases[0], phases[-1]) if named else ("", "")
+    lags = merged["lag"]
+    merged["lag"] = {}
+    for name, spec in lags.items():
+        what = f"lag {name}"
+        if not isinstance(spec, dict):
+            raise ModelError(f"{what} must be a table")
+        for key in spec:
+            if key not in _LAG_KEYS:
+                raise ModelError(f"{what}: unknown key {key!r}")
+        of = spec.get("of")
+        found = None
+        if isinstance(of, str):
+            for section in ("var", "flow", "state", "lever"):
+                if isinstance(merged[section].get(of), dict):
+                    found = (section, merged[section][of])
+                    break
+        if found is None:
+            raise ModelError(f"{what}: 'of' must name a var, flow, state or lever")
+        steps = spec.get("steps")
+        if not isinstance(steps, int) or isinstance(steps, bool) or not 1 <= steps <= 1200:
+            raise ModelError(f"{what}: 'steps' must be a whole number from 1 to 1200")
+        section, element = found
+        if section == "flow":
+            for side in ("from", "to"):
+                sector = merged["sector"].get(element.get(side))
+                if isinstance(sector, dict) and sector.get("entity") is not None:
+                    raise ModelError(f"{what}: a lag of a flow held record by record is not supported")
+            carrier = _carrier(merged, "flow", element, "", name, what)
+            shape = {key: carrier[key] for key in ("type", "unit")}
+        else:
+            shape = {key: element[key] for key in ("type", "unit", "dims", "entity") if key in element}
+        if "initial" in spec:
+            initial = spec["initial"]
+        elif "initial" in element:
+            initial = element["initial"]
+        elif section == "lever" and "default" in element:
+            initial = element["default"]
+        else:
+            raise ModelError(f"{what}: needs 'initial', as {of} has none")
+        chain = [f"{name}__{k}" for k in range(1, steps + 1)]
+        for made in [name, *chain]:
+            if any(made in merged[s] for s in ("param", "lever", "var", "state", "flow", "account")):
+                raise ModelError(f"{what}: {made} is already declared")
+        source = of
+        for state in chain:
+            merged["state"][state] = {**shape, "phase": spec.get("phase", last_phase), "initial": initial,
+                                      "next": source, "lag": name}
+            source = state
+        var = {**shape, **{key: spec[key] for key in ("label", "doc") if key in spec}}
+        var.update({"phase": first_phase, "initial": initial, "expr": source, "lag": name})
+        merged["var"][name] = var
 
 
 _OPTION_NAME = re.compile(r"[a-z_][a-z0-9_]*\Z")
@@ -589,6 +652,7 @@ def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
                 merged[section][name] = spec
     applied, mod_notes = _apply_mods(merged, mods, digest)
     _expand_situations(merged)
+    _expand_lags(merged)
     dilemmas = _expand_dilemmas(merged)
 
     head = merged["model"]
