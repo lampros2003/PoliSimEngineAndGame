@@ -130,6 +130,8 @@ pub enum Op {
     ClampF(R, R, R, R),
     AbsI(R, R),
     AbsF(R, R),
+    /// S5.1: `exp`, by the fixed algorithm of docs/spec/02 ([`exp_fixed`]).
+    Exp(R, R),
     ToInt(Rounding, R, R),
     /// destination, condition, value if true, value if false
     SelI(R, R, R, R),
@@ -282,4 +284,65 @@ pub struct Compiled {
     pub lagged: Vec<usize>,
     /// Unit of the result; `None` only for a bare literal zero.
     pub unit: Option<Unit>,
+}
+
+/// `exp(x)` by the fixed algorithm of docs/spec/02-formula-language-v0.md, so that every
+/// machine gives the same bits: only rounded `+`, `-`, `*` (no fused multiply-add) and an
+/// exact scaling by a power of two. A port of the oracle's `exp_fixed`.
+pub fn exp_fixed(x: f64) -> f64 {
+    const C: [f64; 13] = [
+        2.08767569878681e-09,
+        2.505210838544172e-08,
+        2.755731922398589e-07,
+        2.7557319223985893e-06,
+        2.48015873015873e-05,
+        0.0001984126984126984,
+        0.001388888888888889,
+        0.008333333333333333,
+        0.041666666666666664,
+        0.16666666666666666,
+        0.5,
+        1.0,
+        1.0,
+    ];
+    if x.is_nan() {
+        return x;
+    }
+    if x > 709.0 {
+        return f64::INFINITY;
+    }
+    if x < -708.0 {
+        return 0.0;
+    }
+    let k = (x * 1.4426950408889634).round_ties_even();
+    let r = (x - k * 0.6931471803691238) - k * 1.9082149292705877e-10;
+    let mut p = 1.6059043836821613e-10;
+    for c in C {
+        p = p * r + c;
+    }
+    // 2^k for k in [-1022, 1023], built from its bits: exact.
+    p * f64::from_bits(((k as i64 + 1023) as u64) << 52)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exp_fixed;
+
+    fn ulps(a: f64, b: f64) -> u64 {
+        (a.to_bits() as i64 - b.to_bits() as i64).unsigned_abs()
+    }
+
+    #[test]
+    fn exp_is_within_two_units_in_the_last_place() {
+        // A fixed sweep over the range against the platform's library.
+        let mut x = -708.0;
+        while x < 709.0 {
+            assert!(ulps(exp_fixed(x), x.exp()) <= 2, "{x}");
+            x += 0.0137;
+        }
+        assert_eq!(exp_fixed(0.0), 1.0);
+        assert_eq!(exp_fixed(709.5), f64::INFINITY);
+        assert_eq!(exp_fixed(-708.5), 0.0);
+        assert!(exp_fixed(f64::NAN).is_nan());
+    }
 }

@@ -282,6 +282,39 @@ def expected(sim: Simulation, ctx: str, typ: str, unit: str, formula: str) -> st
     return encode(result)
 
 
+def exp_cases() -> list[tuple[str, str, str, str]]:
+    """Stage S5.1: exp over its whole range, at the limits, inside formulas, and refused
+    with a unit. Drawn from their own generator, so the cases before them do not change."""
+    rng = random.Random(51)
+    cases = [
+        ("-", "real", "1", "exp(0.0)"),
+        ("-", "real", "1", "exp(1)"),
+        ("-", "real", "1", "exp(-1.0)"),
+        ("-", "real", "1", "exp(709.0)"),
+        ("-", "real", "1", "exp(709.0000000000001)"),
+        ("-", "real", "1", "exp(-708.0)"),
+        ("-", "real", "1", "exp(-708.0000000000001)"),
+        ("-", "real", "1", "exp(0.34657359027997264)"),
+        ("-", "real", "1", "exp(-0.34657359027997264)"),
+        ("-", "real", "1", "exp(0.0 / 0.0)"),
+        ("-", "real", "1", "exp(1.0 / 0.0)"),
+        ("-", "real", "1", "exp(-1.0 / 0.0)"),
+        ("-", "real", "1", "exp(rate1) / (1.0 + exp(rate1))"),
+        ("-", "real", "1", "exp(r1 - r1)"),
+        ("rec", "real", "1", "exp(rate1 * 3.0)"),
+        ("-", "int", "1", "round(exp(5))"),
+        ("-", "real", "1", "exp(m1)"),
+        ("-", "real", "1", "exp(1.0, 2.0)"),
+        ("-", "int", "1", "exp(1.0)"),
+        ("-", "real", "1", "exp(true)"),
+    ]
+    for _ in range(400):
+        x = rng.choice([rng.uniform(-750.0, 750.0), rng.uniform(-20.0, 20.0), rng.uniform(-0.5, 0.5),
+                        rng.uniform(-1e-6, 1e-6), float(rng.randint(-710, 710))])
+        cases.append(("-", "real", "1", f"exp({x!r})"))
+    return cases
+
+
 def warmed_up_simulation() -> Simulation:
     sim = Simulation(load_model(ROOT / "conformance" / "model"), seed=SEED)
     sim.run(WARM_UP_STEPS)
@@ -299,6 +332,8 @@ def main() -> None:
             # Now and then ask for the wrong result type, to exercise the rejection.
             want = typ if rng.random() < 0.95 else ("int", "real", "bool")[rng.randrange(3)]
             cases.append((ctx, want, "1", formula))
+
+    cases += exp_cases()
 
     sim = warmed_up_simulation()
     counts = {"value": 0, "E:static": 0, "E:runtime": 0}

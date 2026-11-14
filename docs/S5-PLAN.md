@@ -58,7 +58,7 @@ constituencies and blocs.
 | # | Status |
 |---|---|
 | S5.0 | Done. `tools/uk/elections.py` extracts the 2024 general election by constituency and bloc (`models/uk/data/elections/ge2024.csv`: votes, electorate, winner, and the best "other" candidate, since in two seats several independents together out-polled the winner) and Census 2021 age and economic activity for the 575 constituencies of England and Wales (`census_pcon.csv`). Votes and seats of every party equal the published totals; by bloc: centre-left 33.7% and 411 seats, centre-right 23.7% and 121, populist right 14.3% and 5, liberal 12.2% and 72. Open Parliament Licence terms still to be confirmed by the owner (`docs/data/first-country-licences.md`) |
-| S5.1 | Not started |
+| S5.1 | Done. `exp(x)` in the formula language by a fixed algorithm (`docs/spec/02-formula-language-v0.md`): reduction by ln 2, a degree-13 polynomial, exact scaling. Within 1 unit in the last place of the C library over 300,000 arguments; oracle and engine agree on 420 recorded cases across the range and at its limits |
 | S5.2 | Not started |
 | S5.3 | Not started |
 | S5.4 | Not started |

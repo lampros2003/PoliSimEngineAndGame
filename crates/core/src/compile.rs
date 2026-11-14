@@ -466,6 +466,18 @@ impl<'a> Builder<'a> {
                 });
                 Ok(Built { ty, unit, reg: d })
             }
+            "exp" => {
+                arg_count(fname, args, 1)?;
+                let a = self.build(&args[0], ctx)?;
+                number(&a, "exp()")?;
+                if a.unit.is_some() {
+                    units::unify(&a.unit, &Some(Unit::one()), "exp() argument")?;
+                }
+                let x = self.as_real(&a);
+                let d = self.reg(Ty::Real);
+                self.ops.push(Op::Exp(d, x));
+                Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
+            }
             "abs" => {
                 arg_count(fname, args, 1)?;
                 let a = self.build(&args[0], ctx)?;

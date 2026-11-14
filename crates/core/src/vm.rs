@@ -766,6 +766,12 @@ fn run_block(
                     *d = a.abs();
                 }
             }
+            Op::Exp(d, a) => {
+                let (d, a) = pick!(regs.f, len, d, a);
+                for (d, a) in d.iter_mut().zip(a) {
+                    *d = crate::program::exp_fixed(*a);
+                }
+            }
             Op::ToInt(mode, d, a) => {
                 for (d, a) in regs.i[d as usize][..len].iter_mut().zip(&regs.f[a as usize][..len]) {
                     *d = real_to_int(*a, mode)?;

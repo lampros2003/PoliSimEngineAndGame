@@ -269,6 +269,29 @@ _COMPARE = {"<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operato
 _LAGGABLE = {"var", "flow", "state", "account", "lever"}
 
 
+_EXP_COEFFICIENTS = (2.08767569878681e-09, 2.505210838544172e-08, 2.755731922398589e-07,
+                     2.7557319223985893e-06, 2.48015873015873e-05, 0.0001984126984126984,
+                     0.001388888888888889, 0.008333333333333333, 0.041666666666666664,
+                     0.16666666666666666, 0.5, 1.0, 1.0)
+
+
+def exp_fixed(x: float) -> float:
+    """exp(x) by the fixed algorithm of docs/spec/02-formula-language-v0.md: the same bits
+    on every machine (only rounded + - * and an exact scaling by a power of two)."""
+    if x != x:
+        return x
+    if x > 709.0:
+        return math.inf
+    if x < -708.0:
+        return 0.0
+    k = round(x * 1.4426950408889634)
+    r = (x - k * 0.6931471803691238) - k * 1.9082149292705877e-10
+    p = 1.6059043836821613e-10
+    for c in _EXP_COEFFICIENTS:
+        p = p * r + c
+    return math.ldexp(p, k)
+
+
 class _Builder:
     """Turns a syntax tree into a closure while checking types and units.
 
@@ -600,6 +623,15 @@ class _Builder:
             m = lo if lo > x else x
             return hi if hi < m else m
         return Built(typ, unit, fn)
+
+    def _fn_exp(self, args, ctx):
+        """S5.1: e to the power x, by the fixed algorithm of docs/spec/02 (exp_fixed)."""
+        self._args("exp", args, 1)
+        a = self._number(self.build(args[0], ctx), "exp()")
+        if a.unit is not None:
+            U.unify(a.unit, U.ONE, "exp() argument")
+        f = a.fn
+        return Built("real", U.ONE, lambda i: exp_fixed(float(f(i))))
 
     def _fn_abs(self, args, ctx):
         self._args("abs", args, 1)

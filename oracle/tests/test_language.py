@@ -354,3 +354,36 @@ class Loader(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Exp(unittest.TestCase):
+    """Stage S5.1: exp by a fixed algorithm (docs/spec/02-formula-language-v0.md)."""
+
+    def test_within_two_units_in_the_last_place_of_the_c_library(self):
+        import math
+        import random
+        import struct
+
+        from polisim_oracle.expr import exp_fixed
+
+        def ulps(a: float, b: float) -> int:
+            return abs(struct.unpack("<q", struct.pack("<d", a))[0] - struct.unpack("<q", struct.pack("<d", b))[0])
+        rng = random.Random(51)
+        for _ in range(20000):
+            x = rng.choice([rng.uniform(-708.0, 709.0), rng.uniform(-30.0, 30.0), rng.uniform(-0.4, 0.4)])
+            self.assertLessEqual(ulps(exp_fixed(x), math.exp(x)), 2, x)
+
+    def test_limits(self):
+        import math
+
+        from polisim_oracle.expr import exp_fixed
+        self.assertEqual(exp_fixed(0.0), 1.0)
+        self.assertEqual(exp_fixed(709.5), math.inf)
+        self.assertEqual(exp_fixed(-708.5), 0.0)
+        self.assertTrue(math.isnan(exp_fixed(math.nan)))
+
+    def test_in_a_formula(self):
+        s = Scope()
+        self.assertAlmostEqual(s.value("exp(rate) / (1.0 + exp(rate))", "real"), 0.549833997312478, places=12)
+        with self.assertRaises(Exception):
+            s.value("exp(sales)", "real")  # money has a unit
