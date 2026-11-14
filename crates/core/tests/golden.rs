@@ -68,3 +68,17 @@ fn uk_households_match_the_oracles_recorded_hashes() {
         assert_eq!(pyfmt::hex(&row.hash), *want, "households state hash differs from the oracle at step {step}");
     }
 }
+
+#[test]
+fn an_early_election_matches_the_oracles_recorded_hashes() {
+    // Stage S5.3: a general election in the second month, a hung parliament and a coalition.
+    let scenario = load_scenario(&root().join("models/uk/scenarios/early_election.toml")).unwrap();
+    let recorded = std::fs::read_to_string(root().join("models/uk/golden/early_election.hashes.csv")).unwrap();
+    let golden: Vec<&str> = recorded.lines().skip(1).map(|line| line.split(',').nth(1).unwrap()).collect();
+    assert_eq!(golden.len(), 3);
+    let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
+    for (step, want) in golden.iter().enumerate() {
+        let row = sim.step().unwrap();
+        assert_eq!(pyfmt::hex(&row.hash), *want, "early election state hash differs from the oracle at step {step}");
+    }
+}

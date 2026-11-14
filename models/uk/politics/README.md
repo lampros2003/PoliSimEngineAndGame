@@ -48,3 +48,29 @@ In the base month the government (the centre-left bloc) has 33.9% (its 2024 shar
 33.7%; the households weight regions by adults, not by registered electors) and turnout
 is 59.7%. With unchanged policy the government drifts to 31.3% in five years: time in
 office, and unemployment a little higher.
+
+## Seats and government (stage S5.3)
+
+Each month the model projects the House of Commons "if an election were held now":
+every constituency's 2024 shares (`seat_shares.csv`; the "other" bloc by its best-placed
+candidate, as first past the post counts candidates) are scaled by its region's swing,
+the region's voting intention now over its 2024 shares (proportional swing), and the
+largest share wins the seat. In the base month this gives the 2024 result exactly: 411
+centre-left, 121 centre-right, 72 liberal, 18 Northern Ireland, 9 Scottish nationalist,
+6 others, 5 populist right, 4 green and 4 Welsh nationalist.
+
+A general election is held when `parliament_months` (60) have passed since the last: the
+first in July 2029. Then `seats` and `seat_holder` take the projection, and a government
+forms: the largest bloc, then the blocs nearest it on a left-right axis (`positions.csv`,
+a judgement of where each stands on tax and spending: green -0.7, centre-left -0.4, Welsh
+nationalist -0.35, Scottish nationalist -0.3, liberal -0.1, Northern Ireland and others
+0, centre-right 0.4, populist right 0.8), added until they hold 326 seats. Time in office
+restarts when the governing blocs change; unemployment and inflation are measured from
+the new election.
+
+`player_governs` is false once the player's bloc (the centre-left) is out of government.
+With unchanged policy for thirty years the player's bloc keeps office at every election to
+2054: majorities of 373 in 2029 and 340 in 2034; in 2039 it falls short with 296 seats and
+governs with the green and the two nationalist blocs (326 together), which restarts its
+time in office; majorities again from 2044. Time in office counts heavily: the 2039 reset
+is why 2044 goes well.

@@ -86,3 +86,33 @@ class Response(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Elections(unittest.TestCase):
+    """Stage S5.3: seats, elections and governments."""
+
+    def test_the_base_month_projects_the_2024_seats(self):
+        sim, row = first_month()
+        self.assertEqual(sim.column("projected_seats"), [411, 121, 72, 5, 4, 9, 4, 18, 6])
+        self.assertEqual(sim.column("would_govern"), [True] + [False] * 8)
+        self.assertEqual(row["government_seats"], 411)
+        self.assertFalse(row["election_now"])
+
+    def test_an_election_when_parliament_ends(self):
+        sim = Simulation(model(), seed=SEED, params={"parliament_months": 7})
+        rows = sim.run(3)
+        self.assertEqual([r["election_now"] for r in rows], [False, True, False])
+        self.assertEqual([r["months_since_election"] for r in rows], [7, 1, 2])  # by the start of the next month
+        self.assertTrue(rows[1]["player_governs"])  # re-elected with unchanged policy
+        self.assertGreaterEqual(rows[1]["government_seats"], 326)
+
+    def test_a_hung_parliament_makes_a_coalition_of_the_nearest_blocs(self):
+        sim = Simulation(model(), seed=SEED, params={"parliament_months": 7, "vote_tenure_effect": -0.9})
+        rows = sim.run(2)
+        seats, governing = sim.column("seats"), sim.column("governing")
+        self.assertLess(max(seats), 326)
+        self.assertFalse(rows[1]["player_governs"])
+        self.assertEqual(seats.index(max(seats)), 1)  # the centre-right is largest and leads
+        self.assertTrue(governing[1])
+        self.assertGreaterEqual(rows[1]["government_seats"], 326)
+        self.assertEqual(rows[1]["government_seats"], sum(n for n, g in zip(seats, governing) if g))

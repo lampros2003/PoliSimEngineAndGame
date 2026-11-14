@@ -1,0 +1,13 @@
+# A test of elections and coalitions (stage S5.3): Parliament ends after seven months, so
+# the general election falls in February 2025, and time in office counts heavily against
+# the government, which loses its majority. Not a scenario to play.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 3
+preset = "central"
+
+[params]
+parliament_months = 7
+vote_tenure_effect = -0.9

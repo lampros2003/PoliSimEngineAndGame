@@ -90,7 +90,7 @@ unit = "1"
 phase = "politics"
 dims = ["bloc"]
 initial = { data = "politics/governing.csv" }
-next = "governing"
+next = "select(election_now, would_govern, governing)"
 
 [state.months_in_office]
 label = "Months the government has held office"
@@ -98,7 +98,7 @@ type = "int"
 unit = "1"
 phase = "politics"
 initial = 6
-next = "months_in_office + 1"
+next = "select(election_now and government_changes, 1, months_in_office + 1)"
 
 [state.unemployment_at_election]
 doc = "Unemployment at the last election; the base month's stands in for July 2024's (-1 until it is known)"
@@ -106,7 +106,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 initial = -1.0
-next = "select(unemployment_at_election < 0.0, unemployment_rate, unemployment_at_election)"
+next = "select(unemployment_at_election < 0.0 or election_now, unemployment_rate, unemployment_at_election)"
 
 [state.inflation_at_election]
 doc = "Inflation at the last election; the base month's stands in for July 2024's (-1 until it is known)"
@@ -114,7 +114,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 initial = -1.0
-next = "select(inflation_at_election < -0.5, inflation_annual, inflation_at_election)"
+next = "select(inflation_at_election < -0.5 or election_now, inflation_annual, inflation_at_election)"
 
 # ---- each household's change in real income, the pocketbook
 
@@ -232,3 +232,167 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "sum(select(governing, vote_intention, 0.0), bloc)"
+
+# ------------------------------------------------------------------ seats (stage S5.3)
+# Each seat's 2024 shares, scaled by its region's swing (proportional), first past the post.
+
+[dim.constituency]
+members = ["E14001101", "E14001106", "E14001107", "E14001173", "E14001183", "E14001190", "E14001211", "E14001244", "E14001272", "E14001285", "E14001295", "E14001307", "E14001367", "E14001368", "E14001377", "E14001378", "E14001379", "E14001382", "E14001389", "E14001397", "E14001440", "E14001492", "E14001518", "E14001519", "E14001531", "E14001557", "E14001567", "E14001065", "E14001070", "E14001076", "E14001091", "E14001102", "E14001103", "E14001104", "E14001105", "E14001110", "E14001111", "E14001112", "E14001113", "E14001142", "E14001144", "E14001145", "E14001152", "E14001158", "E14001163", "E14001164", "E14001170", "E14001178", "E14001185", "E14001222", "E14001242", "E14001251", "E14001277", "E14001286", "E14001299", "E14001317", "E14001318", "E14001329", "E14001337", "E14001338", "E14001339", "E14001340", "E14001341", "E14001347", "E14001350", "E14001352", "E14001353", "E14001354", "E14001361", "E14001372", "E14001415", "E14001416", "E14001422", "E14001424", "E14001433", "E14001443", "E14001446", "E14001450", "E14001455", "E14001459", "E14001463", "E14001491", "E14001504", "E14001509", "E14001510", "E14001515", "E14001517", "E14001528", "E14001539", "E14001561", "E14001564", "E14001565", "E14001577", "E14001580", "E14001583", "E14001584", "E14001585", "E14001589", "E14001598", "E14001602", "E14001074", "E14001075", "E14001087", "E14001118", "E14001119", "E14001120", "E14001127", "E14001128", "E14001147", "E14001177", "E14001196", "E14001198", "E14001199", "E14001200", "E14001250", "E14001255", "E14001262", "E14001269", "E14001297", "E14001308", "E14001313", "E14001314", "E14001315", "E14001319", "E14001320", "E14001321", "E14001322", "E14001323", "E14001324", "E14001325", "E14001383", "E14001418", "E14001423", "E14001428", "E14001436", "E14001444", "E14001451", "E14001452", "E14001461", "E14001462", "E14001464", "E14001466", "E14001467", "E14001468", "E14001469", "E14001470", "E14001472", "E14001475", "E14001506", "E14001544", "E14001560", "E14001582", "E14001604", "E14001605", "E14001066", "E14001068", "E14001079", "E14001109", "E14001114", "E14001140", "E14001165", "E14001179", "E14001192", "E14001193", "E14001194", "E14001195", "E14001228", "E14001243", "E14001245", "E14001253", "E14001266", "E14001287", "E14001288", "E14001311", "E14001326", "E14001327", "E14001328", "E14001336", "E14001342", "E14001343", "E14001355", "E14001357", "E14001362", "E14001364", "E14001375", "E14001391", "E14001404", "E14001406", "E14001407", "E14001410", "E14001411", "E14001412", "E14001457", "E14001458", "E14001471", "E14001476", "E14001483", "E14001487", "E14001488", "E14001490", "E14001571", "E14001064", "E14001092", "E14001093", "E14001094", "E14001095", "E14001096", "E14001097", "E14001098", "E14001099", "E14001100", "E14001138", "E14001143", "E14001150", "E14001180", "E14001181", "E14001182", "E14001203", "E14001204", "E14001261", "E14001281", "E14001309", "E14001316", "E14001335", "E14001358", "E14001380", "E14001395", "E14001398", "E14001400", "E14001413", "E14001441", "E14001453", "E14001473", "E14001478", "E14001479", "E14001493", "E14001513", "E14001514", "E14001520", "E14001521", "E14001522", "E14001523", "E14001524", "E14001526", "E14001535", "E14001538", "E14001541", "E14001543", "E14001547", "E14001562", "E14001566", "E14001574", "E14001579", "E14001594", "E14001595", "E14001596", "E14001597", "E14001601", "E14001077", "E14001084", "E14001121", "E14001125", "E14001136", "E14001139", "E14001146", "E14001149", "E14001154", "E14001156", "E14001159", "E14001174", "E14001176", "E14001206", "E14001224", "E14001226", "E14001256", "E14001267", "E14001268", "E14001273", "E14001278", "E14001283", "E14001284", "E14001289", "E14001298", "E14001302", "E14001344", "E14001345", "E14001346", "E14001351", "E14001359", "E14001365", "E14001384", "E14001390", "E14001393", "E14001396", "E14001401", "E14001402", "E14001405", "E14001408", "E14001409", "E14001425", "E14001437", "E14001480", "E14001481", "E14001489", "E14001494", "E14001496", "E14001497", "E14001501", "E14001502", "E14001507", "E14001512", "E14001516", "E14001530", "E14001546", "E14001568", "E14001569", "E14001573", "E14001578", "E14001590", "E14001073", "E14001081", "E14001083", "E14001085", "E14001086", "E14001089", "E14001122", "E14001123", "E14001124", "E14001137", "E14001153", "E14001160", "E14001167", "E14001169", "E14001172", "E14001175", "E14001186", "E14001187", "E14001188", "E14001189", "E14001205", "E14001207", "E14001208", "E14001209", "E14001213", "E14001221", "E14001223", "E14001225", "E14001229", "E14001236", "E14001238", "E14001257", "E14001259", "E14001260", "E14001264", "E14001265", "E14001270", "E14001271", "E14001276", "E14001279", "E14001290", "E14001292", "E14001293", "E14001300", "E14001301", "E14001305", "E14001306", "E14001310", "E14001312", "E14001331", "E14001332", "E14001333", "E14001334", "E14001371", "E14001414", "E14001417", "E14001421", "E14001430", "E14001434", "E14001435", "E14001445", "E14001448", "E14001454", "E14001503", "E14001525", "E14001527", "E14001534", "E14001550", "E14001553", "E14001556", "E14001558", "E14001559", "E14001563", "E14001576", "E14001586", "E14001063", "E14001067", "E14001069", "E14001071", "E14001072", "E14001078", "E14001082", "E14001088", "E14001090", "E14001108", "E14001117", "E14001129", "E14001130", "E14001141", "E14001151", "E14001157", "E14001162", "E14001166", "E14001184", "E14001191", "E14001197", "E14001201", "E14001202", "E14001210", "E14001212", "E14001214", "E14001215", "E14001216", "E14001218", "E14001219", "E14001220", "E14001227", "E14001230", "E14001233", "E14001234", "E14001235", "E14001239", "E14001246", "E14001249", "E14001252", "E14001254", "E14001258", "E14001263", "E14001274", "E14001275", "E14001280", "E14001282", "E14001294", "E14001296", "E14001303", "E14001304", "E14001330", "E14001348", "E14001349", "E14001360", "E14001366", "E14001369", "E14001370", "E14001373", "E14001374", "E14001376", "E14001392", "E14001403", "E14001419", "E14001420", "E14001431", "E14001432", "E14001438", "E14001439", "E14001442", "E14001447", "E14001449", "E14001456", "E14001465", "E14001474", "E14001477", "E14001499", "E14001500", "E14001505", "E14001532", "E14001533", "E14001549", "E14001555", "E14001570", "E14001587", "E14001588", "E14001591", "E14001592", "E14001593", "E14001599", "E14001600", "E14001080", "E14001115", "E14001116", "E14001126", "E14001131", "E14001132", "E14001133", "E14001134", "E14001135", "E14001148", "E14001155", "E14001161", "E14001168", "E14001171", "E14001217", "E14001231", "E14001232", "E14001237", "E14001240", "E14001241", "E14001247", "E14001248", "E14001291", "E14001356", "E14001363", "E14001381", "E14001385", "E14001386", "E14001387", "E14001388", "E14001394", "E14001399", "E14001426", "E14001427", "E14001429", "E14001460", "E14001482", "E14001484", "E14001485", "E14001486", "E14001495", "E14001498", "E14001508", "E14001511", "E14001529", "E14001536", "E14001537", "E14001540", "E14001542", "E14001545", "E14001548", "E14001551", "E14001552", "E14001554", "E14001572", "E14001575", "E14001581", "E14001603", "W07000081", "W07000082", "W07000083", "W07000084", "W07000085", "W07000086", "W07000087", "W07000088", "W07000089", "W07000090", "W07000091", "W07000092", "W07000093", "W07000094", "W07000095", "W07000096", "W07000097", "W07000098", "W07000099", "W07000100", "W07000101", "W07000102", "W07000103", "W07000104", "W07000105", "W07000106", "W07000107", "W07000108", "W07000109", "W07000110", "W07000111", "W07000112", "S14000021", "S14000027", "S14000045", "S14000048", "S14000051", "S14000060", "S14000061", "S14000062", "S14000063", "S14000064", "S14000065", "S14000066", "S14000067", "S14000068", "S14000069", "S14000070", "S14000071", "S14000072", "S14000073", "S14000074", "S14000075", "S14000076", "S14000077", "S14000078", "S14000079", "S14000080", "S14000081", "S14000082", "S14000083", "S14000084", "S14000085", "S14000086", "S14000087", "S14000088", "S14000089", "S14000090", "S14000091", "S14000092", "S14000093", "S14000094", "S14000095", "S14000096", "S14000097", "S14000098", "S14000099", "S14000100", "S14000101", "S14000102", "S14000103", "S14000104", "S14000105", "S14000106", "S14000107", "S14000108", "S14000109", "S14000110", "S14000111", "N05000001", "N05000002", "N05000003", "N05000004", "N05000005", "N05000006", "N05000007", "N05000008", "N05000009", "N05000010", "N05000011", "N05000012", "N05000013", "N05000014", "N05000015", "N05000016", "N05000017", "N05000018"]
+labels = ["Bishop Auckland", "Blaydon and Consett", "Blyth and Ashington", "City of Durham", "Cramlington and Killingworth", "Darlington", "Easington", "Gateshead Central and Whickham", "Hartlepool", "Hexham", "Houghton and Sunderland South", "Jarrow and Gateshead East", "Middlesbrough and Thornaby East", "Middlesbrough South and East Cleveland", "Newcastle upon Tyne Central and West", "Newcastle upon Tyne East and Wallsend", "Newcastle upon Tyne North", "Newton Aycliffe and Spennymoor", "North Durham", "North Northumberland", "Redcar", "South Shields", "Stockton North", "Stockton West", "Sunderland Central", "Tynemouth", "Washington and Gateshead South", "Altrincham and Sale West", "Ashton-under-Lyne", "Barrow and Furness", "Birkenhead", "Blackburn", "Blackley and Middleton South", "Blackpool North and Fleetwood", "Blackpool South", "Bolton North East", "Bolton South and Walkden", "Bolton West", "Bootle", "Burnley", "Bury North", "Bury South", "Carlisle", "Cheadle", "Chester North and Neston", "Chester South and Eddisbury", "Chorley", "Congleton", "Crewe and Nantwich", "Ellesmere Port and Bromborough", "Fylde", "Gorton and Denton", "Hazel Grove", "Heywood and Middleton North", "Hyndburn", "Knowsley", "Lancaster and Wyre", "Leigh and Atherton", "Liverpool Garston", "Liverpool Riverside", "Liverpool Walton", "Liverpool Wavertree", "Liverpool West Derby", "Macclesfield", "Makerfield", "Manchester Central", "Manchester Rusholme", "Manchester Withington", "Mid Cheshire", "Morecambe and Lunesdale", "Oldham East and Saddleworth", "Oldham West, Chadderton and Royton", "Pendle and Clitheroe", "Penrith and Solway", "Preston", "Ribble Valley", "Rochdale", "Rossendale and Darwen", "Runcorn and Helsby", "Salford", "Sefton Central", "South Ribble", "Southport", "St Helens North", "St Helens South and Whiston", "Stalybridge and Hyde", "Stockport", "Stretford and Urmston", "Tatton", "Wallasey", "Warrington North", "Warrington South", "West Lancashire", "Westmorland and Lonsdale", "Whitehaven and Workington", "Widnes and Halewood", "Wigan", "Wirral West", "Worsley and Eccles", "Wythenshawe and Sale East", "Barnsley North", "Barnsley South", "Beverley and Holderness", "Bradford East", "Bradford South", "Bradford West", "Bridlington and The Wolds", "Brigg and Immingham", "Calder Valley", "Colne Valley", "Dewsbury and Batley", "Doncaster Central", "Doncaster East and the Isle of Axholme", "Doncaster North", "Goole and Pocklington", "Great Grimsby and Cleethorpes", "Halifax", "Harrogate and Knaresborough", "Huddersfield", "Keighley and Ilkley", "Kingston upon Hull East", "Kingston upon Hull North and Cottingham", "Kingston upon Hull West and Haltemprice", "Leeds Central and Headingley", "Leeds East", "Leeds North East", "Leeds North West", "Leeds South", "Leeds South West and Morley", "Leeds West and Pudsey", "Normanton and Hemsworth", "Ossett and Denby Dale", "Penistone and Stocksbridge", "Pontefract, Castleford and Knottingley", "Rawmarsh and Conisbrough", "Richmond and Northallerton", "Rother Valley", "Rotherham", "Scarborough and Whitby", "Scunthorpe", "Selby", "Sheffield Brightside and Hillsborough", "Sheffield Central", "Sheffield Hallam", "Sheffield Heeley", "Sheffield South East", "Shipley", "Skipton and Ripon", "Spen Valley", "Thirsk and Malton", "Wakefield and Rothwell", "Wetherby and Easingwold", "York Central", "York Outer", "Amber Valley", "Ashfield", "Bassetlaw", "Bolsover", "Boston and Skegness", "Broxtowe", "Chesterfield", "Corby and East Northamptonshire", "Daventry", "Derby North", "Derby South", "Derbyshire Dales", "Erewash", "Gainsborough", "Gedling", "Grantham and Bourne", "Harborough, Oadby and Wigston", "High Peak", "Hinckley and Bosworth", "Kettering", "Leicester East", "Leicester South", "Leicester West", "Lincoln", "Loughborough", "Louth and Horncastle", "Mansfield", "Melton and Syston", "Mid Derbyshire", "Mid Leicestershire", "Newark", "North East Derbyshire", "North West Leicestershire", "Northampton North", "Northampton South", "Nottingham East", "Nottingham North and Kimberley", "Nottingham South", "Rushcliffe", "Rutland and Stamford", "Sherwood Forest", "Sleaford and North Hykeham", "South Derbyshire", "South Holland and The Deepings", "South Leicestershire", "South Northamptonshire", "Wellingborough and Rushden", "Aldridge-Brownhills", "Birmingham Edgbaston", "Birmingham Erdington", "Birmingham Hall Green and Moseley", "Birmingham Hodge Hill and Solihull North", "Birmingham Ladywood", "Birmingham Northfield", "Birmingham Perry Barr", "Birmingham Selly Oak", "Birmingham Yardley", "Bromsgrove", "Burton and Uttoxeter", "Cannock Chase", "Coventry East", "Coventry North West", "Coventry South", "Droitwich and Evesham", "Dudley", "Halesowen", "Hereford and South Herefordshire", "Kenilworth and Southam", "Kingswinford and South Staffordshire", "Lichfield", "Meriden and Solihull East", "Newcastle-under-Lyme", "North Herefordshire", "North Shropshire", "North Warwickshire and Bedworth", "Nuneaton", "Redditch", "Rugby", "Shrewsbury", "Smethwick", "Solihull West and Shirley", "South Shropshire", "Stafford", "Staffordshire Moorlands", "Stoke-on-Trent Central", "Stoke-on-Trent North", "Stoke-on-Trent South", "Stone, Great Wyrley and Penkridge", "Stourbridge", "Stratford-on-Avon", "Sutton Coldfield", "Tamworth", "Telford", "The Wrekin", "Tipton and Wednesbury", "Walsall and Bloxwich", "Warwick and Leamington", "West Bromwich", "West Worcestershire", "Wolverhampton North East", "Wolverhampton South East", "Wolverhampton West", "Worcester", "Wyre Forest", "Basildon and Billericay", "Bedford", "Braintree", "Brentwood and Ongar", "Broadland and Fakenham", "Broxbourne", "Bury St Edmunds and Stowmarket", "Cambridge", "Castle Point", "Central Suffolk and North Ipswich", "Chelmsford", "Clacton", "Colchester", "Dunstable and Leighton Buzzard", "Ely and East Cambridgeshire", "Epping Forest", "Great Yarmouth", "Harlow", "Harpenden and Berkhamsted", "Harwich and North Essex", "Hemel Hempstead", "Hertford and Stortford", "Hertsmere", "Hitchin", "Huntingdon", "Ipswich", "Lowestoft", "Luton North", "Luton South and South Bedfordshire", "Maldon", "Mid Bedfordshire", "Mid Norfolk", "North Bedfordshire", "North East Cambridgeshire", "North East Hertfordshire", "North Norfolk", "North West Cambridgeshire", "North West Essex", "North West Norfolk", "Norwich North", "Norwich South", "Peterborough", "Rayleigh and Wickford", "South Basildon and East Thurrock", "South Cambridgeshire", "South Norfolk", "South Suffolk", "South West Hertfordshire", "South West Norfolk", "Southend East and Rochford", "Southend West and Leigh", "St Albans", "St Neots and Mid Cambridgeshire", "Stevenage", "Suffolk Coastal", "Thurrock", "Watford", "Waveney Valley", "Welwyn Hatfield", "West Suffolk", "Witham", "Barking", "Battersea", "Beckenham and Penge", "Bermondsey and Old Southwark", "Bethnal Green and Stepney", "Bexleyheath and Crayford", "Brent East", "Brent West", "Brentford and Isleworth", "Bromley and Biggin Hill", "Carshalton and Wallington", "Chelsea and Fulham", "Chingford and Woodford Green", "Chipping Barnet", "Cities of London and Westminster", "Clapham and Brixton Hill", "Croydon East", "Croydon South", "Croydon West", "Dagenham and Rainham", "Dulwich and West Norwood", "Ealing Central and Acton", "Ealing North", "Ealing Southall", "East Ham", "Edmonton and Winchmore Hill", "Eltham and Chislehurst", "Enfield North", "Erith and Thamesmead", "Feltham and Heston", "Finchley and Golders Green", "Greenwich and Woolwich", "Hackney North and Stoke Newington", "Hackney South and Shoreditch", "Hammersmith and Chiswick", "Hampstead and Highgate", "Harrow East", "Harrow West", "Hayes and Harlington", "Hendon", "Holborn and St Pancras", "Hornchurch and Upminster", "Hornsey and Friern Barnet", "Ilford North", "Ilford South", "Islington North", "Islington South and Finsbury", "Kensington and Bayswater", "Kingston and Surbiton", "Lewisham East", "Lewisham North", "Lewisham West and East Dulwich", "Leyton and Wanstead", "Mitcham and Morden", "Old Bexley and Sidcup", "Orpington", "Peckham", "Poplar and Limehouse", "Putney", "Queen's Park and Maida Vale", "Richmond Park", "Romford", "Ruislip, Northwood and Pinner", "Southgate and Wood Green", "Stratford and Bow", "Streatham and Croydon North", "Sutton and Cheam", "Tooting", "Tottenham", "Twickenham", "Uxbridge and South Ruislip", "Vauxhall and Camberwell Green", "Walthamstow", "West Ham and Beckton", "Wimbledon", "Aldershot", "Arundel and South Downs", "Ashford", "Aylesbury", "Banbury", "Basingstoke", "Beaconsfield", "Bexhill and Battle", "Bicester and Woodstock", "Bognor Regis and Littlehampton", "Bracknell", "Brighton Kemptown and Peacehaven", "Brighton Pavilion", "Buckingham and Bletchley", "Canterbury", "Chatham and Aylesford", "Chesham and Amersham", "Chichester", "Crawley", "Dartford", "Didcot and Wantage", "Dorking and Horley", "Dover and Deal", "Earley and Woodley", "East Grinstead and Uckfield", "East Hampshire", "East Surrey", "East Thanet", "East Worthing and Shoreham", "Eastbourne", "Eastleigh", "Epsom and Ewell", "Esher and Walton", "Fareham and Waterlooville", "Farnham and Bordon", "Faversham and Mid Kent", "Folkestone and Hythe", "Gillingham and Rainham", "Godalming and Ash", "Gosport", "Gravesham", "Guildford", "Hamble Valley", "Hastings and Rye", "Havant", "Henley and Thame", "Herne Bay and Sandwich", "Horsham", "Hove and Portslade", "Isle of Wight East", "Isle of Wight West", "Lewes", "Maidenhead", "Maidstone and Malling", "Mid Buckinghamshire", "Mid Sussex", "Milton Keynes Central", "Milton Keynes North", "New Forest East", "New Forest West", "Newbury", "North East Hampshire", "North West Hampshire", "Oxford East", "Oxford West and Abingdon", "Portsmouth North", "Portsmouth South", "Reading Central", "Reading West and Mid Berkshire", "Reigate", "Rochester and Strood", "Romsey and Southampton North", "Runnymede and Weybridge", "Sevenoaks", "Sittingbourne and Sheppey", "Slough", "Southampton Itchen", "Southampton Test", "Spelthorne", "Surrey Heath", "Sussex Weald", "Tonbridge", "Tunbridge Wells", "Weald of Kent", "Winchester", "Windsor", "Witney", "Woking", "Wokingham", "Worthing West", "Wycombe", "Bath", "Bournemouth East", "Bournemouth West", "Bridgwater", "Bristol Central", "Bristol East", "Bristol North East", "Bristol North West", "Bristol South", "Camborne and Redruth", "Central Devon", "Cheltenham", "Chippenham", "Christchurch", "East Wiltshire", "Exeter", "Exmouth and Exeter East", "Filton and Bradley Stoke", "Forest of Dean", "Frome and East Somerset", "Glastonbury and Somerton", "Gloucester", "Honiton and Sidmouth", "Melksham and Devizes", "Mid Dorset and North Poole", "Newton Abbot", "North Cornwall", "North Cotswolds", "North Devon", "North Dorset", "North East Somerset and Hanham", "North Somerset", "Plymouth Moor View", "Plymouth Sutton and Devonport", "Poole", "Salisbury", "South Cotswolds", "South Devon", "South Dorset", "South East Cornwall", "South West Devon", "South West Wiltshire", "St Austell and Newquay", "St Ives", "Stroud", "Swindon North", "Swindon South", "Taunton and Wellington", "Tewkesbury", "Thornbury and Yate", "Tiverton and Minehead", "Torbay", "Torridge and Tavistock", "Truro and Falmouth", "Wells and Mendip Hills", "West Dorset", "Weston-super-Mare", "Yeovil", "Aberafan Maesteg", "Alyn and Deeside", "Bangor Aberconwy", "Blaenau Gwent and Rhymney", "Brecon, Radnor and Cwm Tawe", "Bridgend", "Caerfyrddin", "Caerphilly", "Cardiff East", "Cardiff North", "Cardiff South and Penarth", "Cardiff West", "Ceredigion Preseli", "Clwyd East", "Clwyd North", "Dwyfor Meirionnydd", "Gower", "Llanelli", "Merthyr Tydfil and Aberdare", "Mid and South Pembrokeshire", "Monmouthshire", "Montgomeryshire and Glyndŵr", "Neath and Swansea East", "Newport East", "Newport West and Islwyn", "Pontypridd", "Rhondda and Ogmore", "Swansea West", "Torfaen", "Vale of Glamorgan", "Wrexham", "Ynys Môn", "East Renfrewshire", "Na h-Eileanan an Iar", "Midlothian", "North Ayrshire and Arran", "Orkney and Shetland", "Aberdeen North", "Aberdeen South", "Aberdeenshire North and Moray East", "Airdrie and Shotts", "Alloa and Grangemouth", "Angus and Perthshire Glens", "Arbroath and Broughty Ferry", "Argyll, Bute and South Lochaber", "Bathgate and Linlithgow", "Caithness, Sutherland and Easter Ross", "Coatbridge and Bellshill", "Cowdenbeath and Kirkcaldy", "Cumbernauld and Kirkintilloch", "Dumfries and Galloway", "Dumfriesshire, Clydesdale and Tweeddale", "Dundee Central", "Dunfermline and Dollar", "East Kilbride and Strathaven", "Edinburgh East and Musselburgh", "Edinburgh North and Leith", "Edinburgh South", "Edinburgh South West", "Edinburgh West", "Falkirk", "Glasgow East", "Glasgow North", "Glasgow North East", "Glasgow South", "Glasgow South West", "Glasgow West", "Glenrothes and Mid Fife", "Gordon and Buchan", "Hamilton and Clyde Valley", "Inverclyde and Renfrewshire West", "Inverness, Skye and West Ross-shire", "Livingston", "Lothian East", "Mid Dunbartonshire", "Moray West, Nairn and Strathspey", "Motherwell, Wishaw and Carluke", "North East Fife", "Paisley and Renfrewshire North", "Paisley and Renfrewshire South", "Perth and Kinross-shire", "Rutherglen", "Stirling and Strathallan", "West Dunbartonshire", "Ayr, Carrick and Cumnock", "Berwickshire, Roxburgh and Selkirk", "Central Ayrshire", "Kilmarnock and Loudoun", "West Aberdeenshire and Kincardine", "Belfast East", "Belfast North", "Belfast South and Mid Down", "Belfast West", "East Antrim", "East Londonderry", "Fermanagh and South Tyrone", "Foyle", "Lagan Valley", "Mid Ulster", "Newry and Armagh", "North Antrim", "North Down", "South Antrim", "South Down", "Strangford", "Upper Bann", "West Tyrone"]
+
+[dim.rival]
+doc = "The blocs again, to compare each bloc with every other"
+members = ["centre_left", "centre_right", "liberal", "populist_right", "green", "scottish_nationalist", "welsh_nationalist", "northern_ireland", "other"]
+
+[param.seat_region]
+type = "int"
+unit = "1"
+dims = ["constituency"]
+data = "politics/constituencies.csv"
+column = "region"
+
+[param.seat_share_2024]
+doc = "Each bloc's share of the valid votes in 2024 (the other bloc's by its best candidate)"
+type = "real"
+unit = "1"
+dims = ["constituency", "bloc"]
+data = "politics/seat_shares.csv"
+
+[param.regional_share_2024]
+type = "real"
+unit = "1"
+dims = ["region", "bloc"]
+data = "politics/regional_shares.csv"
+
+[param.bloc_position]
+doc = "Left (-1) to right (+1) on tax and spending: a judgement"
+type = "real"
+unit = "1"
+dims = ["bloc"]
+data = "politics/positions.csv"
+
+[param.parliament_months]
+doc = "Months from one general election to the next"
+type = "int"
+unit = "1"
+value = 60
+
+[param.majority]
+doc = "Seats needed to govern alone: more than half of 650"
+type = "int"
+unit = "seat"
+value = 326
+
+[param.seat_each]
+doc = "One seat per constituency won"
+type = "int"
+unit = "seat"
+value = 1
+
+[state.months_since_election]
+label = "Months since the last general election"
+type = "int"
+unit = "1"
+phase = "politics"
+initial = 6
+next = "select(election_now, 1, months_since_election + 1)"
+
+[var.election_now]
+label = "A general election this month"
+type = "bool"
+unit = "1"
+phase = "politics"
+expr = "months_since_election >= parliament_months"
+
+[var.projected_share]
+label = "Share of the vote by seat, if an election were held now"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["constituency", "bloc"]
+expr = "seat_share_2024 * safe_div(regional_intention[region: seat_region], regional_share_2024[region: seat_region], 0.0)"
+
+[var.seat_won]
+type = "bool"
+unit = "1"
+phase = "politics"
+dims = ["constituency", "bloc"]
+expr = "sum(select(projected_share[bloc: coord(rival)] > projected_share or projected_share[bloc: coord(rival)] == projected_share and coord(rival) < coord(bloc), 1, 0), rival) == 0"
+
+[var.projected_seats]
+label = "Seats, if an election were held now"
+type = "int"
+unit = "seat"
+phase = "politics"
+dims = ["bloc"]
+expr = "sum(select(seat_won, seat_each, 0), constituency)"
+
+[state.seats]
+label = "Seats in the House of Commons"
+type = "int"
+unit = "seat"
+phase = "politics"
+dims = ["bloc"]
+initial = { data = "politics/seats.csv" }
+next = "select(election_now, projected_seats, seats)"
+
+[state.seat_holder]
+label = "The bloc holding each seat"
+type = "int"
+unit = "1"
+phase = "politics"
+dims = ["constituency"]
+initial = { data = "politics/constituencies.csv", column = "winner" }
+next = "select(election_now, sum(select(seat_won, coord(bloc), 0), bloc), seat_holder)"
+
+# ---- forming a government: the largest bloc, then the nearest blocs until a majority
+
+[var.largest_bloc]
+type = "bool"
+unit = "1"
+phase = "politics"
+dims = ["bloc"]
+expr = "sum(select(projected_seats[bloc: coord(rival)] > projected_seats or projected_seats[bloc: coord(rival)] == projected_seats and coord(rival) < coord(bloc), 1, 0), rival) == 0"
+
+[var.leader_position]
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "sum(select(largest_bloc, bloc_position, 0.0), bloc)"
+
+[var.distance_from_leader]
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["bloc"]
+expr = "abs(bloc_position - leader_position)"
+
+[var.would_govern]
+doc = "In the government an election now would form: the largest bloc, then the nearest, until a majority"
+type = "bool"
+unit = "1"
+phase = "politics"
+dims = ["bloc"]
+expr = "projected_seats > 0 and sum(select(distance_from_leader[bloc: coord(rival)] < distance_from_leader or distance_from_leader[bloc: coord(rival)] == distance_from_leader and coord(rival) < coord(bloc), projected_seats[bloc: coord(rival)], 0), rival) < majority"
+
+[var.government_changes]
+doc = "This month's election changes which blocs govern"
+type = "bool"
+unit = "1"
+phase = "politics"
+expr = "election_now and sum(select(would_govern != governing, 1, 0), bloc) > 0"
+
+[var.government_seats]
+label = "Seats of the governing blocs"
+doc = "After this month's election, if there is one"
+type = "int"
+unit = "seat"
+phase = "politics"
+expr = "sum(select(select(election_now, would_govern, governing), select(election_now, projected_seats, seats), 0), bloc)"
+
+[var.player_governs]
+label = "The player's bloc is in government"
+type = "bool"
+unit = "1"
+phase = "politics"
+expr = "select(election_now, would_govern[bloc: centre_left], governing[bloc: centre_left])"
