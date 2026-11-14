@@ -54,10 +54,11 @@ def fetch(only: list[str] | None = None) -> None:
         request = urllib.request.Request(spec["url"], headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(request, timeout=600) as response:
             data = response.read()
-        (CACHE / f"{name}.csv").write_bytes(data)
+        target = CACHE / spec.get("file", f"{name}.csv")
+        target.write_bytes(data)
         meta = {"retrieved": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
-        (CACHE / f"{name}.meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+        (CACHE / f"{target.stem}.meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
         print(f"fetched {name}: {len(data):,} bytes")
 
 
@@ -111,6 +112,8 @@ def load_all() -> tuple[dict, dict, dict]:
     sources = load_toml("sources.toml")["dataset"]
     values, info = {}, {}
     for name, spec in sources.items():
+        if spec["format"] == "ons_xlsx":
+            continue  # workbooks: read by tools/uk/population.py and its kind
         path = CACHE / f"{name}.csv"
         if not path.exists():
             sys.exit(f"{path} is missing: run `python tools/uk/pipeline.py fetch` first")
@@ -156,8 +159,8 @@ def extract() -> None:
               'text = "Contains public sector information licensed under the Open Government Licence v3.0. '
               'Source: Office for National Statistics and Bank of England."', ""]
     for name, spec in sources.items():
-        meta = json.loads((CACHE / f"{name}.meta.json").read_text(encoding="utf-8"))
-        release = next((i.get("Release Date", "") for i in info[name].values() if i.get("Release Date")), "")
+        meta = json.loads((CACHE / f"{Path(spec.get('file', name + '.csv')).stem}.meta.json").read_text(encoding="utf-8"))
+        release = next((i.get("Release Date", "") for i in info.get(name, {}).values() if i.get("Release Date")), "")
         lines += [f"[dataset.{name}]"]
         for key in ("title", "publisher", "url", "page", "licence", "attribution"):
             lines.append(f"{key} = {json.dumps(spec[key])}")

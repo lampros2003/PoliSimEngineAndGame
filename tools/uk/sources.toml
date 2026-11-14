@@ -55,3 +55,23 @@ page = "https://www.bankofengland.co.uk/boeapps/database"
 licence = "Open Government Licence v3.0 (Bank of England Database)"
 attribution = "Contains Bank of England data licensed under the Open Government Licence v3.0"
 format = "boe_monthly"
+
+[dataset.mye24]
+title = "Population estimates for the UK, England, Wales, Scotland and Northern Ireland: mid-2024"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland/mid2024/mye24tablesuk.xlsx"
+page = "https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_xlsx"
+file = "mye24.xlsx"
+
+[dataset.lifetables]
+title = "National life tables: United Kingdom"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkingdomreferencetables/current/nltuk198020223.xlsx"
+page = "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkingdomreferencetables"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+format = "ons_xlsx"
+file = "lifetables.xlsx"

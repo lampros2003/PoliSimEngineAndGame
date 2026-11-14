@@ -69,6 +69,28 @@ release_date = ""
 retrieved = "2026-11-14T02:00:37Z"
 sha256 = "5161f3039b6f384d5194ee7f745c7e804635bfead7ada2d5ddce89dd15ab2ca9"
 
+[dataset.mye24]
+title = "Population estimates for the UK, England, Wales, Scotland and Northern Ireland: mid-2024"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland/mid2024/mye24tablesuk.xlsx"
+page = "https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T02:48:33Z"
+sha256 = "f78d50e8d77fe5ed9d04667d6875aefcf62b56380af7aceb2e90dce067981526"
+
+[dataset.lifetables]
+title = "National life tables: United Kingdom"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkingdomreferencetables/current/nltuk198020223.xlsx"
+page = "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkingdomreferencetables"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T02:48:33Z"
+sha256 = "cbc71edc1a46b75f3ecf6326f05501216c68fa2d648f54f231a4a82cea786846"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"
