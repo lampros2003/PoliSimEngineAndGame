@@ -204,9 +204,29 @@ four and a half times someone of 45 to 64, children of 5 to 14 half), education 
 aged 4 to 21, social care people aged 65 and over, and the rest everyone. With unchanged
 money the levels wear down as the population grows and ages, health and social care
 fastest: health falls below 95%, the threshold of a situation, in the 55th month. A
-quarter off health spending takes its level halfway to 75% in about four months. NHS
-England's waiting list, planned as health's sourced outcome, waits for its data: its site
-is not reachable from the environment this was built in.
+quarter off health spending takes its level halfway to 75% in about four months.
+
+### The NHS waiting list (stage S9.0)
+
+`tools/uk/nhs.py` reads NHS England's referral-to-treatment overview series (OGL;
+`data/nhs_rtt.csv`, every month from August 2007 to January 2025): the number waiting for
+planned hospital treatment in England, with NHS England's estimates for trusts that did
+not report, the new referrals and the waits that ended in treatment. In 2024 about 1.74
+million referrals joined the list a month, 1.50 million treatments left it, and about 3.3%
+of the list a month left it for other reasons (validation, treatment elsewhere, patients
+who no longer needed it), the gap between the flows and the change in the list, which fell
+from 7.58 to 7.46 million. The longest list on record was 7.77 million, in September 2023.
+
+In the model (`nhs.toml`) the list starts at 7.46 million, December 2024's. Referrals grow
+with the population weighted by its need for health care (S8.1); treatments follow real
+health spending as the service has adjusted to it (`treatment_response`: 10% more real
+spending treats 10% more patients, a judgement, presets 0.5 and 1.5); other removals stay
+at 2024's share of the list. With unchanged money referrals grow about 1.3% a year, as the
+population grows and ages, while treatments stay flat, so the list passes its record in the
+30th month and reaches 8.8 million by the 2029 election. A tenth off health spending leaves
+it about 2 million longer than unchanged money after two years. The list is
+in the headline; "Months to clear the waiting list" divides it by this month's treatments
+(about five).
 
 ## Emissions (stage S8.2)
 
@@ -249,9 +269,12 @@ end, each with a start and an end so it does not flicker:
 | Public services improving (good, S8.1) | all services, weighted by spending, above 105% | below 103% |
 | Emissions above the path to net zero (S8.2) | more than 5% above a straight path from 2024's to nothing in 2050 | below the path |
 | On track for net zero (good, S8.2) | more than 2% below the path | above it |
+| Record NHS waiting list (S9.0) | longer than the record, 7.77 million in September 2023 | 1% below it |
+| NHS waiting list falling (good, S9.0) | more than 5% shorter than at the end of 2024 | less than 3% shorter |
 
-With policy unchanged, debt passes 100% of GDP in the 18th month and nothing else comes on
-in five years. Cutting purchases of goods and services by a quarter brings a recession at
+With policy unchanged, debt passes 100% of GDP in the 18th month, emissions move above
+their path in the 16th, the waiting list passes its record in the 30th and the health
+service falls below 95% in the 55th. Cutting purchases of goods and services by a quarter brings a recession at
 once and high unemployment from the sixth month, both over within two years. (That was
 written when purchases were one lever; with spending by function, cutting health spending by
 a third does the same, with unemployment above 6% at once.)

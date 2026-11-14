@@ -41,6 +41,9 @@ func _initialize() -> void:
 	for line in main.budget._lines:
 		var entry: Dictionary = line["entry"]
 		lines.append("%s,%s" % [str(entry.get("label", line["name"])), line["cells"][0].text])
+	# The headline strip, as shown (stage S9.0: the NHS waiting list is one of its figures).
+	for key in main._cards:
+		lines.append("headline %s,\"%s\"" % [key, main._cards[key]["value"].text])
 	for key in ["revenue", "spending", "balance"]:
 		var cells: Array = main.budget._totals.get(key, [])
 		if cells.size() == 3:

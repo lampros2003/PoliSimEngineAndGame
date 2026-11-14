@@ -24,7 +24,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 | Part | What it shows |
 |---|---|
 | Top bar | The month just finished; buttons to advance one month, a quarter or a year; **Amounts a year** (amounts at an annual rate, as the public finances are published, or per month); Save, Load, Reload model, Help |
-| Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP and the government's poll rating, each with last month's change, a **Chart** and a **Why** button |
+| Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP, the government's poll rating and the NHS waiting list in England, each with last month's change, a **Chart** and a **Why** button |
 | Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus), each since the month it began. A new one is announced when it begins |
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
 | Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
@@ -57,7 +57,9 @@ election, and how long the government has been in office.
    region, Scotland loses nothing, because it sets its own rates.
 2. **Cut health spending by a quarter** (Policy, Public services) and advance two years.
    Jobs by industry move out of health and social work, public employment falls with the
-   pay bill, and unemployment, the polls and the situations show the cost.
+   pay bill, the NHS waiting list (in the headline) climbs past its record, and
+   unemployment, the polls and the situations show the cost. Leave health alone instead
+   and the list still grows, more slowly, as the population ages.
 3. **Put a 20% trade barrier on China** (Policy, Trade). Customs duties appear in the
    budget, about £8bn a year; exports to China fall by about 40%, and so do imports from
    it.

@@ -475,6 +475,37 @@ class Emissions(unittest.TestCase):
         self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))
 
 
+class WaitingList(unittest.TestCase):
+    """Stage S9.0: the NHS waiting list, from NHS England's 2024 flows
+    (models/uk/data/nhs_rtt.csv): referrals join it, treatments and other removals leave it."""
+
+    def test_the_first_month_moves_the_list_as_2024_did(self):
+        with open(UK / "data" / "nhs_rtt.csv", newline="", encoding="utf-8") as handle:
+            rows = {r["month"]: r for r in csv.DictReader(handle)}
+        months = [rows[f"2024-{m:02d}"] for m in range(1, 13)]
+        referrals = sum(int(r["referrals"]) for r in months) / 12
+        treated = sum(int(r["treated"]) for r in months) / 12
+        end_2024 = int(rows["2024-12"]["waiting"])
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        self.assertAlmostEqual(row["referrals"], referrals, places=6)
+        self.assertAlmostEqual(row["treatments"], treated, places=6)
+        # In 2024 the list fell by about 12,000 a month; the first month does about the same.
+        self.assertLess(abs(row["waiting_list"] - end_2024 + 12015), 5000)
+        self.assertEqual(model().symbols["record_waiting_list"].spec["value"], max(int(r["waiting"]) for r in rows.values()))
+
+    def test_a_health_cut_lengthens_the_list_within_a_year(self):
+        cut = {1: {"spending_health": model().symbols["spending_health"].spec["default"] * 9 // 10}}
+        base = Simulation(model(), seed=SEED)
+        cutting = Simulation(model(), seed=SEED, commands=cut)
+        for _ in range(12):
+            row, row_cut = base.step(), cutting.step()
+        self.assertLess(row_cut["treatments"], 0.95 * row["treatments"])
+        self.assertGreater(row_cut["waiting_list"], row["waiting_list"] + 500_000)
+        self.assertTrue(row_cut["waiting_list_record"])
+        self.assertFalse(row["waiting_list_record"])
+
+
 class Issues(unittest.TestCase):
     """Stage S8.3: voters weigh health, education, policing and the environment for the
     government, each as its change since the last election."""

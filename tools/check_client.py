@@ -230,17 +230,26 @@ def parse_money(text: str) -> float:
 
 def compare_uk_budget(text: str) -> list[str]:
     import csv
-    shown = {row["label"]: parse_money(row["text"]) for row in csv.DictReader(text.splitlines())}
+    rows = list(csv.DictReader(text.splitlines()))
+    shown = {row["label"]: parse_money(row["text"]) for row in rows if not row["label"].startswith("headline ")}
+    headline = {row["label"].removeprefix("headline "): row["text"] for row in rows if row["label"].startswith("headline ")}
     with open(ROOT / "models" / "uk" / "data" / "annual.csv", newline="", encoding="utf-8") as handle:
         year = next(row for row in csv.DictReader(handle) if row["period"] == "2024")
 
     def published(columns):
         return sum((-1 if c.startswith("-") else 1) * float(year[c.lstrip("-")]) for c in columns) * 1e6
 
+    problems = []
+    # Stage S9.0: the headline shows the NHS waiting list, whole, as the runner has it.
+    out = subprocess.run([str(ROOT / "target" / "release" / EXE), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"),
+                          "--steps", "1", "--columns", "waiting_list"], capture_output=True, text=True, timeout=600)
+    want = int(out.stdout.splitlines()[1]) if out.returncode == 0 else None
+    got = headline.get("waiting_list")
+    if want is None or got is None or got.replace(",", "") != str(want):
+        problems.append(f"UK headline: the waiting list shows {got}, the runner has {want}")
     checks = [(label, shown.get(label), published(columns)) for label, columns in UK_BUDGET.items()]
     interest = [shown.get(label) for label in UK_INTEREST]
     checks.append(("Debt interest", None if None in interest else sum(interest), published(["ps_interest"])))
-    problems = []
     for label, got, want in checks:
         # Totals are shown to three figures (£1.12tn), so they get the rounding as slack.
         slack = 0.01 if abs(want) < 1e12 else 0.006

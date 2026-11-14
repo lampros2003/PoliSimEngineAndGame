@@ -57,7 +57,7 @@ class UnitedKingdom(unittest.TestCase):
         self.assertEqual(names, ["recession", "strong_growth", "high_unemployment", "high_inflation",
                                  "debt_above_output", "budget_surplus", "no_majority", "health_strain",
                                  "schools_strain", "policing_strain", "services_improving", "emissions_above_path",
-                                 "emissions_on_track"])
+                                 "emissions_on_track", "waiting_list_record", "waiting_list_falling"])
         scenario.commands = {1: {d.name: d.spec["default"] * 3 // 4 for d in scenario.model.symbols.values()
                                  if d.kind == "lever" and d.name.startswith("spending_")}}
         sim = from_scenario(scenario)

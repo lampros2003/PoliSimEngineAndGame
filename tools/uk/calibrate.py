@@ -473,7 +473,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
-               "functions.toml", "emissions.toml", "situations.toml") if people else ())
+               "functions.toml", "emissions.toml", "nhs.toml", "situations.toml") if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
     if people:
@@ -509,6 +509,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
             encoding="utf-8", newline="\n")
         import emissions
         (out_dir / "emissions.toml").write_text(emissions.write(out_dir), encoding="utf-8", newline="\n")
+        import nhs
+        (out_dir / "nhs.toml").write_text(nhs.write(), encoding="utf-8", newline="\n")
     fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income)" if people
                                 else "round(income_tax_rate * (wages + public_pay + benefits + other_income))")
     fills["nics_expr"] = ("round(ni_scale * (employee_ni_total + employer_ni_total))" if people
@@ -524,7 +526,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     fills["customs_receipts"] = " + customs_duties + carbon_tax_firms + carbon_tax_households" if people else ""
     for name in ("model.toml", "economy.toml",
                  *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml", "functions.toml",
-                                                  "emissions.toml"))):
+                                                  "emissions.toml", "nhs.toml"))):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))

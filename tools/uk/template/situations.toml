@@ -108,3 +108,18 @@ doc = "Greenhouse gas emissions are below a straight path from 2024's to nothing
 good = true
 start = "emissions < 0.98 * net_zero_path"
 end = "emissions > net_zero_path"
+
+# ---- Stage S9.0: the NHS waiting list (nhs.toml)
+
+[situation.waiting_list_record]
+label = "Record NHS waiting list"
+doc = "More people are waiting for planned hospital treatment in England than ever before"
+start = "waiting_list > record_waiting_list"
+end = "waiting_list < round(0.99 * record_waiting_list)"
+
+[situation.waiting_list_falling]
+label = "NHS waiting list falling"
+doc = "The NHS waiting list is more than 5% shorter than at the end of 2024"
+good = true
+start = "waiting_list < round(0.95 * waiting_list_2024)"
+end = "waiting_list > round(0.97 * waiting_list_2024)"
