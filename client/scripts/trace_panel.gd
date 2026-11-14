@@ -30,11 +30,12 @@ func _ready() -> void:
 	box.add_child(head)
 	_title = Label.new()
 	_title.text = "Why did it change?"
-	_title.add_theme_font_size_override("font_size", Palette.TITLE)
+	_title.theme_type_variation = "Title"
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
 	_back = Button.new()
 	_back.text = "Back"
+	_back.theme_type_variation = "Link"
 	_back.disabled = true
 	_back.pressed.connect(func() -> void: back.emit())
 	head.add_child(_back)
@@ -162,6 +163,7 @@ func show_explanation(e: Dictionary) -> void:
 		if symbol != "" and str(input_entry.get("row", "")) != "":
 			var plot := Button.new()
 			plot.text = "Chart"
+			plot.theme_type_variation = "Link"
 			var input_row: String = input_entry["row"]
 			plot.pressed.connect(func() -> void: chart.emit(input_row))
 			row.add_child(plot)

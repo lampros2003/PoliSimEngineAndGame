@@ -32,11 +32,12 @@ func _ready() -> void:
 	box.add_child(head)
 	_title = Label.new()
 	_title.text = "Connections"
-	_title.add_theme_font_size_override("font_size", Palette.TITLE)
+	_title.theme_type_variation = "Title"
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
 	_back = Button.new()
 	_back.text = "Back"
+	_back.theme_type_variation = "Link"
 	_back.disabled = true
 	_back.pressed.connect(_go_back)
 	head.add_child(_back)
@@ -210,7 +211,7 @@ func _tile(name: String, main := false) -> Control:
 		text += "\n" + ("by " + ", ".join(dims).replace("_", " ") if not dims.is_empty() else ("for each " + where if where != "" else str(entry.get("kind", ""))))
 	button.text = text
 	button.tooltip_text = str(entry.get("doc", ""))
-	var style := Palette.panel_style(Palette.PANEL_RAISED, 4, 6)
+	var style := Palette.panel_style(Palette.PANEL_RAISED, 0, 6)
 	style.border_color = Palette.ACCENT if main else colour
 	style.set_border_width_all(2 if main else 1)
 	button.add_theme_stylebox_override("normal", style)

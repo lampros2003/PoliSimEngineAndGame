@@ -107,7 +107,7 @@ func _draw() -> void:
 	# Grid and value labels.
 	for t in _nice_ticks(r.x, r.y):
 		var y := _y(t, rect, r)
-		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Palette.LINE, 1.0)
+		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Palette.RULE, 1.0)
 		draw_string(font, Vector2(4, y + 5), _label(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12, small, Palette.MUTED)
 	if r.x < 0.0 and r.y > 0.0:
 		var zero := _y(0.0, rect, r)

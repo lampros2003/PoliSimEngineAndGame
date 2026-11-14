@@ -23,12 +23,13 @@ func _ready() -> void:
 	add_child(box)
 	_title = Label.new()
 	_title.text = "Budget"
-	_title.add_theme_font_size_override("font_size", Palette.TITLE)
+	_title.theme_type_variation = "Title"
 	box.add_child(_title)
 	_grid = GridContainer.new()
 	_grid.columns = 6
 	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.add_theme_constant_override("v_separation", 9)
+	Palette.rule_rows(_grid)
 	box.add_child(_grid)
 
 
@@ -37,6 +38,8 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 	label.text = text
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_font_size_override("font_size", size)
+	if size == Palette.SMALL:
+		label.theme_type_variation = "Heading"
 	if right:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		label.custom_minimum_size = Vector2(118, 0)
@@ -61,11 +64,13 @@ func _line(name: String, entry: Dictionary, sign: int) -> void:
 	var row: String = entry.get("row", name)
 	var plot := Button.new()
 	plot.text = "Chart"
+	plot.theme_type_variation = "Link"
 	plot.name = "chart_" + name
 	plot.pressed.connect(func() -> void: chart_requested.emit(row, str(entry.get("label", name))))
 	_grid.add_child(plot)
 	var why := Button.new()
 	why.text = "Why"
+	why.theme_type_variation = "Link"
 	why.name = "why_" + name
 	why.pressed.connect(func() -> void: explain_requested.emit(name))
 	_grid.add_child(why)

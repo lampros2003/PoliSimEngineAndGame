@@ -25,7 +25,7 @@ func _ready() -> void:
 	add_child(box)
 	var title := Label.new()
 	title.text = "Policy"
-	title.add_theme_font_size_override("font_size", Palette.TITLE)
+	title.theme_type_variation = "Title"
 	box.add_child(title)
 	hint = Label.new()
 	hint.text = "Changes take effect from next month."
@@ -81,7 +81,8 @@ func build(levers: Array) -> void:
 			header.flat = true
 			header.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			header.name = "group_" + group.replace(" ", "_")
-			header.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
+			header.theme_type_variation = "Link"
+			header.add_theme_font_size_override("font_size", Palette.FONT_SIZE + 1)
 			_list.add_child(header)
 			_groups[group] = {"button": header, "rows": [], "open": OPEN_GROUPS.has(group)}
 			header.pressed.connect(func() -> void: _toggle(group))
@@ -131,6 +132,7 @@ func build(levers: Array) -> void:
 		top.add_child(spin)
 		var why := Button.new()
 		why.text = "Why"
+		why.theme_type_variation = "Link"
 		why.tooltip_text = "Show what this lever affects next to the figures it feeds."
 		why.visible = false
 		top.add_child(why)
@@ -143,6 +145,7 @@ func build(levers: Array) -> void:
 		bottom.add_child(pending)
 		var cancel := Button.new()
 		cancel.text = "Undo"
+		cancel.theme_type_variation = "Link"
 		cancel.visible = false
 		cancel.pressed.connect(func() -> void: lever_cancelled.emit(name))
 		bottom.add_child(cancel)

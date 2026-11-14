@@ -179,20 +179,28 @@ func _build_layout() -> void:
 	background.add_theme_stylebox_override("panel", Palette.panel_style(Palette.BG, 0, 0))
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+	# A navy masthead across the top with the date and the controls, the page below it.
+	var frame := VBoxContainer.new()
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.add_theme_constant_override("separation", 0)
+	add_child(frame)
+	var masthead := PanelContainer.new()
+	masthead.theme_type_variation = "Masthead"
+	frame.add_child(masthead)
 	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 14)
-	add_child(margin)
+		margin.add_theme_constant_override("margin_" + side, 16)
+	frame.add_child(margin)
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 12)
+	page.add_theme_constant_override("separation", 14)
 	margin.add_child(page)
 
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
-	page.add_child(top)
+	masthead.add_child(top)
 	_date = Label.new()
-	_date.add_theme_font_size_override("font_size", Palette.TITLE)
+	_date.theme_type_variation = "MastheadTitle"
 	_date.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# The title gives way first when the window is narrow, so the page never overflows.
 	_date.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -202,6 +210,7 @@ func _build_layout() -> void:
 		var button := Button.new()
 		button.text = spec[0]
 		button.name = "advance_%d" % spec[1]
+		button.theme_type_variation = "MastheadPrimary" if spec[1] == 1 else "MastheadButton"
 		var count: int = spec[1]
 		button.pressed.connect(func() -> void: advance(count))
 		top.add_child(button)
@@ -216,7 +225,7 @@ func _build_layout() -> void:
 	_reload = _tool_button(top, "Reload model", func() -> void: _reload_model())
 	_tool_button(top, "Help", func() -> void: _show_dialog("PoliSim", HELP))
 	_status = Label.new()
-	_status.add_theme_color_override("font_color", Palette.MUTED)
+	_status.theme_type_variation = "MastheadLabel"
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(_status)
 
@@ -285,11 +294,13 @@ func _build_layout() -> void:
 	tabs.custom_minimum_size = Vector2(420, 300)
 	right.add_child(tabs)
 	tabs.add_child(trace)
+	trace.add_theme_stylebox_override("panel", StyleBoxEmpty.new())  # the tab already frames it
 	tabs.set_tab_title(0, "Why did it change?")
 	web = WebPanel.new()
 	web.fmt = fmt
 	web.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_child(web)
+	web.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	tabs.set_tab_title(1, "Connections")
 
 	_message = PanelContainer.new()
@@ -307,6 +318,7 @@ func _build_layout() -> void:
 	message_row.add_child(_message_text)
 	var close := Button.new()
 	close.text = "Close"
+	close.theme_type_variation = "Link"
 	close.pressed.connect(func() -> void: _message.visible = false)
 	message_row.add_child(close)
 
@@ -314,6 +326,7 @@ func _build_layout() -> void:
 func _tool_button(parent: Control, text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
+	button.theme_type_variation = "MastheadButton"
 	button.pressed.connect(action)
 	parent.add_child(button)
 	return button
@@ -379,6 +392,7 @@ func _build_headline() -> void:
 		if entry.is_empty():
 			continue
 		var card := PanelContainer.new()
+		card.theme_type_variation = "HeadlineCard"
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.tooltip_text = str(entry.get("doc", ""))
 		var box := VBoxContainer.new()
@@ -390,7 +404,7 @@ func _build_headline() -> void:
 		label.add_theme_font_size_override("font_size", Palette.SMALL)
 		box.add_child(label)
 		var value := Label.new()
-		value.add_theme_font_size_override("font_size", Palette.FIGURE)
+		value.theme_type_variation = "Figure"
 		box.add_child(value)
 		var line := HBoxContainer.new()
 		box.add_child(line)
@@ -403,10 +417,12 @@ func _build_headline() -> void:
 		var name: String = entry["name"]
 		var plot := Button.new()
 		plot.text = "Chart"
+		plot.theme_type_variation = "Link"
 		plot.pressed.connect(func() -> void: add_to_chart(key))
 		line.add_child(plot)
 		var why := Button.new()
 		why.text = "Why"
+		why.theme_type_variation = "Link"
 		why.pressed.connect(func() -> void: explain(name, true))
 		line.add_child(why)
 		_headline.add_child(card)
@@ -612,8 +628,17 @@ func _migration_note(event: Dictionary) -> String:
 
 func _show_message(bbcode: String, problem := false) -> void:
 	_message_text.text = bbcode
-	_message.add_theme_stylebox_override("panel", Palette.panel_style(Palette.BAD.darkened(0.6) if problem else Palette.PANEL_RAISED))
+	_message.add_theme_stylebox_override("panel", _notice_style(Palette.BAD if problem else Palette.ACCENT))
 	_message.visible = true
+
+
+## A notice: white, with a thick rule down the left in the notice's colour.
+static func _notice_style(colour: Color) -> StyleBoxFlat:
+	var box := Palette.panel_style(Palette.PANEL, 0, 12)
+	box.border_color = colour
+	box.set_border_width_all(1)
+	box.border_width_left = 6
+	return box
 
 
 func _show_dialog(title: String, bbcode: String) -> void:
@@ -683,9 +708,10 @@ func _show_situations() -> void:
 		var chip := PanelContainer.new()
 		chip.name = "situation_" + str(entry["name"])
 		var good := str(entry["situation"]) == "good"
-		var style := Palette.panel_style(Palette.PANEL_RAISED, 4, 6)
-		style.border_color = Palette.GOOD if good else Palette.BAD
-		style.set_border_width_all(2)
+		# A tag: a pale tint of its colour, the text in the colour itself.
+		var style := Palette.panel_style((Palette.GOOD if good else Palette.BAD).lerp(Color.WHITE, 0.86), 0, 6)
+		style.content_margin_left = 10
+		style.content_margin_right = 10
 		chip.add_theme_stylebox_override("panel", style)
 		chip.tooltip_text = str(entry.get("doc", ""))
 		var label := Label.new()
@@ -714,8 +740,8 @@ func _show_dilemmas() -> void:
 			var ask := Button.new()
 			ask.name = "dilemma_" + name
 			ask.text = "Decide: " + label
+			ask.theme_type_variation = "Primary"
 			ask.tooltip_text = str(d.get("doc", ""))
-			ask.add_theme_color_override("font_color", Palette.ACCENT)
 			ask.pressed.connect(ask_dilemma)
 			_situation_strip.add_child(ask)
 			continue
@@ -740,9 +766,9 @@ func _show_dilemmas() -> void:
 			continue
 		var chip := PanelContainer.new()
 		chip.name = "dilemma_" + name
-		var style := Palette.panel_style(Palette.PANEL_RAISED, 4, 6)
-		style.border_color = Palette.MUTED
-		style.set_border_width_all(1)
+		var style := Palette.panel_style(Color("#e3e3e1"), 0, 6)  # a grey tag
+		style.content_margin_left = 10
+		style.content_margin_right = 10
 		chip.add_theme_stylebox_override("panel", style)
 		chip.tooltip_text = str(d.get("doc", ""))
 		var chip_label := Label.new()

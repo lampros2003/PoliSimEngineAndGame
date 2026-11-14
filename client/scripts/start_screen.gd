@@ -31,18 +31,23 @@ func _ready() -> void:
 	var center := CenterContainer.new()
 	add_child(center)
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", Palette.panel_style())
+	var style := Palette.panel_style(Palette.PANEL, 0, 32)  # a sheet with a navy rule on top
+	style.set_border_width_all(0)
+	style.border_color = Palette.ACCENT
+	style.border_width_top = 6
+	card.add_theme_stylebox_override("panel", style)
 	card.custom_minimum_size = Vector2(680, 0)
 	center.add_child(card)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 12)
 	card.add_child(box)
 	var title := Label.new()
 	title.text = "PoliSim"
-	title.add_theme_font_size_override("font_size", Palette.TITLE + 8)
+	title.theme_type_variation = "Title"
+	title.add_theme_font_size_override("font_size", 40)
 	box.add_child(title)
 	box.add_child(_muted("You lead a government. Choose a country, and any mods to play it with."))
-	box.add_child(_muted("Country", true))
+	box.add_child(_muted("Country", true, true))
 	_choice = OptionButton.new()
 	_choice.name = "scenario_choice"
 	_choice.item_selected.connect(func(_i: int) -> void: _show_choice())
@@ -50,12 +55,12 @@ func _ready() -> void:
 	_summary = Label.new()
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_summary)
-	_language_title = _muted("Language", true)
+	_language_title = _muted("Language", true, true)
 	box.add_child(_language_title)
 	_language = OptionButton.new()
 	_language.name = "language_choice"
 	box.add_child(_language)
-	box.add_child(_muted("Mods", true))
+	box.add_child(_muted("Mods", true, true))
 	_mod_box = VBoxContainer.new()
 	_mod_box.add_theme_constant_override("separation", 4)
 	box.add_child(_mod_box)
@@ -65,6 +70,7 @@ func _ready() -> void:
 	_new = Button.new()
 	_new.name = "new_game"
 	_new.text = "New game"
+	_new.theme_type_variation = "Primary"
 	_new.pressed.connect(func() -> void: chosen.emit(selected_path(), selected_mods(), false, selected_language()))
 	buttons.add_child(_new)
 	_continue = Button.new()
@@ -74,13 +80,15 @@ func _ready() -> void:
 	buttons.add_child(_continue)
 
 
-func _muted(text: String, small := false) -> Label:
+func _muted(text: String, small := false, heading := false) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", Palette.MUTED)
 	if small:
 		label.add_theme_font_size_override("font_size", Palette.SMALL)
+	if heading:
+		label.theme_type_variation = "Heading"
 	return label
 
 

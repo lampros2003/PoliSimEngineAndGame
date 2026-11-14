@@ -34,7 +34,7 @@ func _ready() -> void:
 	box.add_child(top)
 	var title := Label.new()
 	title.text = "Who gains, who loses"
-	title.add_theme_font_size_override("font_size", Palette.TITLE)
+	title.theme_type_variation = "Title"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
 	_choice = OptionButton.new()
@@ -53,7 +53,8 @@ func _ready() -> void:
 	_grid = GridContainer.new()
 	_grid.columns = 5
 	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 4)
+	_grid.add_theme_constant_override("v_separation", 9)
+	Palette.rule_rows(_grid)
 	box.add_child(_grid)
 
 
@@ -62,6 +63,8 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 	label.text = text
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_font_size_override("font_size", size)
+	if size == Palette.SMALL:
+		label.theme_type_variation = "Heading"
 	if right:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		label.custom_minimum_size = Vector2(100, 0)
