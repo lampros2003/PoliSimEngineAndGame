@@ -571,24 +571,64 @@ fn quantile(agg: &Agg, terms: &Col, weights: &[i64], counts: Option<&[i64]>, cx:
         return Err("quantile(): the records' weights add to nothing".to_string());
     }
     let target = p * total as f64;
-    let mut order: Vec<usize> = (0..weights.len()).filter(|r| each[*r] != 0).collect();
-    match terms {
-        Col::I(v) => order.sort_by(|a, b| v[*a].cmp(&v[*b]).then(a.cmp(b))),
-        Col::F(v) => order.sort_by(|a, b| v[*a].partial_cmp(&v[*b]).expect("no NaN").then(a.cmp(b))),
+    // Stage S11.5: each value as a whole-number key in the same order (for a real, -0.0
+    // first becomes 0.0, so the two tie, then by record, as the spec has them; no value is
+    // not-a-number), paired with its record. No two pairs are equal, so the record the spec's
+    // walk stops at is the one `weighted_select` finds; the value is read from the record,
+    // so its sign is kept.
+    let mut pairs: Vec<(u64, u32)> = match terms {
+        Col::I(v) => {
+            (0..weights.len()).filter(|r| each[*r] != 0).map(|r| ((v[r] as u64) ^ (1 << 63), r as u32)).collect()
+        }
+        Col::F(v) => {
+            let key = |x: f64| {
+                let bits = (x + 0.0).to_bits();
+                if bits >> 63 == 1 { !bits } else { bits | (1 << 63) }
+            };
+            (0..weights.len()).filter(|r| each[*r] != 0).map(|r| (key(v[r]), r as u32)).collect()
+        }
         Col::B(_) => return internal("a quantile of true/false values"),
-    }
-    let mut so_far: i128 = 0;
-    for r in order {
-        so_far += each[r];
-        if so_far as f64 >= target {
-            return Ok(match terms {
-                Col::I(v) => Val::I(v[r]),
-                Col::F(v) => Val::F(v[r]),
-                Col::B(_) => unreachable!("checked above"),
-            });
+    };
+    let Some(r) = weighted_select(&mut pairs, &each, target) else {
+        return internal("a quantile past its records");
+    };
+    let r = r as usize;
+    Ok(match terms {
+        Col::I(v) => Val::I(v[r]),
+        Col::F(v) => Val::F(v[r]),
+        Col::B(_) => unreachable!("checked above"),
+    })
+}
+
+/// Stage S11.5: of `pairs` (distinct keys with their records), the record at which the
+/// weight so far, in ascending order of key, first reaches `target` (compared as a real),
+/// as walking the sorted pairs would find it, without sorting them all: each round splits
+/// the pairs around the middle one and keeps the side the answer is on.
+fn weighted_select(pairs: &mut [(u64, u32)], each: &[i128], target: f64) -> Option<u32> {
+    let (mut lo, mut hi) = (0usize, pairs.len());
+    let mut below: i128 = 0;
+    while hi - lo > 32 {
+        let mid = lo + (hi - lo) / 2;
+        pairs[lo..hi].select_nth_unstable(mid - lo);
+        let left: i128 = pairs[lo..mid].iter().map(|(_, r)| each[*r as usize]).sum();
+        let pivot = each[pairs[mid].1 as usize];
+        if (below + left) as f64 >= target {
+            hi = mid;
+        } else if (below + left + pivot) as f64 >= target {
+            return Some(pairs[mid].1);
+        } else {
+            below += left + pivot;
+            lo = mid + 1;
         }
     }
-    internal("a quantile past its records")
+    pairs[lo..hi].sort_unstable();
+    for &(_, r) in &pairs[lo..hi] {
+        below += each[r as usize];
+        if below as f64 >= target {
+            return Some(r);
+        }
+    }
+    None
 }
 
 fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {

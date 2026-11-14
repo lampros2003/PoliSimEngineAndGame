@@ -610,10 +610,17 @@ impl Simulation {
             }
             Ok(())
         };
+        // Stage S11.5: a column is first checked in one plain pass; only if something is
+        // wrong is it walked again, value by value, to report the first value that is.
+        let ints_fine = |c: &[i64]| !ranged || c.iter().fold(true, |ok, v| ok & (lo <= *v as f64) & (*v as f64 <= hi));
+        let reals_fine =
+            |c: &[f64]| c.iter().fold(true, |ok, v| ok & v.is_finite() & (!ranged | ((lo <= *v) & (*v <= hi))));
         match &value {
             Computed::One(Val::I(v)) => check_int(*v)?,
             Computed::One(Val::F(v)) => check_real(*v)?,
             Computed::One(Val::B(v)) => check_bool(*v)?,
+            Computed::Each(Col::I(column)) if ints_fine(column) => {}
+            Computed::Each(Col::F(column)) if reals_fine(column) => {}
             Computed::Each(Col::I(column)) => column.iter().try_for_each(|v| check_int(*v))?,
             Computed::Each(Col::F(column)) => column.iter().try_for_each(|v| check_real(*v))?,
             Computed::Each(Col::B(column)) => {
