@@ -32,6 +32,7 @@ options:
   --save FILE      write a save file after the last step
   --resume FILE    continue from a save file; seed and parameters come from the save
   --time           report milliseconds per step on standard error
+  --profile N      report the N formulas that took longest, per step, on standard error
 
 polisim text lists the languages a scenario's model and mods have text in, or, given one,
 what the model has words for that the language does not translate (exit 1 if anything).";
@@ -46,6 +47,8 @@ struct Options {
     save: Option<PathBuf>,
     resume: Option<PathBuf>,
     time: bool,
+    /// Stage S10: print the N formulas that took longest.
+    profile: Option<usize>,
 }
 
 fn parse_options(args: &[String]) -> Result<Options, String> {
@@ -65,6 +68,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--save" => options.save = Some(value("--save")?.into()),
             "--resume" => options.resume = Some(value("--resume")?.into()),
             "--time" => options.time = true,
+            "--profile" => {
+                options.profile = Some(value("--profile")?.parse().map_err(|_| "--profile needs a whole number")?)
+            }
             other if other.starts_with("--") => return Err(format!("unknown option {other}")),
             other if options.scenario.is_none() => options.scenario = Some(other.into()),
             other => return Err(format!("unexpected argument {other}")),
@@ -128,6 +134,9 @@ fn run(options: Options) -> Result<ExitCode, String> {
         }
     };
 
+    if options.profile.is_some() {
+        sim.set_profiling(true);
+    }
     let steps = options.steps.unwrap_or(scenario.steps);
     let mut rows = Vec::with_capacity(steps as usize);
     let mut failure = None;
@@ -183,6 +192,22 @@ fn run(options: Options) -> Result<ExitCode, String> {
         eprintln!("{:.3} ms per step over {} steps", elapsed.as_secs_f64() * 1e3 / steps, rows.len());
         for (phase, spent) in sim.phase_times() {
             eprintln!("  {phase:<12} {:>9.3} ms per step", spent.as_secs_f64() * 1e3 / steps);
+        }
+    }
+    if let (Some(top), false) = (options.profile, rows.is_empty()) {
+        let steps = rows.len() as f64;
+        let times = sim.symbol_times();
+        let total: f64 = times.iter().map(|(_, t, _)| t.as_secs_f64()).sum();
+        eprintln!("formulas, slowest first ({:.3} ms per step in all):", total * 1e3 / steps);
+        for (name, spent, _) in times.iter().take(top) {
+            let d = sim.model().sym(name).expect("a symbol");
+            let phase = d.phase.map(|p| sim.model().phases[p].as_str()).unwrap_or("");
+            eprintln!(
+                "  {name:<36} {:>8.3} ms {:>5.1}%  {} {phase}",
+                spent.as_secs_f64() * 1e3 / steps,
+                spent.as_secs_f64() / total * 100.0,
+                d.kind.name()
+            );
         }
     }
     Ok(ExitCode::SUCCESS)

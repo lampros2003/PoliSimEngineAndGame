@@ -1,0 +1,43 @@
+# Stage S10: the engine's speed, reliability and power
+
+Written 2026-11-14, at the owner's request after S9: "continue devving, focus on the engine:
+speed-up, reliability and also power". It changes no model's results: every recorded hash
+stays as it is, and the oracle stays the definition.
+
+## Where the time went
+
+Measured on the UK model (20,000 households, 600 voter types, 650 constituencies) on the
+four-core build machine, before this stage: 29 ms a month in the runner, 34 ms in a game
+session; on one thread 44 ms. So four threads gave only 1.5 times one. A profile by formula
+(`polisim run --profile N`, new here) showed why: the income phase is about forty
+household formulas, each run on several threads but one after another, with the threads
+idle between them; and the sums over records (`wsum`, `wsum_by`) and the values with
+dimensions ran on one thread. Loading the UK model takes about 0.2 s.
+
+## Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| What may change | Nothing a run computes: every value, error and hash is what one thread gives, in the same order | Determinism is the engine's contract; the oracle must not need to change for speed |
+| Sums over records on several threads | The terms are computed on several threads and added on one, in record order | Real sums depend on their order; this keeps the bits and still moves the costly part |
+| Independent formulas at once | Each phase is cut into levels (a formula reads, within its phase, only earlier levels); a level runs at once when it holds two or more heavy formulas (records, cells, sums, rakes). If anything in a phase fails, the phase runs again one formula at a time, so the error is the one a single thread meets first | Fills the idle threads; failures are rare, and the rerun makes them exactly as before |
+| Reliability | Tests that a run is the same on one, two and eight threads; damaged saves and model files are refused, never a crash (thousands of mutations, the UK's files included); the game's simulation thread catches a panic and reports it, so the game never waits forever | The new threading must never change a result, and nothing from outside may bring the engine down |
+| Power | The formula language gains `div` and `mod` on whole numbers, `largest` and `smallest` over dimensions, and grouped sums over a dimension (`sum_by`), each in the oracle, the engine, the spec and the shared cases | Models had to work around each: a parameter for each voter type's quintile because there was no `mod`; a sum over 600 voter types for each of 108 cells where a grouped sum needs 600 |
+
+## Milestones
+
+| # | Milestone | Done when |
+|---|---|---|
+| S10.0 | Profile | `--profile N` on the runner lists the slowest formulas |
+| S10.1 | Speed | Records, cells and sums on several threads; levels; the UK's month at least a quarter faster on four threads, every hash the same |
+| S10.2 | Reliability | Thread-count, fuzzing and failure-order tests; the worker survives a panic |
+| S10.3 | Power | `div`, `mod`, `largest`, `smallest` and `sum_by` in oracle, engine, spec and shared cases; the UK uses them where they help |
+
+## Status
+
+| # | Status |
+|---|---|
+| S10.0 | Done. `Simulation::set_profiling` and `symbol_times`; `polisim run --profile N` prints the slowest formulas a month, with their share, kind and phase |
+| S10.1 | Done. Records and cells run in tasks of blocks on several threads, joined in order; `wsum` and `wsum_by` compute their terms (and keys) on several threads and add them in record order on one, with the same order of errors; phases run level by level; registers are reused between formulas on each thread. The UK's month: 20 ms in the runner (29 before), 21.5 ms in a game session (34); on one thread 38.5 ms (44). Every recorded hash is unchanged |
+| S10.2 | Done. `crates/core/tests/threads.rs`: the UK and the cohort model give the same hash on every step on one, two and eight threads, and with two formulas failing in one step the error is the one plan order meets first. `crates/core/tests/robustness.rs`: 3,000 damaged saves (cut short, bytes changed, bytes removed) and about 2,400 damaged model files (the toy, the cohort model, a model full of dilemmas and situations, and the UK) are each refused or run, and none makes the engine panic. The game's simulation thread catches a panic, marks the run failed and tells the player, instead of leaving the game waiting |
+| S10.3 | |

@@ -10,8 +10,9 @@
 //!
 //! After any error the simulation is in an undefined state and must be discarded.
 
+use rayon::prelude::*;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -79,6 +80,10 @@ pub struct Vote {
 struct Phase {
     order: Vec<usize>,
     states: Vec<usize>,
+    /// Stage S10: `order` cut into levels: each symbol reads, within the phase, only
+    /// symbols of earlier levels, so a level's symbols can be computed at the same time.
+    /// Each level keeps plan order.
+    levels: Vec<Vec<usize>>,
 }
 
 pub struct Simulation {
@@ -109,6 +114,11 @@ pub struct Simulation {
     pub(crate) snapshots: VecDeque<Snapshot>,
     /// Time spent in each phase, then in posting, since the run started.
     phase_time: Vec<Duration>,
+    /// Stage S10: time spent computing each symbol since profiling was switched on, and
+    /// how many times; empty while it is off.
+    sym_time: Vec<(Duration, u64)>,
+    /// Stage S10: symbols worth a thread of their own (records, cells, aggregates, rakes).
+    heavy: Vec<bool>,
     /// Each entity's current weights: its data's, or its weight state's (format 1, S4.4).
     weights: Vec<Vec<i64>>,
     /// Format 1 (S5.4): every vote on a lever change, and the defeats in the step running.
@@ -314,6 +324,8 @@ impl Simulation {
             deps: vec![Vec::new(); count],
             lagged_deps: vec![Vec::new(); count],
             tracing: false,
+            sym_time: Vec::new(),
+            heavy: Vec::new(),
             snapshots: VecDeque::new(),
             phase_time: vec![Duration::ZERO; model.phases.len() + 1],
             weights: model.entities.iter().map(|e| e.weights.clone()).collect(),
@@ -459,6 +471,16 @@ impl Simulation {
         }
         simulation.plan = plan(m, &deps)?;
         simulation.deps = deps;
+        simulation.heavy = (0..count)
+            .map(|id| {
+                let d = &m.symbols[id];
+                let prog = simulation.progs[id].as_ref();
+                d.entity.is_some()
+                    || !d.dims.is_empty()
+                    || simulation.rakes[id].is_some()
+                    || prog.is_some_and(|p| !p.aggs.is_empty() || !p.aggs_by.is_empty() || !p.subs.is_empty())
+            })
+            .collect();
 
         // ---- values that prev() sees during the first step
         let mut lagged: Vec<usize> = (0..count).filter(|id| simulation.lagged[*id]).collect();
@@ -993,6 +1015,84 @@ impl Simulation {
         self.progs[id].as_ref()
     }
 
+    /// Stage S10: records the time each symbol's formula takes from now on (off by default;
+    /// switching it on again starts the counts afresh).
+    pub fn set_profiling(&mut self, on: bool) {
+        self.sym_time = if on { vec![(Duration::ZERO, 0); self.model.symbols.len()] } else { Vec::new() };
+    }
+
+    /// Stage S10: each symbol's total time and count of evaluations since profiling was
+    /// switched on, slowest first; symbols never evaluated are left out.
+    pub fn symbol_times(&self) -> Vec<(String, Duration, u64)> {
+        let mut out: Vec<(String, Duration, u64)> = self
+            .sym_time
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, n))| *n > 0)
+            .map(|(id, (t, n))| (self.model.symbols[id].name.clone(), *t, *n))
+            .collect();
+        out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        out
+    }
+
+    /// Stage S10: the phase's vars and flows, level by level; false if any failed (to be
+    /// run again in plan order).
+    fn run_levels(&mut self, phase: usize) -> bool {
+        for level in 0..self.plan[phase].levels.len() {
+            let ids = self.plan[phase].levels[level].clone();
+            let Some(values) = self.compute_all(&ids) else { return false };
+            for (id, value) in values {
+                if self.store(id, value).is_err() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Stage S10: computes symbols that do not read one another: at the same time when at
+    /// least two are heavy, else one after another. None if any failed.
+    fn compute_all(&mut self, ids: &[usize]) -> Option<Vec<(usize, Computed)>> {
+        if ids.iter().filter(|id| self.heavy[**id]).count() < 2 {
+            let mut out = Vec::with_capacity(ids.len());
+            for &id in ids {
+                out.push((id, self.compute_timed(id).ok()?));
+            }
+            return Some(out);
+        }
+        let this = &*self;
+        let results: Vec<(usize, Result<Computed>, Duration)> = ids
+            .par_iter()
+            .map(|&id| {
+                let started = Instant::now();
+                let value = this.compute(id);
+                (id, value, started.elapsed())
+            })
+            .collect();
+        let mut out = Vec::with_capacity(ids.len());
+        for (id, value, spent) in results {
+            if let Some(entry) = self.sym_time.get_mut(id) {
+                entry.0 += spent;
+                entry.1 += 1;
+            }
+            out.push((id, value.ok()?));
+        }
+        Some(out)
+    }
+
+    /// Computes a symbol, timing it when profiling is on.
+    fn compute_timed(&mut self, id: usize) -> Result<Computed> {
+        if self.sym_time.is_empty() {
+            return self.compute(id);
+        }
+        let started = Instant::now();
+        let value = self.compute(id);
+        let entry = &mut self.sym_time[id];
+        entry.0 += started.elapsed();
+        entry.1 += 1;
+        value
+    }
+
     /// Time spent so far in each phase, by name, then in posting.
     pub fn phase_times(&self) -> Vec<(String, Duration)> {
         let names = self.model.phases.iter().cloned().chain(std::iter::once("posting".to_string()));
@@ -1011,15 +1111,28 @@ impl Simulation {
         }
         for phase in 0..self.plan.len() {
             let started = Instant::now();
-            for position in 0..self.plan[phase].order.len() {
-                let id = self.plan[phase].order[position];
-                let value = self.compute(id)?;
-                self.store(id, value)?;
+            // Stage S10: level by level, several symbols at once. A symbol's value depends
+            // only on what it reads, so the values are those of the plan order; if anything
+            // fails, the phase runs again in plan order, which stops at the error one thread
+            // would have met first.
+            if !self.run_levels(phase) {
+                for position in 0..self.plan[phase].order.len() {
+                    let id = self.plan[phase].order[position];
+                    let value = self.compute_timed(id)?;
+                    self.store(id, value)?;
+                }
             }
-            let mut pending = Vec::with_capacity(self.plan[phase].states.len());
-            for &id in &self.plan[phase].states {
-                pending.push((id, self.compute(id)?));
-            }
+            let states = self.plan[phase].states.clone();
+            let pending = match self.compute_all(&states) {
+                Some(values) => values,
+                None => {
+                    let mut pending = Vec::with_capacity(states.len());
+                    for &id in &states {
+                        pending.push((id, self.compute_timed(id)?));
+                    }
+                    pending
+                }
+            };
             let mut weights_changed = false;
             for (id, value) in pending {
                 weights_changed |= self.rakes[id].is_some() || self.is_weight_state(id);
@@ -1557,7 +1670,17 @@ fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
             };
             order.push(remaining.remove(position)); // earliest declared among those that are ready
         }
-        phases.push(Phase { order, states });
+        let mut level_of: HashMap<usize, usize> = HashMap::new();
+        let mut levels: Vec<Vec<usize>> = Vec::new();
+        for &id in &order {
+            let level = deps[id].iter().filter_map(|u| level_of.get(u).map(|l| l + 1)).max().unwrap_or(0);
+            level_of.insert(id, level);
+            if levels.len() <= level {
+                levels.resize(level + 1, Vec::new());
+            }
+            levels[level].push(id);
+        }
+        phases.push(Phase { order, states, levels });
     }
     Ok(phases)
 }

@@ -57,6 +57,41 @@ impl Regs {
             b: vec![vec![false; len]; prog.n_b as usize],
         }
     }
+
+    /// Stage S10: registers for `prog`, taken from this thread's spares when it has them
+    /// (every instruction writes its register before any reads it, so old contents do not
+    /// matter). Give them back with [`Regs::put`].
+    fn take(prog: &Program, len: usize) -> Regs {
+        let spare = SPARE.with(|s| s.borrow_mut().pop());
+        let Some(mut regs) = spare else { return Regs::new(prog, len) };
+        fn fit<T: Clone>(files: &mut Vec<Vec<T>>, count: usize, len: usize, zero: T) {
+            files.truncate(count);
+            files.resize_with(count, Vec::new);
+            for file in files.iter_mut() {
+                if file.len() < len {
+                    file.resize(len, zero.clone());
+                }
+            }
+        }
+        fit(&mut regs.i, prog.n_i as usize, len, 0);
+        fit(&mut regs.f, prog.n_f as usize, len, 0.0);
+        fit(&mut regs.b, prog.n_b as usize, len, false);
+        regs
+    }
+
+    fn put(self) {
+        SPARE.with(|s| {
+            let mut spare = s.borrow_mut();
+            if spare.len() < 4 {
+                spare.push(self);
+            }
+        });
+    }
+}
+
+thread_local! {
+    /// Stage S10: each thread's spare registers, kept between formulas.
+    static SPARE: std::cell::RefCell<Vec<Regs>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// Values a program needs before its instructions run: aggregates and table bands.
@@ -114,43 +149,51 @@ fn prepare(prog: &Program, cx: &EvalCtx) -> Check<Prepared> {
 
 /// `wsum_by` and `wcount_by`: like `wsum` and `wcount`, but each record's term goes to the
 /// member its key names, in ascending record order within each member.
+///
+/// Stage S10: the terms and keys are computed on several threads, then added in record
+/// order on one, so the sums are the same bits. Errors come in the order the blocks would
+/// give them one after another: in each block, the term's error, then the key's, then a
+/// key that names no member or a whole-number sum that overflows.
 fn eval_agg_by(agg: &AggBy, cx: &EvalCtx) -> Check<Col> {
     let value_prepared = prepare(&agg.value, cx)?;
     let key_prepared = prepare(&agg.key, cx)?;
     let weights = &cx.weights[agg.entity];
     let count = weights.len();
-    let width = BLOCK.min(count.max(1));
-    let mut value_regs = Regs::new(&agg.value, width);
-    let mut key_regs = Regs::new(&agg.key, width);
-    let (vr, kr) = (agg.value.result as usize, agg.key.result as usize);
+    let (values, keys) = rayon::join(
+        || eval_all(&agg.value, cx, Some(agg.entity), count, &value_prepared),
+        || eval_all(&agg.key, cx, Some(agg.entity), count, &key_prepared),
+    );
+    let (values, value_failure) = split(values);
+    let (keys, key_failure) = split(keys);
+    // Records before the first block that failed to evaluate, if any.
+    let stop = [&value_failure, &key_failure].iter().filter_map(|f| f.as_ref().map(|f| f.0)).min().unwrap_or(count);
+    let Col::I(keys) = keys else { return internal("a key that is not a whole number") };
     let mut whole = vec![0i128; agg.size];
     let mut real = vec![0.0f64; agg.size];
-    let mut start = 0;
-    while start < count {
-        let len = BLOCK.min(count - start);
-        run_block(&agg.value, cx, Some(agg.entity), start, len, &mut value_regs, &value_prepared)?;
-        run_block(&agg.key, cx, Some(agg.entity), start, len, &mut key_regs, &key_prepared)?;
-        for k in 0..len {
-            let key = key_regs.i[kr][k];
-            let pos = key.checked_sub(agg.first).filter(|p| (0..agg.size as i64).contains(p));
-            let Some(pos) = pos else {
-                return Err(format!("{}(): a record's key {key} is not a member of {}", agg.name, agg.dim));
-            };
-            let (pos, w) = (pos as usize, weights[start + k]);
-            match agg.kind {
-                AggKind::SumInt => match whole[pos].checked_add(w as i128 * value_regs.i[vr][k] as i128) {
-                    Some(total) => whole[pos] = total,
-                    None => return overflow(),
-                },
-                AggKind::SumReal => real[pos] += w as f64 * value_regs.f[vr][k],
-                AggKind::Count => {
-                    if value_regs.b[vr][k] {
-                        whole[pos] += w as i128;
-                    }
+    for (k, &key) in keys.iter().enumerate().take(stop) {
+        let pos = key.checked_sub(agg.first).filter(|p| (0..agg.size as i64).contains(p));
+        let Some(pos) = pos else {
+            return Err(format!("{}(): a record's key {key} is not a member of {}", agg.name, agg.dim));
+        };
+        let (pos, w) = (pos as usize, weights[k]);
+        match (&agg.kind, &values) {
+            (AggKind::SumInt, Col::I(v)) => match whole[pos].checked_add(w as i128 * v[k] as i128) {
+                Some(total) => whole[pos] = total,
+                None => return overflow(),
+            },
+            (AggKind::SumReal, Col::F(v)) => real[pos] += w as f64 * v[k],
+            (AggKind::Count, Col::B(v)) => {
+                if v[k] {
+                    whole[pos] += w as i128;
                 }
             }
+            _ => return internal("a grouped sum's term of another type"),
         }
-        start += len;
+    }
+    match (value_failure, key_failure) {
+        (Some((at, e)), _) if at == stop => return Err(e),
+        (_, Some((_, e))) if stop < count => return Err(e),
+        _ => {}
     }
     match agg.kind {
         AggKind::SumReal => Ok(Col::F(real)),
@@ -167,28 +210,65 @@ fn eval_agg_by(agg: &AggBy, cx: &EvalCtx) -> Check<Col> {
     }
 }
 
-/// Format 1: evaluates a formula with dimensions for every cell of its domain, in row-major order.
-pub fn eval_cells(prog: &Program, cells: usize, cx: &EvalCtx) -> Check<Col> {
-    let prepared = prepare(prog, cx)?;
-    let mut regs = Regs::new(prog, BLOCK.min(cells.max(1)));
-    let r = prog.result as usize;
-    let mut out = match prog.ty {
-        Ty::Int => Col::I(Vec::with_capacity(cells)),
-        Ty::Real => Col::F(Vec::with_capacity(cells)),
-        Ty::Bool => Col::B(Vec::with_capacity(cells)),
-    };
-    let mut start = 0;
-    while start < cells {
-        let len = BLOCK.min(cells - start);
-        run_block(prog, cx, None, start, len, &mut regs, &prepared)?;
-        match &mut out {
-            Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
-            Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
-            Col::B(v) => v.extend_from_slice(&regs.b[r][..len]),
+/// Stage S10: a value for each record or cell `0..count`, from blocks evaluated on several
+/// threads when there are enough of them, joined in order. On failure: the start of the
+/// first block that failed, its error, and the values of the records before it.
+type Partial = Result<Col, (usize, String, Col)>;
+
+fn empty(ty: Ty, capacity: usize) -> Col {
+    match ty {
+        Ty::Int => Col::I(Vec::with_capacity(capacity)),
+        Ty::Real => Col::F(Vec::with_capacity(capacity)),
+        Ty::Bool => Col::B(Vec::with_capacity(capacity)),
+    }
+}
+
+fn append(out: &mut Col, part: &Col) {
+    match (out, part) {
+        (Col::I(v), Col::I(p)) => v.extend_from_slice(p),
+        (Col::F(v), Col::F(p)) => v.extend_from_slice(p),
+        (Col::B(v), Col::B(p)) => v.extend_from_slice(p),
+        _ => unreachable!("every part has the program's type"),
+    }
+}
+
+/// The values computed, and the failure (where, what) if there was one.
+fn split(result: Partial) -> (Col, Option<(usize, String)>) {
+    match result {
+        Ok(col) => (col, None),
+        Err((at, e, before)) => (before, Some((at, e))),
+    }
+}
+
+fn eval_all(prog: &Program, cx: &EvalCtx, entity: Option<usize>, count: usize, prepared: &Prepared) -> Partial {
+    let task = BLOCK * TASK_BLOCKS;
+    if count <= task {
+        return eval_range(prog, cx, entity, 0, count, prepared);
+    }
+    // Records (and cells) are independent, so tasks of whole blocks run on several threads
+    // and give what one thread would; the parts are joined in order, and the first failure
+    // in order is the one reported, as if the blocks had run one after another.
+    let starts: Vec<usize> = (0..count).step_by(task).collect();
+    let parts: Vec<Partial> =
+        starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), prepared)).collect();
+    let mut out = empty(prog.ty, count);
+    for part in parts {
+        match part {
+            Ok(col) => append(&mut out, &col),
+            Err((at, e, before)) => {
+                append(&mut out, &before);
+                return Err((at, e, out));
+            }
         }
-        start += len;
     }
     Ok(out)
+}
+
+/// Format 1: evaluates a formula with dimensions for every cell of its domain, in row-major
+/// order (stage S10: on several threads when there are many cells).
+pub fn eval_cells(prog: &Program, cells: usize, cx: &EvalCtx) -> Check<Col> {
+    let prepared = prepare(prog, cx)?;
+    eval_all(prog, cx, None, cells, &prepared).map_err(|(_, e, _)| e)
 }
 
 /// `sum`: runs of `group` cells added one at a time from 0 (whole numbers exactly, only the
@@ -268,70 +348,48 @@ fn finish_sub(kind: SubKind, column: Col) -> Check<Col> {
 /// Evaluates a national formula.
 pub fn eval_scalar(prog: &Program, cx: &EvalCtx) -> Check<Val> {
     let prepared = prepare(prog, cx)?;
-    let mut regs = Regs::new(prog, 1);
-    run_block(prog, cx, None, 0, 1, &mut regs, &prepared)?;
+    let mut regs = Regs::take(prog, 1);
+    let ran = run_block(prog, cx, None, 0, 1, &mut regs, &prepared);
     let r = prog.result as usize;
-    Ok(match prog.ty {
+    let value = match prog.ty {
         Ty::Int => Val::I(regs.i[r][0]),
         Ty::Real => Val::F(regs.f[r][0]),
         Ty::Bool => Val::B(regs.b[r][0]),
-    })
+    };
+    regs.put();
+    ran.map(|()| value)
 }
 
 /// Evaluates a per-record formula for every record of `entity`.
 pub fn eval_column(prog: &Program, entity: usize, cx: &EvalCtx) -> Check<Col> {
     let prepared = prepare(prog, cx)?;
     let count = cx.entities[entity].ids.len();
-    let task = BLOCK * TASK_BLOCKS;
-    if count <= task {
-        return eval_range(prog, cx, entity, 0, count, &prepared);
-    }
-    // Records are independent, so tasks of whole blocks run on several threads and give
-    // what one thread would; the parts are joined in record order, and the first error in
-    // record order is the one reported, as if the blocks had run one after another.
-    let starts: Vec<usize> = (0..count).step_by(task).collect();
-    let parts: Vec<Check<Col>> =
-        starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), &prepared)).collect();
-    let mut out = match prog.ty {
-        Ty::Int => Col::I(Vec::with_capacity(count)),
-        Ty::Real => Col::F(Vec::with_capacity(count)),
-        Ty::Bool => Col::B(Vec::with_capacity(count)),
-    };
-    for part in parts {
-        match (&mut out, part?) {
-            (Col::I(v), Col::I(p)) => v.extend_from_slice(&p),
-            (Col::F(v), Col::F(p)) => v.extend_from_slice(&p),
-            (Col::B(v), Col::B(p)) => v.extend_from_slice(&p),
-            _ => unreachable!("every part has the program's type"),
-        }
-    }
-    Ok(out)
+    eval_all(prog, cx, Some(entity), count, &prepared).map_err(|(_, e, _)| e)
 }
 
 /// Blocks per parallel task (4,096 records): smaller sets of records run on one thread.
 const TASK_BLOCKS: usize = 16;
 
-/// Records `start..end` of one entity, block after block.
+/// Records (or cells) `start..end`, block after block.
 fn eval_range(
     prog: &Program,
     cx: &EvalCtx,
-    entity: usize,
+    entity: Option<usize>,
     start: usize,
     end: usize,
     prepared: &Prepared,
-) -> Check<Col> {
+) -> Partial {
     let count = end - start;
-    let mut regs = Regs::new(prog, BLOCK.min(count.max(1)));
+    let mut regs = Regs::take(prog, BLOCK.min(count.max(1)));
     let r = prog.result as usize;
-    let mut out = match prog.ty {
-        Ty::Int => Col::I(Vec::with_capacity(count)),
-        Ty::Real => Col::F(Vec::with_capacity(count)),
-        Ty::Bool => Col::B(Vec::with_capacity(count)),
-    };
+    let mut out = empty(prog.ty, count);
     let mut at = start;
     while at < end {
         let len = BLOCK.min(end - at);
-        run_block(prog, cx, Some(entity), at, len, &mut regs, prepared)?;
+        if let Err(e) = run_block(prog, cx, entity, at, len, &mut regs, prepared) {
+            regs.put();
+            return Err((at, e, out));
+        }
         match &mut out {
             Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
             Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
@@ -339,48 +397,47 @@ fn eval_range(
         }
         at += len;
     }
+    regs.put();
     Ok(out)
 }
 
 /// `wsum` and `wcount`. Whole-number sums are exact; a real sum is accumulated in
-/// ascending record order, each term being `real(weight) * value`.
+/// ascending record order, each term being `real(weight) * value`. Stage S10: the terms are
+/// computed on several threads and added on one, so the sum is the same bits; a sum that
+/// overflows before the first block that fails is reported first, as one thread would.
 fn eval_agg(agg: &Agg, cx: &EvalCtx) -> Check<Val> {
     let prog = &agg.prog;
     let prepared = prepare(prog, cx)?;
     let weights = &cx.weights[agg.entity];
     let count = weights.len();
-    let mut regs = Regs::new(prog, BLOCK.min(count.max(1)));
-    let r = prog.result as usize;
+    let (terms, failure) = split(eval_all(prog, cx, Some(agg.entity), count, &prepared));
     let mut whole: i128 = 0;
     let mut real: f64 = 0.0;
-    let mut start = 0;
-    while start < count {
-        let len = BLOCK.min(count - start);
-        run_block(prog, cx, Some(agg.entity), start, len, &mut regs, &prepared)?;
-        let w = &weights[start..start + len];
-        match agg.kind {
-            AggKind::SumInt => {
-                for (w, v) in w.iter().zip(&regs.i[r][..len]) {
-                    whole = match whole.checked_add(*w as i128 * *v as i128) {
-                        Some(total) => total,
-                        None => return overflow(),
-                    };
-                }
+    match (&agg.kind, &terms) {
+        (AggKind::SumInt, Col::I(v)) => {
+            for (w, v) in weights.iter().zip(v) {
+                whole = match whole.checked_add(*w as i128 * *v as i128) {
+                    Some(total) => total,
+                    None => return overflow(),
+                };
             }
-            AggKind::SumReal => {
-                for (w, v) in w.iter().zip(&regs.f[r][..len]) {
-                    real += *w as f64 * *v;
-                }
+        }
+        (AggKind::SumReal, Col::F(v)) => {
+            for (w, v) in weights.iter().zip(v) {
+                real += *w as f64 * *v;
             }
-            AggKind::Count => {
-                for (w, c) in w.iter().zip(&regs.b[r][..len]) {
-                    if *c {
-                        whole += *w as i128;
-                    }
+        }
+        (AggKind::Count, Col::B(v)) => {
+            for (w, c) in weights.iter().zip(v) {
+                if *c {
+                    whole += *w as i128;
                 }
             }
         }
-        start += len;
+        _ => return internal("a sum's term of another type"),
+    }
+    if let Some((_, e)) = failure {
+        return Err(e);
     }
     match agg.kind {
         AggKind::SumReal => Ok(Val::F(real)),

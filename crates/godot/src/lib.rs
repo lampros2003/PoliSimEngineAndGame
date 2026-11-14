@@ -161,11 +161,47 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
     let language = session.language().to_string();
     let mut failed: Option<String> = None;
     for request in requests {
-        let event = match request {
+        // Stage S10: a panic in the engine must not leave the game waiting for a thread that
+        // has died. It is caught, the run is marked failed (loading a save or reloading the
+        // model recovers), and the player is told.
+        let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            handle(&mut session, request, &mut failed, &language, &replies)
+        }));
+        let event = match handled {
+            Ok(event) => event,
+            Err(payload) => {
+                let what = payload
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown".to_string());
+                let message = format!("internal error in the engine ({what}); load a saved game or reload the model");
+                failed = Some(message.clone());
+                Some(EventData::Failed(message))
+            }
+        };
+        let _ = replies.send(Reply::View(Box::new(view_of(&session, &failed))));
+        if let Some(event) = event {
+            let _ = replies.send(Reply::Event(event));
+        }
+        outstanding.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// One request on the worker thread: what it changes, and the event to report.
+fn handle(
+    session: &mut Session,
+    request: Request,
+    failed: &mut Option<String>,
+    language: &str,
+    replies: &Sender<Reply>,
+) -> Option<EventData> {
+    {
+        match request {
             Request::Step(count) => {
                 let mut done = 0;
                 let mut error = None;
-                if let Some(message) = &failed {
+                if let Some(message) = failed.as_ref() {
                     error = Some(message.clone());
                 } else {
                     for _ in 0..count {
@@ -177,7 +213,7 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                             Ok(()) => done += 1,
                             Err(e) => {
                                 error = Some(e.to_string());
-                                failed = error.clone();
+                                *failed = error.clone();
                                 break;
                             }
                         }
@@ -212,11 +248,11 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                 match loaded {
                     Ok(mut next) => {
                         if !language.is_empty() {
-                            let _ = next.set_language(&language);
+                            let _ = next.set_language(language);
                         }
-                        session = next;
-                        failed = None;
-                        let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
+                        *session = next;
+                        *failed = None;
+                        let _ = replies.send(Reply::Model(Box::new(model_info(session))));
                         Some(EventData::Loaded {
                             migration: session.migration().cloned(),
                             missing_mods: session.missing_mods().to_vec(),
@@ -232,18 +268,13 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                 Ok(reset) => {
                     // A failed step was undone, so a corrected model carries on from the
                     // end of the last good month.
-                    failed = None;
-                    let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
+                    *failed = None;
+                    let _ = replies.send(Reply::Model(Box::new(model_info(session))));
                     Some(EventData::Reloaded { reset, error: None })
                 }
                 Err(e) => Some(EventData::Reloaded { reset: Vec::new(), error: Some(e.to_string()) }),
             },
-        };
-        let _ = replies.send(Reply::View(Box::new(view_of(&session, &failed))));
-        if let Some(event) = event {
-            let _ = replies.send(Reply::Event(event));
         }
-        outstanding.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
