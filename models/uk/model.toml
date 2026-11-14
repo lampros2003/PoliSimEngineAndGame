@@ -251,4 +251,15 @@ type = "real"
 unit = "person"
 phase = "accounts"
 initial = 26718096.35473867
-next = "private_employment + hiring_speed * (wage_share * labour_share * private_demand / private_pay_per_worker - private_employment)"
+next = "private_employment + hiring_speed * ((labour_force - public_employment) * curve(wage_share * labour_share * private_demand / private_pay_per_worker / (labour_force - public_employment), labour_capacity) - private_employment)"
+
+# Stage S11.3: how much of firms' demand for workers the labour market can fill, a judgement
+# (docs/S11-PLAN.md). Demand and filled jobs are shares of the workers not employed by the
+# state. Up to 95.5% (unemployment around 3.7%, below 2024's 4.3%) every job wanted is
+# filled, as before; beyond, it gets harder, and at most 98% of those workers are employed:
+# some are always between jobs, so unemployment cannot fall much below 2%.
+[table.labour_capacity]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.0, y = 0.0 }, { x = 0.955, y = 0.955 }, { x = 1.0, y = 0.97 }, { x = 1.1, y = 0.977 }, { x = 1.3, y = 0.98 }]

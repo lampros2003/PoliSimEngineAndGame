@@ -51,7 +51,11 @@ tested against (`oracle/tests/test_uk.py`, `crates/core/tests/golden.rs`).
 
 1. **Labour.** Public employment is the public pay bill divided by public pay per worker.
    Private employment moves a quarter of the way each month toward the number that firms'
-   sales justify. The rest of the labour force is unemployed.
+   sales justify, as far as the workers not employed by the state allow (stage S11.3: a
+   curve, `labour_capacity`, that fills every job wanted up to 95.5% of them and then ever
+   fewer, never more than 98%). The rest of the labour force is unemployed, though never
+   much less than 2% of it (`employment_capacity`), even when the state hires faster than
+   firms let go.
 2. **Income.** Wages, public pay, benefits (a fixed bill set by policy plus an amount per
    unemployed person), firms' payouts (dividends and self-employment income, raised when
    firms hold more cash than usual), interest on gilts, and taxes on income.
@@ -65,7 +69,9 @@ tested against (`oracle/tests/test_uk.py`, `crates/core/tests/golden.rs`).
 5. **Accounts.** GDP, unemployment, inflation and the debt ratios are computed.
 
 Prices rise each month by target inflation plus a Phillips-curve term in the gap between
-unemployment and its natural rate. Pay per worker rises with prices and productivity,
+unemployment and its natural rate (stage S11.3: a curve, `phillips_shape`, straight within a
+point of the natural rate, steeper a point at a time as the labour market tightens, half as
+steep when it is slack). Pay per worker rises with prices and productivity,
 and by a further point a year for each point unemployment is below its natural rate (a
 wage curve; less when it is above), which is what keeps employment from running ahead of
 the labour force. Amounts set by policy (spending bills, benefit rates) are in 2024
@@ -220,7 +226,9 @@ from 7.58 to 7.46 million. The longest list on record was 7.77 million, in Septe
 In the model (`nhs.toml`) the list starts at 7.46 million, December 2024's. Referrals grow
 with the population weighted by its need for health care (S8.1); treatments follow real
 health spending as the service has adjusted to it (`treatment_response`: 10% more real
-spending treats 10% more patients, a judgement, presets 0.5 and 1.5); other removals stay
+spending treats 10% more patients, a judgement, presets 0.5 and 1.5; since stage S11.3 along
+a curve, `treatment_curve`: a cut bites a fifth harder, and rises beyond a fifth buy ever
+fewer treatments); other removals stay
 at 2024's share of the list. With unchanged money referrals grow about 1.3% a year, as the
 population grows and ages, while treatments stay flat, so the list passes its record in the
 30th month and reaches 8.8 million by the 2029 election. A tenth off health spending leaves

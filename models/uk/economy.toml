@@ -21,7 +21,18 @@ label = "Unemployed people"
 type = "real"
 unit = "person"
 phase = "labour"
-expr = "max(labour_force - private_employment - public_employment, 0.0)"
+expr = "labour_force * (1.0 - curve((private_employment + public_employment) / labour_force, employment_capacity))"
+doc = "People in the labour force without a job. When the state and firms together want more workers than there are, some are still between jobs: unemployment cannot fall much below 2%"
+
+# Stage S11.3: the share of the labour force in work, given the jobs the state and firms
+# want filled as a share of it, a judgement (docs/S11-PLAN.md). Up to 96.2% (unemployment
+# of 3.8%, below 2024's 4.3%) it is the share wanted, as before; beyond, it rises ever more
+# slowly to at most 98%.
+[table.employment_capacity]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.0, y = 0.0 }, { x = 0.962, y = 0.962 }, { x = 1.0, y = 0.975 }, { x = 1.1, y = 0.98 }]
 
 # ================================================================= phase: income
 
@@ -406,7 +417,19 @@ label = "Inflation this month"
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "inflation_target + phillips_slope * (natural_unemployment - unemployment_rate) + inflation_shock"
+expr = "inflation_target + phillips_slope * curve(natural_unemployment - unemployment_rate, phillips_shape) + inflation_shock"
+
+# Stage S11.3: the Phillips curve's shape, a judgement (docs/S11-PLAN.md). Within a point of
+# the natural rate it is the straight line it was (phillips_slope times the gap); with the
+# labour market tighter it steepens, a point at a time, to two, three and four times that
+# slope, and with it slacker it flattens to half. Beyond 14.5% unemployment or 0.5% it is
+# level. The slope at the natural rate stays phillips_slope, with its presets.
+[table.phillips_shape]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = -0.10, y = -0.055 }, { x = -0.01, y = -0.01 }, { x = 0.0, y = 0.0 }, { x = 0.01, y = 0.01 },
+          { x = 0.02, y = 0.03 }, { x = 0.03, y = 0.06 }, { x = 0.04, y = 0.10 }]
 
 [var.inflation_annual]
 label = "Inflation, annual rate"

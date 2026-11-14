@@ -286,6 +286,16 @@ next = "select(regional_unemployment_at_election < 0.0 or election_now, regional
 members = ["health", "education", "policing", "environment"]
 labels = ["Health", "Education", "Policing", "The environment"]
 
+# Stage S11.3: how voters take a change in an issue since the last election, a judgement
+# (docs/S11-PLAN.md). A fall counts half as much again as a rise; a rise counts in full up
+# to a fifth, and half beyond; level beyond a doubling or a halving. Voters punish what got
+# worse more than they reward what got better.
+[table.issue_reaction]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = -1.0, y = -1.5 }, { x = 0.0, y = 0.0 }, { x = 0.2, y = 0.2 }, { x = 1.0, y = 0.6 }]
+
 [param.issue_weight]
 doc = "How much each age band weighs each issue: utility for the government per unit of change since the last election (a judgement)"
 type = "real"
@@ -334,7 +344,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * (issue_measure - issue_at_election)), issue)"
+expr = "government_standing + fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
 
 [var.utility]
 type = "real"

@@ -172,11 +172,24 @@ expr = "referrals_2024 * health_need / people_served_first[function: health]"
 
 [var.treatments]
 label = "Treatments"
-doc = "Waits that ended in treatment this month, in England; they follow real health spending"
+doc = "Waits that ended in treatment this month, in England; they follow real health spending, cuts biting harder than rises help"
 type = "real"
 unit = "person/month"
 phase = "accounts"
-expr = "max(0.0, treatments_2024 * (1.0 + treatment_response * (health_spending_ratio - 1.0)))"
+expr = "max(0.0, treatments_2024 * curve(health_spending_ratio, treatment_curve))"
+
+# Stage S11.3: how treatments follow real health spending, a judgement (docs/S11-PLAN.md).
+# At 2024's spending (1.0) treatments are 2024's. A rise of up to a fifth adds treatment_response
+# times as much (the straight line of S9.0), a further rise to half as much again three fifths
+# of that, and beyond, three tenths: a service cannot turn money into treatment at once. A cut
+# bites a fifth harder, down to nothing at no spending. Level beyond twice 2024's spending.
+[table.treatment_curve]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{{ x = 0.0, y = 0.0 }}, {{ x = 0.5, y = "1.0 - 0.6 * treatment_response" }}, {{ x = 1.0, y = 1.0 }},
+          {{ x = 1.2, y = "1.0 + 0.2 * treatment_response" }}, {{ x = 1.5, y = "1.0 + 0.38 * treatment_response" }},
+          {{ x = 2.0, y = "1.0 + 0.53 * treatment_response" }}]
 
 [state.waiting_list]
 label = "NHS waiting list"
