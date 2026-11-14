@@ -102,6 +102,39 @@ release_date = ""
 retrieved = "2026-11-14T02:53:23Z"
 sha256 = "14d8f4bd2993f8f0cd5339b28056b419c0f5aee15c920ecb4903c78756e29a56"
 
+[dataset.households2025]
+title = "Families and households in the UK: 2025 (tables to 2025; 2024 estimates used)"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/families/datasets/familiesandhouseholdsfamiliesandhouseholds/current/familiesandhouseholdsuk2025.xlsx"
+page = "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/families/datasets/familiesandhouseholdsfamiliesandhouseholds"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T03:09:33Z"
+sha256 = "a89eaa3d7f519bfa949c7cfa12f531b8c7a86c704adcb70e81f49567ae724a91"
+
+[dataset.ashe3]
+title = "Annual Survey of Hours and Earnings, table 3 (work region), 2024 revised"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/regionbyoccupation2digitsocashetable3/2024revised/ashetable32024revised.zip"
+page = "https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/regionbyoccupation2digitsocashetable3"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T03:09:34Z"
+sha256 = "80b589758158ba8462202f10ffc3c1c77589a2d6d8280821f69d8dff73a1e196"
+
+[dataset.ashe6]
+title = "Annual Survey of Hours and Earnings, table 6 (age group), 2024 revised"
+publisher = "Office for National Statistics"
+url = "https://www.ons.gov.uk/file?uri=/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/agegroupashetable6/2024revised/ashetable62024revised.zip"
+page = "https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/agegroupashetable6"
+licence = "Open Government Licence v3.0"
+attribution = "Source: Office for National Statistics licensed under the Open Government Licence v3.0"
+release_date = ""
+retrieved = "2026-11-14T03:09:34Z"
+sha256 = "cd3c982b408d8c28d64963d5da39e259162a07bd60b2e7783a0508be6a7ed725"
+
 [series.gdp]
 dataset = "qna"
 code = "BKTL"

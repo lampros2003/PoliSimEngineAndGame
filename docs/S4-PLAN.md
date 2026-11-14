@@ -48,3 +48,11 @@ Both go through the usual path: specification, oracle, engine, conformance cases
 | Synthetic households miss the joint distribution (earnings by household type) | Tax by household type far from HMRC's tables | Add the joint table as a target before adding rules |
 | Universal Credit's detail grows without end | S4.2 slips | The rule list above is the scope; the rest goes to the list for S6 |
 | Rule depth makes 100,000 households slow | S4.4 timing fails | Profile per rule; the engine's block evaluation already amortises dispatch |
+
+## Status
+
+| # | Status |
+|---|---|
+| S4.0 | Done. `wsum_by` and `wcount_by` total records by a dimension (`docs/spec/06-model-format-1.md`); oracle and engine agree on `models/cohort` and 13 new conformance cases |
+| S4.1 | Done. `tools/uk/households.py` builds 20,000 households from ONS tables only (households by type, ASHE pay by region, sex and age, the mid-2024 population) and weights them by exponential calibration: 28.6 million households and 67.4 million people in them, with every one of 179 targets (households by type; people by region, sex and age band; people in work) within 0.03%. Weighted earnings come to £1,220bn and pensions to £173bn. Assumptions (employment by age, self-employment, pensions, people outside households) are listed in `models/uk/households/HOUSEHOLDS.md` |
+| S4.2 | Next: the 2024-25 tax and benefit rules on these households |
