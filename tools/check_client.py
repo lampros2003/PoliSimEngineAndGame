@@ -81,6 +81,16 @@ def main() -> int:
             print("res://tests/situations_check.gd failed", file=sys.stderr)
             return 1
         print(situations.stdout.strip().splitlines()[-1])
+        # Stage S9.1: a dilemma asked, waited for and answered (Valmora's dock strike mod).
+        dilemma = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/dilemma_check.gd",
+             "--", "--scenario=models/valmora/scenarios/dock_strike.toml"],
+            capture_output=True, text=True, timeout=900)
+        if dilemma.returncode != 0:
+            print(dilemma.stdout.strip()[-2000:], dilemma.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/dilemma_check.gd failed", file=sys.stderr)
+            return 1
+        print(dilemma.stdout.strip().splitlines()[-1])
         # Stage S7.4: Valmora in French, through the start screen and a save.
         language = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/language_check.gd",

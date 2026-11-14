@@ -7,7 +7,8 @@ from the published figures for 2024. The first general election is due in July 2
 office and the game is over.
 
 The test build also has Valmora, the small invented country the client was first built
-on, and an example mod, a wealth tax for the UK.
+on, and two example mods: a wealth tax for the UK, and a dock strike for Valmora, which
+puts a question to you in the third month.
 
 ## Starting
 
@@ -25,7 +26,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 |---|---|
 | Top bar | The month just finished; buttons to advance one month, a quarter or a year; **Amounts a year** (amounts at an annual rate, as the public finances are published, or per month); Save, Load, Reload model, Help |
 | Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP, the government's poll rating and the NHS waiting list in England, each with last month's change, a **Chart** and a **Why** button |
-| Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus), each since the month it began. A new one is announced when it begins |
+| Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus, a record NHS waiting list), each since the month it began. A new one is announced when it begins. Questions put to you, and your answers while they last, show here too |
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
 | Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
 | Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, the months to the next election, and the issues voters weigh beyond the economy (health, education, policing, the environment) against the last election |
@@ -49,6 +50,15 @@ Northern Ireland's parties and others). In the first month each region votes as 
 2024. After that each kind of voter (by region, age, income and work) weighs the change in
 its real household income, unemployment in its region and inflation since the last
 election, and how long the government has been in office.
+
+## Questions put to you
+
+Sometimes the government must decide: a strike, a crisis. A dialog puts the question with
+two or more answers, each saying what it does. No month runs until you answer; you can
+close the dialog to look at the figures first, and **Decide** under the headline asks
+again. Your answer takes effect the next month, for good or for the months it says, and
+shows under the headline while it lasts. (The UK's own questions come in a later build;
+the dock strike mod shows how one works in Valmora.)
 
 ## Things to try
 

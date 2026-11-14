@@ -24,6 +24,8 @@ You run the government. Each month households work, earn, pay tax, receive benef
 
 [b]Advance time[/b] with Next month, Next quarter or Next year. A term is five years.
 
+[b]Decide[/b] when a question is put to you (a strike, a crisis): choose one of the answers. No month runs until you do; close the question to look around first, and "Decide" under the headline asks it again. An answer takes effect next month, for good or for the months it says.
+
 [b]See why[/b]: press Why next to any figure. The panel lists what moved it last month and by how much; press an input to follow it to its own causes, and Back to return. [b]Connections[/b] shows the same figure with what it depends on and what depends on it; press a tile to move along.
 
 [b]Who gains, who loses[/b] breaks a figure down by group (income decile, region, industry). [b]Politics[/b] shows the polls and the seats; lose office at an election and the game is over.
@@ -57,6 +59,11 @@ var _headline: HBoxContainer
 var situations: Array = []
 var _situations_on := {}
 var _situation_strip: HFlowContainer
+## Stage S9.1: the model's dilemmas (from the catalogue), and the dialog that asks for an
+## answer to one of them.
+var dilemmas: Array = []
+var dilemma_dialog: AcceptDialog
+var _dilemma_asked := ""
 var _cards := {}  # key -> {value, change}
 var budget: BudgetPanel
 var breakdown: BreakdownPanel
@@ -341,6 +348,7 @@ func _model_changed() -> void:
 		if str(entry.get("situation", "")) != "":
 			situations.append(entry)
 			_situations_on[entry["name"]] = game.latest(str(entry["row"])) == true
+	dilemmas = catalogue.get("dilemmas", [])
 
 
 func _headline_keys() -> Array:
@@ -479,8 +487,11 @@ func _refresh_chart() -> void:
 
 func _set_controls(enabled: bool) -> void:
 	var busy := game != null and game.is_busy()
+	# Stage S9.1: no month runs while a dilemma waits for an answer.
+	var waiting := not unanswered_dilemmas().is_empty()
 	for button in _advance:
-		button.disabled = not enabled or busy
+		button.disabled = not enabled or busy or waiting
+		button.tooltip_text = "Answer the question put to you first" if waiting else ""
 	_save.disabled = not enabled or busy
 	_reload.disabled = busy or game == null
 	_load.disabled = busy or game == null or not FileAccess.file_exists(save_path)
@@ -502,6 +513,9 @@ func show_per_year(on: bool) -> void:
 
 func advance(months: int) -> void:
 	if failed or lost or game.is_busy():
+		return
+	if not unanswered_dilemmas().is_empty():
+		ask_dilemma()
 		return
 	game.advance(months)
 	_set_controls(true)
@@ -683,7 +697,126 @@ func _show_situations() -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		chip.add_child(label)
 		_situation_strip.add_child(chip)
+	_show_dilemmas()
 	_situation_strip.visible = _situation_strip.get_child_count() > 0
+
+
+## Stage S9.1: on the strip, each dilemma waiting for an answer (a button that asks it
+## again), each answer given for next month, and each answer whose effects are in force.
+func _show_dilemmas() -> void:
+	var pending: Dictionary = game.pending()
+	var waiting := unanswered_dilemmas()
+	for d in dilemmas:
+		var name := str(d["name"])
+		var label := str(d.get("label", name))
+		var options: Array = d.get("options", [])
+		if waiting.has(d):
+			var ask := Button.new()
+			ask.name = "dilemma_" + name
+			ask.text = "Decide: " + label
+			ask.tooltip_text = str(d.get("doc", ""))
+			ask.add_theme_color_override("font_color", Palette.ACCENT)
+			ask.pressed.connect(ask_dilemma)
+			_situation_strip.add_child(ask)
+			continue
+		var text := ""
+		if pending.has(name):
+			var k := int(pending[name])
+			if k >= 1 and k <= options.size():
+				text = "%s: %s · from next month" % [label, str(options[k - 1].get("label", ""))]
+		else:
+			var choice: Variant = game.latest(name + "_choice")
+			var age: Variant = game.latest(name + "_age")
+			if choice != null and int(choice) >= 1 and int(choice) <= options.size() and age != null:
+				var option: Dictionary = options[int(choice) - 1]
+				var months := int(option.get("months", 0))
+				# The answer's month is the step `age` months before the last one run.
+				var last := game.steps_done() - 1 - int(age) + months - 1
+				if months == 0:
+					text = "%s: %s" % [label, str(option.get("label", ""))]
+				elif last >= game.steps_done():
+					text = "%s: %s · until %s" % [label, str(option.get("label", "")), fmt.month_name(last)]
+		if text == "":
+			continue
+		var chip := PanelContainer.new()
+		chip.name = "dilemma_" + name
+		var style := Palette.panel_style(Palette.PANEL_RAISED, 4, 6)
+		style.border_color = Palette.MUTED
+		style.set_border_width_all(1)
+		chip.add_theme_stylebox_override("panel", style)
+		chip.tooltip_text = str(d.get("doc", ""))
+		var chip_label := Label.new()
+		chip_label.text = text
+		chip_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		chip.add_child(chip_label)
+		_situation_strip.add_child(chip)
+
+
+## Stage S9.1: the dilemmas open now with no answer given for next month, in model order.
+func unanswered_dilemmas() -> Array:
+	var out := []
+	if game == null or not started:
+		return out
+	var pending: Dictionary = game.pending()
+	for d in dilemmas:
+		var name := str(d["name"])
+		if game.latest(name + "_open") == true and not pending.has(name):
+			out.append(d)
+	return out
+
+
+## Stage S9.1: puts the first dilemma waiting for an answer to the player, in a dialog with
+## a button for each answer. Closing it leaves the question on the strip.
+func ask_dilemma() -> void:
+	var waiting := unanswered_dilemmas()
+	if waiting.is_empty():
+		return
+	var d: Dictionary = waiting[0]
+	var name := str(d["name"])
+	if dilemma_dialog != null and is_instance_valid(dilemma_dialog):
+		if dilemma_dialog.visible and _dilemma_asked == name:
+			return
+		dilemma_dialog.queue_free()
+	_dilemma_asked = name
+	dilemma_dialog = AcceptDialog.new()
+	dilemma_dialog.name = "dilemma_dialog"
+	dilemma_dialog.title = str(d.get("label", name))
+	dilemma_dialog.get_ok_button().visible = false
+	var text := RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.fit_content = true
+	text.custom_minimum_size = Vector2(620, 0)
+	var lines := PackedStringArray()
+	if str(d.get("doc", "")) != "":
+		lines.append(str(d["doc"]) + ".\n")
+	for option in d.get("options", []):
+		var line := "[b]%s[/b]" % str(option.get("label", option["name"]))
+		if str(option.get("doc", "")) != "":
+			line += ": " + str(option["doc"])
+		lines.append(line + ".\n")
+	lines.append("Your answer takes effect next month; no month runs until you give one.")
+	text.text = "\n".join(lines)
+	dilemma_dialog.add_child(text)
+	var options: Array = d.get("options", [])
+	for i in options.size():
+		# On the right of the (hidden) OK button, so the answers keep the model's order.
+		dilemma_dialog.add_button(str(options[i].get("label", options[i]["name"])), true, "answer_%d" % (i + 1))
+	dilemma_dialog.custom_action.connect(func(action: StringName) -> void:
+		answer_dilemma(name, int(str(action).trim_prefix("answer_"))))
+	add_child(dilemma_dialog)
+	dilemma_dialog.popup_centered(Vector2i(680, 0))
+
+
+## Stage S9.1: answers dilemma `name` with its answer number `answer` (from 1), for next
+## month, then asks the next dilemma waiting, if any.
+func answer_dilemma(name: String, answer: int) -> void:
+	var refused := game.set_lever(name, answer)
+	if refused != "":
+		_show_message("[b]The answer was not taken[/b]: " + refused, true)
+	if dilemma_dialog != null and is_instance_valid(dilemma_dialog):
+		dilemma_dialog.hide()
+	_refresh()
+	ask_dilemma()
 
 
 ## The step a situation that is on now last came on, from the history; -1 if unknown.
@@ -749,6 +882,7 @@ func _process(_delta: float) -> void:
 				_announce_votes()
 				_announce_situations()
 				_announce_election()
+				ask_dilemma.call_deferred()
 				if game.steps_done() >= term and not term_announced:
 					_announce_term.call_deferred()
 			"failed":
@@ -774,6 +908,7 @@ func _process(_delta: float) -> void:
 					lost = _player_lost()
 					trace.trail.clear()
 					_model_changed()
+					ask_dilemma.call_deferred()
 					_status.text = "loaded"
 					var note := ""
 					var missing: PackedStringArray = event.get("missing_mods", PackedStringArray())

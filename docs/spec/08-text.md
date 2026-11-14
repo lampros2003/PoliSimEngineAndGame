@@ -40,6 +40,11 @@ currency_name = "couronnes"
 [scenario.term]            # one scenario's, by its file name
 title = "Valmora (un pays d'essai)"
 summary = "…"
+
+[dilemma.dock_strike_walkout]   # stage S9.1: a dilemma, and its answers by name
+label = "Grève des dockers"
+doc = "…"
+option.settle = { label = "Payer les dockers", doc = "…" }
 ```
 
 Any other section is an error. Words the file does not give keep the model's own. A
@@ -52,7 +57,9 @@ polisim text models/valmora/scenarios/term.toml fr
 ```
 
 lists what the model has words for that the language does not translate (each element's
-`label` and `doc`, each dimension with labels of its own, each sector), one key a line
+`label` and `doc`, each dimension with labels of its own, each sector, and each dilemma's
+`label` and `doc` and its answers' own labels and docs, as `dilemma.<name>.option.<answer>.label`;
+the elements a dilemma makes take its words), one key a line
 such as `element.basic_rate.doc`, and exits with 1 if there is anything. Without a
 language it lists the languages the scenario's model and mods have text in.
 

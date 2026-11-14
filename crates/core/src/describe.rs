@@ -2,7 +2,7 @@
 //! written for that model: every named value with its kind, unit, label and help text,
 //! and which payments enter and leave each sector.
 
-use crate::model::{Kind, Model};
+use crate::model::{DilemmaInfo, Kind, Model};
 use crate::program::Ty;
 use crate::units::{self, Unit};
 
@@ -45,6 +45,9 @@ pub struct Entry {
     pub leaning: String,
     /// Stage S7.3: "good" or "bad" for a situation, else "".
     pub situation: String,
+    /// Stage S9.1: for an element a dilemma makes (its lever, its states), the dilemma's
+    /// name, else "".
+    pub dilemma: String,
     /// Format 1: the value's dimensions, by name.
     pub dims: Vec<String>,
     /// Stage S6.1: what this value's formula reads this step, and through `prev()`; for an
@@ -84,6 +87,10 @@ pub struct Catalogue {
     /// Format 1 (S5.4): the model has a legislature that votes on lever changes.
     pub legislature: bool,
     pub dims: Vec<DimEntry>,
+    /// Stage S9.1: the questions put to the player, in order, with their answers. A
+    /// dilemma `d` is answered by setting the lever `d` to the answer's position, from 1,
+    /// while the state `d_open` is true; `d_choice` is the answer in force.
+    pub dilemmas: Vec<DilemmaInfo>,
 }
 
 /// `income_tax_total` becomes `Income tax total`.
@@ -157,10 +164,14 @@ impl Catalogue {
                     model.instruments[account.instrument].name.clone()
                 }),
                 financial: d.spec.get("financial").and_then(|v| v.as_bool()).unwrap_or(false),
-                player: d.kind == Kind::Lever && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
+                // A dilemma's lever is answered in the dilemma's own dialog, not a policy panel.
+                player: d.kind == Kind::Lever
+                    && !d.spec.contains_key("dilemma")
+                    && d.spec.get("player").and_then(|v| v.as_bool()).unwrap_or(true),
                 group: text("group").unwrap_or_default(),
                 leaning: text("leaning").unwrap_or_default(),
                 situation: if d.kind == Kind::State { text("situation").unwrap_or_default() } else { String::new() },
+                dilemma: text("dilemma").unwrap_or_default(),
                 dims: d.dims.iter().map(|x| model.dims[*x].name.clone()).collect(),
                 inputs: Vec::new(),
                 lagged_inputs: Vec::new(),
@@ -206,6 +217,7 @@ impl Catalogue {
             sectors,
             legislature: model.legislature.is_some(),
             dims: model.dims.iter().map(|d| DimEntry { name: d.name.clone(), labels: d.labels.clone() }).collect(),
+            dilemmas: model.dilemmas.clone(),
         }
     }
 

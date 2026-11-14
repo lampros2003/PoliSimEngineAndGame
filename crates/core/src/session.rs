@@ -357,6 +357,21 @@ impl Session {
         self.sim.set_commands(commands);
     }
 
+    /// Stage S9.1: the dilemmas open now with no answer scheduled for the next step, in
+    /// the order declared. A game asks for these before it runs another month.
+    pub fn unanswered_dilemmas(&self) -> Vec<String> {
+        let next = self.sim.steps_done();
+        let answered: Vec<String> =
+            self.sim.commands().into_iter().filter(|(step, _, _)| *step == next).map(|(_, lever, _)| lever).collect();
+        self.model
+            .dilemmas
+            .iter()
+            .filter(|d| matches!(self.sim.scalar(&format!("{}_open", d.name)), Some(Val::B(true))))
+            .filter(|d| !answered.contains(&d.name))
+            .map(|d| d.name.clone())
+            .collect()
+    }
+
     /// Lever changes that will take effect in the next step.
     pub fn pending(&self) -> Vec<(String, Val)> {
         let next = self.sim.steps_done();

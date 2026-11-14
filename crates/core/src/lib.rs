@@ -35,7 +35,8 @@ pub use describe::Catalogue;
 pub use error::{Error, Result};
 pub use explain::{Explanation, Num, Part};
 pub use model::{
-    ModInfo, Model, Scenario, load_model, load_model_with_mods, load_scenario, load_scenario_with_mods, read_mod,
+    DilemmaInfo, DilemmaOption, ModInfo, Model, Scenario, load_model, load_model_with_mods, load_scenario,
+    load_scenario_with_mods, read_mod,
 };
 pub use program::{Col, Ty, Val};
 pub use save::Migration;

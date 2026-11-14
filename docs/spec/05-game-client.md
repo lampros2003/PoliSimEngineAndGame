@@ -43,6 +43,23 @@ step the player is told which situations began, with their `doc`, and which are 
 added to any other message of that step. Nothing is announced for a game just opened,
 loaded or reloaded.
 
+## Dilemmas
+
+Stage S9.1. The catalogue lists the model's dilemmas ([model format
+1](06-model-format-1.md#dilemmas-stage-s91)) with their answers, in the model's words or
+the game's language. When a step leaves a dilemma open with no answer given for the next
+month, the client asks it in a dialog: its `doc`, each answer's label and `doc`, and a
+button for each answer. Choosing one sets the dilemma's lever to the answer's number, for
+the next month. No month runs while a dilemma waits: the month buttons are off, and a run
+of several months (a quarter, a year) stops at the month the dilemma opens, which the
+bridge enforces on its own thread (`Session::unanswered_dilemmas`). The player may close
+the dialog to look around; "Decide: <label>" on the strip under the headline asks again.
+Once answered, the strip shows the answer, "from next month" until it applies, then
+"until <month>" for an answer that lasts some months, or the answer alone for one that lasts
+for good. A dilemma's lever is not in the policy panel (its catalogue entry has `player`
+false and `dilemma` set). `polisim play` asks a dilemma the same way, as numbered answers
+for `set <name> N`.
+
 ## The scenario's `[play]` table
 
 Presentation settings. The engine ignores them and they never affect a run.

@@ -1,0 +1,13 @@
+# The dock strike in French (stage S7.4 text, stage S9.1 dilemmas).
+[text]
+language = "fr"
+name = "Français"
+
+[element.dock_strike_month]
+label = "Mois depuis le début de la partie"
+
+[dilemma.dock_strike_walkout]
+label = "Grève des dockers"
+doc = "Les dockers de Valmora ont cessé le travail pour leurs salaires. Tant que les ports sont fermés, les entreprises perdent des ventes"
+option.settle = { label = "Payer les dockers", doc = "L'État accepte la revendication : ses achats augmentent d'un cinquième pendant six mois" }
+option.wait = { label = "Attendre", doc = "Les ports restent fermés trois mois : les ventes des entreprises baissent d'un dixième" }

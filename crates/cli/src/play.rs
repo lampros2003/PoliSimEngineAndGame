@@ -9,7 +9,8 @@ use polisim_core::{Error, RawValue, Row, Scenario, Simulation, Val, units};
 const HELP: &str = "\
 commands:
   step [N]            advance N steps (default 1); an empty line does the same
-  set LEVER VALUE     change a policy lever from the next step on
+  set LEVER VALUE     change a policy lever from the next step on; answer a question put to
+                      you (a dilemma) with set NAME N, N the answer's number
   levers              list the levers, their settings and their limits
   show [NAME ...]     show values from the last step (default: the watch list)
   watch NAME ...      choose what is shown after each step
@@ -107,7 +108,8 @@ impl Session {
 
     fn levers(&self) {
         let model = self.sim.model();
-        for d in model.symbols.iter().filter(|d| d.kind == Kind::Lever) {
+        // A dilemma's lever is answered when the dilemma is put (see `step`).
+        for d in model.symbols.iter().filter(|d| d.kind == Kind::Lever && !d.spec.contains_key("dilemma")) {
             let current = self.sim.scalar(&d.name).expect("levers are national values");
             let scale = if d.money { model.minor as f64 } else { 1.0 };
             let limits = match d.range {
@@ -133,19 +135,51 @@ impl Session {
         }
     }
 
-    /// Advances `count` steps. Returns false when the run has failed and must end.
+    /// Stage S9.1: the first dilemma open with no answer for the next step, by its index.
+    fn waiting(&self) -> Option<usize> {
+        let next = self.sim.steps_done();
+        self.sim.model().dilemmas.iter().position(|d| {
+            matches!(self.sim.scalar(&format!("{}_open", d.name)), Some(Val::B(true)))
+                && !self.commands.iter().any(|(step, lever, _)| *step == next && *lever == d.name)
+        })
+    }
+
+    /// Asks the dilemma waiting for an answer, if any: its text and its numbered answers.
+    fn ask(&self) {
+        let Some(index) = self.waiting() else { return };
+        let d = &self.sim.model().dilemmas[index];
+        println!("{}: {}", d.label, d.doc);
+        for (k, option) in d.options.iter().enumerate() {
+            let doc = if option.doc.is_empty() { String::new() } else { format!(": {}", option.doc) };
+            println!("  {}. {}{doc}", k + 1, option.label);
+        }
+        println!("answer with `set {} N`; no step runs until you do", d.name);
+    }
+
+    /// Advances `count` steps, stopping at a dilemma that waits for an answer. Returns false
+    /// when the run has failed and must end.
     fn step(&mut self, count: u64) -> bool {
+        let mut ran = 0;
         for _ in 0..count {
+            if self.waiting().is_some() {
+                break;
+            }
             match self.sim.step() {
-                Ok(row) => self.last = Some(row),
+                Ok(row) => {
+                    self.last = Some(row);
+                    ran += 1;
+                }
                 Err(error) => {
                     println!("the run has failed and cannot continue: {error}");
                     return false;
                 }
             }
         }
-        println!("after step {} ({} completed):", self.sim.steps_done() - 1, self.sim.steps_done());
-        self.show(&self.watch.clone());
+        if ran > 0 {
+            println!("after step {} ({} completed):", self.sim.steps_done() - 1, self.sim.steps_done());
+            self.show(&self.watch.clone());
+        }
+        self.ask();
         true
     }
 

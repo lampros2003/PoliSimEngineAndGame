@@ -29,7 +29,7 @@ _WHOLE = re.compile(r"[+-]?\d+\Z")
 _RESERVED = set(FUNCTIONS) | {"and", "or", "not", "true", "false"}
 _TYPES = {"money": ("int", True), "int": ("int", False), "real": ("real", False), "bool": ("bool", False)}
 _SECTIONS = ("model", "legislature", "dim", "sector", "instrument", "entity", "stream", "table",
-             "param", "lever", "var", "state", "flow", "account", "renamed", "situation")
+             "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma")
 MAX_CELLS = 16_777_216
 
 
@@ -137,6 +137,7 @@ class Model:
     mods: list[ModInfo] = field(default_factory=list)  # S7.1: the mods applied, in order
     mod_notes: list[str] = field(default_factory=list)  # S7.1: e.g. an element two mods patch
     renamed: list[tuple[str, str]] = field(default_factory=list)  # S7.0: (old name, name now), sorted
+    dilemmas: list[dict] = field(default_factory=list)  # S9.1: each dilemma and its answers, in order
 
     def cells(self, dims: tuple[str, ...]) -> list[dict[str, int]]:
         """Coordinates ({dimension: position}) of every cell, in row-major order."""
@@ -257,7 +258,7 @@ class ModInfo:
 
 
 _MOD_ID = re.compile(r"[a-z][a-z0-9_]*\Z")
-_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation")
+_MOD_SECTIONS = ("dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma")
 _PATCH_KINDS = ("param", "lever", "var", "state", "flow", "account")
 
 
@@ -415,6 +416,113 @@ def _expand_situations(merged: dict[str, dict]) -> None:
         merged["state"][name] = state
 
 
+_OPTION_NAME = re.compile(r"[a-z_][a-z0-9_]*\Z")
+_DILEMMA_KEYS = ("label", "doc", "start", "again_after", "option", "phase")
+_OPTION_KEYS = ("name", "label", "doc", "months", "effect")
+# What a dilemma makes besides its lever: (suffix, section).
+_DILEMMA_PARTS = (("", "lever"), ("_choice", "var"), ("_age", "var"), ("_answer", "state"), ("_months", "state"),
+                  ("_open", "state"))
+
+
+def _whole_at_least_one(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def _expand_dilemmas(merged: dict[str, dict]) -> list[dict]:
+    """Stage S9.1: each dilemma becomes a lever for the answer given this month, vars for the
+    answer in force and its age, and states for the answer, the months since and whether the
+    dilemma is open; each answer's effects then wrap the formulas they name. Returns the
+    dilemmas, in order, with their answers."""
+    phases = merged["model"].get("phases")
+    named = isinstance(phases, list) and phases and all(isinstance(p, str) for p in phases)
+    first_phase, last_phase = (phases[0], phases[-1]) if named else ("", "")
+    dilemmas = merged["dilemma"]
+    merged["dilemma"] = {}
+    made: set[str] = set()
+    checked = []
+    for name, spec in dilemmas.items():
+        what = f"dilemma {name}"
+        if not isinstance(spec, dict):
+            raise ModelError(f"{what} must be a table")
+        for key in spec:
+            if key not in _DILEMMA_KEYS:
+                raise ModelError(f"{what}: unknown key {key!r}")
+        start = spec.get("start")
+        if not isinstance(start, str):
+            raise ModelError(f"{what}: needs 'start', the formula that opens it")
+        again = spec.get("again_after")
+        if again is not None and not _whole_at_least_one(again):
+            raise ModelError(f"{what}: 'again_after' must be a whole number of months, at least 1")
+        options = spec.get("option")
+        if not isinstance(options, list) or not 2 <= len(options) <= 6 or not all(isinstance(o, dict) for o in options):
+            raise ModelError(f"{what}: needs two to six answers, each an [[dilemma.{name}.option]] table")
+        seen: set[str] = set()
+        for option in options:
+            for key in option:
+                if key not in _OPTION_KEYS:
+                    raise ModelError(f"{what}: an answer has the unknown key {key!r}")
+            answer = option.get("name")
+            if not isinstance(answer, str) or not _OPTION_NAME.match(answer):
+                raise ModelError(f"{what}: each answer needs a 'name', a lowercase identifier")
+            if answer in seen:
+                raise ModelError(f"{what}: the answer {answer!r} is given twice")
+            seen.add(answer)
+            months = option.get("months")
+            if months is not None and not _whole_at_least_one(months):
+                raise ModelError(f"{what}, answer {answer}: 'months' must be a whole number, at least 1")
+            effect = option.get("effect", {})
+            if not isinstance(effect, dict) or not all(isinstance(f, str) for f in effect.values()):
+                raise ModelError(f"{what}, answer {answer}: 'effect' must be a table of formulas")
+        for suffix, section in _DILEMMA_PARTS:
+            if name + suffix in merged[section] or name + suffix in made:
+                raise ModelError(f"{section}.{name + suffix} is declared twice")
+            made.add(name + suffix)
+        checked.append((name, spec, start, again, options))
+
+    out = []
+    for name, spec, start, again, options in checked:
+        lever = {key: spec[key] for key in ("label", "doc") if key in spec}
+        lever.update({"type": "int", "unit": "1", "default": 0, "range": [0, len(options)], "dilemma": name})
+        merged["lever"][name] = lever
+        merged["var"][f"{name}_choice"] = {"type": "int", "unit": "1", "phase": first_phase, "dilemma": name,
+                                           "expr": f"select({name} != 0, {name}, {name}_answer)"}
+        merged["var"][f"{name}_age"] = {"type": "int", "unit": "1", "phase": first_phase, "dilemma": name,
+                                        "expr": f"select({name} != 0, 0, {name}_months)"}
+        phase = spec.get("phase", last_phase)
+        state = {"type": "int", "unit": "1", "phase": phase, "initial": 0, "dilemma": name}
+        merged["state"][f"{name}_answer"] = {**state, "next": f"{name}_choice"}
+        merged["state"][f"{name}_months"] = {**state, "next": f"{name}_age + 1"}
+        fresh = f"{name}_choice == 0" if again is None else f"({name}_choice == 0 or {name}_age + 1 >= {again})"
+        merged["state"][f"{name}_open"] = {"type": "bool", "unit": "1", "phase": phase, "initial": False,
+                                           "dilemma": name,
+                                           "next": f"select({name}_open, {name} == 0, ({start}) and {fresh})"}
+        out.append({"name": name, "label": spec.get("label", name), "doc": spec.get("doc", ""),
+                    "again_after": again,
+                    "options": [{"name": o["name"], "label": o.get("label", o["name"]), "doc": o.get("doc", ""),
+                                 "months": o.get("months")} for o in options]})
+
+    for name, spec, start, again, options in checked:
+        for k, option in enumerate(options, 1):
+            what = f"dilemma {name}, answer {option['name']}"
+            months = option.get("months")
+            when = f"{name}_choice == {k}" + (f" and {name}_age < {months}" if months is not None else "")
+            for target, formula in option.get("effect", {}).items():
+                found = None
+                if target not in made:
+                    for section, key in (("var", "expr"), ("flow", "expr"), ("state", "next")):
+                        if isinstance(merged[section].get(target), dict):
+                            found = (merged[section][target], key)
+                            break
+                if found is None:
+                    raise ModelError(f"{what}: the model has no var, flow or state {target} of its own")
+                element, key = found
+                old = element.get(key)
+                if not isinstance(old, str):
+                    raise ModelError(f"{what}: {target} has no formula to change")
+                element[key] = f"select({when}, ({formula.replace('{base}', f'({old})')}), ({old}))"
+    return out
+
+
 def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
     """A model folder (or its model.toml), with mods applied in order (stage S7.1)."""
     path = Path(path)
@@ -445,6 +553,7 @@ def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
                 merged[section][name] = spec
     applied, mod_notes = _apply_mods(merged, mods, digest)
     _expand_situations(merged)
+    dilemmas = _expand_dilemmas(merged)
 
     head = merged["model"]
     fmt = head.get("format")
@@ -721,7 +830,7 @@ def load_model(path: str | Path, mods: list[str | Path] = ()) -> Model:
 
     return Model(root, head["id"], head["currency"], minor, step_unit, phases, sectors, instruments,
                  entities, streams, tables, symbols, flows, accounts, digest.hexdigest(), dims, fmt, legislature,
-                 renamed=renamed, mods=applied, mod_notes=mod_notes)
+                 renamed=renamed, mods=applied, mod_notes=mod_notes, dilemmas=dilemmas)
 
 
 def _rake(spec, what: str) -> Rake:

@@ -3,7 +3,7 @@
 //! A port of oracle/polisim_oracle/model.py. Formulas are compiled later, by the
 //! simulation.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -42,7 +42,7 @@ pub const FUNCTIONS: [&str; 23] = [
     "wsum_by",
 ];
 const KEYWORDS: [&str; 5] = ["and", "or", "not", "true", "false"];
-const SECTIONS: [&str; 16] = [
+const SECTIONS: [&str; 17] = [
     "model",
     "legislature",
     "dim",
@@ -59,6 +59,7 @@ const SECTIONS: [&str; 16] = [
     "account",
     "renamed",
     "situation",
+    "dilemma",
 ];
 /// Format 1: the most cells one value may have.
 pub const MAX_CELLS: usize = 16_777_216;
@@ -285,6 +286,28 @@ pub struct Model {
     /// has now (chains followed), sorted by the old name. Saves made before a rename carry
     /// the value across.
     pub renamed: Vec<(String, String)>,
+    /// Stage S9.1: each dilemma and its answers, in the order declared.
+    pub dilemmas: Vec<DilemmaInfo>,
+}
+
+/// Stage S9.1: a question put to the player, as the loader keeps it for the catalogue and
+/// for checking answers. Its lever is `name`; the elements it makes carry `dilemma = name`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DilemmaInfo {
+    pub name: String,
+    pub label: String,
+    pub doc: String,
+    pub again_after: Option<i64>,
+    pub options: Vec<DilemmaOption>,
+}
+
+/// Stage S9.1: one answer to a dilemma.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DilemmaOption {
+    pub name: String,
+    pub label: String,
+    pub doc: String,
+    pub months: Option<i64>,
 }
 
 /// Format 1 (S5.4): symbol indices of the seats each bloc holds (whole numbers), whether it
@@ -880,7 +903,8 @@ pub fn read_mod(dir: &Path) -> Result<(ModInfo, Vec<String>, Vec<u8>)> {
 }
 
 /// The sections a mod's files may add to, besides `[patch]`.
-const MOD_SECTIONS: [&str; 9] = ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation"];
+const MOD_SECTIONS: [&str; 10] =
+    ["dim", "param", "lever", "var", "state", "flow", "account", "renamed", "situation", "dilemma"];
 /// The kinds of element a `[patch.<kind>.<name>]` may change.
 const PATCH_KINDS: [&str; 6] = ["param", "lever", "var", "state", "flow", "account"];
 
@@ -1084,6 +1108,7 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
         state.insert("situation".to_string(), Value::String(if good { "good" } else { "bad" }.to_string()));
         merged[section("state")].insert(name, Value::Table(state));
     }
+    let dilemmas = expand_dilemmas(&mut merged)?;
 
     let head = &merged[0];
     let format = match head.get("format").and_then(Value::as_integer) {
@@ -1577,7 +1602,223 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
         format,
         legislature,
         renamed,
+        dilemmas,
     })
+}
+
+const DILEMMA_KEYS: [&str; 6] = ["label", "doc", "start", "again_after", "option", "phase"];
+const OPTION_KEYS: [&str; 5] = ["name", "label", "doc", "months", "effect"];
+/// What a dilemma makes besides its lever: (suffix, section).
+const DILEMMA_PARTS: [(&str, &str); 6] = [
+    ("", "lever"),
+    ("_choice", "var"),
+    ("_age", "var"),
+    ("_answer", "state"),
+    ("_months", "state"),
+    ("_open", "state"),
+];
+
+/// `None` for a missing key, `Some(Some(n))` for a whole number of at least 1, `Some(None)`
+/// for anything else.
+fn whole_at_least_one(value: Option<&Value>) -> Option<Option<i64>> {
+    match value {
+        None => None,
+        Some(Value::Integer(n)) if *n >= 1 => Some(Some(*n)),
+        Some(_) => Some(None),
+    }
+}
+
+fn is_option_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_lowercase() || c == '_')
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// Stage S9.1: each dilemma becomes a lever for the answer given this month, vars for the
+/// answer in force and its age, and states for the answer, the months since and whether the
+/// dilemma is open; each answer's effects then wrap the formulas they name. Mirrors the
+/// oracle's `_expand_dilemmas`.
+fn expand_dilemmas(merged: &mut [Toml]) -> Result<Vec<DilemmaInfo>> {
+    let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
+    let (first_phase, last_phase) = match merged[0].get("phases") {
+        Some(Value::Array(phases)) if !phases.is_empty() && phases.iter().all(Value::is_str) => {
+            (phases[0].as_str().unwrap().to_string(), phases[phases.len() - 1].as_str().unwrap().to_string())
+        }
+        _ => (String::new(), String::new()),
+    };
+    let dilemmas = std::mem::take(&mut merged[section("dilemma")]);
+    let mut made: HashSet<String> = HashSet::new();
+    // A dilemma that passed the checks.
+    struct Checked {
+        name: String,
+        spec: Toml,
+        start: String,
+        again: Option<i64>,
+        options: Vec<Toml>,
+    }
+    let mut checked: Vec<Checked> = Vec::new();
+    for (name, spec) in dilemmas {
+        let what = format!("dilemma {name}");
+        let Value::Table(spec) = spec else { return model_err(format!("{what} must be a table")) };
+        if let Some(key) = spec.keys().find(|k| !DILEMMA_KEYS.contains(&k.as_str())) {
+            return model_err(format!("{what}: unknown key {key:?}"));
+        }
+        let Some(start) = text_of(&spec, "start") else {
+            return model_err(format!("{what}: needs 'start', the formula that opens it"));
+        };
+        let start = start.to_string();
+        let again = match whole_at_least_one(spec.get("again_after")) {
+            None => None,
+            Some(Some(n)) => Some(n),
+            Some(None) => {
+                return model_err(format!("{what}: 'again_after' must be a whole number of months, at least 1"));
+            }
+        };
+        let options: Vec<Toml> = match spec.get("option") {
+            Some(Value::Array(list)) if (2..=6).contains(&list.len()) && list.iter().all(Value::is_table) => {
+                list.iter().map(|o| o.as_table().unwrap().clone()).collect()
+            }
+            _ => {
+                return model_err(format!("{what}: needs two to six answers, each an [[dilemma.{name}.option]] table"));
+            }
+        };
+        let mut seen: HashSet<String> = HashSet::new();
+        for option in &options {
+            if let Some(key) = option.keys().find(|k| !OPTION_KEYS.contains(&k.as_str())) {
+                return model_err(format!("{what}: an answer has the unknown key {key:?}"));
+            }
+            let Some(answer) = text_of(option, "name").filter(|n| is_option_name(n)) else {
+                return model_err(format!("{what}: each answer needs a 'name', a lowercase identifier"));
+            };
+            if !seen.insert(answer.to_string()) {
+                return model_err(format!("{what}: the answer {answer:?} is given twice"));
+            }
+            if let Some(None) = whole_at_least_one(option.get("months")) {
+                return model_err(format!("{what}, answer {answer}: 'months' must be a whole number, at least 1"));
+            }
+            match option.get("effect") {
+                None => {}
+                Some(Value::Table(effect)) if effect.values().all(Value::is_str) => {}
+                Some(_) => return model_err(format!("{what}, answer {answer}: 'effect' must be a table of formulas")),
+            }
+        }
+        for (suffix, kind) in DILEMMA_PARTS {
+            let part = format!("{name}{suffix}");
+            if merged[section(kind)].contains_key(&part) || made.contains(&part) {
+                return model_err(format!("{kind}.{part} is declared twice"));
+            }
+            made.insert(part);
+        }
+        checked.push(Checked { name, spec, start, again, options });
+    }
+
+    let mut out = Vec::new();
+    for Checked { name, spec, start, again, options } in &checked {
+        let text = |key: &str| text_of(spec, key).map(str::to_string);
+        let mut lever = Toml::new();
+        for key in ["label", "doc"] {
+            if let Some(v) = spec.get(key) {
+                lever.insert(key.to_string(), v.clone());
+            }
+        }
+        let int = |phase: &str| {
+            let mut t = Toml::new();
+            t.insert("type".to_string(), Value::String("int".to_string()));
+            t.insert("unit".to_string(), Value::String("1".to_string()));
+            t.insert("phase".to_string(), Value::String(phase.to_string()));
+            t.insert("dilemma".to_string(), Value::String(name.clone()));
+            t
+        };
+        lever.insert("type".to_string(), Value::String("int".to_string()));
+        lever.insert("unit".to_string(), Value::String("1".to_string()));
+        lever.insert("default".to_string(), Value::Integer(0));
+        lever.insert("range".to_string(), Value::Array(vec![Value::Integer(0), Value::Integer(options.len() as i64)]));
+        lever.insert("dilemma".to_string(), Value::String(name.clone()));
+        merged[section("lever")].insert(name.clone(), Value::Table(lever));
+        let mut choice = int(&first_phase);
+        choice.insert("expr".to_string(), Value::String(format!("select({name} != 0, {name}, {name}_answer)")));
+        merged[section("var")].insert(format!("{name}_choice"), Value::Table(choice));
+        let mut age = int(&first_phase);
+        age.insert("expr".to_string(), Value::String(format!("select({name} != 0, 0, {name}_months)")));
+        merged[section("var")].insert(format!("{name}_age"), Value::Table(age));
+        let phase = spec.get("phase").cloned().unwrap_or(Value::String(last_phase.clone()));
+        let state = |next: String| {
+            let mut t = int("");
+            t.insert("phase".to_string(), phase.clone());
+            t.insert("initial".to_string(), Value::Integer(0));
+            t.insert("next".to_string(), Value::String(next));
+            t
+        };
+        merged[section("state")].insert(format!("{name}_answer"), Value::Table(state(format!("{name}_choice"))));
+        merged[section("state")].insert(format!("{name}_months"), Value::Table(state(format!("{name}_age + 1"))));
+        let fresh = match again {
+            None => format!("{name}_choice == 0"),
+            Some(a) => format!("({name}_choice == 0 or {name}_age + 1 >= {a})"),
+        };
+        let mut open = Toml::new();
+        open.insert("type".to_string(), Value::String("bool".to_string()));
+        open.insert("unit".to_string(), Value::String("1".to_string()));
+        open.insert("phase".to_string(), phase.clone());
+        open.insert("initial".to_string(), Value::Boolean(false));
+        open.insert("dilemma".to_string(), Value::String(name.clone()));
+        open.insert(
+            "next".to_string(),
+            Value::String(format!("select({name}_open, {name} == 0, ({start}) and {fresh})")),
+        );
+        merged[section("state")].insert(format!("{name}_open"), Value::Table(open));
+        out.push(DilemmaInfo {
+            name: name.clone(),
+            label: text("label").unwrap_or_else(|| name.clone()),
+            doc: text("doc").unwrap_or_default(),
+            again_after: *again,
+            options: options
+                .iter()
+                .map(|o| {
+                    let answer = text_of(o, "name").unwrap().to_string();
+                    DilemmaOption {
+                        label: text_of(o, "label").map(str::to_string).unwrap_or_else(|| answer.clone()),
+                        doc: text_of(o, "doc").unwrap_or_default().to_string(),
+                        months: o.get("months").and_then(Value::as_integer),
+                        name: answer,
+                    }
+                })
+                .collect(),
+        });
+    }
+
+    for Checked { name, options, .. } in &checked {
+        for (k, option) in options.iter().enumerate() {
+            let k = k + 1;
+            let what = format!("dilemma {name}, answer {}", text_of(option, "name").unwrap());
+            let when = match option.get("months").and_then(Value::as_integer) {
+                None => format!("{name}_choice == {k}"),
+                Some(m) => format!("{name}_choice == {k} and {name}_age < {m}"),
+            };
+            let Some(Value::Table(effect)) = option.get("effect") else { continue };
+            for (target, formula) in effect {
+                let formula = formula.as_str().unwrap();
+                let mut found = None;
+                if !made.contains(target) {
+                    for (kind, key) in [("var", "expr"), ("flow", "expr"), ("state", "next")] {
+                        if matches!(merged[section(kind)].get(target), Some(Value::Table(_))) {
+                            found = Some((section(kind), key));
+                            break;
+                        }
+                    }
+                }
+                let Some((index, key)) = found else {
+                    return model_err(format!("{what}: the model has no var, flow or state {target} of its own"));
+                };
+                let Some(Value::Table(element)) = merged[index].get_mut(target) else { unreachable!() };
+                let Some(old) = element.get(key).and_then(Value::as_str).map(str::to_string) else {
+                    return model_err(format!("{what}: {target} has no formula to change"));
+                };
+                let changed = formula.replace("{base}", &format!("({old})"));
+                element.insert(key.to_string(), Value::String(format!("select({when}, ({changed}), ({old}))")));
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Stage S7.0: `[renamed] old = "new"`. An old name is no longer a name in the model; the

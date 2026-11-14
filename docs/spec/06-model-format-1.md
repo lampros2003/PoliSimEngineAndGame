@@ -336,6 +336,92 @@ applied (a mod may add situations); the shared cases are in
 `conformance/situation_cases.toml`. Any other key is an error. The section is accepted in
 format 0 models too.
 
+## Dilemmas (stage S9.1)
+
+A dilemma is a question put to the player when a condition first holds, with two to six
+answers. Each answer may change chosen formulas, for good or for some months. It is
+declared with its own section and becomes ordinary elements, so an answer's effects show
+in a trace, a chart and the icon web like any other change, and a mod may add dilemmas:
+
+```toml
+[dilemma.pay_claim]
+label = "Public sector pay claim"
+doc = "Unions in the NHS and schools ask for a rise that keeps up with prices"
+start = "inflation_annual > 0.04"
+again_after = 24
+
+[[dilemma.pay_claim.option]]
+name = "settle"
+label = "Meet the claim"
+doc = "Pay rises 3% for a year"
+months = 12
+effect = { public_pay_bill = "{base} * 1.03" }
+
+[[dilemma.pay_claim.option]]
+name = "hold"
+label = "Hold firm"
+effect = { health_service_strain = "{base} + 0.02" }
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `start` | A true/false formula: the dilemma opens when it holds | required |
+| `again_after` | A whole number of months, at least 1: after an answer, the dilemma may open again once this many months have passed (counting the month of the answer) and `start` holds | never again |
+| `option` | Two to six answers, in the order shown | required |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its states are updated in | the last phase |
+
+| Option key | Meaning | Default |
+|---|---|---|
+| `name` | The answer's name, a lowercase identifier, unique in the dilemma | required |
+| `label`, `doc` | Shown with the answer | |
+| `months` | A whole number, at least 1: how many months the effects last, counting the month of the answer | for good, until another answer |
+| `effect` | A table from the name of a `var`, `flow` or `state` (one the model declares itself, not one a dilemma makes) to a formula in which `{base}` stands for the element's own formula (a state's `next`), as in a [mod's patch](07-mods.md) | no effects |
+
+For a dilemma `d` with `n` answers the loader makes, after mods and situations, and in the
+order the dilemmas are declared:
+
+| Element | Kind | Definition |
+|---|---|---|
+| `d` | lever, `int`, unit `1`, `default = 0`, `range = [0, n]` | the answer given this month: `k` for the `k`th, 0 for none |
+| `d_choice` | var, `int`, unit `1`, the first phase | `select(d != 0, d, d_answer)`: the answer in force |
+| `d_age` | var, `int`, unit `1`, the first phase | `select(d != 0, 0, d_months)`: months since that answer |
+| `d_answer` | state, `int`, unit `1`, `initial = 0` | `next = "d_choice"` |
+| `d_months` | state, `int`, unit `1`, `initial = 0` | `next = "d_age + 1"` |
+| `d_open` | state, `bool`, unit `1`, `initial = false` | `next = "select(d_open, d == 0, (<start>) and d_choice == 0)"`, or with `again_after = a`, `... and (d_choice == 0 or d_age + 1 >= a))` |
+
+The states are updated in the dilemma's `phase`. The lever carries `label` and `doc` from
+the dilemma, and every element made carries `dilemma = "d"`, which the catalogue passes on.
+Each answer `k` with effects then rewrites each element it names, in the order written:
+the element's formula `F` becomes
+
+```text
+select(d_choice == k, (E), (F))                       without months
+select(d_choice == k and d_age < m, (E), (F))         with months = m
+```
+
+where `E` is the effect with every `{base}` replaced by `(F)`. So effects of later answers
+and later dilemmas wrap those of earlier ones, and an element's formula without effects in
+force is its own.
+
+**Answering.** A dilemma's lever is set by a command, like any lever, but is never a bill.
+In part 1 of a step, a command to it is an error unless its dilemma is open (`d_open` is
+true at the start of the step) and the value is a whole number from 1 to `n`. At the end
+of the step, after the flows are posted, every dilemma's lever returns to 0, so between
+steps (in a save, and in the state hash) it is always 0, and `d_choice` and `d_answer`
+hold the answer. An open dilemma stays open until it is answered; a run with no answers
+is not an error.
+
+A dilemma with no `rand()` in `start` opens at the same point of every run; a model that
+wants chance writes a draw from a declared random stream into `start`. Any other key is an
+error, in the dilemma or an option, as are: an `option` that is not an array of two to six
+tables; a missing, repeated or non-identifier `name`; `months` or `again_after` that is
+not a whole number of at least 1; an effect naming anything but a declared `var`, `flow`
+or `state`, or one without a formula; an effect that is not a formula; and any name the
+dilemma would make that the model already has. The oracle and the engine expand dilemmas
+and check answers the same way; the shared cases are in `conformance/dilemma_cases.toml`.
+The section is accepted in format 0 models too.
+
 ## Load-time checks
 
 Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot

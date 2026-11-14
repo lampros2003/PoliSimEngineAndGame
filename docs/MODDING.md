@@ -116,12 +116,49 @@ the model, and the change takes effect from the next month.
 A saved game remembers its mods. If you load it after removing a mod, it carries on
 without the mod's values and says so.
 
+## A dilemma
+
+A mod can put a question to the player: `mods/dock_strike` is one, for Valmora. Its file
+declares a counter of months and a dilemma that opens in the third:
+
+```toml
+[dilemma.dock_strike_walkout]
+label = "Dock strike"
+doc = "Valmora's dockers have walked out over pay. While the ports are shut, firms lose sales"
+start = "dock_strike_month >= 2"
+
+[[dilemma.dock_strike_walkout.option]]
+name = "settle"
+label = "Pay the dockers"
+doc = "The government meets the claim: its purchases rise by a fifth for six months"
+months = 6
+effect = { gov_spending = "round({base} * 1.2)" }
+
+[[dilemma.dock_strike_walkout.option]]
+name = "wait"
+label = "Wait them out"
+doc = "The ports stay shut for three months: firms' sales fall by a tenth"
+months = 3
+effect = { net_sales = "round({base} * 0.9)" }
+```
+
+`start` is when the question is put; each answer's `effect` changes formulas the model
+already has, with `{base}` for the formula as it was, for `months` months from the answer
+(or for good without `months`); `again_after = 24` would put the question again two years
+after an answer, if `start` still holds. The game stops and asks when the dilemma opens,
+and the answer shows under the headline. Everything a dilemma does is an ordinary formula,
+so **Why** next to government purchases shows the strike's effect. The format, with every
+rule, is in [`docs/spec/06-model-format-1.md`](spec/06-model-format-1.md#dilemmas-stage-s91);
+`models/valmora/scenarios/dock_strike.toml` opens Valmora with the mod.
+
 ## Words in other languages
 
 A mod may bring its words in other languages: `text/fr.toml` in its folder, as
 [`docs/spec/08-text.md`](spec/08-text.md) describes, with `[element.wealth_tax_rate]` and
 so on. A translation of a whole country is a mod too: a `mod.toml` with no files and a
-`text` folder. `polisim text <scenario> <language>` lists what is left untranslated.
+`text` folder. `polisim text <scenario> <language>` lists what is left untranslated. A
+dilemma's words go in `[dilemma.<name>]`, with each answer's under `option.<answer>`, as
+`mods/dock_strike/text/fr.toml` shows.
 
 ## Limits for now
 

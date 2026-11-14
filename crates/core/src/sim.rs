@@ -404,6 +404,9 @@ impl Simulation {
         for d in m.symbols.iter().filter(|d| d.kind == Kind::Lever) {
             let given =
                 lever_overrides.iter().position(|(name, _)| *name == d.name).map(|i| lever_overrides.remove(i).1);
+            if given.is_some() && d.spec.contains_key("dilemma") {
+                return model_err(format!("dilemma {}: it is answered by a command, not set at the start", d.name));
+            }
             let raw = given.or_else(|| d.initial.clone()).expect("levers have a default");
             simulation.set_lever(&d.name, &raw)?;
         }
@@ -618,7 +621,28 @@ impl Simulation {
     /// Checks that `raw` is a legal setting for the lever `name` without applying it.
     /// Returns the value as it would be stored.
     pub fn check_lever(&self, name: &str, raw: &Value) -> Result<Val> {
+        self.check_answer(name, raw)?;
         check_lever(&self.model, name, raw)
+    }
+
+    /// Stage S9.1: an answer to a dilemma is a whole number from 1 to the number of its
+    /// answers, given while it is open (at the start of the step). Other levers pass.
+    fn check_answer(&self, name: &str, raw: &Value) -> Result<()> {
+        let Some(&id) = self.model.sym_index.get(name) else { return Ok(()) };
+        let d = &self.model.symbols[id];
+        if d.kind != Kind::Lever || !d.spec.contains_key("dilemma") {
+            return Ok(());
+        }
+        let open = self.model.sym_index[&format!("{name}_open")];
+        if !matches!(self.scal[open], Val::B(true)) {
+            return sim_err(format!("dilemma {name} is not open"));
+        }
+        let value = convert(Raw::Toml(raw), d.ty, d.money, self.model.minor, &format!("dilemma {name}"))?;
+        let count = d.range.map_or(0.0, |(_, hi)| hi);
+        if !matches!(value, Val::I(v) if v >= 1 && v as f64 <= count) {
+            return sim_err(format!("dilemma {name}: the answer must be from 1 to {count}"));
+        }
+        Ok(())
     }
 
     fn set_lever(&mut self, name: &str, raw: &Value) -> Result<()> {
@@ -979,6 +1003,7 @@ impl Simulation {
         self.defeated = 0;
         if let Some(commands) = self.commands.get(&self.step).cloned() {
             for (lever, raw) in commands {
+                self.check_answer(&lever, &raw)?;
                 if self.passes(&lever, &raw)? {
                     self.set_lever(&lever, &raw)?;
                 }
@@ -1009,7 +1034,14 @@ impl Simulation {
         let posted = self.post_flows();
         let last = self.phase_time.len() - 1;
         self.phase_time[last] += started.elapsed();
-        posted
+        posted?;
+        // Stage S9.1: an answer to a dilemma lasts one step; between steps its lever is 0.
+        let model = Arc::clone(&self.model);
+        for dilemma in &model.dilemmas {
+            let id = model.sym_index[&dilemma.name];
+            self.store(id, Computed::One(Val::I(0)))?;
+        }
+        Ok(())
     }
 
     /// Double entry: every flow leaves one account and enters another (contract, section 4).

@@ -88,6 +88,8 @@ class Simulation:
         lever_overrides = dict(levers or {})
         for d in sym.values():
             if d.kind == "lever":
+                if d.spec.get("dilemma") and d.name in lever_overrides:
+                    raise ModelError(f"dilemma {d.name}: it is answered by a command, not set at the start")
                 self._set_lever(d.name, lever_overrides.pop(d.name, d.initial))
         if lever_overrides:
             raise ModelError(f"unknown lever(s): {', '.join(lever_overrides)}")
@@ -300,6 +302,19 @@ class Simulation:
             self.defeated += 1
         return passed
 
+    def _check_answer(self, name: str, raw) -> None:
+        """Stage S9.1: an answer to a dilemma is a whole number from 1 to the number of its
+        answers, given while it is open (at the start of the step)."""
+        d = self.model.symbols.get(name)
+        if d is None or d.kind != "lever" or not d.spec.get("dilemma"):
+            return
+        if not self.rt.S[f"{name}_open"]:
+            raise SimError(f"dilemma {name} is not open")
+        value = convert(raw, d.type, d.money, self.model.minor, f"dilemma {name}")
+        count = d.spec["range"][1]
+        if not 1 <= value <= count:
+            raise SimError(f"dilemma {name}: the answer must be from 1 to {count}")
+
     def _set_lever(self, name: str, raw) -> None:
         d = self.model.symbols.get(name)
         if d is None or d.kind != "lever":
@@ -357,6 +372,7 @@ class Simulation:
         try:
             self.defeated = 0
             for name, raw in self.commands.get(rt.step, {}).items():
+                self._check_answer(name, raw)
                 if self._passes(name, raw):
                     self._set_lever(name, raw)
 
@@ -370,6 +386,9 @@ class Simulation:
                     self._sync_weights()
 
             self._post_flows()
+            # Stage S9.1: an answer to a dilemma lasts one step; between steps its lever is 0.
+            for dilemma in m.dilemmas:
+                self._store(sym[dilemma["name"]], 0)
         except SimError as exc:
             raise SimError(f"step {rt.step}: {exc}") from None
 

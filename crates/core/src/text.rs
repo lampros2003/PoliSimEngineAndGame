@@ -23,6 +23,11 @@
 //! [scenario.term]
 //! title = "Valmora (un pays d'essai)"
 //! summary = "…"
+//!
+//! [dilemma.strike]          # stage S9.1: a dilemma and its answers
+//! label = "Grève des dockers"
+//! doc = "…"
+//! option.settle = { label = "Accorder la hausse", doc = "…" }
 //! ```
 //!
 //! Text is not part of the run: it is outside the model hash, and the oracle never reads
@@ -99,7 +104,7 @@ pub fn load_text(model: &Model, language: &str) -> Result<Option<Text>> {
             let Value::Table(content) = content else {
                 return model_err(format!("{}: [{section}] must be a table", file.display()));
             };
-            if !["text", "element", "dim", "sector", "play", "scenario"].contains(&section.as_str()) {
+            if !["text", "element", "dim", "sector", "play", "scenario", "dilemma"].contains(&section.as_str()) {
                 return model_err(format!("{}: unknown section [{section}]", file.display()));
             }
             merge(out.table.entry(section).or_insert_with(|| Value::Table(Toml::new())), content);
@@ -148,6 +153,31 @@ impl Text {
                 sector.label = label;
             }
         }
+        for dilemma in &mut catalogue.dilemmas {
+            let words = self.table.get("dilemma").and_then(|d| d.get(&dilemma.name));
+            let word = |table: Option<&Value>, key: &str| {
+                table.and_then(|t| t.get(key)).and_then(Value::as_str).map(str::to_string)
+            };
+            if let Some(label) = word(words, "label") {
+                dilemma.label = label.clone();
+                // The dilemma's lever carries its words too.
+                if let Some(entry) = catalogue.entries.iter_mut().find(|e| e.name == dilemma.name) {
+                    entry.label = label;
+                }
+            }
+            if let Some(doc) = word(words, "doc") {
+                dilemma.doc = doc;
+            }
+            for option in &mut dilemma.options {
+                let answer = words.and_then(|w| w.get("option")).and_then(|o| o.get(&option.name));
+                if let Some(label) = word(answer, "label") {
+                    option.label = label;
+                }
+                if let Some(doc) = word(answer, "doc") {
+                    option.doc = doc;
+                }
+            }
+        }
         for dim in &mut catalogue.dims {
             if let Some(Value::Array(labels)) = self.get("dim", &dim.name, "labels") {
                 let labels: Vec<String> = labels.iter().filter_map(Value::as_str).map(str::to_string).collect();
@@ -175,6 +205,10 @@ impl Text {
     pub fn missing(&self, model: &Model) -> Vec<String> {
         let mut out = Vec::new();
         for d in &model.symbols {
+            // A dilemma's elements take its words, which are checked below.
+            if d.spec.contains_key("dilemma") {
+                continue;
+            }
             for key in ["label", "doc"] {
                 if d.spec.contains_key(key) && self.text("element", &d.name, key).is_none() {
                     out.push(format!("element.{}.{key}", d.name));
@@ -187,6 +221,26 @@ impl Text {
                 matches!(self.get("dim", &dim.name, "labels"), Some(Value::Array(l)) if l.len() == dim.labels.len());
             if has_labels && !translated {
                 out.push(format!("dim.{}.labels", dim.name));
+            }
+        }
+        for dilemma in &model.dilemmas {
+            let words = self.table.get("dilemma").and_then(|d| d.get(&dilemma.name));
+            let has =
+                |table: Option<&Value>, key: &str| table.and_then(|t| t.get(key)).and_then(Value::as_str).is_some();
+            let lever = model.sym(&dilemma.name);
+            for key in ["label", "doc"] {
+                if lever.is_some_and(|d| d.spec.contains_key(key)) && !has(words, key) {
+                    out.push(format!("dilemma.{}.{key}", dilemma.name));
+                }
+            }
+            for option in &dilemma.options {
+                let answer = words.and_then(|w| w.get("option")).and_then(|o| o.get(&option.name));
+                if option.label != option.name && !has(answer, "label") {
+                    out.push(format!("dilemma.{}.option.{}.label", dilemma.name, option.name));
+                }
+                if !option.doc.is_empty() && !has(answer, "doc") {
+                    out.push(format!("dilemma.{}.option.{}.doc", dilemma.name, option.name));
+                }
             }
         }
         // The catalogue names sectors after themselves, so every one wants a translation.

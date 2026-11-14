@@ -169,6 +169,10 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                     error = Some(message.clone());
                 } else {
                     for _ in 0..count {
+                        // Stage S9.1: a month does not run while a dilemma awaits an answer.
+                        if !session.unanswered_dilemmas().is_empty() {
+                            break;
+                        }
                         match session.step() {
                             Ok(()) => done += 1,
                             Err(e) => {
@@ -355,6 +359,7 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("group", e.group.as_str());
         d.set("leaning", e.leaning.as_str());
         d.set("situation", e.situation.as_str());
+        d.set("dilemma", e.dilemma.as_str());
         d.set("dims", &strings(&e.dims));
         d.set("inputs", &strings(&e.inputs));
         d.set("lagged_inputs", &strings(&e.lagged_inputs));
@@ -377,7 +382,28 @@ fn catalogue_dict(catalogue: &Catalogue) -> VarDictionary {
         d.set("labels", &strings(&x.labels));
         dims.push(&d.to_variant());
     }
+    // Stage S9.1: the questions put to the player, each with its answers in order.
+    let mut dilemmas = VarArray::new();
+    for x in &catalogue.dilemmas {
+        let mut d = VarDictionary::new();
+        d.set("name", x.name.as_str());
+        d.set("label", x.label.as_str());
+        d.set("doc", x.doc.as_str());
+        d.set("again_after", x.again_after.unwrap_or(0));
+        let mut options = VarArray::new();
+        for o in &x.options {
+            let mut option = VarDictionary::new();
+            option.set("name", o.name.as_str());
+            option.set("label", o.label.as_str());
+            option.set("doc", o.doc.as_str());
+            option.set("months", o.months.unwrap_or(0));
+            options.push(&option.to_variant());
+        }
+        d.set("options", &options);
+        dilemmas.push(&d.to_variant());
+    }
     let mut out = VarDictionary::new();
+    out.set("dilemmas", &dilemmas);
     out.set("id", catalogue.id.as_str());
     out.set("legislature", catalogue.legislature);
     out.set("dims", &dims);
