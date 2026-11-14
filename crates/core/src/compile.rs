@@ -85,7 +85,7 @@ impl<'a> Builder<'a> {
 
     fn finish(self, result: &Built) -> Check<Program> {
         let narrow = |n: u32| u16::try_from(n).map_err(|_| "formula is too large".to_string());
-        Ok(Program {
+        let mut prog = Program {
             ops: self.ops,
             n_i: narrow(self.n_i)?,
             n_f: narrow(self.n_f)?,
@@ -99,7 +99,10 @@ impl<'a> Builder<'a> {
             indexes: self.indexes,
             subs: self.subs,
             aggs_by: self.aggs_by,
-        })
+            hoisted: None,
+        };
+        prog.hoisted = crate::program::hoist(&prog);
+        Ok(prog)
     }
 
     // ---------------------------------------------------------------- format 1

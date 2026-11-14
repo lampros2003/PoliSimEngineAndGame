@@ -990,10 +990,21 @@ impl Simulation {
         }
     }
 
+    /// Keeps a copy of the state as it is now, and the two before it. Stage S10.8: the
+    /// oldest copy's buffers are reused, and the columns are copied on several threads.
     fn take_snapshot(&mut self) {
-        let snapshot = Snapshot { steps_done: self.step, scal: self.scal.clone(), cols: self.cols.clone() };
+        let mut snapshot = if self.snapshots.len() >= 3 {
+            self.snapshots.pop_back().expect("three snapshots")
+        } else {
+            Snapshot { steps_done: 0, scal: Vec::new(), cols: Vec::new() }
+        };
+        snapshot.steps_done = self.step;
+        snapshot.scal.clone_from(&self.scal);
+        snapshot.cols.truncate(self.cols.len());
+        let reused = snapshot.cols.len();
+        snapshot.cols.par_iter_mut().zip(&self.cols[..reused]).for_each(|(copy, col)| copy.copy_from(col));
+        snapshot.cols.extend(self.cols[reused..].iter().cloned());
         self.snapshots.push_front(snapshot);
-        self.snapshots.truncate(3);
     }
 
     /// Keeps copies of the state at the end of each step so that [`Simulation::explain`]

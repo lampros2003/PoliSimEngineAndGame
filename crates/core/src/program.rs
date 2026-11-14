@@ -37,6 +37,17 @@ pub enum Col {
 }
 
 impl Col {
+    /// Stage S10.8: makes this column a copy of `other`, reusing its buffer when both hold
+    /// the same kind of value (a derived `clone_from` would allocate anew).
+    pub fn copy_from(&mut self, other: &Col) {
+        match (self, other) {
+            (Col::I(a), Col::I(b)) => a.clone_from(b),
+            (Col::F(a), Col::F(b)) => a.clone_from(b),
+            (Col::B(a), Col::B(b)) => a.clone_from(b),
+            (this, other) => *this = other.clone(),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             Col::I(v) => v.len(),
@@ -307,6 +318,176 @@ pub struct Program {
     pub indexes: Vec<IndexUse>,
     pub subs: Vec<Sub>,
     pub aggs_by: Vec<AggBy>,
+    /// Stage S10.8: for a program over records or cells, its instructions split into those
+    /// whose operands are the same for every record or cell and the rest ([`hoist`]); `None`
+    /// when no instruction beyond a load or a constant would be saved.
+    pub hoisted: Option<Box<Hoisted>>,
+}
+
+/// Stage S10.8: a program over records or cells split in two. `once` holds the
+/// instructions whose operands are the same for every record or cell (constants, national
+/// values, sums, and anything computed from those alone), run once for one record; `each`
+/// holds the rest, in their order, run block by block after the registers in `fills` are
+/// filled from what `once` computed. Each value is computed by the same operations as
+/// before, so the results are the same bits; the virtual machine runs the whole program
+/// instead whenever `once` fails, so errors are exactly as before too.
+#[derive(Clone, Debug)]
+pub struct Hoisted {
+    pub once: Vec<Op>,
+    pub each: Vec<Op>,
+    pub fills: Vec<(Ty, R)>,
+}
+
+/// The register an instruction writes.
+fn writes(op: &Op) -> (Ty, R) {
+    use Op::*;
+    match *op {
+        ConstI(d, _)
+        | LoadSI(d, _)
+        | LoadCI(d, _)
+        | LoadAggI(d, _)
+        | NegI(d, _)
+        | AddI(d, ..)
+        | SubI(d, ..)
+        | MulI(d, ..)
+        | MinI(d, ..)
+        | MaxI(d, ..)
+        | ClampI(d, ..)
+        | AbsI(d, _)
+        | ToInt(_, d, _)
+        | SelI(d, ..)
+        | MulDiv(d, ..)
+        | DivI(d, ..)
+        | ModI(d, ..)
+        | Marginal(d, ..)
+        | LoadGI(d, ..)
+        | Coord(d, _)
+        | IndexI(d, _)
+        | LoadSubI(d, _)
+        | LoadAggByI(d, ..) => (Ty::Int, d),
+        ConstF(d, _)
+        | LoadSF(d, _)
+        | LoadCF(d, _)
+        | LoadAggF(d, _)
+        | NegF(d, _)
+        | AddF(d, ..)
+        | SubF(d, ..)
+        | MulF(d, ..)
+        | DivF(d, ..)
+        | IToF(d, _)
+        | MinF(d, ..)
+        | MaxF(d, ..)
+        | ClampF(d, ..)
+        | AbsF(d, _)
+        | Exp(d, _)
+        | Ln(d, _)
+        | Sqrt(d, _)
+        | Pow(d, ..)
+        | SelF(d, ..)
+        | SafeDiv(d, ..)
+        | Rand(d, ..)
+        | LoadGF(d, ..)
+        | IndexF(d, _)
+        | LoadSubF(d, _)
+        | LoadAggByF(d, ..) => (Ty::Real, d),
+        ConstB(d, _)
+        | LoadSB(d, _)
+        | LoadCB(d, _)
+        | NotB(d, _)
+        | CmpI(_, d, ..)
+        | CmpF(_, d, ..)
+        | CmpB(_, d, ..)
+        | AndB(d, ..)
+        | OrB(d, ..)
+        | SelB(d, ..)
+        | LoadGB(d, ..)
+        | IndexB(d, _) => (Ty::Bool, d),
+    }
+}
+
+/// The registers an instruction reads, and whether it gives the same value for every
+/// record or cell when they do (`false` for loads of columns, cells and coordinates,
+/// indexes and random draws, which depend on the record or cell).
+fn reads(op: &Op, prog: &Program) -> (Vec<(Ty, R)>, bool) {
+    use Op::*;
+    use Ty::{Bool as B, Int as I, Real as F};
+    let (regs, same) = match *op {
+        ConstI(..) | ConstF(..) | ConstB(..) | LoadSI(..) | LoadSF(..) | LoadSB(..) | LoadAggI(..) | LoadAggF(..) => {
+            (vec![], true)
+        }
+        LoadCI(..) | LoadCF(..) | LoadCB(..) | LoadGI(..) | LoadGF(..) | LoadGB(..) | Coord(..) | Rand(..)
+        | LoadSubI(..) | LoadSubF(..) | LoadAggByI(..) | LoadAggByF(..) => (vec![], false),
+        IndexI(_, u) | IndexF(_, u) | IndexB(_, u) => {
+            (prog.indexes[u as usize].fixed.iter().map(|f| (I, f.reg)).collect(), false)
+        }
+        NegI(_, a) | AbsI(_, a) | IToF(_, a) => (vec![(I, a)], true),
+        NegF(_, a) | AbsF(_, a) | Exp(_, a) | Ln(_, a) | Sqrt(_, a) | ToInt(_, _, a) => (vec![(F, a)], true),
+        NotB(_, a) => (vec![(B, a)], true),
+        Marginal(_, x, _) => (vec![(I, x)], true),
+        AddI(_, a, b)
+        | SubI(_, a, b)
+        | MulI(_, a, b)
+        | MinI(_, a, b)
+        | MaxI(_, a, b)
+        | DivI(_, a, b)
+        | ModI(_, a, b)
+        | CmpI(_, _, a, b) => (vec![(I, a), (I, b)], true),
+        AddF(_, a, b)
+        | SubF(_, a, b)
+        | MulF(_, a, b)
+        | DivF(_, a, b)
+        | MinF(_, a, b)
+        | MaxF(_, a, b)
+        | Pow(_, a, b)
+        | CmpF(_, _, a, b) => (vec![(F, a), (F, b)], true),
+        CmpB(_, _, a, b) | AndB(_, a, b) | OrB(_, a, b) => (vec![(B, a), (B, b)], true),
+        ClampI(_, x, lo, hi) | MulDiv(_, x, lo, hi) => (vec![(I, x), (I, lo), (I, hi)], true),
+        ClampF(_, x, lo, hi) | SafeDiv(_, x, lo, hi) => (vec![(F, x), (F, lo), (F, hi)], true),
+        SelI(_, c, a, b) => (vec![(B, c), (I, a), (I, b)], true),
+        SelF(_, c, a, b) => (vec![(B, c), (F, a), (F, b)], true),
+        SelB(_, c, a, b) => (vec![(B, c), (B, a), (B, b)], true),
+    };
+    (regs, same)
+}
+
+/// Stage S10.8: splits `prog` into what is the same for every record or cell and the rest
+/// (see [`Hoisted`]); `None` when only loads and constants would move.
+pub fn hoist(prog: &Program) -> Option<Box<Hoisted>> {
+    let mut same = [vec![false; prog.n_i as usize], vec![false; prog.n_f as usize], vec![false; prog.n_b as usize]];
+    let file = |ty: Ty| match ty {
+        Ty::Int => 0,
+        Ty::Real => 1,
+        Ty::Bool => 2,
+    };
+    let (mut once, mut each) = (Vec::new(), Vec::new());
+    let mut saved = 0;
+    for op in &prog.ops {
+        let (inputs, uniform) = reads(op, prog);
+        if uniform && inputs.iter().all(|(ty, r)| same[file(*ty)][*r as usize]) {
+            let (ty, d) = writes(op);
+            same[file(ty)][d as usize] = true;
+            saved += usize::from(!inputs.is_empty());
+            once.push(*op);
+        } else {
+            each.push(*op);
+        }
+    }
+    if saved == 0 {
+        return None;
+    }
+    let mut fills: Vec<(Ty, R)> = Vec::new();
+    let mut fill = |ty: Ty, r: R| {
+        if same[file(ty)][r as usize] && !fills.contains(&(ty, r)) {
+            fills.push((ty, r));
+        }
+    };
+    for op in &each {
+        for (ty, r) in reads(op, prog).0 {
+            fill(ty, r);
+        }
+    }
+    fill(prog.ty, prog.result);
+    Some(Box::new(Hoisted { once, each, fills }))
 }
 
 impl Program {

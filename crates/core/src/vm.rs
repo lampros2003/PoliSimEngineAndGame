@@ -6,7 +6,7 @@
 //! anywhere fails the whole formula.
 
 use crate::model::Entity;
-use crate::program::{Agg, AggBy, AggKind, Cmp, Col, Op, Program, Rounding, Src, SubKind, Ty, Val};
+use crate::program::{Agg, AggBy, AggKind, Cmp, Col, Hoisted, Op, Program, Rounding, Src, SubKind, Ty, Val};
 use crate::rng::uniform;
 use rayon::prelude::*;
 
@@ -246,17 +246,48 @@ fn split(result: Partial) -> (Col, Option<(usize, String)>) {
     }
 }
 
+/// Stage S10.8: what a hoisted program's `once` part computed, one value for each of its
+/// `fills`.
+type Once<'p> = Option<(&'p Hoisted, Vec<Val>)>;
+
+/// Stage S10.8: runs the part of `prog` that is the same for every record or cell, once.
+/// `None` when the program is not split, there is nothing to compute, or that part fails:
+/// the whole program then runs block by block, and gives its error exactly as before.
+fn run_once<'p>(prog: &'p Program, cx: &EvalCtx, count: usize, prepared: &Prepared) -> Once<'p> {
+    let hoisted = prog.hoisted.as_deref()?;
+    if count == 0 {
+        return None;
+    }
+    let mut regs = Regs::take(prog, 1);
+    let ran = run_block(prog, &hoisted.once, cx, None, 0, 1, &mut regs, prepared);
+    let values = ran.ok().map(|()| {
+        hoisted
+            .fills
+            .iter()
+            .map(|&(ty, r)| match ty {
+                Ty::Int => Val::I(regs.i[r as usize][0]),
+                Ty::Real => Val::F(regs.f[r as usize][0]),
+                Ty::Bool => Val::B(regs.b[r as usize][0]),
+            })
+            .collect()
+    });
+    regs.put();
+    values.map(|v| (hoisted, v))
+}
+
 fn eval_all(prog: &Program, cx: &EvalCtx, entity: Option<usize>, count: usize, prepared: &Prepared) -> Partial {
     let task = BLOCK * TASK_BLOCKS;
+    let once = run_once(prog, cx, count, prepared);
+    let once = once.as_ref().map(|(h, v)| (*h, v.as_slice()));
     if count <= task {
-        return eval_range(prog, cx, entity, 0, count, prepared);
+        return eval_range(prog, cx, entity, 0, count, prepared, once);
     }
     // Records (and cells) are independent, so tasks of whole blocks run on several threads
     // and give what one thread would; the parts are joined in order, and the first failure
     // in order is the one reported, as if the blocks had run one after another.
     let starts: Vec<usize> = (0..count).step_by(task).collect();
     let parts: Vec<Partial> =
-        starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), prepared)).collect();
+        starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), prepared, once)).collect();
     let mut out = empty(prog.ty, count);
     for part in parts {
         match part {
@@ -425,7 +456,7 @@ fn finish_sub(kind: SubKind, column: Col) -> Check<Col> {
 pub fn eval_scalar(prog: &Program, cx: &EvalCtx) -> Check<Val> {
     let prepared = prepare(prog, cx)?;
     let mut regs = Regs::take(prog, 1);
-    let ran = run_block(prog, cx, None, 0, 1, &mut regs, &prepared);
+    let ran = run_block(prog, &prog.ops, cx, None, 0, 1, &mut regs, &prepared);
     let r = prog.result as usize;
     let value = match prog.ty {
         Ty::Int => Val::I(regs.i[r][0]),
@@ -446,7 +477,9 @@ pub fn eval_column(prog: &Program, entity: usize, cx: &EvalCtx) -> Check<Col> {
 /// Blocks per parallel task (4,096 records): smaller sets of records run on one thread.
 const TASK_BLOCKS: usize = 16;
 
-/// Records (or cells) `start..end`, block after block.
+/// Records (or cells) `start..end`, block after block: the whole program, or (stage S10.8)
+/// the part of a hoisted one that differs between records, after filling the registers it
+/// reads from the part computed once.
 fn eval_range(
     prog: &Program,
     cx: &EvalCtx,
@@ -454,15 +487,26 @@ fn eval_range(
     start: usize,
     end: usize,
     prepared: &Prepared,
+    once: Option<(&Hoisted, &[Val])>,
 ) -> Partial {
     let count = end - start;
     let mut regs = Regs::take(prog, BLOCK.min(count.max(1)));
     let r = prog.result as usize;
     let mut out = empty(prog.ty, count);
     let mut at = start;
+    let ops = once.map_or(prog.ops.as_slice(), |(h, _)| h.each.as_slice());
     while at < end {
         let len = BLOCK.min(end - at);
-        if let Err(e) = run_block(prog, cx, entity, at, len, &mut regs, prepared) {
+        if let Some((hoisted, values)) = once {
+            for (&(_, reg), value) in hoisted.fills.iter().zip(values) {
+                match *value {
+                    Val::I(v) => regs.i[reg as usize][..len].fill(v),
+                    Val::F(v) => regs.f[reg as usize][..len].fill(v),
+                    Val::B(v) => regs.b[reg as usize][..len].fill(v),
+                }
+            }
+        }
+        if let Err(e) = run_block(prog, ops, cx, entity, at, len, &mut regs, prepared) {
             regs.put();
             return Err((at, e, out));
         }
@@ -610,8 +654,10 @@ fn compare<T: PartialOrd>(cmp: Cmp, x: T, y: T) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_block(
     prog: &Program,
+    ops: &[Op],
     cx: &EvalCtx,
     entity: Option<usize>,
     start: usize,
@@ -620,7 +666,7 @@ fn run_block(
     prepared: &Prepared,
 ) -> Check<()> {
     let end = start + len;
-    for op in &prog.ops {
+    for op in ops {
         match *op {
             Op::ConstI(d, v) => regs.i[d as usize][..len].fill(v),
             Op::ConstF(d, v) => regs.f[d as usize][..len].fill(v),
