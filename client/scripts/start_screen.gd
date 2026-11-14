@@ -6,8 +6,9 @@ extends PanelContainer
 
 const Palette := preload("res://scripts/palette.gd")
 
-## A new game (`resume` false) or the saved one (`resume` true).
-signal chosen(scenario_path: String, mods: PackedStringArray, resume: bool)
+## A new game (`resume` false) or the saved one (`resume` true), with the game's words in
+## `language` ("" for the model's own; stage S7.4).
+signal chosen(scenario_path: String, mods: PackedStringArray, resume: bool, language: String)
 
 var scenarios: Array = []  # dictionaries from the bridge's scenarios()
 var mods: Array = []  # dictionaries from the bridge's mods()
@@ -15,6 +16,9 @@ var saves_folder := ""
 var user_mods := ""
 var _choice: OptionButton
 var _summary: Label
+var _language_title: Label
+var _language: OptionButton
+var _language_codes: PackedStringArray = []
 var _mod_box: VBoxContainer
 var _ticks := {}  # mod path -> CheckBox
 var _new: Button
@@ -46,6 +50,11 @@ func _ready() -> void:
 	_summary = Label.new()
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_summary)
+	_language_title = _muted("Language", true)
+	box.add_child(_language_title)
+	_language = OptionButton.new()
+	_language.name = "language_choice"
+	box.add_child(_language)
 	box.add_child(_muted("Mods", true))
 	_mod_box = VBoxContainer.new()
 	_mod_box.add_theme_constant_override("separation", 4)
@@ -56,12 +65,12 @@ func _ready() -> void:
 	_new = Button.new()
 	_new.name = "new_game"
 	_new.text = "New game"
-	_new.pressed.connect(func() -> void: chosen.emit(selected_path(), selected_mods(), false))
+	_new.pressed.connect(func() -> void: chosen.emit(selected_path(), selected_mods(), false, selected_language()))
 	buttons.add_child(_new)
 	_continue = Button.new()
 	_continue.name = "continue_game"
 	_continue.text = "Continue saved game"
-	_continue.pressed.connect(func() -> void: chosen.emit(selected_path(), PackedStringArray(), true))
+	_continue.pressed.connect(func() -> void: chosen.emit(selected_path(), PackedStringArray(), true, selected_language()))
 	buttons.add_child(_continue)
 
 
@@ -91,6 +100,21 @@ func fill(found_scenarios: Array, found_mods: Array) -> void:
 func selected_path() -> String:
 	var i := _choice.selected
 	return str(scenarios[i]["path"]) if i >= 0 and i < scenarios.size() else ""
+
+
+## The chosen language's code, or "" for the model's own words.
+func selected_language() -> String:
+	var i := _language.selected
+	return _language_codes[i] if i >= 0 and i < _language_codes.size() else ""
+
+
+## Picks a language by code, as a test or a player would.
+func choose_language(code: String) -> bool:
+	var i := _language_codes.find(code)
+	if i < 0:
+		return false
+	_language.select(i)
+	return true
 
 
 func selected_mods() -> PackedStringArray:
@@ -126,6 +150,16 @@ func _show_choice() -> void:
 		return
 	var scenario: Dictionary = scenarios[i]
 	_summary.text = str(scenario.get("summary", ""))
+	# Stage S7.4: the model's own words first, then the languages it has text in.
+	_language.clear()
+	_language_codes = PackedStringArray([""])
+	_language.add_item("English (the model's own words)")
+	for language in scenario.get("languages", []):
+		_language_codes.append(str(language["code"]))
+		_language.add_item(str(language["name"]))
+	_language.select(0)
+	_language_title.visible = _language_codes.size() > 1
+	_language.visible = _language_codes.size() > 1
 	_continue.disabled = not FileAccess.file_exists(save_of(str(scenario["path"])))
 	var model := str(scenario["model"])
 	for mod in mods:

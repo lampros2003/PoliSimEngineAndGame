@@ -27,7 +27,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use toml::Value;
+use toml::{Table as Toml, Value};
 
 use crate::describe::Catalogue;
 use crate::error::{Error, Result, model_err, sim_err};
@@ -36,6 +36,7 @@ use crate::model::{Kind, Model, Scenario, load_model_with_mods, load_scenario_wi
 use crate::program::{Col, Val};
 use crate::save::Migration;
 use crate::sim::Simulation;
+use crate::text::load_text;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
 /// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them);
@@ -129,6 +130,10 @@ pub struct Session {
     extra_mods: Vec<PathBuf>,
     /// Stage S7.1: mods a loaded game had that could not be found, by folder.
     missing_mods: Vec<String>,
+    /// Stage S7.4: the language of the game's words ("" for the model's own), and the
+    /// scenario's `[play]` table as written, before any text was applied to it.
+    language: String,
+    play_written: Toml,
 }
 
 impl Session {
@@ -168,7 +173,10 @@ impl Session {
             migration: None,
             extra_mods: Vec::new(),
             missing_mods: Vec::new(),
+            language: String::new(),
+            play_written: Toml::new(),
         };
+        session.play_written = session.scenario.play.clone();
         // Lever settings are known before any step.
         for entry in session.catalogue.entries.iter().filter(|e| e.kind == Kind::Lever) {
             if let Some(value) = session.sim.scalar(&entry.name) {
@@ -186,6 +194,41 @@ impl Session {
     /// was carried across and what started again.
     pub fn migration(&self) -> Option<&Migration> {
         self.migration.as_ref()
+    }
+
+    /// Stage S7.4: the language of the game's words: "" for the model's own.
+    pub fn language(&self) -> &str {
+        &self.language
+    }
+
+    /// Stage S7.4: puts the game's words (labels, help, the scenario's `[play]` text) in a
+    /// language from the model's and its mods' `text/` folders, or back in the model's own
+    /// with "". The run does not change.
+    pub fn set_language(&mut self, language: &str) -> Result<()> {
+        let previous = std::mem::replace(&mut self.language, language.to_string());
+        if let Err(e) = self.relabel() {
+            self.language = previous;
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    /// Builds the catalogue and the `[play]` table again, in the session's language.
+    fn relabel(&mut self) -> Result<()> {
+        let mut catalogue = Catalogue::of(&self.model);
+        let (deps, lagged) = self.sim.dependencies();
+        catalogue.link(&self.model, deps, lagged);
+        let mut play = self.play_written.clone();
+        if !self.language.is_empty() {
+            let Some(text) = load_text(&self.model, &self.language)? else {
+                return model_err(format!("this model has no text in {:?}", self.language));
+            };
+            text.apply(&mut catalogue);
+            text.apply_play(&mut play, &self.scenario.name);
+        }
+        self.catalogue = catalogue;
+        self.scenario.play = play;
+        Ok(())
     }
 
     /// Stage S7.1: the mods the player chose beyond the scenario's own.
@@ -345,11 +388,14 @@ impl Session {
         let model = Arc::new(load_model_with_mods(&self.model.root, &mods)?);
         let (sim, reset) = self.sim.reload(Arc::clone(&model), &self.scenario.preset, self.scenario.params.clone())?;
         self.scenario.model = (*model).clone();
-        self.catalogue = Catalogue::of(&model);
-        let (deps, lagged) = sim.dependencies();
-        self.catalogue.link(&model, deps, lagged);
         self.model = model;
         self.sim = sim;
+        // Stage S7.4: in the same language (its text may have changed too); if that text is
+        // gone, the model's own words.
+        if self.relabel().is_err() {
+            self.language.clear();
+            self.relabel()?;
+        }
         Ok(reset)
     }
 

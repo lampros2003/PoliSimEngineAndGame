@@ -21,12 +21,14 @@ Related: [engine contract](00-engine-contract.md), [model format](01-model-forma
 
 Stage S7.1. Started with `--scenario=PATH` (after `--` on Godot's command line, as the
 tests and the Valmora launcher do), the client opens that scenario, with the mods in
-`--mods=a,b` (folders) after the scenario's own. Without it, it shows the start screen
+`--mods=a,b` (folders) after the scenario's own, and in `--language=CODE` if given. Without it, it shows the start screen
 (`client/scripts/start_screen.gd`): every scenario with a `[play] title` under the game's
 `models` folder, the one picked described by its `summary`; the mods for its model (a
 mod that names another model is not offered), from the game's `mods` folder and the
 player's own (`user://mods`, created if missing and named on the screen), each with a
-tick box and its description; a mod that cannot be read is shown with its error. **New
+tick box and its description; a mod that cannot be read is shown with its error; and,
+when the model has text in other languages ([text](08-text.md), stage S7.4), a choice of
+language, the model's own words first. **New
 game** starts the scenario with the ticked mods; **Continue saved game**, when the
 scenario has a save, opens it and loads the save, mods and all. The title bar names the
 mods in play, and notes from loading them ([mods](07-mods.md)) are shown when the game
@@ -194,7 +196,7 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs thirteen scripted sessions in Godot without a display and
+`tools/check_client.py` runs fourteen scripted sessions in Godot without a display and
 compares them with the command-line runner or with published figures:
 
 | Script | Checks |
@@ -203,6 +205,7 @@ compares them with the command-line runner or with published figures:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/situations_check.gd` | Stage S7.3: in `2025.toml`, no situation after a quiet first month; then, with purchases of goods and services cut to £20bn a month, a recession: announced, and on the strip as "Recession · since February 2025" |
+| `tests/language_check.gd` | Stage S7.4: from the start screen, French is not offered for the UK; Valmora in French has a French budget and policy panel, and so does a game saved and loaded |
 | `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/wealth_tax`) for the UK only; with it ticked, the game starts with the mod's lever in the policy panel, its name in the title bar, and, once the rate is set, a wealth tax line in the budget |
 | `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |

@@ -18,7 +18,7 @@ a mod.
 
 | Path | What it is |
 |---|---|
-| `docs/spec/` | The engine contract, model formats 0 and 1, the formula language, save formats, the game client, mods, and the toy model with its target patterns |
+| `docs/spec/` | The engine contract, model formats 0 and 1, the formula language, save formats, the game client, mods, text for translations, and the toy model with its target patterns |
 | `crates/core/` | The engine (Rust): model loader, type and unit checker, bytecode compiler, block-wise interpreter, step loop, saves |
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |

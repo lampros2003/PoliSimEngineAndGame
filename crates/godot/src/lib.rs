@@ -125,6 +125,30 @@ fn scenario_entry(path: &std::path::Path) -> Option<VarDictionary> {
     d.set("start", play.get("start").and_then(|c| c.as_str()).unwrap_or(""));
     d.set("summary", play.get("summary").and_then(|c| c.as_str()).unwrap_or(""));
     d.set("model", id);
+    // Stage S7.4: the languages the model has text in, without loading it.
+    let mut languages = VarArray::new();
+    let mut found: Vec<(String, String)> = Vec::new();
+    for file in std::fs::read_dir(path.parent()?.join(model).join("text")).into_iter().flatten().flatten() {
+        let file = file.path();
+        if file.extension().is_none_or(|e| e != "toml") {
+            continue;
+        }
+        let code = file.file_stem()?.to_string_lossy().into_owned();
+        let name = std::fs::read_to_string(&file)
+            .ok()
+            .and_then(|t| t.parse::<polisim_core::RawTable>().ok())
+            .and_then(|t| t.get("text").and_then(|h| h.get("name")).and_then(|n| n.as_str()).map(str::to_string))
+            .unwrap_or_else(|| code.clone());
+        found.push((code, name));
+    }
+    found.sort();
+    for (code, name) in found {
+        let mut l = VarDictionary::new();
+        l.set("code", code.as_str());
+        l.set("name", name.as_str());
+        languages.push(&l.to_variant());
+    }
+    d.set("languages", &languages);
     Some(d)
 }
 
@@ -133,6 +157,8 @@ fn model_info(session: &Session) -> ModelInfo {
 }
 
 fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Reply>, outstanding: Arc<AtomicUsize>) {
+    // Stage S7.4: a loaded game keeps the language the game was opened in.
+    let language = session.language().to_string();
     let mut failed: Option<String> = None;
     for request in requests {
         let event = match request {
@@ -180,7 +206,10 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
                     .map_err(|e| format!("cannot read {}: {e}", path.display()))
                     .and_then(|bytes| Session::load(session.scenario_path(), &bytes).map_err(|e| e.to_string()));
                 match loaded {
-                    Ok(next) => {
+                    Ok(mut next) => {
+                        if !language.is_empty() {
+                            let _ = next.set_language(&language);
+                        }
                         session = next;
                         failed = None;
                         let _ = replies.send(Reply::Model(Box::new(model_info(&session))));
@@ -521,13 +550,25 @@ impl PoliSim {
     /// own. Returns "" or the reason it could not start.
     #[func]
     fn open_with_mods(&mut self, scenario_path: GString, mods: PackedStringArray) -> GString {
+        self.open_game(scenario_path, mods, GString::new())
+    }
+
+    /// Stage S7.4: as `open_with_mods`, with the game's words in `language` (a code from
+    /// the model's `text/` folder; "" for the model's own).
+    #[func]
+    fn open_game(&mut self, scenario_path: GString, mods: PackedStringArray, language: GString) -> GString {
         self.close();
         let path = PathBuf::from(scenario_path.to_string());
         let mods: Vec<PathBuf> = mods.as_slice().iter().map(|m| PathBuf::from(m.to_string())).collect();
-        let session = match Session::open_with_mods(&path, &mods) {
+        let mut session = match Session::open_with_mods(&path, &mods) {
             Ok(s) => s,
             Err(e) => return e.to_string().as_str().into(),
         };
+        if !language.is_empty()
+            && let Err(e) = session.set_language(&language.to_string())
+        {
+            return e.to_string().as_str().into();
+        }
         self.scenario_name = session.scenario().name.clone();
         let mut play = VarDictionary::new();
         for (k, v) in &session.scenario().play {

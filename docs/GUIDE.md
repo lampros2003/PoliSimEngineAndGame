@@ -15,7 +15,8 @@ On Windows, unpack the download and run `PoliSim.bat`. Windows may warn that the
 publisher is unknown, because the build is not signed: choose "More info", then "Run
 anyway". The start screen offers the United Kingdom and Valmora, and the mods there are
 for the country you pick: tick any you want and choose **New game**, or **Continue saved
-game**. The UK opens at the start of January 2025. **Help** in the top bar repeats the
+game**. Valmora can also be played in French (a test translation); the game's own buttons
+stay in English. The UK opens at the start of January 2025. **Help** in the top bar repeats the
 essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 
 ## The screen

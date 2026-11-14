@@ -89,7 +89,7 @@ func _ready() -> void:
 	var mods := PackedStringArray()
 	for name in _argument("mods", "").split(",", false):
 		mods.append(find_folder(name))
-	start(find_file(given), mods)
+	start(find_file(given), mods, _argument("language", ""))
 
 
 ## Stage S7.1: lists the scenarios and mods, and waits for the player's choice.
@@ -101,19 +101,20 @@ func _show_start_screen() -> void:
 	add_child(start_screen)
 	var base := find_folder("models").get_base_dir()
 	start_screen.fill(game.scenarios(base), game.mods(PackedStringArray([find_folder("mods"), start_screen.user_mods])))
-	start_screen.chosen.connect(func(path: String, mods: PackedStringArray, resume: bool) -> void:
+	start_screen.chosen.connect(func(path: String, mods: PackedStringArray, resume: bool, language: String) -> void:
 		start_screen.queue_free()
 		start_screen = null
-		start(path, mods)
+		start(path, mods, language)
 		if resume and started:
 			_load_game())
 	_set_controls(false)
 
 
-## Opens a scenario with the mods chosen beyond its own, and shows its screen.
-func start(path: String, mods := PackedStringArray()) -> void:
+## Opens a scenario with the mods chosen beyond its own, in a language from the model's
+## text ("" for its own words), and shows its screen.
+func start(path: String, mods := PackedStringArray(), language := "") -> void:
 	scenario_path = path
-	var error := game.open_with_mods(scenario_path, mods)
+	var error := game.open_game(scenario_path, mods, language)
 	started = error == ""
 	if error != "":
 		_show_message("[b]Could not start the game[/b]\n%s\n\nScenario: %s" % [error, scenario_path], true)

@@ -116,6 +116,13 @@ the model, and the change takes effect from the next month.
 A saved game remembers its mods. If you load it after removing a mod, it carries on
 without the mod's values and says so.
 
+## Words in other languages
+
+A mod may bring its words in other languages: `text/fr.toml` in its folder, as
+[`docs/spec/08-text.md`](spec/08-text.md) describes, with `[element.wealth_tax_rate]` and
+so on. A translation of a whole country is a mod too: a `mod.toml` with no files and a
+`text` folder. `polisim text <scenario> <language>` lists what is left untranslated.
+
 ## Limits for now
 
 A mod cannot bring data files, add households or other record sets, add sectors, or remove

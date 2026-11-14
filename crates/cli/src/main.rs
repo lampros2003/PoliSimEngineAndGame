@@ -21,6 +21,7 @@ use polisim_core::{Error, Row, Simulation, Val, load_scenario, pyfmt};
 const USAGE: &str = "\
 usage: polisim run <scenario.toml> [options]
        polisim play <scenario.toml> [--seed N] [--resume FILE]
+       polisim text <scenario.toml> [LANGUAGE]
        polisim version
 
 options:
@@ -30,7 +31,10 @@ options:
   --columns A,B,C  write only these columns
   --save FILE      write a save file after the last step
   --resume FILE    continue from a save file; seed and parameters come from the save
-  --time           report milliseconds per step on standard error";
+  --time           report milliseconds per step on standard error
+
+polisim text lists the languages a scenario's model and mods have text in, or, given one,
+what the model has words for that the language does not translate (exit 1 if anything).";
 
 #[derive(Default)]
 struct Options {
@@ -194,11 +198,34 @@ fn play_session(options: Options) -> Result<(), String> {
     play::play(scenario, options.seed, resume)
 }
 
+/// Stage S7.4: the languages a model has text in, or what one of them leaves out.
+fn text_check(args: &[String]) -> Result<ExitCode, String> {
+    let Some(path) = args.first() else { return Err(USAGE.to_string()) };
+    let scenario = load_scenario(&PathBuf::from(path)).map_err(|e| e.to_string())?;
+    let model = &scenario.model;
+    let Some(language) = args.get(1) else {
+        for (code, name) in polisim_core::languages(model) {
+            println!("{code}\t{name}");
+        }
+        return Ok(ExitCode::SUCCESS);
+    };
+    let Some(text) = polisim_core::load_text(model, language).map_err(|e| e.to_string())? else {
+        return Err(format!("{} has no text in {language:?}", model.id));
+    };
+    let missing = text.missing(model);
+    for key in &missing {
+        println!("{key}");
+    }
+    eprintln!("{}: {} untranslated", text.name, missing.len());
+    Ok(if missing.is_empty() { ExitCode::SUCCESS } else { ExitCode::from(1) })
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.first().map(String::as_str) {
         Some("run") => parse_options(&args[1..]).and_then(run),
         Some("play") => parse_options(&args[1..]).and_then(play_session).map(|()| ExitCode::SUCCESS),
+        Some("text") => text_check(&args[1..]),
         Some("version") => {
             println!("polisim {}", polisim_core::VERSION);
             Ok(ExitCode::SUCCESS)
