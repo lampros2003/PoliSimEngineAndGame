@@ -314,7 +314,8 @@ pub fn exp_fixed(x: f64) -> f64 {
     if x < -708.0 {
         return 0.0;
     }
-    let k = (x * 1.4426950408889634).round_ties_even();
+    // LOG2_E is the double the specification writes as 1.4426950408889634.
+    let k = (x * std::f64::consts::LOG2_E).round_ties_even();
     let r = (x - k * 0.6931471803691238) - k * 1.9082149292705877e-10;
     let mut p = 1.6059043836821613e-10;
     for c in C {
@@ -344,5 +345,6 @@ mod tests {
         assert_eq!(exp_fixed(709.5), f64::INFINITY);
         assert_eq!(exp_fixed(-708.5), 0.0);
         assert!(exp_fixed(f64::NAN).is_nan());
+        assert_eq!(std::f64::consts::LOG2_E.to_bits(), 0x3FF7_1547_652B_82FE);
     }
 }
