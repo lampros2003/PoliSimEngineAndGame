@@ -27,7 +27,7 @@ essentials. (`PoliSim Valmora.bat` goes straight to Valmora.)
 | Headline | Output (GDP), the unemployment rate, the budget balance, debt as a share of GDP and the government's poll rating, each with last month's change, a **Chart** and a **Why** button |
 | Situations | Under the headline: what is going on now (a recession, high unemployment, debt above a year's output, a budget surplus), each since the month it began. A new one is announced when it begins |
 | Budget | Every payment into the government (revenue) and out of it (spending), this month and last |
-| Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry. Each group's change on last month, with a bar |
+| Who gains, who loses | Net income per household by income decile, household type or region; jobs and pay per job by industry; each public service's level (real spending per person it serves, against January 2025) and spending. Each group's change on last month, with a bar |
 | Politics | Voting intention for the nine blocs, the seats they hold and would hold if an election were held now, and the months to the next election |
 | Policy | 63 levers in groups: public services (health, education, defence and six more), other spending, income tax (and Scotland's own rates), National Insurance, Child Benefit, Universal Credit, the State Pension age, VAT and corporation tax, and trade barriers with the EU, the United States, China and the rest of the world |
 | Chart | Any figure over time. Dashed lines are your policy changes. Click a name in the legend to remove it |

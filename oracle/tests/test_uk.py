@@ -405,6 +405,47 @@ class Functions(unittest.TestCase):
         self.assertLess(row["public_employment"], before["public_employment"])
 
 
+class Services(unittest.TestCase):
+    """Stage S8.1: each function's service level, its real spending per person served
+    against the first month, followed over some months."""
+
+    def test_services_start_at_100_and_follow_a_cut_over_months(self):
+        names = model().dims["function"].members
+        health = names.index("health")
+        default = model().symbols["spending_health"].spec["default"]
+        base = Simulation(model(), seed=SEED)
+        cut = Simulation(model(), seed=SEED, commands={1: {"spending_health": default * 3 // 4}})
+        first = cut.step()
+        base.step()
+        self.assertEqual(cut.column("service_level"), [1.0] * len(names))
+        self.assertEqual(first["service_level_overall"], 1.0)
+        cut.step()
+        base.step()
+        level = cut.column("service_level")[health]
+        target = cut.column("service_target")[health]
+        # A quarter less money: heading for about 75%, a sixth of the way there in a month.
+        self.assertAlmostEqual(target, 0.75, delta=0.01)
+        self.assertAlmostEqual(level, 1.0 - (1.0 - target) / 6.0, places=12)
+        for _ in range(3):
+            cut.step()
+            base.step()
+        # Four months on, about half the way: 1 - 0.25 * (1 - (5/6) ** 4).
+        self.assertLess(cut.column("service_level")[health], 0.88)
+        # Other functions are untouched, beyond the population's growth.
+        self.assertAlmostEqual(cut.column("service_level")[names.index("defence")],
+                               base.column("service_level")[names.index("defence")], places=6)
+
+    def test_an_ageing_population_wears_down_health_with_unchanged_money(self):
+        sim = Simulation(model(), seed=SEED)
+        for _ in range(4):
+            row = sim.step()
+        names = model().dims["function"].members
+        levels = dict(zip(names, sim.column("service_level")))
+        self.assertLess(levels["health"], levels["defence"])
+        self.assertLess(levels["social_care"], 1.0)
+        self.assertLess(row["service_level_overall"], 1.0)
+
+
 class Trade(unittest.TestCase):
     """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
 

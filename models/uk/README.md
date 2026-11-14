@@ -192,6 +192,21 @@ raked so that together they buy the input-output tables' government purchases, s
 base month is unchanged. Cutting health spending by a third falls on the health industry
 and on public employment, and brings a recession at once.
 
+### What services deliver (stage S8.1)
+
+Each function has a service level: its real spending (the lever, in 2024 prices) per
+person it serves, against the first month, followed over about six months
+(`service_adjust_months`, presets 3 and 12), since staff are hired and let go and
+contracts run out over months. Health serves the population weighted by need (a
+judgement shaped like the OBR's profile of health spending by age: people over 85 count
+four and a half times someone of 45 to 64, children of 5 to 14 half), education people
+aged 4 to 21, social care people aged 65 and over, and the rest everyone. With unchanged
+money the levels wear down as the population grows and ages, health and social care
+fastest: health falls below 95%, the threshold of a situation, in the 55th month. A
+quarter off health spending takes its level halfway to 75% in about four months. NHS
+England's waiting list, planned as health's sourced outcome, waits for its data: its site
+is not reachable from the environment this was built in.
+
 ## Situations (stage S7.3)
 
 `situations.toml` names seven conditions the player is told about when they begin and
@@ -206,6 +221,8 @@ end, each with a start and an end so it does not flicker:
 | Debt above a year's output | net debt above 100% of GDP | below 98% |
 | Budget surplus (good) | receipts above spending | below |
 | No majority | the governing blocs hold fewer than 326 seats | 326 or more |
+| Health service, schools, or police and courts under strain (S8.1) | the service level below 95% | above 97% |
+| Public services improving (good, S8.1) | all services, weighted by spending, above 105% | below 103% |
 
 With policy unchanged, debt passes 100% of GDP in the 18th month and nothing else comes on
 in five years. Cutting purchases of goods and services by a quarter brings a recession at

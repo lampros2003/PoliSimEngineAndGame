@@ -17,8 +17,9 @@ this way is mostly income from sales, which PESA nets off and does not split by 
 
 `write()` gives the model its functions (functions.toml, written by calibrate.py): a lever
 per function, in 2024 prices, whose pay and purchases follow its 2024 split; the public
-pay bill and purchases the economy reads, as their sums; and each function's demand for
-the industries' products.
+pay bill and purchases the economy reads, as their sums; each function's demand for the
+industries' products; and (stage S8.1) each function's service level: its real spending
+per person it serves, against the first month, followed over a few months.
 """
 
 from __future__ import annotations
@@ -61,6 +62,19 @@ SEED = {
     "culture": {"other_services": 0.7, "public_administration": 0.3},
     "general": {"public_administration": 0.8, "information": 0.2},
 }
+
+
+# Stage S8.1: whom each function serves, for its service level: "health" (the population
+# weighted by age, as health care costs more with age), "school" (people aged 4 to 21),
+# "older" (people aged 65 and over) or "everyone".
+SERVES = {"health": "health", "education": "school", "social_care": "older"}
+# Health care per person by age, against people aged 45 to 64: a judgement shaped like the
+# profile of public health spending by age in the OBR's fiscal sustainability reports
+# (high in the first years of life, lowest in childhood, rising steeply after 65).
+HEALTH_WEIGHT = [(0, 4, 1.0), (5, 14, 0.5), (15, 44, 0.7), (45, 64, 1.0), (65, 74, 2.0), (75, 84, 3.0), (85, 90, 4.5)]
+# Months over which a service level follows a change in its funding: a judgement (staff are
+# hired and let go, contracts run out), with low and high presets.
+ADJUST_MONTHS = {"low": 3.0, "central": 6.0, "high": 12.0}
 
 
 def extract() -> dict[str, tuple[float, float]]:
@@ -185,6 +199,10 @@ def write(out_dir: Path, pay_monthly: int, procurement_monthly: int, government_
         for p in government_products:
             lines.append(f"{n},{p},{raked[n].get(p, 0.0) * total / s!r}")
     (folder / "products.csv").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    lines = ["age,weight"]
+    for first, last, weight in HEALTH_WEIGHT:
+        lines += [f"{age},{weight!r}" for age in range(first, last + 1)]
+    (folder / "health_weights.csv").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return rules(pay, spend)
 
 
@@ -207,6 +225,15 @@ doc = "{doc}, in 2024 prices; its pay and purchases keep their 2024 split (HM Tr
     pay_terms = " + ".join(f"muldiv(spending_{f[0]}, function_pay[function: {k}], function_spending[function: {k}])"
                            for k, f in enumerate(FUNCTIONS))
     total_terms = " + ".join(f"spending_{f[0]}" for f in FUNCTIONS)
+    def pick(values):
+        out = values[-1]
+        for k in range(len(values) - 2, -1, -1):
+            out = f"select(coord(function) == {k}, {values[k]}, {out})"
+        return out
+    whom = {"health": "health_need", "school": "school_age_population", "older": "older_population",
+            "everyone": "population_total"}
+    served = pick([whom[SERVES.get(f[0], "everyone")] for f in FUNCTIONS])
+    lever_chain = pick([f"spending_{f[0]}" for f in FUNCTIONS])
     chain = "spending_" + FUNCTIONS[-1][0]
     for k in range(len(FUNCTIONS) - 2, -1, -1):
         chain = f"select(coord(function) == {k}, spending_{FUNCTIONS[k][0]}, {chain})"
@@ -276,6 +303,105 @@ unit = "GBP/month"
 phase = "accounts"
 dims = ["product"]
 expr = "sum(spending_by_function * function_products, function)"
+
+[var.public_services_spending]
+label = "Public services"
+doc = "Pay and purchases of all functions, at this month's prices"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "sum(spending_by_function, function)"
+
+# ------------------------------------------------------- what services deliver (stage S8.1)
+
+[param.health_age_weight]
+doc = "Health care per person by age, against people aged 45 to 64 (a judgement shaped like the OBR's profile of health spending by age)"
+type = "real"
+unit = "1"
+dims = ["age"]
+data = "functions/health_weights.csv"
+column = "weight"
+
+[param.service_adjust_months]
+doc = "Months over which a service follows a change in its funding (a judgement)"
+type = "real"
+unit = "1"
+low = {ADJUST_MONTHS["low"]!r}
+central = {ADJUST_MONTHS["central"]!r}
+high = {ADJUST_MONTHS["high"]!r}
+
+[var.health_need]
+label = "People weighted by their need for health care"
+doc = "The population, each person weighted by the health care people of that age need"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(population * health_age_weight, region, sex, age)"
+
+[var.school_age_population]
+label = "People aged 4 to 21"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(select(coord(age) >= 4 and coord(age) <= 21, population, 0.0), region, sex, age)"
+
+[var.older_population]
+label = "People aged 65 and over"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(select(coord(age) >= 65, population, 0.0), region, sex, age)"
+
+[var.people_served]
+doc = "Whom each function serves: health the population weighted by need, education people aged 4 to 21, social care people aged 65 and over, the rest everyone"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["function"]
+expr = "{served}"
+
+[var.people_served_first]
+doc = "The people each function served in the first month"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["function"]
+expr = "select(prev(people_served_first) > 0.0, prev(people_served_first), people_served)"
+initial = 0.0
+
+[var.real_spending_by_function]
+doc = "Each function's spending lever: pay and purchases in 2024 prices"
+type = "money"
+unit = "GBP/month"
+phase = "accounts"
+dims = ["function"]
+expr = "{lever_chain}"
+
+[var.service_target]
+doc = "Each function's real spending per person it serves, against the first month: where its service level is heading"
+type = "real"
+unit = "1"
+phase = "accounts"
+dims = ["function"]
+expr = "(real_spending_by_function / function_spending) / (people_served / people_served_first)"
+
+[var.service_level]
+label = "Service level, by function"
+doc = "Real spending per person served, against the first month (100%), followed over a few months"
+type = "real"
+unit = "1"
+phase = "accounts"
+dims = ["function"]
+expr = "prev(service_level) + (service_target - prev(service_level)) / service_adjust_months"
+initial = 1.0
+
+[var.service_level_overall]
+label = "Service level, all public services"
+doc = "The functions' service levels, weighted by their spending in 2024"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "sum(service_level * function_spending, function) / sum(function_spending, function)"
 '''
 
 

@@ -64,3 +64,32 @@ end = "budget_balance < 0"
 label = "No majority"
 doc = "The governing blocs hold fewer than the 326 seats needed to govern alone, so a bill can fail"
 start = "government_seats < majority"
+
+# Stage S8.1: public services, from their service levels (functions.toml). The functions
+# are indexed in the order functions.toml declares them: health 0, education 1, police,
+# courts and prisons 3.
+
+[situation.health_strain]
+label = "Health service under strain"
+doc = "Real health spending per person, weighted by need, is more than 5% below its level when the game began"
+start = "service_level[function: 0] < 0.95"
+end = "service_level[function: 0] > 0.97"
+
+[situation.schools_strain]
+label = "Schools under strain"
+doc = "Real spending on education per person aged 4 to 21 is more than 5% below its level when the game began"
+start = "service_level[function: 1] < 0.95"
+end = "service_level[function: 1] > 0.97"
+
+[situation.policing_strain]
+label = "Police and courts under strain"
+doc = "Real spending on police, courts and prisons per person is more than 5% below its level when the game began"
+start = "service_level[function: 3] < 0.95"
+end = "service_level[function: 3] > 0.97"
+
+[situation.services_improving]
+label = "Public services improving"
+doc = "Real spending on public services per person served is more than 5% above its level when the game began"
+good = true
+start = "service_level_overall > 1.05"
+end = "service_level_overall < 1.03"

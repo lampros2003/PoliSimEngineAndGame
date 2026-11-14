@@ -44,7 +44,7 @@ Proposed here, and taken as decided unless the owner changes them.
 | # | Status |
 |---|---|
 | S8.0 | Done. `tools/uk/functions.py` reads PESA 2025's procurement and current spending by function (OGL; new source `pesa2025_ch5`) and estimates pay by function; nine function levers in a "Public services" group replace the pay bill and purchases levers, which are now their sums, exact at the defaults, so the base month is unchanged to the penny. Government demand by product follows each function's own mix, raked to the input-output tables' government purchases. A third off health spending brings a recession at once. Tests and the client moved from the purchases lever to the function levers |
-| S8.1 | Not started |
+| S8.1 | Done, without the waiting list. Each function has a service level: real spending per person served (health weighted by age, education aged 4 to 21, social care 65 and over), against the first month, followed over about six months (presets 3 and 12). With unchanged money, ageing wears health down to 95% in the 55th month; four situations (health, schools, police and courts under strain; services improving). The client shows service levels and spending by function in "Who gains, who loses". NHS England's site is not reachable here, so the waiting list waits: the owner can allow the host or add the file |
 | S8.2 | Not started |
 | S8.3 | Not started |
 | S8.4 | Not started |

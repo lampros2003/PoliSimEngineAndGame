@@ -269,6 +269,11 @@ UK_INDUSTRIES = ["Agriculture, forestry and fishing", "Mining, energy, water and
                  "Health and social work", "Arts, recreation and other services"]
 UK_INDUSTRY_BREAKDOWNS = {"Jobs, by industry": "Workforce jobs",
                           "Pay per employee job, by industry": "Pay per employee job"}
+# Stage S8.1: service levels and spending by function.
+UK_FUNCTIONS = ["Health", "Education", "Defence", "Police, courts and prisons", "Transport", "Social care",
+                "Environment and housing", "Culture, sport and recreation", "Government and the economy"]
+UK_FUNCTION_BREAKDOWNS = {"Service level, by function": "Service level, all public services",
+                          "Spending, by function": "Public services"}
 
 
 def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
@@ -281,6 +286,7 @@ def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
     for month in ("1", "2"):
         expected = {b: g + ["All households"] for b, g in UK_GROUPS.items()}
         expected.update({b: UK_INDUSTRIES + [total] for b, total in UK_INDUSTRY_BREAKDOWNS.items()})
+        expected.update({b: UK_FUNCTIONS + [total] for b, total in UK_FUNCTION_BREAKDOWNS.items()})
         for breakdown, groups in expected.items():
             shown = [r["group"] for r in rows if r["month"] == month and r["breakdown"] == breakdown]
             if shown != groups:
@@ -308,6 +314,11 @@ def check_uk_breakdowns(text: str, runner: Path) -> list[str]:
     if not change("By income decile", "All households") < 0:
         problems.append("UK breakdowns: average net income should fall")
     problems += check_uk_industries(line, runner)
+    # Every service at 100% of its first month, after the first month.
+    for group in UK_FUNCTIONS + ["Service level, all public services"]:
+        shown = line[("1", "Service level, by function", group)]["now"]
+        if shown != "100.0%":
+            problems.append(f"UK service levels: {group} shows {shown} in the first month")
     return problems
 
 
