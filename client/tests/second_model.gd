@@ -29,7 +29,7 @@ func _initialize() -> void:
 	# 250 retired people times 100 euros more, in cents.
 	if after - before != 250 * 100 * 100:
 		problems.append("the pension change moved pensions by %d cents, not 2,500,000" % (after - before))
-	if main.budget._lines[1]["cells"][0].text != "€ 250,000":
+	if main.budget._lines[1]["cells"][0].text != "€250,000":
 		problems.append("the budget shows %s for pensions" % main.budget._lines[1]["cells"][0].text)
 	if problems.is_empty():
 		print("second model: screen built from its catalogue; a lever change reached the budget")

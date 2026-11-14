@@ -10,6 +10,7 @@ signal explain_requested(name: String)
 
 var fmt: RefCounted
 var _rows := {}  # name -> {entry, spin, now, pending, cancel}
+var _units := {}  # name -> amount one unit of a money input stands for: 1, 1e6 or 1e9
 var _list: VBoxContainer
 
 
@@ -32,12 +33,26 @@ func _ready() -> void:
 	box.add_child(_list)
 
 
-## How a lever is typed: rates as percentages, money in major units.
+## Stored value to input value: rates as percentages; money in major units, or millions
+## or billions for large amounts; flows at the rate the screen shows them (a year or a
+## step).
 func _scale(entry: Dictionary) -> float:
 	if fmt.is_rate(entry):
 		return 100.0
 	if entry.get("money", false):
-		return 1.0 / float(fmt.minor)
+		return fmt.factor(entry, false) / float(fmt.minor) / float(_units.get(entry["name"], 1.0))
+	return fmt.factor(entry, false)
+
+
+## Large amounts are typed in millions or billions, judged by the top of the range.
+func _money_unit(entry: Dictionary) -> float:
+	if not entry.get("has_range", false):
+		return 1.0
+	var top: float = absf(float(entry["max"])) * fmt.factor(entry, false) / float(fmt.minor)
+	if top >= 1e10:
+		return 1e9
+	if top >= 1e7:
+		return 1e6
 	return 1.0
 
 
@@ -45,8 +60,11 @@ func build(levers: Array) -> void:
 	for child in _list.get_children():
 		child.queue_free()
 	_rows.clear()
+	_units.clear()
 	for entry in levers:
 		var name: String = entry["name"]
+		if entry.get("money", false):
+			_units[name] = _money_unit(entry)
 		var row := VBoxContainer.new()
 		row.add_theme_constant_override("separation", 2)
 		var top := HBoxContainer.new()
@@ -79,10 +97,11 @@ func build(levers: Array) -> void:
 			spin.custom_arrow_step = 0.5
 			spin.suffix = "%"
 		elif money:
-			var big: bool = spin.max_value >= 1e8
-			spin.step = 1e6 if big else 0.01
-			spin.custom_arrow_step = 1e8 if big else 10.0
+			var unit: float = _units[name]
+			spin.step = 0.001 if unit > 1.0 else 0.01
+			spin.custom_arrow_step = 1.0 if unit > 1.0 else 10.0
 			spin.prefix = fmt.symbol
+			spin.suffix = "bn" if unit == 1e9 else ("m" if unit == 1e6 else "")
 		else:
 			spin.step = 1.0
 		spin.tooltip_text = entry["doc"]
@@ -116,12 +135,13 @@ func build(levers: Array) -> void:
 func _typed(name: String, value: float) -> void:
 	var entry: Dictionary = _rows[name]["entry"]
 	var raw := ""
+	var per_step: float = fmt.factor(entry, false)
 	if fmt.is_rate(entry):
 		raw = String.num(value / 100.0, 6)
 	elif entry.get("money", false):
-		raw = String.num(value, 2)
+		raw = String.num(value * float(_units[name]) / per_step, 2)
 	else:
-		raw = String.num(value, 6)
+		raw = String.num(value / per_step, 6)
 	lever_changed.emit(name, raw)
 
 
@@ -144,7 +164,14 @@ func refresh(current: Callable, pending: Dictionary) -> void:
 			row["cancel"].visible = false
 
 
-## For tests: types a value into a lever's input as a player would.
+## For tests: types a value into a lever's input as a player would. The value is in the
+## lever's own terms: money in major units a step, rates in percent.
 func type_value(name: String, value: float) -> void:
+	var entry: Dictionary = _rows[name]["entry"]
 	var spin: SpinBox = _rows[name]["spin"]
-	spin.value = value
+	if fmt.is_rate(entry):
+		spin.value = value
+	elif entry.get("money", false):
+		spin.value = value * float(fmt.minor) * _scale(entry)
+	else:
+		spin.value = value * _scale(entry)

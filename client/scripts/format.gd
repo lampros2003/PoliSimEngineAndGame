@@ -1,6 +1,8 @@
 extends RefCounted
 ## Numbers and dates for people. Values arrive as the engine stores them: money in minor
-## units (such as pence), rates as fractions.
+## units (such as pence), rates as fractions, flows per step. With `per_year` on, flows
+## are shown at an annual rate (a month's flow times twelve), which is how published
+## accounts and budgets are given.
 
 const MONTHS := ["January", "February", "March", "April", "May", "June", "July", "August",
 	"September", "October", "November", "December"]
@@ -10,12 +12,19 @@ var symbol := ""
 var currency := ""
 var start_year := 2027
 var start_month := 0  # 0 = January
+var step_unit := "month"
+var steps_per_year := 12
+var per_year := false
+
+const STEPS_PER_YEAR := {"month": 12, "quarter": 4, "year": 1, "week": 52}
 
 
 func configure(catalogue: Dictionary, play: Dictionary) -> void:
 	minor = int(catalogue.get("minor", 100))
 	currency = str(catalogue.get("currency", ""))
 	symbol = str(play.get("currency_symbol", currency))
+	step_unit = str(catalogue.get("step_unit", "month"))
+	steps_per_year = int(STEPS_PER_YEAR.get(step_unit, 1))
 	var start := str(play.get("start", "2027-01")).split("-")
 	if start.size() == 2:
 		start_year = int(start[0])
@@ -46,7 +55,7 @@ static func grouped(value: float, decimals := 0) -> String:
 		if i > 0 and (whole.length() - i) % 3 == 0:
 			out += ","
 		out += whole[i]
-	return ("-" if negative else "") + out + rest
+	return (MINUS if negative else "") + out + rest
 
 
 ## A major-unit amount in a short form: 39.12bn, 812.4m, 12,500, 800.50.
@@ -63,10 +72,41 @@ static func compact(amount: float) -> String:
 	return grouped(amount, 2)
 
 
+## The symbol and the amount: "£12.38bn", but "Cr 12.38bn" for a symbol ending in a letter.
+func with_symbol(amount_text: String) -> String:
+	if symbol == "":
+		return amount_text
+	var last := symbol.unicode_at(symbol.length() - 1)
+	var letter := (last >= 65 and last <= 90) or (last >= 97 and last <= 122)
+	return symbol + (" " if letter else "") + amount_text
+
+
+# A true minus sign, joined to what follows so a line never breaks between them.
+const MINUS := "\u2212\u2060"
+
+
 func money(minor_units: float) -> String:
 	var amount := minor_units / float(minor)
-	var sign := "-" if amount < 0.0 else ""
-	return "%s%s %s" % [sign, symbol, compact(absf(amount))]
+	var sign := MINUS if amount < 0.0 else ""
+	return sign + with_symbol(compact(absf(amount)))
+
+
+## True when a unit is an amount per step, such as GBP/month.
+func is_flow(unit: String) -> bool:
+	var parts := unit.split("/")
+	for i in range(1, parts.size()):
+		if parts[i] == step_unit:
+			return true
+	return false
+
+
+## What a stored value is multiplied by for display: twelve for a monthly flow shown a
+## year, otherwise one. `shown` picks the unit of totals, as in value().
+func factor(entry: Dictionary, shown := true) -> float:
+	if not per_year or is_rate(entry):
+		return 1.0
+	var unit: String = entry.get("shown_unit" if shown else "unit", "1")
+	return float(steps_per_year) if is_flow(unit) else 1.0
 
 
 static func percent(fraction: float, decimals := 1) -> String:
@@ -82,7 +122,9 @@ func unit_words(unit: String) -> String:
 		words.append(top + ("s" if not top.ends_with("s") else ""))
 	for i in range(1, parts.size()):
 		var bottom := parts[i]
-		if bottom == "month" or bottom == "year" or bottom == "quarter":
+		if per_year and bottom == step_unit:
+			words.append("a year")
+		elif bottom == "month" or bottom == "year" or bottom == "quarter":
 			words.append("a " + bottom)
 		else:
 			words.append("per " + bottom)
@@ -95,11 +137,16 @@ static func is_rate(entry: Dictionary) -> bool:
 
 
 ## A value with its unit, as the entry describes it. `shown` uses the total's unit.
-func value(entry: Dictionary, v: Variant, shown := true, with_unit := true) -> String:
+## `scaled` means `v` has already been multiplied by factor().
+func value(entry: Dictionary, v: Variant, shown := true, with_unit := true, scaled := false) -> String:
 	if v == null:
 		return "–"
 	var unit: String = entry.get("shown_unit" if shown else "unit", "1")
 	var text := ""
+	if typeof(v) != TYPE_BOOL and not scaled:
+		var k := factor(entry, shown)
+		if k != 1.0:
+			v = v * int(k) if typeof(v) == TYPE_INT else float(v) * k
 	if typeof(v) == TYPE_BOOL:
 		text = "yes" if v else "no"
 	elif entry.get("money", false):
@@ -118,12 +165,12 @@ func value(entry: Dictionary, v: Variant, shown := true, with_unit := true) -> S
 func change(entry: Dictionary, delta: Variant) -> String:
 	if delta == null:
 		return "–"
-	var d := float(delta)
+	var d := float(delta) * factor(entry)
 	if d == 0.0:
 		return "no change"
-	var sign := "+" if d > 0.0 else "-"
+	var sign := "+" if d > 0.0 else MINUS
 	if entry.get("money", false):
-		return sign + symbol + " " + compact(absf(d) / float(minor))
+		return sign + with_symbol(compact(absf(d) / float(minor)))
 	if is_rate(entry):
 		return sign + String.num(absf(d) * 100.0, 2) + " pts"
 	if typeof(delta) == TYPE_INT:

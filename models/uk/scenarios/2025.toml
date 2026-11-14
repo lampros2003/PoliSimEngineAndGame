@@ -13,5 +13,7 @@ currency_name = "pounds"
 start = "2025-01"
 term = 60
 government = "government"
+# Amounts paid each month are shown at an annual rate, as the public finances are published.
+amounts = "year"
 headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "inflation_annual"]

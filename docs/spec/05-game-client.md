@@ -24,7 +24,8 @@ Presentation settings. The engine ignores them and they never affect a run.
 | Key | Meaning | Default |
 |---|---|---|
 | `country` | Name shown in the title bar | the scenario's file name |
-| `currency_symbol` | Shown before money | the model's currency code |
+| `currency_symbol` | Shown before money, with a space only if it ends in a letter (`£12.4bn`, `Cr 12.4bn`) | the model's currency code |
+| `amounts` | `"year"` to show flows (values whose unit is per step, such as `GBP/month`) at an annual rate, twelve times the month, as published accounts are; `"step"` to show them per step. The player can switch with the "Amounts a year" button; lever inputs follow the same choice | `"step"` |
 | `start` | The month step 0 covers, as `YYYY-MM` | `2027-01` |
 | `term` | Steps in a term; the end-of-term summary appears after this many | 60 |
 | `government` | The sector whose flows make up the budget screen | `government` |
@@ -91,8 +92,8 @@ against the lever's range before they are accepted.
 
 ## How the client is tested
 
-`tools/check_client.py` runs four scripted sessions in Godot without a display and
-compares them with the command-line runner:
+`tools/check_client.py` runs five scripted sessions in Godot without a display and
+compares them with the command-line runner or with published figures:
 
 | Script | Checks |
 |---|---|
@@ -100,6 +101,18 @@ compares them with the command-line runner:
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working budget, levers and headline |
+| `tests/budget_dump.gd` | The UK's budget screen after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%) |
 
-`tests/screens.gd` saves screenshots for a person to look at; on a server it needs
-`xvfb-run`.
+`tests/screens.gd` saves screenshots of a scripted toy session, and `tests/look.gd` one
+screenshot of any scenario (`--scenario`, `--months`, `--chart=a,b`, `--why=name`,
+`--shot=FILE`), for a person to look at; on a server they need `xvfb-run`. Godot's
+`--resolution 1440x2100` before `--path` gives a tall window that shows the whole left
+column.
+
+## Lever inputs
+
+Rates are typed in percent. Money is typed in major units, or in millions (`m`) or
+billions (`bn`) when the top of the lever's range is at least ten million or ten billion
+in the units shown; a lever whose unit is per step follows the "Amounts a year" choice,
+so a monthly bill is typed as a yearly figure and divided by twelve, to the penny, when
+it is sent to the engine.

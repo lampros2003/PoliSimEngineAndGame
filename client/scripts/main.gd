@@ -45,6 +45,7 @@ var _advance: Array[Button] = []
 var _save: Button
 var _load: Button
 var _reload: Button
+var _per_year: Button
 var _headline: HBoxContainer
 var _cards := {}  # key -> {value, change}
 var budget: BudgetPanel
@@ -70,6 +71,8 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(save_path.get_base_dir())
 	play = game.play_settings()
 	term = int(play.get("term", 60))
+	fmt.per_year = str(play.get("amounts", "step")) == "year"
+	_per_year.set_pressed_no_signal(fmt.per_year)
 	_model_changed()
 	_refresh()
 	var country := str(play.get("country", game.scenario_name()))
@@ -117,6 +120,9 @@ func _build_layout() -> void:
 	_date = Label.new()
 	_date.add_theme_font_size_override("font_size", Palette.TITLE)
 	_date.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The title gives way first when the window is narrow, so the page never overflows.
+	_date.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_date.custom_minimum_size = Vector2(160, 0)
 	top.add_child(_date)
 	for spec in [["Next month", 1], ["Next quarter", 3], ["Next year", 12]]:
 		var button := Button.new()
@@ -127,13 +133,16 @@ func _build_layout() -> void:
 		top.add_child(button)
 		_advance.append(button)
 	top.add_child(VSeparator.new())
+	_per_year = _tool_button(top, "Amounts a year", func() -> void: show_per_year(_per_year.button_pressed))
+	_per_year.toggle_mode = true
+	_per_year.name = "per_year"
+	_per_year.tooltip_text = "Show amounts paid each month at an annual rate (twelve times the month), as published accounts and budgets are."
 	_save = _tool_button(top, "Save", func() -> void: _save_game())
 	_load = _tool_button(top, "Load", func() -> void: _load_game())
 	_reload = _tool_button(top, "Reload model", func() -> void: _reload_model())
 	_tool_button(top, "Help", func() -> void: _show_dialog("PoliSim", HELP))
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", Palette.MUTED)
-	_status.custom_minimum_size = Vector2(120, 0)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(_status)
 
@@ -278,6 +287,8 @@ func _build_headline() -> void:
 		var change := Label.new()
 		change.add_theme_font_size_override("font_size", Palette.SMALL)
 		change.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		change.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		change.custom_minimum_size = Vector2(60, 0)
 		line.add_child(change)
 		var name: String = entry["name"]
 		var plot := Button.new()
@@ -325,7 +336,7 @@ func _refresh() -> void:
 		if now != null and before != null:
 			card["change"].text = fmt.change(entry, now - before) + " on last month"
 		else:
-			card["change"].text = "advance a month to see the change"
+			card["change"].text = "no change yet"
 		card["change"].add_theme_color_override("font_color", Palette.MUTED)
 	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
 	levers.refresh(func(name: String) -> Variant: return game.latest(name), game.pending())
@@ -339,11 +350,13 @@ func _refresh_chart() -> void:
 	for c in game.changes():
 		var entry: Dictionary = entries.get(c["lever"], {})
 		markers.append({"step": c["step"], "text": "%s → %s" % [entry.get("label", c["lever"]), fmt.value(entry, c["value"], false, false)]})
+	var k: float = fmt.factor(chart.entry) if not chart.series.is_empty() else 1.0
 	for s in chart.series:
 		var values := game.series(str(s["row"]).trim_prefix("-"))
-		if s["row"].begins_with("-"):
+		var sign := -1.0 if s["row"].begins_with("-") else 1.0
+		if sign * k != 1.0:
 			for i in values.size():
-				values[i] = -values[i]
+				values[i] = values[i] * sign * k
 		s["values"] = values
 	chart.set_data(steps, markers)
 
@@ -359,6 +372,17 @@ func _set_controls(enabled: bool) -> void:
 
 
 # ---------------------------------------------------------------------------- actions
+
+## Shows flows at an annual rate, or per step.
+func show_per_year(on: bool) -> void:
+	fmt.per_year = on
+	_per_year.set_pressed_no_signal(on)
+	if game != null and catalogue.size() > 0:
+		_model_changed()
+		_refresh()
+		if not trace.trail.is_empty():
+			explain(trace.trail[trace.trail.size() - 1], false)
+
 
 func advance(months: int) -> void:
 	if failed or game.is_busy():

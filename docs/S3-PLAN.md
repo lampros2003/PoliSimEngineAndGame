@@ -39,7 +39,8 @@ S3.5 and S3.6 then add the detail S4 (households) builds on.
 | S3.0 | Done. `python tools/uk/pipeline.py` rebuilds `models/uk/data/` from the cached downloads |
 | S3.1 | Done in a narrower form than planned: `models/uk/data/CHECKS.md` shows the three identities (GDP by expenditure, sector balances, the public sector's borrowing) close for every year from 2000 to 2024: exactly, except sector balances, which are off by at most £5 million (rounding in the published figures); 2025 is incomplete and does not close, and the model's first month reproduces the 2024 net lending of households and financial corporations. A full transaction-by-sector matrix was not needed for a five-sector model and is left for S3.6 |
 | S3.2 | Built. `models/uk/`, calibrated by `tools/uk/calibrate.py`; tests in `oracle/tests/test_uk.py` and `crates/core/tests/golden.rs`; random scenarios compared with `python tools/diff_engine.py --model models/uk`. Known weaknesses are listed in `models/uk/README.md` |
-| S3.3 | Next |
+| S3.3 | Done. The client opens `models/uk/scenarios/2025.toml` with no UK-specific code. Generic additions: amounts at an annual rate (`amounts = "year"` in `[play]`, and a button), large money levers typed in £bn, currency symbols without a space, a true minus sign, a title that gives way on narrow windows, and financial flows (gilt and loan transactions) kept off the budget. `tools/check_client.py` reads the UK budget screen as text and finds every line within 1% of the 2024 public finances |
+| S3.4 | Next |
 
 ## Bands for the hindcast (S3.4)
 

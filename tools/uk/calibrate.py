@@ -123,6 +123,10 @@ def main() -> None:
         out.append("")
 
     def lever(name, label, default, unit, rng, doc, kind="money"):
+        # Amounts are set in 2024 prices and uprated by the trend index, so the budget
+        # line they feed is larger than the setting; the label says so.
+        if kind == "money":
+            label += " (2024 prices)"
         out.append(f"[lever.{name}]")
         out.append(f'label = "{label}"')
         out.append(f'type = "{kind}"')

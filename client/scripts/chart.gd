@@ -9,7 +9,7 @@ signal series_removed(row: String)
 
 var fmt: RefCounted  # format.gd
 var entry := {}  # catalogue entry that sets the unit of the axis
-var series: Array = []  # {row, label, values: PackedFloat64Array, color, negate}
+var series: Array = []  # {row, label, values: PackedFloat64Array (already scaled for display), color}
 var steps := PackedInt64Array()
 var markers: Array = []  # {step, text}
 var hover := -1
@@ -90,7 +90,7 @@ func _y(v: float, rect: Rect2, r: Vector2) -> float:
 func _label(v: float) -> String:
 	if fmt == null:
 		return str(v)
-	return fmt.value(entry, int(v) if entry.get("type", "") == "int" else v, true, false)
+	return fmt.value(entry, int(v) if entry.get("type", "") == "int" else v, true, false, true)
 
 
 func _draw() -> void:

@@ -80,7 +80,75 @@ def main() -> int:
             print("res://tests/second_model.gd failed", file=sys.stderr)
             return 1
         print(second.stdout.strip().splitlines()[-1])
+        # The UK's budget screen, as the player reads it, against the 2024 public finances.
+        dump = folder / "uk_budget.csv"
+        uk = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/budget_dump.gd",
+             "--", "--scenario=models/uk/scenarios/2025.toml", f"--out={dump}"],
+            capture_output=True, text=True, timeout=900)
+        if uk.returncode != 0 or not dump.exists():
+            print(uk.stdout.strip()[-2000:], uk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/budget_dump.gd failed", file=sys.stderr)
+            return 1
+        problems = compare_uk_budget(dump.read_text(encoding="utf-8"))
+        if problems:
+            print("\n".join(problems), file=sys.stderr)
+            return 1
+        print("UK budget screen: every line within 1% of the 2024 public finances")
         return 0
+
+
+# Budget screen label -> the 2024 figures (columns of models/uk/data/annual.csv, £ million)
+# whose sum it should show; a leading "-" subtracts.
+UK_BUDGET = {
+    "Income tax": ["income_tax"],
+    "National Insurance": ["social_contributions"],
+    "Council tax": ["council_tax"],
+    "VAT": ["vat"],
+    "Corporation tax": ["corporation_tax"],
+    "Other taxes on production": ["taxes_on_production", "-vat"],
+    "revenue": ["ps_current_receipts"],
+    "Public sector pay": ["cg_staff_costs", "lg_staff_costs"],
+    "Social benefits": ["ps_social_benefits"],
+    "Public purchases": ["cg_procurement", "lg_procurement"],
+    "Public investment": ["ps_depreciation", "-ps_net_investment"],
+    "Subsidies": ["ps_subsidies"],
+    "balance": ["ps_net_borrowing"],
+}
+UK_INTEREST = ("Debt interest to UK holders", "Debt interest to holders abroad")
+
+
+def parse_money(text: str) -> float:
+    """'£310.70bn' or '−£148.56bn' (with a true minus sign) -> pounds."""
+    sign = -1.0 if text.startswith(("-", "\u2212")) else 1.0
+    number = text.lstrip("-\u2212\u2060").lstrip("£").replace(",", "")
+    for suffix, size in (("tn", 1e12), ("bn", 1e9), ("m", 1e6)):
+        if number.endswith(suffix):
+            return sign * float(number[: -len(suffix)]) * size
+    return sign * float(number)
+
+
+def compare_uk_budget(text: str) -> list[str]:
+    import csv
+    shown = {row["label"]: parse_money(row["text"]) for row in csv.DictReader(text.splitlines())}
+    with open(ROOT / "models" / "uk" / "data" / "annual.csv", newline="", encoding="utf-8") as handle:
+        year = next(row for row in csv.DictReader(handle) if row["period"] == "2024")
+
+    def published(columns):
+        return sum((-1 if c.startswith("-") else 1) * float(year[c.lstrip("-")]) for c in columns) * 1e6
+
+    checks = [(label, shown.get(label), published(columns)) for label, columns in UK_BUDGET.items()]
+    interest = [shown.get(label) for label in UK_INTEREST]
+    checks.append(("Debt interest", None if None in interest else sum(interest), published(["ps_interest"])))
+    problems = []
+    for label, got, want in checks:
+        # Totals are shown to three figures (£1.12tn), so they get the rounding as slack.
+        slack = 0.01 if abs(want) < 1e12 else 0.006
+        if got is None:
+            problems.append(f"UK budget: no line {label!r} on the screen")
+        elif abs(got / want - 1) > slack:
+            problems.append(f"UK budget: {label} shows {got / 1e9:,.2f}bn, 2024 was {want / 1e9:,.2f}bn")
+    return problems
 
 
 if __name__ == "__main__":

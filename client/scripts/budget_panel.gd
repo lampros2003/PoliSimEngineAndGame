@@ -95,7 +95,7 @@ func build(catalogue: Dictionary, entries: Dictionary, sector: String) -> void:
 	if found.is_empty():
 		_title.text = "Budget (no sector named %s in this model)" % sector
 		return
-	_title.text = "Budget of the %s, this month" % str(found["label"]).to_lower()
+	_title.text = "Budget of the %s, this month%s" % [str(found["label"]).to_lower(), " at an annual rate" if fmt.per_year else ""]
 	for heading in ["", "This month", "Last month", "Change", "", ""]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	# Only payments count: not purchases or sales of assets (marked financial in the
@@ -138,7 +138,7 @@ func refresh(latest: Callable, previous: Callable) -> void:
 				known[key][i] = false
 			else:
 				sums[key][i] += int(v)
-	var money := {"money": true, "shown_unit": "", "type": "int"}
+	var money := {"money": true, "shown_unit": "%s/%s" % [fmt.currency, fmt.step_unit], "type": "int"}
 	for key in ["revenue", "spending"]:
 		_show_total(key, sums[key], known[key], money, 1 if key == "revenue" else -1)
 	var balance := [sums["revenue"][0] - sums["spending"][0], sums["revenue"][1] - sums["spending"][1]]
