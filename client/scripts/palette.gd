@@ -223,9 +223,17 @@ static func make_theme() -> Theme:
 	theme.set_constant("icon_max_width", "Quiet", 20)
 	# Link: an action inside a card ("Undo", "Back"): blue text.
 	theme.set_type_variation("Link", "Button")
-	_button_states(theme, "Link", _empty(), _empty(), _empty(), _empty(), BLUE, Color("#0f2f4d"), LINE)
+	# Stage S13.6: underlined on hover, so every link answers the pointer.
+	var underline := _flat(Color(0, 0, 0, 0), Color("#0f2f4d"), 0, 4, 4)
+	underline.border_width_bottom = 1
+	_button_states(theme, "Link", _empty(), underline, underline, _empty(), BLUE, Color("#0f2f4d"), LINE)
 	theme.set_font("font", "Link", text(600))
 	theme.set_font_size("font_size", "Link", SMALL)
+	# Stage S13.6: a line of the month's report, or a row in a sheet: a tint under the pointer.
+	theme.set_type_variation("ReportLine", "Button")
+	_button_states(theme, "ReportLine", _empty(6, 3), _flat(Color(INK, 0.07), Color(0, 0, 0, 0), 0, 6, 3),
+		_flat(Color(INK, 0.13), Color(0, 0, 0, 0), 0, 6, 3), _empty(6, 3), INK, INK, MUTED)
+	theme.set_font("font", "ReportLine", text(500))
 	# Chip: a figure on the top bar that opens its popup.
 	theme.set_type_variation("Chip", "Button")
 	_button_states(theme, "Chip", _empty(10, 2), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 10, 2),
@@ -272,6 +280,7 @@ static func make_theme() -> Theme:
 	theme.set_stylebox("grabber_area_highlight", "HSlider", filled)
 	theme.set_icon("grabber", "HSlider", _grabber(false))
 	theme.set_icon("grabber_highlight", "HSlider", _grabber(true))
+	theme.set_stylebox("focus", "HSlider", focus)  # stage S13.6: the keyboard's place, in ochre
 
 	# Menus, tooltips, option buttons.
 	theme.set_stylebox("panel", "PopupMenu", card(6, 4))

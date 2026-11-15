@@ -7,7 +7,8 @@ extends SceneTree
 ## a sheet, --hover=KEY points at a node, --type=lever:value types a change into a policy
 ## popup first (and --then=N plays N more months), --dilemma=1 leaves the question on screen, --effects=1 waits for the measured
 ## effects table first (for hover links). Stage S13.4: --node=group:KEY opens a group's
-## popup, and --household=N then opens its Nth household's account. For a person to look at; needs a
+## popup, and --household=N then opens its Nth household's account. Stage S13.6: --report=1
+## shows the month's report, --guide=N the guide's Nth step. For a person to look at; needs a
 ## display. Godot's --resolution WxH before --path sets the window size.
 
 var main: Control
@@ -70,6 +71,13 @@ func _initialize() -> void:
 		main.open_indicator(str(args["entry"]))
 	if args.has("hover"):
 		main.hover(str(args["hover"]))
+	# Stage S13.6: --report=1 shows the last month's report, --guide=N the guide's Nth step.
+	if args.has("report"):
+		main.report.reopen()
+	if args.has("guide"):
+		main.show_guide(false)
+		for i in int(args["guide"]) - 1:
+			main.guide.next()
 	await _settle()
 	for i in 60:
 		await process_frame

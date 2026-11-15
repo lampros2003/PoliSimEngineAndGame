@@ -55,7 +55,16 @@ static func grouped(value: float, decimals := 0) -> String:
 		if i > 0 and (whole.length() - i) % 3 == 0:
 			out += ","
 		out += whole[i]
-	return (MINUS if negative else "") + out + rest
+	# Stage S13.6: a figure that rounds to nought never carries a minus.
+	return (MINUS if negative and not is_nought(text) else "") + out + rest
+
+
+## Stage S13.6: true when a number as written has no digit but nought ("0", "0.00", "£0").
+static func is_nought(text: String) -> bool:
+	for ch in text:
+		if ch in "123456789":
+			return false
+	return true
 
 
 ## A major-unit amount in a short form: 39.12bn, 812.4m, 12,500, 800.50.
@@ -87,8 +96,8 @@ const MINUS := "\u2212\u2060"
 
 func money(minor_units: float) -> String:
 	var amount := minor_units / float(minor)
-	var sign := MINUS if amount < 0.0 else ""
-	return sign + with_symbol(compact(absf(amount)))
+	var size := compact(absf(amount))
+	return (MINUS if amount < 0.0 and not is_nought(size) else "") + with_symbol(size)
 
 
 ## True when a unit is an amount per step, such as GBP/month.
@@ -110,7 +119,8 @@ func factor(entry: Dictionary, shown := true) -> float:
 
 
 static func percent(fraction: float, decimals := 1) -> String:
-	return String.num(fraction * 100.0, decimals) + "%"
+	var text := String.num(absf(fraction) * 100.0, decimals)
+	return ("-" if fraction < 0.0 and not is_nought(text) else "") + text + "%"
 
 
 ## Describes the part of a unit that is not the currency: " a month", " per household".
@@ -184,15 +194,19 @@ func change(entry: Dictionary, delta: Variant) -> String:
 	if delta == null:
 		return "–"
 	var d := float(delta) * factor(entry)
-	if d == 0.0:
-		return "no change"
-	var sign := "+" if d > 0.0 else MINUS
+	var size := ""
 	if is_money(entry):
-		return sign + with_symbol(compact(absf(d) / float(minor)))
-	if is_rate(entry):
-		return sign + String.num(absf(d) * 100.0, 2) + " pts"
-	if typeof(delta) == TYPE_INT:
-		return sign + grouped(absf(d))
-	if is_count(entry):
-		return sign + (grouped(roundf(absf(d))) if absf(d) < 1e6 else compact(absf(d)))
-	return sign + (grouped(absf(d), 3) if absf(d) < 1e4 else compact(absf(d)))
+		size = with_symbol(compact(absf(d) / float(minor)))
+	elif is_rate(entry):
+		size = String.num(absf(d) * 100.0, 2) + " pts"
+	elif typeof(delta) == TYPE_INT:
+		size = grouped(absf(d))
+	elif is_count(entry):
+		size = grouped(roundf(absf(d))) if absf(d) < 1e6 else compact(absf(d))
+	else:
+		size = grouped(absf(d), 3) if absf(d) < 1e4 else compact(absf(d))
+	# Stage S13.6: a change too small to show at the figure's precision is no change, never
+	# "+0.00 pts" or a negative nought.
+	if is_nought(size):
+		return "no change"
+	return ("+" if d > 0.0 else MINUS) + size

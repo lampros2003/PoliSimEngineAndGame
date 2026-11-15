@@ -5,6 +5,7 @@ extends Control
 ## the content and offers Back.
 
 const Palette := preload("res://scripts/palette.gd")
+const Sound := preload("res://scripts/sound.gd")
 
 signal closed
 
@@ -83,6 +84,7 @@ func is_open() -> bool:
 
 ## Opens on new content (`build` returns it) growing from `origin`, a rectangle on screen.
 func open(build: Callable, origin: Rect2) -> void:
+	Sound.play("open")
 	stack.clear()
 	_show(build, origin, true)
 
@@ -128,8 +130,11 @@ func _place(grow: bool) -> void:
 	if content == null:
 		return
 	var view := get_viewport_rect().size
-	var tall := content.get_combined_minimum_size().y + 4.0
 	var room := view.y - top_margin - 2.0 * MARGIN - 50.0
+	# Stage S13.6: content that can fit itself to the room (a policy's controls) does so.
+	if content.has_method("fit_height"):
+		content.fit_height(room)
+	var tall := content.get_combined_minimum_size().y + 4.0
 	_scroll.custom_minimum_size = Vector2(_width(), minf(tall, room))
 	card.reset_size()
 	var box := card.get_combined_minimum_size()
@@ -169,6 +174,7 @@ func _width() -> float:
 func close() -> void:
 	if not visible:
 		return
+	Sound.play("close")
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	var gone := content

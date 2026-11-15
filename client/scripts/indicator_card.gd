@@ -14,6 +14,9 @@ const LeverPanel := preload("res://scripts/lever_panel.gd")
 ## The player followed a cause: an entry's name, or a board key ("policy:...").
 signal follow(name: String)
 
+## Stage S13.6: what a figure reads before the first month has run.
+const AWAITING := "awaiting the first month's figures"
+
 var fmt: RefCounted
 var name_shown := ""  # the catalogue entry shown
 var row := ""  # its result row, "-" in front when shown negated
@@ -168,11 +171,12 @@ func refresh(value_of: Callable, before_of: Callable, better: String) -> void:
 	var now: Variant = value_of.call(row)
 	var was: Variant = before_of.call(row)
 	_figure.text = fmt.value(entry, now, true, false)
-	_change.text = "no change yet"
+	# Stage S13.6: before the first month has run there is no figure yet, and it says so.
+	_change.text = AWAITING if now == null else "no change yet"
 	_change.add_theme_color_override("font_color", Palette.MUTED)
 	if now != null and was != null and typeof(now) != TYPE_BOOL:
 		var d := float(now) - float(was)
-		if d != 0.0:
+		if fmt.change(entry, d) != "no change":
 			_change.text = ("▲ " if d > 0.0 else "▼ ") + fmt.change(entry, d) + " on last month"
 			if better != "":
 				_change.add_theme_color_override("font_color", Palette.GOOD if (d > 0.0) == (better == "high") else Palette.BAD)

@@ -4,6 +4,7 @@ extends Control
 ## and a Close; Esc or a click outside closes it when it may be closed.
 
 const Palette := preload("res://scripts/palette.gd")
+const Sound := preload("res://scripts/sound.gd")
 
 signal closed
 
@@ -127,6 +128,8 @@ func add_text(bbcode: String) -> RichTextLabel:
 
 
 func open() -> void:
+	if not visible:
+		Sound.play("open")
 	visible = true
 	_place.call_deferred()
 	# Wrapped text settles its height a frame later: place the card again then.
@@ -158,5 +161,6 @@ func relayout() -> void:
 func close() -> void:
 	if not visible:
 		return
+	Sound.play("close")
 	visible = false
 	closed.emit()

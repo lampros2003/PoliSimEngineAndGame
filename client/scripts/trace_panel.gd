@@ -137,7 +137,7 @@ func show_explanation(e: Dictionary) -> void:
 			var months: int = lagged[1] + (1 if part["lagged"] else 0)
 			name_button.text = "%s (%d month%s before)" % [label_of(lagged[0]), months, "" if months == 1 else "s"]
 			symbol = lagged[0]
-		name_button.flat = true
+		name_button.theme_type_variation = "ReportLine"  # stage S13.6: tinted under the pointer
 		name_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		name_button.custom_minimum_size = Vector2(190, 0)
 		name_button.size_flags_horizontal = Control.SIZE_FILL

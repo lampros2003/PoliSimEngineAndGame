@@ -15,6 +15,7 @@ const Palette := preload("res://scripts/palette.gd")
 const Chart := preload("res://scripts/chart.gd")
 const Bar := preload("res://scripts/bar.gd")
 const Format := preload("res://scripts/format.gd")
+const Sound := preload("res://scripts/sound.gd")
 
 signal lever_changed(name: String, raw: String)
 signal lever_cancelled(name: String)
@@ -23,7 +24,7 @@ signal follow(name: String)
 
 ## The popup's width with two columns, and the window width from which it has them.
 const WIDE := 1120.0
-const WIDE_FROM := 1500.0
+const WIDE_FROM := 1360.0  # stage S13.6: from 1366x768 up
 
 var fmt: RefCounted
 var key := ""  # the board's policy key
@@ -42,6 +43,9 @@ var year_shown: Array = []
 var year_groups: Array = []
 var year_all_groups: Array = []  # every group's change, shown or not
 var _controls: VBoxContainer
+var _body: BoxContainer
+var _left_scroll: ScrollContainer
+var _left_box: VBoxContainer
 var _year: VBoxContainer
 var _year_title: Label
 var _year_note: Label
@@ -171,11 +175,27 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	var body: BoxContainer = HBoxContainer.new() if wide else VBoxContainer.new()
 	body.add_theme_constant_override("separation", 36 if wide else 12)
 	add_child(body)
+	_body = body
 	_controls = VBoxContainer.new()
 	_controls.add_theme_constant_override("separation", 12)
 	_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_controls.custom_minimum_size.x = 470.0 if wide else 0.0
-	body.add_child(_controls)
+	# Stage S13.6: two columns, the controls (and the history under them) scrolling on their
+	# own when there are many, so "In a year" beside them never scrolls out of sight.
+	var column: Control = _controls
+	if wide:
+		_left_scroll = ScrollContainer.new()
+		_left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_left_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_left_scroll.custom_minimum_size.x = 490.0
+		_left_box = VBoxContainer.new()
+		_left_box.add_theme_constant_override("separation", 12)
+		_left_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_left_scroll.add_child(_left_box)
+		_left_box.add_child(_controls)
+		_controls.custom_minimum_size.x = 470.0
+		column = _left_scroll
+	body.add_child(column)
 	for entry in entries:
 		_lever_row(entry, start_of.call(str(entry["name"])))
 		levers.append(str(entry["name"]))
@@ -204,11 +224,22 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	_year.add_child(_group_rows)
 	_year.visible = wide
 	_chart_lever = levers[0] if not levers.is_empty() else ""
-	add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
+	var holder: Control = _left_box if wide else self
+	holder.add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
 	chart = Chart.new()
 	chart.fmt = fmt
 	chart.custom_minimum_size = Vector2(0, 190)
-	add_child(chart)
+	holder.add_child(chart)
+
+
+## Stage S13.6: in two columns, the controls' column takes the room the popup has (`room`,
+## its scrolling height), so a policy of many levers scrolls its controls, not the popup.
+func fit_height(room: float) -> void:
+	if _left_scroll == null:
+		return
+	var inner := _left_box.get_combined_minimum_size().y
+	var fixed := get_combined_minimum_size().y - _body.get_combined_minimum_size().y
+	_left_scroll.custom_minimum_size.y = clampf(room - fixed - 6.0, minf(260.0, inner), inner)
 
 
 func _table() -> GridContainer:
@@ -298,6 +329,7 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 		slider.max_value = 2.0 * float(start) * scale
 	slider.step = spin.step
 	slider.value_changed.connect(func(value: float) -> void:
+		Sound.play("change")
 		spin.apply(value, _dragging != name))
 	slider.drag_started.connect(func() -> void: _dragging = name)
 	slider.drag_ended.connect(func(changed: bool) -> void:

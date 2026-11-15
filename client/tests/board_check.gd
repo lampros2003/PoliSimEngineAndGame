@@ -1,6 +1,7 @@
 extends SceneTree
 ## Stage S13.2: the board, through the interface (models/uk/scenarios/2025.toml). The UK
-## board is built from [play.web]: ten areas, 24 policies holding every lever the player
+## board is built from [play.web]: ten areas, 24 policies (stage S13.6: at least, as many as
+## the table places) holding every lever the player
 ## has but Scotland's own income tax, 24 indicators; no two nodes, and no label shown at
 ## rest, nor four situation flags, overlap at 1366x768, 1920x1080 or 2560x1440; every node opens the right popup (the
 ## centre, Parliament); a basic rate typed in Income tax's popup waits with its cost in
@@ -8,7 +9,9 @@ extends SceneTree
 ## popups. Then models/mini, which has no [play.web], gets an automatic board. Stage S13.4:
 ## the 18 interest groups round the centre in their five families, each family together;
 ## a label at rest for most nodes, none touching another node, label or flag at the three
-## sizes; a group opens a group popup; models/mini's board has an empty middle.
+## sizes; a group opens a group popup; models/mini's board has an empty middle. Stage S13.6:
+## every node labelled at rest at 1920x1080 and 2560x1440, at least 95% at 1366x768; no
+## hover link passes under the centre medallion.
 
 var main: Control
 
@@ -26,8 +29,19 @@ func _initialize() -> void:
 		return _fail("the board has %d areas (authored: %s)" % [board.areas.size(), board.authored])
 	var policies: int = board.keys_of("policy").size()
 	var indicators: int = board.keys_of("indicator").size()
-	if policies != 24 or indicators != 24:
-		return _fail("the board has %d policies and %d indicators" % [policies, indicators])
+	# Stage S13.6: at least as many as [play.web] places (24 and 24 in S13.4; S13.5 adds more).
+	var want_policies := 0
+	var want_indicators := 0
+	for area in main.play["web"]["areas"]:
+		for p in area.get("policies", []):
+			if Array(p.get("levers", [])).any(func(l): return main.entries.has(str(l)) and main.entries[str(l)].get("player", true)):
+				want_policies += 1
+		for i in area.get("indicators", []):
+			if main.rows.has(str(i.get("row", "")).trim_prefix("-")):
+				want_indicators += 1
+	# A lever the table does not place gets a node of its own (checked below: every lever is on).
+	if policies < want_policies or indicators != want_indicators or want_policies < 24 or indicators < 24:
+		return _fail("the board has %d policies and %d indicators, [play.web] %d and %d" % [policies, indicators, want_policies, want_indicators])
 	var families := []
 	for key in board.keys_of("group"):
 		var family := str(board.nodes[key]["family"])
@@ -60,7 +74,9 @@ func _initialize() -> void:
 			if not board.nodes[key]["kind"] in ["centre", "flag"]:
 				labels += 1
 				labelled += 1 if board.nodes[key]["rest"] else 0
-		if labelled < labels * 0.85:
+		# Stage S13.6: nineteen in twenty from 1920x1080 (every one on the S13.4 board), and
+		# the earlier 85% at 1366x768.
+		if labelled < labels * (0.85 if view.x < 1900.0 else 0.95):
 			return _fail("at %dx%d only %d of %d nodes are labelled at rest" % [view.x, view.y, labelled, labels])
 		rested.append("%d of %d at %dx%d" % [labelled, labels, view.x, view.y])
 	board.size = own_size
@@ -86,6 +102,13 @@ func _initialize() -> void:
 	main.hover("policy:income_tax")
 	if board.linked("policy:income_tax").is_empty() or board._links.is_empty():
 		return _fail("pointing at Income tax shows no links")
+	var centre: Dictionary = board.nodes["centre"]
+	for key in board.keys_of("policy") + board.keys_of("indicator") + board.keys_of("group"):
+		main.hover(key)
+		for link in board._links:
+			for p in link["points"]:
+				if (p as Vector2).distance_to(centre["pos"]) < centre["r"]:
+					return _fail("a link of %s passes under the centre" % key)
 	main.hover("indicator:budget_balance")
 	if board.linked("indicator:budget_balance").is_empty():
 		return _fail("pointing at the budget balance shows nothing that moves it")
@@ -105,7 +128,7 @@ func _initialize() -> void:
 	await _settle()
 	if board.authored or board.keys_of("policy").size() != 2 or board.keys_of("indicator").is_empty() or not board.overlaps().is_empty() 			or not board.keys_of("group").is_empty():
 		return _fail("mini's automatic board: %d policies, %d indicators, %s" % [board.keys_of("policy").size(), board.keys_of("indicator").size(), board.overlaps()])
-	print("board: ten areas, 24 policies, 24 indicators and 18 groups in five families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown; budget lines open; an automatic board for mini, its middle empty" % ", ".join(rested))
+	print("board: ten areas, %d policies, %d indicators and 18 groups in five families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown, none under the centre; budget lines open; an automatic board for mini, its middle empty" % [policies, indicators, ", ".join(rested)])
 	quit(0)
 
 

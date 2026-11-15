@@ -185,9 +185,10 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 	_figure.text = approval_text
 	_note_label.text = _note
 	_note_label.visible = silent
-	_change.text = "no change on last month"
+	# Stage S13.6: before the first month has run there is no figure yet, and it says so.
+	_change.text = "no change on last month" if now != null else "awaiting the first month's figures"
 	_change.add_theme_color_override("font_color", Palette.MUTED)
-	if not silent and now != null and was != null and absf(float(now) - float(was)) >= 0.00005:
+	if not silent and now != null and was != null and fmt.change(entry, float(now) - float(was)) != "no change":
 		var d := float(now) - float(was)
 		_change.text = ("▲ " if d > 0.0 else "▼ ") + fmt.change(entry, d) + " on last month"
 		_change.add_theme_color_override("font_color", Palette.GOOD if d > 0.0 else Palette.BAD)
@@ -195,7 +196,8 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 		_change.text = ""
 	var share: Variant = value_of.call(share_row) if share_row != "" else null
 	_share = float(share) if share != null else 0.0
-	_share_label.text = "%s of adults: %d in every hundred." % [fmt.percent(_share), int(roundf(_share * 100.0))] if share != null else ""
+	_share_label.text = "%s of adults: %d in every hundred." % [fmt.percent(_share), int(roundf(_share * 100.0))] if share != null \
+		else "Awaiting the first month's figures."
 	_people.queue_redraw()
 	drivers_shown.clear()
 	var values := []
@@ -211,7 +213,7 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 		bar.fraction = values[i] / top
 		bar.queue_redraw()
 		var amount: Label = _drivers.get_child(i * 3 + 2)
-		amount.text = "%+.2f" % values[i] if absf(values[i]) >= 0.005 else "0.00"
+		amount.text = "–" if now == null else ("%+.2f" % values[i] if absf(values[i]) >= 0.005 else "0.00")
 		drivers_shown.append([str(drivers[i][0]), float(values[i])])
 
 
@@ -275,9 +277,11 @@ class HouseholdTile extends Button:
 		lines = [[place, Palette.text(600), Palette.INK], [kind, Palette.text(400), Palette.MUTED],
 			[GroupCardWords.whole(fmt, net) + " a year", Palette.text(600), Palette.INK]]
 		if change != null:
+			# Stage S13.6: the change in its income, in words.
 			var c := float(change)
-			lines.append(["%s%s in a year" % ["+" if c >= 0.0 else "−", fmt.percent(absf(c))], Palette.text(400),
-				Palette.GOOD if c > 0.0005 else (Palette.BAD if c < -0.0005 else Palette.MUTED)])
+			var by: String = fmt.percent(absf(c))
+			var said := "income as a year ago" if fmt.is_nought(by) else "income %s %s on a year ago" % ["up" if c > 0.0 else "down", by]
+			lines.append([said, Palette.text(400), Palette.MUTED if fmt.is_nought(by) else (Palette.GOOD if c > 0.0 else Palette.BAD)])
 		if support != null:
 			lines.append(["%s back you" % fmt.percent(float(support), 0), Palette.text(400), Palette.MUTED])
 		tooltip_text = "%s, %s" % [kind, place]
