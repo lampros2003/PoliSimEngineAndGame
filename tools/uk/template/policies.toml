@@ -120,7 +120,7 @@ expr = "round(select(cannabis_law == 2, 1.0, 0.0) * cannabis_tax * trend_index)"
 [param.crime_2024]
 doc = "Crimes against households and adults in England and Wales a year, the Crime Survey's headline measure, in the year to June 2024 (ONS, Crime in England and Wales)"
 type = "real"
-unit = "1"
+unit = "incident/year"
 value = 9200000.0
 
 [param.police_crime_elasticity]
@@ -173,7 +173,7 @@ next = "crime_policy_level + (crime_policy_target - crime_policy_level) / crime_
 label = "Crime (incidents a year)"
 doc = "Crimes against households and adults in England and Wales a year, as the Crime Survey counts them: 9.2 million in the year to June 2024. Fewer with more police, tougher sentences and less drinking"
 type = "real"
-unit = "1"
+unit = "incident/year"
 phase = "accounts"
 expr = "crime_2024 * (1.0 - police_crime_elasticity * (service_level[function: 3] - 1.0)) * crime_policy_level"
 
@@ -258,7 +258,7 @@ value = 2.0
 [param.alcohol_deaths_2024]
 doc = "Alcohol-specific deaths registered in the UK in 2023 (ONS, Alcohol-specific deaths in the UK)"
 type = "real"
-unit = "1"
+unit = "death/year"
 value = 10473.0
 
 [var.alcohol_use_target]
@@ -289,7 +289,7 @@ next = "alcohol_harm + (1.0 + alcohol_harm_elasticity * (alcohol_use - 1.0) - al
 label = "Alcohol-specific deaths (a year)"
 doc = "Deaths wholly caused by alcohol in the UK a year: 10,473 in 2023"
 type = "real"
-unit = "1"
+unit = "death/year"
 phase = "accounts"
 expr = "alcohol_deaths_2024 * alcohol_harm"
 
@@ -411,41 +411,47 @@ expr = "round(prescription_items * (prescription_charge * prescription_items_rat
 [param.hle_2024]
 doc = "Healthy life expectancy at birth, UK, 2022-24: 60.7 years for men, 60.9 for women (ONS, Health state life expectancies)"
 type = "real"
-unit = "1"
+unit = "year"
 value = 60.8
 
 [param.hle_service_effect]
 doc = "Years of healthy life per unit of the health service level (a judgement: a tenth more care per person needing it adds about a third of a year)"
 type = "real"
-unit = "1"
+unit = "year"
 value = 3.0
 
 [param.hle_smoking_effect]
 doc = "Years of healthy life lost per unit of the share of adults who smoke (a judgement: a point less smoking adds about 0.15 years)"
 type = "real"
-unit = "1"
+unit = "year"
 value = 15.0
 
 [param.hle_alcohol_effect]
 doc = "Years of healthy life lost per unit of alcohol harm against 2024 (a judgement: a tenth less harm adds about 0.06 years)"
 type = "real"
-unit = "1"
+unit = "year"
 value = 0.6
+
+[param.hle_year]
+doc = "A year of healthy life: the unit of the judgements in hle_other (stage S13.6)"
+type = "real"
+unit = "year"
+value = 1.0
 
 [state.hle_other]
 label = "Healthy life: other policies"
 doc = "Years of healthy life from the soft drinks levy, prescription charges and cannabis law, following them over about three years (judgements: 0.02 years for each multiple of the levy; 0.03 lost when the charge doubles; 0.03 lost with legal cannabis)"
 type = "real"
-unit = "1"
+unit = "year"
 phase = "accounts"
 initial = 0.0
-next = "hle_other + (0.02 * (sugar_levy - 1.0) - 0.03 * (prescription_charge / prescription_charge_2024 - 1.0) - select(cannabis_law == 2, 0.03, 0.0) - hle_other) / 36.0"
+next = "hle_other + ((0.02 * (sugar_levy - 1.0) - 0.03 * (prescription_charge / prescription_charge_2024 - 1.0) - select(cannabis_law == 2, 0.03, 0.0)) * hle_year - hle_other) / 36.0"
 
 [var.healthy_life_expectancy]
 label = "Healthy life expectancy"
 doc = "Years a newborn can expect to live in good health, UK: 60.8 in 2022-24. Longer with a better-funded health service, less smoking and less drinking"
 type = "real"
-unit = "1"
+unit = "year"
 phase = "accounts"
 expr = "hle_2024 + hle_service_effect * (service_level[function: 0] - 1.0) - hle_smoking_effect * (smoking_prevalence - smoking_2024) - hle_alcohol_effect * (alcohol_harm - 1.0) + hle_other"
 
@@ -928,7 +934,7 @@ doc = "Limits on private rents: none (0, England in 2024), rises capped each yea
 [param.homes_built_2024]
 doc = "Net additional dwellings in England, 2023-24 (Ministry of Housing, Housing supply: net additional dwellings)"
 type = "real"
-unit = "home"
+unit = "home/year"
 value = 221070.0
 
 [param.planning_step]
@@ -955,16 +961,16 @@ next = "homes_policy_level + ((1.0 + planning_step * (planning_rules - 2)) * (1.
 [state.social_homes_rate]
 label = "Social homes built a year by the programme"
 type = "real"
-unit = "home"
+unit = "home/year"
 phase = "accounts"
 initial = 0.0
-next = "social_homes_rate + (12.0 * times_step(social_housing / social_home_cost) - social_homes_rate) / 24.0"
+next = "social_homes_rate + (year * (social_housing / social_home_cost) - social_homes_rate) / 24.0"
 
 [var.homes_built]
 label = "Homes built (a year)"
 doc = "Net additional homes in England a year: 221,070 in 2023-24. More with liberal planning and a social housing programme, fewer with rent controls"
 type = "real"
-unit = "home"
+unit = "home/year"
 phase = "accounts"
 expr = "homes_built_2024 * homes_policy_level + social_homes_rate"
 
@@ -1042,9 +1048,9 @@ unit = "1"
 points = [{ x = 0.517, y = 100.0 }, { x = 1.0, y = 0.0 }, { x = 1.55, y = -110.0 }]
 
 [param.visa_migration_scale]
-doc = "A thousand people: the curve's unit"
+doc = "A thousand people a year: the curve's unit"
 type = "real"
-unit = "person"
+unit = "person/year"
 value = 1000.0
 
 [param.migrant_labour_share]
@@ -1057,7 +1063,7 @@ value = 0.6
 label = "Net migration from the policies (a year)"
 doc = "Net migration a year above or below what the population model has, following the visa threshold over about a year"
 type = "real"
-unit = "person"
+unit = "person/year"
 phase = "accounts"
 initial = 0.0
 next = "migration_change + (visa_migration_scale * curve(visa_threshold / visa_threshold_2024, visa_migration) - migration_change) / 12.0"
@@ -1067,22 +1073,22 @@ doc = "Net arrivals against the population model's own, the rate of the year to 
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "1.0 + migration_change / (12.0 * sum(net_migration, region))"
+expr = "1.0 + migration_change / (year * per_step(sum(net_migration, region)))"
 
 [var.net_migration_annual]
 label = "Net migration (a year)"
 doc = "Net arrivals in the UK a year: 739,000 in the year to June 2024 (ONS), as the population model has them. A higher visa salary threshold cuts it"
 type = "real"
-unit = "person"
+unit = "person/year"
 phase = "accounts"
-expr = "12.0 * sum(net_migration, region) * policy_migration_factor"
+expr = "year * per_step(sum(net_migration, region)) * policy_migration_factor"
 
 [var.policy_labour_force_growth]
 doc = "This month's growth in the labour force from the policies' net migration"
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "migrant_labour_share * migration_change / 12.0 / labour_force"
+expr = "times_step(migrant_labour_share * migration_change / year) / labour_force"
 
 # ================================================================= the money, in the accounts
 

@@ -74,16 +74,36 @@ GROUPS = [
 # share of all adults is the published total where one is given, and at most 0.98. The tables
 # count households or adults as their sources do; every figure not marked as published is an
 # estimate. Renters are the adults who are not home owners.
+#
+# Stage S13.6: a "region" list is the published share of households in the group in each
+# region (REGIONS' order). Within a region the shares by age and income are scaled so that
+# their mean over the region's adults is in proportion to it; the national share of adults is
+# then held where it was (the published total, or without one the share by age and income
+# alone), so the region moves members between places, not their number.
 ESTIMATED = {
     # DfT, National Travel Survey 2024, households with a car or van, England: 60% of the
     # poorest fifth, 86% of the richest (published); the middle fifths are read off its chart
-    # (estimates); 78% of all households.
-    "motorists": {"quintile": [0.60, 0.73, 0.83, 0.88, 0.86]},
+    # (estimates); 78% of all households. By region: households with a car or van, Census 2021
+    # TS045 for the English regions and Wales (1 less those with none over all households),
+    # NISRA Census 2021 MS-E10 for Northern Ireland; Scotland, 75% of households with access to
+    # a car in 2022 (Scottish Household Survey, in Transport Scotland's Scottish Transport
+    # Statistics 2023).
+    "motorists": {"quintile": [0.60, 0.73, 0.83, 0.88, 0.86],
+                  "region": [1 - 324661 / 1175680, 1 - 778262 / 3153403, 1 - 564965 / 2330660,
+                             1 - 389858 / 2037332, 1 - 522944 / 2429493, 1 - 442119 / 2628782,
+                             1 - 1440271 / 3423890, 1 - 642098 / 3807966, 1 - 410920 / 2448881,
+                             1 - 261859 / 1347114, 0.75, 1 - 150279 / 768810]},
     # English Housing Survey 2023-24: 65% of households own their home (published); by the
     # age of the household reference person and by income, estimates shaped like its tables
     # (social renting is concentrated in the poorest two fifths, mortgagors in the richest).
+    # By region: households owning outright or with a mortgage, Census 2021 TS054 for the
+    # English regions and Wales, NISRA Census 2021 MS-E15 for Northern Ireland, and Scotland's
+    # Census 2022 (63.2%, National Records of Scotland, Housing).
     "home_owners": {"age": [0.11, 0.42, 0.64, 0.74, 0.79], "quintile": [0.65, 0.9, 1.05, 1.15, 1.2],
-                    "total": 0.65},
+                    "total": 0.65,
+                    "region": [708546 / 1175679, 1965545 / 3153403, 1458591 / 2330658, 1333775 / 2037332,
+                               1525744 / 2429494, 1714628 / 2628782, 1548546 / 3423889, 2500475 / 3807966,
+                               1613214 / 2448879, 889916 / 1347117, 0.632, (267069 + 227856) / 768814]},
     # Health Survey for England: adults who drank in the last week, about 46% at 18 to 24 (a
     # secondary report); the rest by age and income, and the total of 49%, are estimates.
     "drinkers": {"age": [0.46, 0.50, 0.52, 0.58, 0.55], "quintile": [0.75, 0.9, 1.0, 1.1, 1.25], "total": 0.49},
@@ -278,7 +298,13 @@ def estimated_members(voters: list[float]) -> dict[str, list[float]]:
     out = {}
     for key, table in ESTIMATED.items():
         raw = [table.get("age", [1.0] * 5)[a] * table.get("quintile", [1.0] * 5)[q] for _, a, q, _ in types]
-        scale = table["total"] * sum(voters) / sum(n * s for n, s in zip(voters, raw)) if "total" in table else 1.0
+        total = table.get("total", sum(n * s for n, s in zip(voters, raw)) / sum(voters))
+        if "region" in table:  # Stage S13.6: each region's mean in proportion to its published share
+            mean = [sum(n * s for (r, _, _, _), n, s in zip(types, voters, raw) if r == k)
+                    / sum(n for (r, _, _, _), n in zip(types, voters) if r == k) for k in range(len(REGIONS))]
+            raw = [s * table["region"][r] / mean[r] for (r, _, _, _), s in zip(types, raw)]
+        scale = total * sum(voters) / sum(n * s for n, s in zip(voters, raw)) if "total" in table or "region" in table \
+            else 1.0
         out[key] = [min(s * scale, 0.98) for s in raw]
     out["renters"] = [1.0 - s for s in out["home_owners"]]
     return out

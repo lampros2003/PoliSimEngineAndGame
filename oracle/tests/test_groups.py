@@ -101,6 +101,20 @@ class BaseMonth(unittest.TestCase):
         self.assertGreater(row["share_motorists"], 0.7)
         self.assertLess(row["share_motorists"], 0.85)
 
+    def test_london_has_the_fewest_motorists_and_home_owners(self):
+        # Stage S13.6: by region from the censuses: London has about 58% of households with a
+        # car (the other regions 72% to 83%) and 45% owning their home (60% to 66%).
+        sim, _ = first_month()
+        voters, member, region = sim.column("voters"), sim.column("group_member"), sim.column("type_region")
+        for key, below, above in (("motorists", 0.65, 0.74), ("home_owners", 0.55, 0.62)):
+            g = GROUPS.index(key)
+            shares = []
+            for r in range(12):
+                types = [t for t in range(len(voters)) if region[t] == r]
+                shares.append(sum(voters[t] * member[t * len(GROUPS) + g] for t in types) / sum(voters[t] for t in types))
+            self.assertLess(shares[6], below, key)
+            self.assertGreater(min(s for r, s in enumerate(shares) if r != 6), above, key)
+
 
 class Drivers(unittest.TestCase):
     def test_the_drivers_add_up_to_the_performance_part_of_utility(self):
@@ -137,6 +151,19 @@ class Policies(unittest.TestCase):
         parents, pensioners = self.change("parents", **cut), self.change("pensioners", **cut)
         self.assertLess(parents, -0.005)
         self.assertLess(parents, pensioners)
+
+    def test_a_fuel_duty_rise_costs_most_among_motorists_and_least_in_london(self):
+        # Stage S13.6: after a 10p fuel duty rise, motorists' approval falls by more than the
+        # nation's and London's, and London's by less than any other place's in Great Britain
+        # (Northern Ireland has no governing bloc to lose). London has the fewest motorists.
+        rise = {"fuel_duty": 62.95}
+        motorists, london = self.change("motorists", **rise), self.change("london", **rise)
+        nation = after_a_year(**rise)[1]["government_support"] - after_a_year()[1]["government_support"]
+        self.assertLess(motorists, nation)
+        self.assertLess(nation, london)
+        self.assertLess(london, 0.0)
+        for place in ("scotland", "wales", "north", "midlands", "south"):
+            self.assertLess(self.change(place, **rise), london, place)
 
 
 if __name__ == "__main__":

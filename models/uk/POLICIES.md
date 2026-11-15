@@ -184,6 +184,17 @@ point for 10p (a judgement). Reactions: motorists -0.004 for each penny above 52
 households' emissions 1.2% lower after a year and 1.7% after five; consumer inflation 0.06
 points higher for a year; the rating 0.8 points lower.
 
+Stage S13.6: with motorists by region (Groups, below), a 10p rise (52.95 to 62.95 from the
+second month, measured after a year) takes 0.76 points off the government's approval among
+motorists, 0.70 among the rest, 0.75 nationally and 0.67 in London, the least of any place
+in Great Britain (Scotland 0.78, the South 0.70, the Midlands 0.81, the North 0.84, Wales
+0.85). Before, with motorists by income alone, London lost the most of any place (0.87) and
+motorists 0.77 against the rest's 0.71. The reaction is left at -0.004 a penny (a
+judgement): it already carries nearly all of the effect (a standing of -0.031 among
+motorists, -0.022 in London), and raising it would widen the gap between motorists and the
+rest only in proportion, since voter types mix motorists with the rest (most types are 70%
+to 95% motorists), while pushing a 10p rise past a point off the national rating.
+
 ### Electric car grant
 
 None in 2024: the plug-in car grant ran from 2011 to June 2022, more than £1.4bn for nearly
@@ -330,6 +341,13 @@ Inputs shown as rows too: `prison_population` (85,372), `smoking_prevalence` (10
 *secondary*), `alcohol_use`, `fuel_volume`, `homes_insulated`, `energy_bills_saved`,
 `fee_paying_students_now`.
 
+Units (stage S13.6): crime is in `incident/year`, alcohol deaths in `death/year`, healthy life
+expectancy and the values that add to it in `year` (the judgements of `hle_other` are
+multiplied by `hle_year`, one year), homes built and the social homes rate in `home/year`,
+and net migration and `migration_change` in `person/year` (through `year`, twelve months a
+year, and `per_step` on the population model's monthly net arrivals). The prison population
+is in `person`. Every value is as before, to the last digit.
+
 **Crime** is 9.2 million times one less 0.3 times the change in the police, courts and
 prisons service level (a judgement from studies of police numbers and crime, such as Draca,
 Machin and Witt 2011, cited only), times the policies' effect, which follows them over a year.
@@ -371,11 +389,28 @@ where one is given, at most 98%:
 
 | Group | Base month share | Approval | From |
 |---|---|---|---|
-| Motorists | 79.5% | 34.1% | DfT, National Travel Survey 2024, household car availability (https://www.gov.uk/government/statistics/national-travel-survey-2024/nts-2024-household-car-availability-and-trends-in-car-trips): 60% of the poorest fifth of households and 86% of the richest have a car; the middle fifths (73%, 83%, 88%) are *estimates* read from its chart; 78% of all households. Household shares applied to adults |
-| Home owners | 65.0% | 32.2% | English Housing Survey 2023-24 (https://www.gov.uk/government/statistics/chapters-for-english-housing-survey-2023-to-2024-headline-findings-on-demographics-and-household-resilience/chapter-1-profile-of-households-and-dwellings): 65% of households own; by age (11%, 42%, 64%, 74%, 79% from 18-24 to 65 and over) and income fifth (factors 0.65 to 1.2) *estimates* shaped like its tables |
-| Renters | 35.0% | 37.5% | The rest |
+| Motorists | 79.5% | 33.5% | DfT, National Travel Survey 2024, household car availability (https://www.gov.uk/government/statistics/national-travel-survey-2024/nts-2024-household-car-availability-and-trends-in-car-trips): 60% of the poorest fifth of households and 86% of the richest have a car; the middle fifths (73%, 83%, 88%) are *estimates* read from its chart; 78% of all households. Household shares applied to adults. By region (stage S13.6, below) |
+| Home owners | 64.9% | 31.8% | English Housing Survey 2023-24 (https://www.gov.uk/government/statistics/chapters-for-english-housing-survey-2023-to-2024-headline-findings-on-demographics-and-household-resilience/chapter-1-profile-of-households-and-dwellings): 65% of households own; by age (11%, 42%, 64%, 74%, 79% from 18-24 to 65 and over) and income fifth (factors 0.65 to 1.2) *estimates* shaped like its tables. By region (stage S13.6, below) |
+| Renters | 35.1% | 38.3% | The rest |
 | Drinkers | 49.0% | 33.9% | Health Survey for England: about 46% of 18 to 24 year olds drank in the last week (*secondary*); the other ages, the income factors and the total of 49% are *estimates* |
 | Smokers | 10.6% | 34.8% | ONS, Adult smoking habits in the UK 2024: 10.6% of adults; 8.1% at 18 to 24, 12.6% at 25 to 34, 7.1% at 65 and over; 35 to 64 (11.5%, 11%) and the income factors (1.6 to 0.6: routine and manual workers smoke three times as often as managers and professionals) are *estimates* |
+
+**By region (stage S13.6).** Motorists and home owners also follow their region: within each
+region the shares by age and income are scaled so the region's mean over its adults is in
+proportion to its published share of households, then all are scaled together so the national
+share of adults stays where it was (79.5% of adults for motorists, 65% for home owners, the
+cap at 98% taking a little off). The regional shares of households, in the order North East,
+North West, Yorkshire and the Humber, East Midlands, West Midlands, East, London, South East,
+South West, Wales, Scotland, Northern Ireland:
+
+| Group | Shares of households (%) | From |
+|---|---|---|
+| Motorists (a car or van) | 72.4, 75.3, 75.8, 80.9, 78.5, 83.2, 57.9, 83.1, 83.2, 80.6, 75.0, 80.5 | ONS, Census 2021, TS045 Car or van availability (https://www.nomisweb.co.uk/datasets/c2021ts045), English regions and Wales: 1 less households with none over all households; NISRA, Census 2021, MS-E10 Car or van availability (https://build.nisra.gov.uk/en/standard/MS-E10), Northern Ireland: 150,279 of 768,810 with none; Scotland: 75% of households had access to a car in 2022, Scottish Household Survey, as Transport Scotland's Scottish Transport Statistics 2023, chapter 1 reports it (https://www.transport.gov.scot/publication/scottish-transport-statistics-2023/chapter-1-road-transport-vehicles; *secondary*, a survey, not the census; the page states Transport Scotland's copyright and no licence) |
+| Home owners (outright or with a mortgage) | 60.3, 62.3, 62.6, 65.5, 62.8, 65.2, 45.2, 65.7, 65.9, 66.1, 63.2, 64.4 | ONS, Census 2021, TS054 Tenure (https://www.nomisweb.co.uk/datasets/c2021ts054), "Owned" over all households, shared ownership left out; NISRA, Census 2021, MS-E15 Tenure - households (https://build.nisra.gov.uk/en/standard/MS-E15), owns outright or with a mortgage, 494,925 of 768,814; National Records of Scotland, Scotland's Census 2022, Housing (https://www.scotlandscensus.gov.uk/2022-results/scotland-s-census-2022-housing/): 63.2% of households own their home |
+
+The censuses count 2021 (Scotland 2022) and households, not adults; the regional pattern is
+used, the national level is the earlier sources'. In the base month London has 60% motorists
+(75% to 87% elsewhere) and 48% home owners (64% to 69% elsewhere).
 
 A reaction reaches a voter type in proportion to its share in the group, so where a type is
 part owner and part renter, reactions of owners and renters to the same policy partly cancel

@@ -195,6 +195,14 @@ published shares by income quintile and age band (`estimated_groups.csv`, the pa
 and the policing issue is the police service level over the policies' effect on crime
 (`crime_policy_level`); both are nil, or one, with every policy as in 2024.
 
+Stage S13.6: motorists and home owners also vary by region. Within each region the shares by
+income and age are scaled so that the region's mean is in proportion to its published share
+of households with a car or van (Census 2021 TS045, NISRA MS-E10, the Scottish Household
+Survey) or owning their home (Census 2021 TS054, NISRA MS-E15, Scotland's Census 2022), and
+the national share of adults is held where it was (79.5% and 65%). London, with the highest
+incomes but the fewest cars, now has 60% motorists against 75% to 87% elsewhere, and 48%
+home owners against 64% to 69%. Renters are still the rest.
+
 ## Against past elections (stage S9.4)
 
 `tools/uk/history.py` fits the government's reactions to income and unemployment to the
