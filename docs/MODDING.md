@@ -30,7 +30,8 @@ files = ["wealth_tax.toml"]
 The mod's own file, `wealth_tax.toml`, is written like any model file. Every name you add
 starts with your mod's id, so that mods never collide.
 
-A **lever** the player sets, in its own group on the policy panel. `leaning = "left"`
+A **lever** the player sets, which stands on the board as a policy in an area named after
+its group. `leaning = "left"`
 makes raising it a bill the House of Commons votes on, as a move to the left:
 
 ```toml
@@ -55,8 +56,8 @@ unit = "1"
 value = 0.4
 ```
 
-A **flow**: money moving from one sector to another each month. It appears on the budget
-screen by itself, because the budget is built from the flows into and out of the
+A **flow**: money moving from one sector to another each month. It appears on the Budget
+sheet by itself, because the budget is built from the flows into and out of the
 government:
 
 ```toml
@@ -99,14 +100,15 @@ dims = ["voter_type"]
 expr = "select(floor(coord(voter_type) / 2.0) - 5.0 * floor(coord(voter_type) / 10.0) == 4.0, 1.0, 0.0)"
 ```
 
-To find what to patch, use the game itself: **Why** next to any figure lists what it is
-made of, and **Connections** shows what depends on it. The model's files are in
+To find what to patch, use the game itself: click an indicator, and **Why it moved last
+month** lists what it is made of. The model's files are in
 `game/models/uk/`; `politics.toml` holds the voters.
 
 ## 4. Try it
 
 Start the game, tick the mod on the start screen and choose New game. The title bar names
-the mods in play. Set the wealth tax rate to 1% and advance a month: the budget shows
+the mods in play. Open the Wealth tax policy (its area is at the end of the rim), set the rate to 1% and
+advance a month: the Budget shows
 about £7.6bn a year of wealth tax, and the government's poll rating falls by about a
 quarter of a point, the richest fifth of voters turning away.
 
@@ -173,8 +175,8 @@ expr = "select(yoy_gdp_a_year_before > 0, gdp / yoy_gdp_a_year_before - 1.0, 0.0
 ```
 
 The loader turns the lag into twelve states, each passing its value on to the next, and a
-value that holds `gdp` as it was twelve months before (`initial` until then); **Why**
-shows it as output twelve months before. The rules are in
+value that holds `gdp` as it was twelve months before (`initial` until then); **Why it
+moved last month** shows it as output twelve months before. The rules are in
 [`docs/spec/06-model-format-1.md`](spec/06-model-format-1.md#lags-stage-s105). For rates
 and elasticities, formulas also have `ln`, `sqrt` and `pow` (as `pow(1.0 + rate, 12)`), each
 computed the same way on every machine

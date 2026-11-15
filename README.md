@@ -9,9 +9,13 @@ You govern the United Kingdom from January 2025: a monthly stock-flow model of t
 economy and public finances calibrated to 2024, 20,000 synthetic households under the
 2024-25 tax and benefit rules, 600 types of voter choosing between nine blocs, 650
 constituencies, a House of Commons that votes on your policy changes, and a general
-election in July 2029. The Godot client shows the budget, who gains and who loses, the
-polls and seats, and why any figure changed. Mods add to the model; saved games survive
-changes to it. `docs/GUIDE.md` is the player's guide; `docs/MODDING.md` shows how to make
+election in July 2029. The Godot client has one screen, the board: your policies round the
+rim, the indicators they move inside them, 23 groups of voters round the centre with how
+many of each back you, and the government's approval, the election and your political
+capital at the centre. Clicking a node opens a popup: what a policy would do in a year
+and how the Commons would vote on it, why an indicator moved, a group's households. The
+Budget and Parliament open as sheets. Mods add to the model; saved games survive changes
+to it. `docs/GUIDE.md` is the player's guide; `docs/MODDING.md` shows how to make
 a mod.
 
 ## Layout
@@ -22,9 +26,9 @@ a mod.
 | `crates/core/` | The engine (Rust): model loader, type and unit checker, bytecode compiler, block-wise interpreter, step loop, saves |
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |
-| `client/` | The Godot 4.7 game client (GDScript) and its scripted tests |
+| `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, pictograms, type and sounds, and its scripted tests |
 | `oracle/` | The reference evaluator: a deliberately naive Python implementation of the contract. It defines the behaviour; the engine is tested against it |
-| `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`) |
+| `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and 19 real-life policies, 6 indicators and 23 interest groups (`models/uk/POLICIES.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
 | `mods/` | Mods the game ships with: `wealth_tax`, the example in `docs/MODDING.md` |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
 | `models/valmora/` | The same economy scaled to an invented country, where the client was first built |
@@ -33,14 +37,14 @@ a mod.
 | `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
 | `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
-| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S12-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
+| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S13-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
 ## Play
 
 **The game client.** On Windows, download `PoliSim-windows` from the latest CI run of the
-branch (Actions tab), unpack it and run `PoliSim.bat`. `docs/GUIDE.md` explains the screen.
+branch (Actions tab), unpack it and run `PoliSim.bat`. `docs/GUIDE.md` explains the board and what to try.
 To run it from the repository instead, with Godot 4.7.2 installed:
 
 ```bash
@@ -148,6 +152,6 @@ households, 600 voter types, 650 seats) now takes 17 to 20 ms a month on four th
 | The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
 | The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
 
-Stage S12 (`docs/S12-PLAN.md`) adds pages, policy areas with icons, the policy web, political capital that bills cost (an engine rule, checked against the oracle) and a map of the regions.
+Stage S12 (`docs/S12-PLAN.md`) added political capital that bills cost, an engine rule checked against the oracle. Stage S13 (`docs/S13-PLAN.md`) replaced the S12 pages with the board and added looking ahead in the engine and bridge, 23 interest groups with approvals and sample households, and 19 real-life policies with six new indicators; S13.1 to S13.5 are done and S13.6 (sound, guidance, the guide and the specification) is under way.
 
 Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.6 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions, the population by region, sex and age, and 15 industries). The status is in `docs/S3-PLAN.md`.
