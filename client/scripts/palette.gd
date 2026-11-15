@@ -239,6 +239,15 @@ static func make_theme() -> Theme:
 	_button_states(theme, "Chip", _empty(10, 2), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 10, 2),
 		_flat(Color(INK, 0.12), Color(INK, 0.0), 0, 10, 2), _empty(10, 2), INK, INK, INK)
 
+	# Stage S13.5: a step of a level policy's control: card stock, the step chosen in ink.
+	theme.set_type_variation("Step", "Button")
+	_button_states(theme, "Step", _flat(CARD, INK, 2, 8, 5, 2), _flat(Color("#fbf3dc"), INK, 2, 8, 5, 2),
+		_flat(INK, INK, 2, 8, 5, 0), _flat(PAPER, LINE, 2, 8, 5, 0), INK, INK, LINE)
+	for key in ["font_pressed_color", "font_hover_pressed_color"]:
+		theme.set_color(key, "Step", CARD)
+	theme.set_font("font", "Step", text(500))
+	theme.set_font_size("font_size", "Step", SMALL)
+
 	# Text styles.
 	theme.set_type_variation("Title", "Label")
 	theme.set_font("font", "Title", display(500))

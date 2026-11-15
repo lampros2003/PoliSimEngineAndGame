@@ -19,7 +19,7 @@ government = "government"
 # Amounts paid each month are shown at an annual rate, as the public finances are published.
 amounts = "year"
 # Stage S13.2: short names for the top bar and the board.
-labels = { government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Home building" }
+labels = { government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Housing stock", crime_incidents = "Crime", prison_population = "Prisoners", healthy_life_expectancy = "Healthy life", smoking_prevalence = "Smoking", alcohol_deaths = "Alcohol deaths", ev_share = "Electric cars", school_attainment = "School results", homes_built = "Homes built", net_migration_annual = "Net migration" }
 headline = ["government_support", "gdp", "unemployment_rate", "consumer_inflation_annual", "budget_balance", "debt_to_gdp"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_inflation_annual", "waiting_list"]
 # "Who gains, who loses": net income per household by group, from the households; jobs and
@@ -74,6 +74,21 @@ issues_at_election = "issue_at_election"
 #                                  a national result row; `better` is "high" or "low" where
 #                                  that is clear, and tints its rises and falls
 #
+# Stage S13.5: real policies, a growing board, estimated groups.
+#   a policy's `levels = ["...", ...]`  the names of a level policy's settings, in order from
+#                                  the lever's minimum: chosen by name, never as a number
+#   a policy's `off = <value>`     the setting (as typed: pounds for money) at which it is
+#                                  not in force: off the board, offered by the area's
+#                                  "introduce a policy" node, and "Repeal" when in force
+#   a policy's `line = "..."`      one line on what it does, in the area's introduce list
+#   `unit` on a policy or an indicator, how its value reads: "years" (an age, a life:
+#                                  "18 years"), "year" (a calendar year: "2030"), "multiple"
+#                                  (of 2024's rates: "as now", "+20%"), "pence" ("52.95p"),
+#                                  "count" (a plain number: "9,200,000")
+#   a policy's `per = "..."`       what its amount is for: "a car" reads "£2,500 a car"
+#   a group's `estimate = "..."`   for a group with no households: where its membership is
+#                                  estimated from, said in its popup in their place
+#
 # Icons are file names in client/icons (game-icons.net, credited in client/icons/CREDITS.md).
 [play.web]
 hide = ["starter_rate", "scottish_basic_rate", "scottish_basic_threshold", "intermediate_rate",
@@ -100,6 +115,12 @@ groups = [
   { key = "north", label = "The North", icon = "group-north", row = "approval_north", share = "share_north", households = "household_in_north", family = "Places" },
   { key = "midlands", label = "The Midlands", icon = "group-midlands", row = "approval_midlands", share = "share_midlands", households = "household_in_midlands", family = "Places" },
   { key = "south", label = "The South", icon = "group-south", row = "approval_south", share = "share_south", households = "household_in_south", family = "Places" },
+  # Stage S13.5: five groups estimated from published shares (models/uk/POLICIES.md, Groups).
+  { key = "motorists", label = "Motorists", icon = "group-motorists", row = "approval_motorists", share = "share_motorists", family = "Ways of life", estimate = "the National Travel Survey's share of households with a car, by income" },
+  { key = "home_owners", label = "Home owners", icon = "group-home-owners", row = "approval_home_owners", share = "share_home_owners", family = "Ways of life", estimate = "the English Housing Survey's share of households who own their home, by age and income" },
+  { key = "renters", label = "Renters", icon = "group-renters", row = "approval_renters", share = "share_renters", family = "Ways of life", estimate = "the English Housing Survey: everyone who does not own their home" },
+  { key = "drinkers", label = "Drinkers", icon = "group-drinkers", row = "approval_drinkers", share = "share_drinkers", family = "Ways of life", estimate = "the Health Survey for England's share who drank in the last week, by age" },
+  { key = "smokers", label = "Smokers", icon = "group-smokers", row = "approval_smokers", share = "share_smokers", family = "Ways of life", estimate = "the ONS's adult smoking habits, by age and kind of work" },
 ]
 group_drivers = { income = "group_driver_income", jobs = "group_driver_jobs", prices_and_time = "group_driver_prices_and_time", services = "group_driver_services", standing = "group_driver_standing" }
 # Stage S13.4: a household as the group popup shows it: its flags and figures by name, the
@@ -150,7 +171,8 @@ policies = [
   { key = "child_benefit", label = "Child Benefit", icon = "child-benefit", size = 2, levers = ["child_benefit_eldest", "child_benefit_other", "hicbc_start", "hicbc_width"] },
   { key = "pensions", label = "Pensions and benefits", icon = "pensions", size = 3, levers = ["benefits_bill"] },
   { key = "state_pension_age", label = "State Pension age", icon = "pension-age", size = 2, levers = ["state_pension_age"] },
-  { key = "jobseekers", label = "Benefit for the unemployed", icon = "jobseekers", size = 1, levers = ["benefit_per_unemployed"] },
+  { key = "jobseekers", label = "Unemployment benefit", icon = "jobseekers", size = 1, levers = ["benefit_per_unemployed"] },
+  { key = "winter_fuel_payment", label = "Winter Fuel Payment", icon = "winter-fuel", size = 2, levers = ["winter_fuel_payment"], levels = ["None", "Means-tested, as now", "Universal"], off = 0, line = "A payment to pensioners each winter, to all or to the poorest." },
 ]
 indicators = [
   { row = "poverty_rate", icon = "poverty", size = 3, better = "low" },
@@ -167,10 +189,17 @@ icon = "health"
 policies = [
   { key = "nhs", label = "The NHS", icon = "hospital", size = 3, levers = ["spending_health"] },
   { key = "social_care", label = "Social care", icon = "social-care", size = 2, levers = ["spending_social_care"] },
+  { key = "alcohol_duty", label = "Alcohol duty", icon = "alcohol-duty", size = 2, levers = ["alcohol_duty"], unit = "multiple" },
+  { key = "tobacco_duty", label = "Tobacco duty", icon = "tobacco-duty", size = 1, levers = ["tobacco_duty"], unit = "multiple" },
+  { key = "sugar_levy", label = "Sugar levy", icon = "sugar-levy", size = 1, levers = ["sugar_levy"], unit = "multiple", off = 0, line = "A levy on sugary soft drinks, which makers avoid by cutting sugar." },
+  { key = "prescription_charge", label = "Prescription charge", icon = "prescription", size = 1, levers = ["prescription_charge"], per = "an item", off = 0, line = "A charge for each prescription item in England." },
 ]
 indicators = [
   { row = "waiting_list", icon = "waiting-list", size = 3, better = "low" },
+  { row = "healthy_life_expectancy", icon = "healthy-life", size = 2, better = "high", unit = "years" },
   { row = "treatments", icon = "treatments", size = 1, better = "high" },
+  { row = "smoking_prevalence", icon = "smoking", size = 1, better = "low" },
+  { row = "alcohol_deaths", icon = "alcohol-deaths", size = 1, better = "low", unit = "count" },
 ]
 
 [[play.web.areas]]
@@ -179,8 +208,11 @@ icon = "education"
 policies = [
   { key = "schools", label = "Schools and universities", icon = "school", size = 3, levers = ["spending_education"] },
   { key = "culture", label = "Culture and sport", icon = "culture", size = 1, levers = ["spending_culture"] },
+  { key = "tuition_fee_cap", label = "Tuition fee cap", icon = "tuition-fees", size = 2, levers = ["tuition_fee_cap"], per = "a year", off = 0, line = "University tuition fees, paid with student loans." },
+  { key = "free_school_meals", label = "Free school meals", icon = "school-meals", size = 2, levers = ["free_school_meals"], levels = ["Means-tested, as now", "All on Universal Credit", "All pupils"] },
 ]
 indicators = [
+  { row = "school_attainment", icon = "attainment", size = 2, better = "high" },
   { row = "service_level_overall", icon = "service", size = 2, better = "high" },
 ]
 
@@ -189,22 +221,35 @@ name = "Law and order"
 icon = "law"
 policies = [
   { key = "policing", label = "Police, courts and prisons", icon = "police", size = 3, levers = ["spending_public_order"] },
+  { key = "sentencing", label = "Sentencing", icon = "sentencing", size = 2, levers = ["sentencing"], levels = ["Lenient", "Lighter", "As now", "Tougher", "Tough"] },
+  { key = "drinking_age", label = "Drinking age", icon = "drinking-age", size = 1, levers = ["drinking_age"], unit = "years" },
+  { key = "cannabis_law", label = "Cannabis law", icon = "cannabis", size = 2, levers = ["cannabis_law"], levels = ["Illegal", "Decriminalised", "Legal and taxed"], off = 0, line = "Decriminalise cannabis, or license and tax its sale." },
 ]
-indicators = []
+indicators = [
+  { row = "crime_incidents", icon = "crime", size = 3, better = "low", unit = "count" },
+  { row = "prison_population", icon = "prison", size = 1 },
+]
 
 [[play.web.areas]]
 name = "Transport"
 icon = "transport"
 policies = [
   { key = "transport", label = "Roads and railways", icon = "train", size = 2, levers = ["spending_transport"] },
+  { key = "fuel_duty", label = "Fuel duty", icon = "fuel-duty", size = 3, levers = ["fuel_duty"], unit = "pence", per = "a litre", off = 0, line = "Duty on petrol and diesel, a fixed amount a litre." },
+  { key = "ev_grant", label = "Electric car grant", icon = "ev-grant", size = 2, levers = ["ev_grant"], per = "a car", off = 0, line = "A grant towards every new battery-electric car." },
+  { key = "bus_fare_cap", label = "Bus fare cap", icon = "bus-fare", size = 1, levers = ["bus_fare_cap"], per = "a journey" },
 ]
-indicators = []
+indicators = [
+  { row = "ev_share", icon = "ev-share", size = 2, better = "high" },
+]
 
 [[play.web.areas]]
 name = "Environment and energy"
 icon = "environment"
 policies = [
   { key = "carbon_price", label = "Carbon price", icon = "carbon-price", size = 3, levers = ["carbon_price"] },
+  { key = "petrol_ban_year", label = "Petrol car ban", icon = "petrol-ban", size = 2, levers = ["petrol_ban_year"], unit = "year" },
+  { key = "insulation_programme", label = "Home insulation", icon = "insulation", size = 2, levers = ["insulation_programme"], per = "a year", off = 0, line = "Public money to insulate homes, cutting bills and emissions." },
 ]
 indicators = [
   { row = "emissions", icon = "emissions", size = 3, better = "low" },
@@ -216,8 +261,12 @@ name = "Housing"
 icon = "housing"
 policies = [
   { key = "housing", label = "Housing and local environment", icon = "homes", size = 2, levers = ["spending_environment_housing"] },
+  { key = "planning_rules", label = "Planning rules", icon = "planning", size = 3, levers = ["planning_rules"], levels = ["Very restrictive", "Restrictive", "As now", "Liberal", "Very liberal"] },
+  { key = "social_housing", label = "Social housing", icon = "social-housing", size = 2, levers = ["social_housing"], per = "a year", off = 0, line = "Public money to build new social homes." },
+  { key = "rent_controls", label = "Rent controls", icon = "rent-controls", size = 2, levers = ["rent_controls"], levels = ["None", "Capped rises", "Strict"], off = 0, line = "Cap private rent rises each year, or set strict limits." },
 ]
 indicators = [
+  { row = "homes_built", icon = "homes-built", size = 2, better = "high", unit = "count" },
   { row = "dwellings", icon = "housing", size = 1, better = "high" },
 ]
 
@@ -228,8 +277,10 @@ policies = [
   { key = "defence", label = "Defence", icon = "defence", size = 3, levers = ["spending_defence"] },
   { key = "trade_barriers", label = "Trade barriers", icon = "trade-barriers", size = 2, levers = ["trade_barrier_eu", "trade_barrier_united_states", "trade_barrier_china", "trade_barrier_rest_of_world"] },
   { key = "aid", label = "Overseas aid", icon = "aid", size = 1, levers = ["transfers_abroad_bill"] },
+  { key = "visa_threshold", label = "Visa salary threshold", icon = "visa", size = 2, levers = ["visa_threshold"], per = "a year" },
 ]
 indicators = [
   { row = "exports", icon = "exports", size = 2, better = "high" },
+  { row = "net_migration_annual", icon = "migration", size = 2, unit = "count" },
   { row = "imports", icon = "imports", size = 1 },
 ]

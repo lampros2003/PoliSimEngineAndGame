@@ -8,7 +8,8 @@ extends SceneTree
 ## popup first (and --then=N plays N more months), --dilemma=1 leaves the question on screen, --effects=1 waits for the measured
 ## effects table first (for hover links). Stage S13.4: --node=group:KEY opens a group's
 ## popup, and --household=N then opens its Nth household's account. Stage S13.6: --report=1
-## shows the month's report, --guide=N the guide's Nth step. For a person to look at; needs a
+## shows the month's report, --guide=N the guide's Nth step. Stage S13.5: --introduce and
+## --draft (below). For a person to look at; needs a
 ## display. Godot's --resolution WxH before --path sets the window size.
 
 var main: Control
@@ -53,6 +54,23 @@ func _initialize() -> void:
 		if args.has("then"):
 			main.advance(int(args["then"]))
 			await _settle()
+	# Stage S13.5: --introduce=KEY:VALUE[,KEY:VALUE] introduces policies not in force (and
+	# --then=N plays on); --draft=KEY:VALUE opens one to be introduced with that setting picked.
+	if args.has("introduce"):
+		for item in str(args["introduce"]).split(","):
+			main.introduce_policy(item.get_slice(":", 0) + ":" + item.get_slice(":", 1), float(item.get_slice(":", 2)))
+			await _settle()
+		if args.has("then"):
+			main.advance(int(args["then"]))
+			await _settle()
+	if args.has("draft"):
+		var item := str(args["draft"])
+		main.open_node(item.get_slice(":", 0) + ":" + item.get_slice(":", 1))
+		await _settle()
+		main.policy_card().type_value(main.policy_card().levers[0], float(item.get_slice(":", 2)))
+		var until := Time.get_ticks_msec() + 30000
+		while main.policy_card().year_shown.is_empty() and Time.get_ticks_msec() < until:
+			await process_frame
 	# The pointer of whoever runs this must not point at the board for the picture.
 	main.board.input_enabled = false
 	main.board.set_hover("")

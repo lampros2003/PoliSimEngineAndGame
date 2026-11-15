@@ -156,9 +156,40 @@ func is_money(entry: Dictionary) -> bool:
 	return currency != "" and entry.get("type", "") == "real" and str(entry.get("unit", "")).split("/")[0] == currency
 
 
-## True for a dimensionless real, which reads best as a percentage.
+## True for a dimensionless real, which reads best as a percentage. Stage S13.5: not for one
+## the scenario says reads otherwise (an age, a count, a multiple of 2024's rates).
 static func is_rate(entry: Dictionary) -> bool:
-	return entry.get("type", "") == "real" and str(entry.get("unit", "")) == "1"
+	return entry.get("type", "") == "real" and str(entry.get("unit", "")) == "1" and not entry.has("show_as") \
+		and not entry.has("levels")
+
+
+## Stage S13.5: how a value the scenario describes reads ([play.web] `levels`, `unit` as
+## `show_as`, `per`): a level by its name, "18 years", "2030", "as now" or "+20%" of 2024's
+## rates, "52.95p", a plain count; "" when the entry has no such description.
+func described(entry: Dictionary, v: Variant) -> String:
+	if v == null or typeof(v) == TYPE_BOOL:
+		return ""
+	var f := float(v)
+	var levels: Array = entry.get("levels", [])
+	if not levels.is_empty():
+		return str(levels[clampi(int(roundf(f - float(entry.get("min", 0.0)))), 0, levels.size() - 1)])
+	var text := ""
+	match str(entry.get("show_as", "")):
+		"years":
+			text = ("%d" % int(roundf(f)) if typeof(v) == TYPE_INT else grouped(f, 1)) + " years"
+		"year":
+			text = "%d" % int(roundf(f))
+		"multiple":
+			var d := roundf((f - 1.0) * 100.0)
+			text = "as now" if d == 0.0 else ("+" if d > 0.0 else MINUS) + "%d%%" % int(absf(d))
+		"pence":
+			text = grouped(f, 2) + "p"
+		"count":
+			text = grouped(roundf(f)) if absf(f) < 1e8 else compact(f)
+		_:
+			return ""
+	var per := str(entry.get("per", ""))
+	return text + (" " + per if per != "" else "")
 
 
 ## A value with its unit, as the entry describes it. `shown` uses the total's unit.
@@ -167,7 +198,9 @@ func value(entry: Dictionary, v: Variant, shown := true, with_unit := true, scal
 	if v == null:
 		return "–"
 	var unit: String = entry.get("shown_unit" if shown else "unit", "1")
-	var text := ""
+	var text := described(entry, v)
+	if text != "":
+		return text
 	if typeof(v) != TYPE_BOOL and not scaled:
 		var k := factor(entry, shown)
 		if k != 1.0:
@@ -186,6 +219,9 @@ func value(entry: Dictionary, v: Variant, shown := true, with_unit := true, scal
 			text = grouped(roundf(f))
 		else:
 			text = grouped(f, 2) if absf(f) < 1e4 else compact(f)
+	# Stage S13.5: an amount the scenario says is for something reads "£2,500 a car".
+	if str(entry.get("per", "")) != "":
+		return text + " " + str(entry["per"])
 	return text + (unit_words(unit) if with_unit else "")
 
 
@@ -195,7 +231,26 @@ func change(entry: Dictionary, delta: Variant) -> String:
 		return "–"
 	var d := float(delta) * factor(entry)
 	var size := ""
-	if is_money(entry):
+	var as_shown := str(entry.get("show_as", ""))
+	# Stage S13.5: the scenario's units; the words after the number never count as digits.
+	var words := ""
+	if entry.has("levels"):
+		size = "%d" % int(roundf(absf(d)))
+		words = " step" if roundf(absf(d)) == 1.0 else " steps"
+	elif as_shown == "years":
+		size = grouped(absf(d), 2)
+		words = " years"
+	elif as_shown == "year":
+		size = "%d" % int(roundf(absf(d)))
+		words = " year" if roundf(absf(d)) == 1.0 else " years"
+	elif as_shown == "multiple":
+		size = String.num(absf(d) * 100.0, 0) + "%"
+		words = " of 2024's rates"
+	elif as_shown == "pence":
+		size = grouped(absf(d), 2) + "p"
+	elif as_shown == "count":
+		size = grouped(roundf(absf(d))) if absf(d) < 1e6 else compact(absf(d))
+	elif is_money(entry):
 		size = with_symbol(compact(absf(d) / float(minor)))
 	elif is_rate(entry):
 		size = String.num(absf(d) * 100.0, 2) + " pts"
@@ -209,4 +264,4 @@ func change(entry: Dictionary, delta: Variant) -> String:
 	# "+0.00 pts" or a negative nought.
 	if is_nought(size):
 		return "no change"
-	return ("+" if d > 0.0 else MINUS) + size
+	return ("+" if d > 0.0 else MINUS) + size + words

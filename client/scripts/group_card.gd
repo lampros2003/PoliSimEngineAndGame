@@ -28,6 +28,7 @@ var chart: Chart
 var approval_text := ""
 var drivers_shown: Array = []  # [plain name, value]
 var records: Array = []  # the households shown
+var estimate := ""  # stage S13.5: where an estimated group's membership comes from
 var _note := ""
 var _figure: Label
 var _change: Label
@@ -90,7 +91,8 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	side.size_flags_vertical = Control.SIZE_SHRINK_END
 	side.add_theme_constant_override("separation", 0)
 	figures.add_child(side)
-	side.add_child(_muted("back the government"))
+	# Stage S13.5: approval counts only those who would vote, as a poll does.
+	side.add_child(_muted("of those who would vote back the government"))
 	_change = Label.new()
 	_change.add_theme_font_override("font", Palette.text(600))
 	side.add_child(_change)
@@ -152,6 +154,11 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 			list.add_child(button)
 	right.add_child(Palette.caps("Households"))
 	_homes_note = _muted("Finding some of their households…")
+	# Stage S13.5: a group estimated from published shares has no households of its own.
+	estimate = str(node.get("estimate", ""))
+	if estimate != "":
+		_homes_note.name = "estimate_note"
+		_homes_note.text = "Who belongs to this group is an estimate, made from published shares (%s), not a fact recorded for any household. So it has no sample households to show." % estimate
 	right.add_child(_homes_note)
 	_homes = GridContainer.new()
 	_homes.name = "households"
@@ -259,9 +266,10 @@ class HouseholdTile extends Button:
 	var adults := 1
 	var children := 0
 	var lines: Array = []  # [text, font, colour]
+	var vote_note := ""
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(120, 200)
+		custom_minimum_size = Vector2(120, 236)  # stage S13.5: room for the vote on two lines
 		flat = true
 		focus_mode = Control.FOCUS_ALL
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -283,8 +291,11 @@ class HouseholdTile extends Button:
 			var said := "income as a year ago" if fmt.is_nought(by) else "income %s %s on a year ago" % ["up" if c > 0.0 else "down", by]
 			lines.append([said, Palette.text(400), Palette.MUTED if fmt.is_nought(by) else (Palette.GOOD if c > 0.0 else Palette.BAD)])
 		if support != null:
-			lines.append(["%s back you" % fmt.percent(float(support), 0), Palette.text(400), Palette.MUTED])
-		tooltip_text = "%s, %s" % [kind, place]
+			# Stage S13.5: the chance an adult here votes for the government, counting those who
+			# would not vote, so it reads lower than the group's approval (of those who would).
+			lines.append(["%s likely to vote for you" % fmt.percent(float(support), 0), Palette.text(400), Palette.MUTED])
+			vote_note = "Each adult here has a %s chance of voting for you, counting those who would not vote at all; the group's approval counts only those who would." % fmt.percent(float(support), 0)
+		tooltip_text = "%s, %s" % [kind, place] + ("\n" + vote_note if vote_note != "" else "")
 
 	func _draw() -> void:
 		var box := Rect2(Vector2.ZERO, size)

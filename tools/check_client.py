@@ -166,13 +166,14 @@ def main() -> int:
                 return 1
             print(run.stdout.strip().splitlines()[-1])
         # Stage S13.2: the board; political capital. Stage S13.3: looking ahead. Stage S13.4: the people.
+        # Stage S13.5: real policies, introduced and repealed; with no script error on the way.
         for script in ("res://tests/board_check.gd", "res://tests/capital_check.gd", "res://tests/forecast_check.gd",
-                       "res://tests/people_check.gd"):
+                       "res://tests/people_check.gd", "res://tests/policies_check.gd"):
             run = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
                  "--", "--scenario=models/uk/scenarios/2025.toml"],
                 capture_output=True, encoding="utf-8", timeout=900)
-            if run.returncode != 0:
+            if run.returncode != 0 or "SCRIPT ERROR" in run.stderr:
                 print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
                 print(f"{script} failed", file=sys.stderr)
                 return 1

@@ -10,7 +10,9 @@ extends Control
 ## close_popup(), type_lever(lever, value), hover(key), menu_action(name), advance(months),
 ## answer_dilemma(name, answer); and reads it: popup_kind(), policy_card(),
 ## indicator_card(), current_trace(), notice_text(), capital_text(), title_text(),
-## flag_text(key), dilemma_title(), can_advance(), board_levers().
+## flag_text(key), dilemma_title(), can_advance(), board_levers(). Stage S13.5: a growing
+## board: available_policies(area), open_introduce(area), introduce_policy(key, value),
+## repeal_policy(key).
 
 const Palette := preload("res://scripts/palette.gd")
 const Format := preload("res://scripts/format.gd")
@@ -26,12 +28,15 @@ const StartScreen := preload("res://scripts/start_screen.gd")
 const MonthReport := preload("res://scripts/month_report.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Sound := preload("res://scripts/sound.gd")
+const IntroduceList := preload("res://scripts/introduce_list.gd")
 
 const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
 const HELP := """[b]The board[/b] is the country. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, blue where the effect rises and brick where it falls, thicker for a stronger effect. Drag to move the board, turn the wheel to zoom, Home to see it all.
 
 [b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote.
+
+[b]New policies[/b]: an area's plus sign lists its policies not in force. Choose one, pick a setting, see what it would do in a year, and put it to the Commons; it waits on the board, faint, until the vote. A policy that can be ended has Repeal in its popup.
 
 [b]See why[/b]: click an indicator for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most.
 
@@ -339,6 +344,9 @@ func _build_layout() -> void:
 			open_node(key))
 	add_child(report)
 	move_child(report, popup.get_index())  # under popups and sheets
+	# Stage S13.5: the board steps aside for the report while it is open.
+	report.docked.connect(func(open: bool) -> void:
+		board.offset_right = -(Web.DOCK_WIDTH if open else 0.0))
 	_date.mouse_filter = Control.MOUSE_FILTER_STOP
 	_date.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_date.tooltip_text = "The month's report"
@@ -674,7 +682,7 @@ func _model_changed() -> void:
 	close_popup()
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	politics.build(play)
-	board.build(entries, play, lever_entries, _key_label)
+	board.build(entries, play, lever_entries, _key_label, func(l: String) -> Variant: return game.latest(l), game.pending())
 	politics.build_groups(board)
 	_build_headline()
 	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
@@ -890,6 +898,9 @@ func _set_controls(enabled: bool) -> void:
 ## Opens the popup of a board node: "policy:<key>", "indicator:<row>", "group:<key>",
 ## "flag:<key>" or "centre" (Parliament).
 func open_node(key: String, from := Rect2()) -> void:
+	if board.available.has(key):
+		_open_to_introduce(key)
+		return
 	if not board.nodes.has(key):
 		return
 	var node: Dictionary = board.nodes[key]
@@ -897,6 +908,11 @@ func open_node(key: String, from := Rect2()) -> void:
 	match str(node["kind"]):
 		"centre":
 			open_overlay("parliament")
+			return
+		"introduce":
+			board.select(key)
+			popup.open(func() -> Control: return _node_content(key), origin)
+			_after_open()
 			return
 		"flag":
 			if str(node.get("tone", "")) == "ask":
@@ -945,17 +961,30 @@ func _node_rect(key: String) -> Rect2:
 
 
 func _node_content(key: String) -> Control:
-	var node: Dictionary = board.nodes[key]
+	var node: Dictionary = board.policy_node(key) if board.policy_node(key).size() > 0 else board.nodes[key]
+	if node["kind"] == "introduce":
+		return _introduce_content(str(node["area"]))
 	if node["kind"] == "policy":
 		var card := LeverPanel.new()
 		card.fmt = fmt
 		card.name = "policy_card"
 		card.wide = get_viewport_rect().size.x >= LeverPanel.WIDE_FROM
+		# Stage S13.5: a policy not in force opens to be introduced; one that can be ended
+		# offers its repeal.
+		card.introducing = board.available.has(key)
+		card.off_stored = node.get("off_stored") if not node.get("ghost", false) else null
 		var lever_entries := []
 		for lever in node["levers"]:
 			lever_entries.append(entries[lever])
 		card.build(node, lever_entries, bool(catalogue.get("legislature", false)), _start_of)
-		card.lever_changed.connect(_lever_typed)
+		card.lever_changed.connect(func(name: String, raw: String) -> void:
+			_lever_typed(name, raw)
+			if card.introducing and game.pending().has(name):
+				close_popup())
+		card.draft_changed.connect(func(_name: String, _raw: String) -> void:
+			_refresh_popup(game.pending(), _show_capital())
+			_forecast_timer.start())
+		card.repeal_pressed.connect(func(name: String) -> void: _lever_typed(name, _typed_off(key)))
 		card.lever_cancelled.connect(func(name: String) -> void:
 			game.cancel_lever(name)
 			Sound.play("withdraw")
@@ -1004,6 +1033,117 @@ func _breakdowns_of(name: String) -> Array:
 		if total == name or (total == "" and str(play.get("breakdown_all", "")) == name):
 			out.append(str(b))
 	return out
+
+
+## Stage S13.5: an area's "introduce a policy" popup: its policies not in force, each with
+## the capital the smallest step in would cost.
+func _introduce_content(area: String) -> Control:
+	var list := IntroduceList.new()
+	list.name = "introduce_list"
+	var icon: Texture2D = Palette.icon("policy")
+	for a in board.areas:
+		if a["name"] == area and str(a.get("icon", "")) != "":
+			icon = Palette.icon(str(a["icon"]))
+	var items := []
+	for key in board.available_in(area):
+		var node: Dictionary = board.available[key]
+		var lever: String = node["levers"][0]
+		var cost: float = game.bill_cost(lever, _first_step(key))
+		var line := str(node.get("line", ""))
+		if line == "":
+			line = str(entries.get(lever, {}).get("doc", "")).get_slice(".", 0) + "."
+		items.append({"key": key, "label": node["label"], "icon": node["icon"], "line": line,
+			"cost": "from %.1f political capital" % cost if cost >= 0.0 else ""})
+	list.build(area, icon, items)
+	list.chosen.connect(_open_to_introduce)
+	return list
+
+
+## Opens a policy not in force in its popup, ready to be introduced (from the area's list,
+## with Back to it, or straight from the board's introduce node).
+func _open_to_introduce(key: String) -> void:
+	if not board.available.has(key):
+		return
+	if popup.is_open():
+		popup.push(func() -> Control: return _node_content(key))
+	else:
+		var origin := _node_rect("introduce:" + str(board.available[key]["area"]))
+		popup.open(func() -> Control: return _node_content(key), origin)
+	_after_open()
+
+
+## A policy's `off` setting as a person types it (the raw a bill takes).
+func _typed_off(key: String) -> String:
+	var node: Dictionary = board.policy_node(key)
+	return _raw(str(node["levers"][0]), float(node.get("off", 0.0)))
+
+
+## A typed value as a bill takes it: a whole number for a whole-number lever.
+func _raw(lever: String, typed: float) -> String:
+	var entry: Dictionary = entries.get(lever, {})
+	if str(entry.get("type", "")) == "int" and not entry.get("money", false):
+		return "%d" % int(roundf(typed))
+	return String.num(typed, 6)
+
+
+## The smallest step into force from a policy's `off` setting, as typed: a level policy's
+## next level; otherwise a tenth of its range.
+func _first_step(key: String) -> String:
+	var node: Dictionary = board.policy_node(key)
+	var entry: Dictionary = entries.get(node["levers"][0], {})
+	var off := float(node.get("off_stored", 0.0))
+	var lo := float(entry.get("min", 0.0))
+	var hi := float(entry.get("max", 1.0))
+	var step := 1.0 if entry.has("levels") else (hi - lo) / 10.0
+	var to := off + step if off + step <= hi else off - step
+	var money: bool = entry.get("money", false)
+	return _raw(str(node["levers"][0]), to / fmt.minor if money else to)
+
+
+## The value of a stored lever setting as a bill or a look-ahead takes it.
+func _typed_value(lever: String, stored: Variant) -> Variant:
+	var entry: Dictionary = entries.get(lever, {})
+	if entry.get("money", false):
+		return float(stored) / fmt.minor
+	return int(roundf(float(stored))) if str(entry.get("type", "")) == "int" else stored
+
+
+## Stage S13.5, for the checks and keyboard play: the policies of an area not in force.
+func available_policies(area: String) -> PackedStringArray:
+	return board.available_in(area)
+
+
+## Opens an area's introduce list.
+func open_introduce(area: String) -> void:
+	open_node("introduce:" + area)
+
+
+## Introduces a policy not in force at `value` (in its lever's own terms, as type_lever
+## takes it), as a player would: its popup, the setting picked, "Put to the Commons".
+## Returns the setting's draft as a bill would take it, or "" if nothing was put forward.
+func introduce_policy(key: String, value: float) -> String:
+	if not board.available.has(key):
+		push_error("%s is not available to introduce" % key)
+		return ""
+	_open_to_introduce(key)
+	var card := policy_card()
+	var lever: String = card.levers[0]
+	card.type_value(lever, value)
+	if not card.draft.has(lever):
+		return ""
+	var raw := str(card.draft[lever][0])
+	card.put_button.pressed.emit()
+	return raw
+
+
+## Repeals a policy in force, as a player would, through its popup's Repeal button.
+func repeal_policy(key: String) -> void:
+	open_node(key)
+	var card := policy_card()
+	if card == null or card.repeal_button == null:
+		push_error("%s cannot be repealed" % key)
+		return
+	card.repeal_button.pressed.emit()
 
 
 ## Stage S13.4: an interest group's popup, and a request for eight of its households.
@@ -1106,6 +1246,19 @@ func _refresh_popup(pending: Dictionary, capital: float) -> void:
 	if popup == null or not popup.is_open():
 		return
 	var card := policy_card()
+	if card != null and not card.levers.is_empty():
+		# Stage S13.5: the setting picked for a policy being introduced, or its repeal: what
+		# the bill would cost and the vote it would get.
+		var lever: String = card.levers[0]
+		var waiting_else := capital - _waiting_except(lever)
+		if card.introducing:
+			card.draft_cost = game.bill_cost(lever, str(card.draft[lever][0])) if card.draft.has(lever) else -1.0
+			if card.draft.has(lever) and game.has_method("vote_preview"):
+				card.show_vote(lever, game.call("vote_preview", lever, _typed_value(lever, card.draft[lever][1])), waiting_else)
+			elif card._rows.has(lever):
+				card._rows[lever]["vote"].visible = false
+		elif card.off_stored != null and game.has_method("vote_preview"):
+			card.show_repeal(game.bill_cost(lever, _typed_off(card.key)), game.call("vote_preview", lever, _typed_value(lever, card.off_stored)), waiting_else)
 	if card != null:
 		card.refresh(func(name: String) -> Variant: return game.latest(name), pending, _costs, capital)
 		var markers := []
@@ -1156,7 +1309,8 @@ func close_popup() -> void:
 		popup.close()
 
 
-## "policy", "indicator", "group", "household" or "" for the popup open now.
+## "policy", "indicator", "group", "household", "introduce" (stage S13.5) or "" for the
+## popup open now.
 func popup_kind() -> String:
 	if popup == null or not popup.is_open():
 		return ""
@@ -1166,11 +1320,17 @@ func popup_kind() -> String:
 		return "group"
 	if popup.content is GroupCard.HouseholdAccount:
 		return "household"
+	if popup.content is IntroduceList:
+		return "introduce"
 	return "indicator"
 
 
 func group_card() -> GroupCard:
 	return popup.content as GroupCard if popup != null and popup.is_open() else null
+
+
+func introduce_list() -> IntroduceList:
+	return popup.content as IntroduceList if popup != null and popup.is_open() else null
 
 
 func policy_card() -> LeverPanel:
@@ -1360,6 +1520,15 @@ func _request_forecast() -> void:
 		return
 	var pending: Dictionary = game.pending()
 	var changes := {}
+	if card.introducing:
+		# Stage S13.5: the setting picked, against the year as it stands.
+		for lever in card.draft:
+			changes[lever] = _typed_value(lever, card.draft[lever][1])
+		if changes.is_empty():
+			card.hide_year()
+		elif game.call("request_forecast", changes, 12, card.key):
+			card.show_year({}, [], true)
+		return
 	for lever in card.levers:
 		if pending.has(lever):
 			# Without this policy's waiting change: its setting now, as a person types it.
@@ -1370,6 +1539,23 @@ func _request_forecast() -> void:
 		return
 	if game.call("request_forecast", changes, 12, card.key):
 		card.show_year({}, [], true)
+
+
+## Stage S13.5: "In a year"'s heading in the policy's own words: "at £2,500 a car",
+## "repealed"; "" for a policy of several levers (the general heading).
+func _year_heading(card: LeverPanel) -> String:
+	if card.levers.size() != 1:
+		return ""
+	var lever: String = card.levers[0]
+	var entry: Dictionary = entries.get(lever, {})
+	if card.introducing:
+		return "at " + fmt.value(entry, card.draft[lever][1], false, false) if card.draft.has(lever) else ""
+	var pending: Dictionary = game.pending()
+	if not pending.has(lever):
+		return ""
+	if Web.is_off(board.policy_node(card.key), pending[lever]):
+		return "repealed"
+	return "at " + fmt.value(entry, pending[lever], false, false)
 
 
 ## The rows the year-ahead table may list: the budget balance first, then every indicator
@@ -1704,8 +1890,16 @@ func _snapshot_for_report() -> void:
 	var values := {}
 	for key in Array(board.keys_of("indicator")) + Array(board.keys_of("group")):
 		values[key] = latest_value(str(board.nodes[key]["row"]))
+	# Stage S13.5: where each lever stood, so a bill that passed can be told as an
+	# introduction or a repeal.
+	var levers := {}
+	for lever in board_levers():
+		levers[lever] = game.latest(lever)
+	for key in board.available:
+		for lever in board.available[key]["levers"]:
+			levers[lever] = game.latest(lever)
 	_report_from = {"step": game.steps_done(), "changes": game.changes().size(), "values": values,
-		"situations": _situations_on.duplicate()}
+		"situations": _situations_on.duplicate(), "levers": levers}
 
 
 ## Stage S13.6: the month's report: the bills put to the Commons, the figures that moved
@@ -1721,16 +1915,22 @@ func _build_report() -> void:
 	for i in range(int(from["changes"]), changes.size()):
 		var c: Dictionary = changes[i]
 		var lever := str(c["lever"])
-		var key := board.policy_of(lever)
+		var key := board.holds(lever)
 		var passed: bool = c.get("passed", true)
 		if key == "" and passed:
 			continue  # an answer to a question, not a bill
-		var entry: Dictionary = entries.get(lever, {})
-		var what := "%s to %s" % [entry.get("label", lever), fmt.value(entry, c["value"], false, false)]
+		var was: Variant = from.get("levers", {}).get(lever, game.latest(lever)) if passed else game.latest(lever)
+		var what := _bill_words(lever, c["value"], was, passed and not c.get("refused", false))
+		# A line opens the policy's popup while it is on the board, else its area's list.
+		if not board.nodes.has(key):
+			key = "introduce:" + str(board.policy_node(key).get("area", "")) if key != "" else ""
+			key = key if board.nodes.has(key) else ""
 		if c.get("refused", false):
 			bills.append({"text": "%s: refused, it needed %.1f political capital" % [what, float(c["cost"])], "tone": "notice", "key": key})
 		elif not passed:
 			bills.append({"text": "%s: voted down, %d to %d" % [what, int(c["votes_for"]), int(c["seats"]) - int(c["votes_for"])], "tone": "notice", "key": key})
+		elif what.contains(" introduced") or what.ends_with(" repealed"):
+			bills.append({"text": what, "tone": "good" if what.contains(" introduced") else "plain", "key": key})
 		else:
 			bills.append({"text": "%s: passed" % what, "tone": "plain", "key": key})
 	if int(from["step"]) == 0 and bills.is_empty():
@@ -1774,6 +1974,24 @@ func _build_report() -> void:
 	report.show_report(heading, [["Bills", bills], ["Moved most", moves.slice(0, 4).map(func(m): return m[1])], ["Situations", sits]])
 
 
+## Stage S13.5: a bill in words: "Fuel duty to 62.95p a litre"; for a policy with an `off`
+## setting, "Electric car grant introduced at £2,500 a car" or "Electric car grant repealed"
+## once passed (`done`), "Electric car grant, to be introduced at £2,500 a car" before. `was`
+## is the lever's setting before the bill.
+func _bill_words(lever: String, value: Variant, was: Variant, done: bool) -> String:
+	var entry: Dictionary = entries.get(lever, {})
+	var label := str(entry.get("label", lever))
+	var node: Dictionary = board.policy_node(board.holds(lever))
+	if not node.is_empty():
+		if (node["levers"] as PackedStringArray).size() == 1:
+			label = str(node["label"])
+		if Web.is_off(node, value):
+			return label + (" repealed" if done else ", to be repealed")
+		if Web.is_off(node, was):
+			return "%s%s %s" % [label, " introduced at" if done else ", to be introduced at", fmt.value(entry, value, false, false)]
+	return "%s to %s" % [label, fmt.value(entry, value, false, false)]
+
+
 ## A row's mean monthly move over up to two years before the last `months` months, or 0
 ## when there is too little history.
 func _usual_move(row: String, months: int) -> float:
@@ -1796,8 +2014,7 @@ func _announce_votes() -> void:
 		var c: Dictionary = changes[i]
 		if c.get("passed", true):
 			continue
-		var entry: Dictionary = entries.get(c["lever"], {})
-		var what := "%s to %s, in %s" % [entry.get("label", c["lever"]), fmt.value(entry, c["value"], false, true),
+		var what := "%s, in %s" % [_bill_words(str(c["lever"]), c["value"], game.latest(str(c["lever"])), false),
 			fmt.month_name(int(c["step"]))]
 		if c.get("refused", false):
 			short.append("%s: it needed %.1f political capital" % [what, float(c["cost"])])
@@ -1850,7 +2067,15 @@ func _process(_delta: float) -> void:
 					if str(event.get("error", "")) != "":
 						card.hide_year()
 					else:
-						card.show_year(event.get("rows", {}), _year_rows())
+						var rows_ahead: Dictionary = event.get("rows", {})
+						if card.introducing:
+							# The forecast's "changed" side is the policy introduced here.
+							var swapped := {}
+							for row in rows_ahead:
+								var pair: Variant = rows_ahead[row]
+								swapped[row] = [pair[1], pair[0]] if pair is Array and pair.size() == 2 else pair
+							rows_ahead = swapped
+						card.show_year(rows_ahead, _year_rows(), false, _year_heading(card))
 					popup.relayout()
 			"effects":
 				_take_effects(event)

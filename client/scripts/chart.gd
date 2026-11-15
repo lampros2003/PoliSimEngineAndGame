@@ -105,6 +105,9 @@ func _draw() -> void:
 	var r := _range()
 	# Grid and value labels.
 	for t in _nice_ticks(r.x, r.y):
+		# Stage S13.5: a whole-number value (an age, a year, a level) is marked at whole numbers only.
+		if ((entry.get("type", "") == "int" and not entry.get("money", false)) or entry.has("levels")) and not is_equal_approx(t, roundf(t)):
+			continue
 		var y := _y(t, rect, r)
 		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Palette.RULE, 1.0)
 		draw_string(font, Vector2(4, y + 5), _label(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12, small, Palette.MUTED)

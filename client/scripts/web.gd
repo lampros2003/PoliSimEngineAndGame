@@ -33,11 +33,13 @@ const LINK_FLOOR := 0.0005
 ## Stage S13.4: a policy's links to groups, besides its links to indicators.
 const MAX_GROUP_LINKS := 3
 ## The groups' ring, as a fraction of the way from the centre medallion to the indicators'.
-const GROUP_RING := Vector2(0.4, 0.42)
+const GROUP_RING := Vector2(0.46, 0.4)
 ## The gap between two families of groups, in the same terms as a group's room.
 const FAMILY_GAP := 26.0
 ## The largest group's radius, in pixels at a unit scale of 1.
-const GROUP_MAX := 26.0
+const GROUP_MAX := 25.0
+## Stage S13.5: the room the month's report takes at the right while it is open.
+const DOCK_WIDTH := 412.0
 
 var fmt: RefCounted
 ## key -> node: {key, kind ("policy", "indicator", "group", "flag", "centre"), label, icon,
@@ -47,6 +49,11 @@ var order: PackedStringArray = []  # node keys in drawing order
 var areas: Array = []  # {name, icon, policies: [key], indicators: [key], from, to (polar angles)}
 var hidden_levers: PackedStringArray = []  # levers the board leaves out
 var groups: Array = []  # [play.web] groups
+## Stage S13.5: policies not in force (their lever at its `off` setting, no bill waiting to
+## bring them in): key -> node, kept off the board and offered by their area's "introduce"
+## node. A policy whose bill to introduce waits is on the board as a ghost.
+var available := {}
+var _appear := {}  # key -> 0..1, a policy just come into force growing onto the board
 ## Measured effects a year on, from the bridge: lever -> {row: signed strength}.
 var effects := {}
 ## Stage S13.4: the row a policy always links to when it moves it ([play.web] `balance`).
@@ -123,7 +130,13 @@ func _ready() -> void:
 	_link_layer.draw.connect(_draw_links)
 	_node_layer.draw.connect(_draw_nodes)
 	_fx_layer.draw.connect(_draw_effects)
-	resized.connect(layout)
+	# Stage S13.5: a change of size (the month's report docking) glides the nodes to their
+	# new places.
+	resized.connect(func() -> void:
+		if nodes.has("centre") and nodes["centre"]["pos"] != Vector2.ZERO:
+			_relayout_smoothly()
+		else:
+			layout())
 	_leave = Timer.new()
 	_leave.one_shot = true
 	_leave.timeout.connect(func() -> void: set_hover(""))
@@ -133,8 +146,9 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------- building
 
 ## Builds the board from the catalogue (name -> entry), the scenario's [play] table and the
-## player's levers. `label_of` gives a result row's label as the screen shows it.
-func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Callable) -> void:
+## player's levers. `label_of` gives a result row's label as the screen shows it. Stage
+## S13.5: `lever_of` and `pending` (as for refresh) decide which policies are in force.
+func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Callable, lever_of := Callable(), pending := {}) -> void:
 	_entries = entries
 	_consumers.clear()
 	_reach.clear()
@@ -147,6 +161,8 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 				if not (_consumers[used] as PackedStringArray).has(name):
 					_consumers[used].append(name)
 	nodes.clear()
+	available.clear()
+	_appear.clear()
 	areas.clear()
 	effects.clear()
 	_links.clear()
@@ -178,14 +194,25 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 				_add(key, "policy", str(p.get("label", entries[own[0]].get("label", own[0]))), str(p.get("icon", "")),
 					int(p.get("size", 2)), a["name"], own, "", own[0])
 				a["policies"].append(key)
+				# Stage S13.5: how its first lever reads (levels, a unit, what an amount is for),
+				# written into the catalogue entry so every screen says it the same way; and the
+				# setting at which it is not in force, held as the engine stores it.
+				_describe(entries.get(own[0], {}), p)
+				nodes[key]["line"] = str(p.get("line", ""))
+				if p.has("off") and own.size() == 1:
+					var off := float(p["off"])
+					nodes[key]["off"] = off
+					nodes[key]["off_stored"] = off * (fmt.minor if fmt != null and entries[own[0]].get("money", false) else 1)
 			for i in area.get("indicators", []):
 				var row := str(i.get("row", ""))
 				if not rows.has(row.trim_prefix("-")):
 					continue
+				_describe(entries.get(rows[row.trim_prefix("-")], {}), i)
 				var key := "indicator:" + row
 				_add(key, "indicator", label_of.call(row), str(i.get("icon", "")), int(i.get("size", 2)), a["name"],
 					PackedStringArray(), row, rows[row.trim_prefix("-")], str(i.get("better", "")))
 				a["indicators"].append(key)
+			a["all"] = a["policies"].duplicate()
 			if not a["policies"].is_empty() or not a["indicators"].is_empty():
 				areas.append(a)
 		# A lever the table does not place (a mod's, say) gets a policy of its own, in the
@@ -204,11 +231,12 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 				if a["name"] == group:
 					home = a
 			if home.is_empty():
-				home = {"name": group, "icon": "", "policies": [], "indicators": []}
+				home = {"name": group, "icon": "", "policies": [], "indicators": [], "all": []}
 				areas.append(home)
 			var key := "policy:" + lever
 			_add(key, "policy", str(entry.get("label", lever)), "", 2, group, PackedStringArray([lever]), "", lever)
 			home["policies"].append(key)
+			home["all"].append(key)
 	else:
 		_automatic(entries, play, levers, rows, label_of)
 	for g in groups:
@@ -219,13 +247,124 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 		_add(key, "group", str(g.get("label", row)), str(g.get("icon", "group")), 2, "", PackedStringArray(), row, rows[row], "high")
 		# Stage S13.4: its family on the board, its share of the electorate (which sizes it),
 		# the flag that picks its households, and what to say for an approval of nought.
-		for field in ["share", "family", "households", "note"]:
+		for field in ["share", "family", "households", "note", "estimate"]:
 			nodes[key][field] = str(g.get(field, ""))
 		nodes[key]["share_value"] = -1.0
 	_add("centre", "centre", "Government", "vote", 3, "", PackedStringArray(), "", "", "")
 	selected = ""
 	hover = ""
+	if lever_of.is_valid():
+		_sync(lever_of, pending)
 	layout()
+
+
+## Stage S13.5: copies a [play.web] item's description of its value into a catalogue entry.
+static func _describe(entry: Dictionary, item: Dictionary) -> void:
+	if entry.is_empty():
+		return
+	if item.has("levels"):
+		entry["levels"] = Array(item["levels"]).map(func(l): return str(l))
+	if item.has("unit"):
+		entry["show_as"] = str(item["unit"])
+	if item.has("per"):
+		entry["per"] = str(item["per"])
+
+
+## Stage S13.5: the policy nodes, on the board or not.
+func policy_node(key: String) -> Dictionary:
+	return nodes.get(key, available.get(key, {}))
+
+
+## The policy that holds a lever, on the board or not, or "".
+func holds(lever: String) -> String:
+	var key := policy_of(lever)
+	if key != "":
+		return key
+	for k in available:
+		if (available[k]["levers"] as PackedStringArray).has(lever):
+			return k
+	return ""
+
+
+## True when a stored lever value is a policy's `off` setting.
+static func is_off(n: Dictionary, v: Variant) -> bool:
+	return n.has("off_stored") and v != null and absf(float(v) - float(n["off_stored"])) <= 1e-6 * maxf(1.0, absf(float(n["off_stored"])))
+
+
+## The policies of an area not in force, in the scenario's order.
+func available_in(area: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for a in areas:
+		if a["name"] == area:
+			for key in a["all"]:
+				if available.has(key):
+					out.append(key)
+	return out
+
+
+## Stage S13.5: puts each policy on the board or off it: in force (its lever off its `off`
+## setting), a ghost (a bill to introduce it waiting) or available to introduce; each area
+## with policies to introduce gets its "introduce" node at the end of its arc. A ghost that
+## comes into force grows onto the board. True when the board changed.
+func _sync(lever_of: Callable, pending: Dictionary) -> bool:
+	var changed := false
+	for a in areas:
+		if not a.has("all"):
+			continue  # an automatic board's area: every policy always in force
+		var present := []
+		var spare := []
+		for key in a["all"]:
+			var n := policy_node(key)
+			var lever: String = n["levers"][0]
+			var in_force := not is_off(n, lever_of.call(lever))
+			var ghost := not in_force and pending.has(lever) and not is_off(n, pending[lever])
+			if in_force and n.get("ghost", false) and nodes.has(key):
+				_appear[key] = 0.0  # its bill passed
+			n["ghost"] = ghost
+			if in_force or ghost:
+				present.append(key)
+				if available.has(key):
+					nodes[key] = available[key]
+					available.erase(key)
+					changed = true
+			else:
+				spare.append(key)
+				if nodes.has(key):
+					available[key] = nodes[key]
+					nodes.erase(key)
+					changed = true
+		var intro := "introduce:" + str(a["name"])
+		if spare.is_empty():
+			if nodes.has(intro):
+				nodes.erase(intro)
+				changed = true
+		else:
+			if not nodes.has(intro):
+				_add(intro, "introduce", "New policy", "", 1, a["name"], PackedStringArray(), "", "")
+				changed = true
+			nodes[intro]["count"] = spare.size()
+			present.append(intro)
+		a["policies"] = present
+	if changed:
+		for key in [hover, selected, _link_key]:
+			if key != "" and not nodes.has(key):
+				hover = "" if hover == key else hover
+				selected = "" if selected == key else selected
+		_links = []
+		_link_key = ""
+		_order_nodes()
+	for key in _appear.keys():
+		if _appear[key] == 0.0 and nodes.has(key):
+			_pulses[key] = 0.0
+			if DisplayServer.get_name() == "headless":
+				_appear.erase(key)
+				continue
+			var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween.tween_method(func(k: float) -> void:
+				_appear[key] = k
+				_node_layer.queue_redraw(), 0.001, 1.0, 0.6)
+			tween.tween_callback(func() -> void: _appear.erase(key))
+	return changed
 
 
 ## A board for a scenario without [play.web]: an area per lever group (in the order the
@@ -415,7 +554,7 @@ func layout() -> void:
 	for a in areas:
 		var p := area_gap
 		for key in a["policies"]:
-			p += (2.0 * RADIUS[nodes[key]["tier"]] + 24.0) * u
+			p += (2.0 * RADIUS[nodes[key]["tier"]] + 32.0) * u  # stage S13.5: room for labels on a fuller rim
 			if nodes[key]["tier"] == 3:  # a label at rest wants room beside its node too
 				p += 26.0 * u
 		var m := area_gap
@@ -594,14 +733,14 @@ func _spread_groups(keys: Array, room: Array, total: float, ring: Ring) -> void:
 		nodes[keys[i]]["pos"] = ring.at(f / total)
 
 
-## A group's radius: its area follows its share of the electorate (six in ten gives a node
-## of radius GROUP_MAX), never smaller than 15 pixels at a unit scale of 1. Quantised,
-## so a month's small change in a share leaves the board as it was.
+## A group's radius: its area follows its share of the electorate (stage S13.5: eight in ten,
+## the motorists, gives a node of radius GROUP_MAX), never smaller than 14 pixels at a unit
+## scale of 1. Quantised, so a month's small change in a share leaves the board as it was.
 func group_radius(n: Dictionary) -> float:
 	var share: float = n.get("share_value", -1.0)
 	if share < 0.0:
 		share = 0.12
-	return snappedf(15.0 + (GROUP_MAX - 15.0) * sqrt(clampf(share / 0.6, 0.0, 1.0)), 1.0) * _unit * _group_scale
+	return snappedf(14.0 + (GROUP_MAX - 14.0) * sqrt(clampf(share / 0.8, 0.0, 1.0)), 1.0) * _unit * _group_scale
 
 
 func _outline(ring: Ring) -> PackedVector2Array:
@@ -654,7 +793,7 @@ func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
 
 func _order_nodes() -> void:
 	order = PackedStringArray()
-	for kind in ["centre", "group", "indicator", "policy", "flag"]:
+	for kind in ["centre", "group", "indicator", "policy", "introduce", "flag"]:
 		for key in nodes:
 			if nodes[key]["kind"] == kind:
 				order.append(key)
@@ -724,11 +863,11 @@ func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, ro
 		var lean := Vector2(w / 2.0 * signf(out.x), 0)
 		var outward: Vector2 = side if absf(out.x) > 0.8 else (below if out.y > 0.0 else above)
 		var candidates := [outward, below, above, side, -side, below + lean, above + lean, below - lean, above - lean]
-		if node["kind"] == "policy":
+		if node["kind"] in ["policy", "introduce"]:
 			candidates = [-outward, below, above, -side, side, below - lean, above - lean]
 		if round_about:
 			# Every way round the node, a label touching it, nearest the preferred way first.
-			var prefer := (-out if node["kind"] == "policy" else out).angle()
+			var prefer := (-out if node["kind"] in ["policy", "introduce"] else out).angle()
 			var turns := []
 			for k in 16:
 				turns.append(k * TAU / 16.0)
@@ -794,7 +933,7 @@ func label_size() -> int:
 ## Stage S13.4: two sizes of label, the larger for the largest nodes.
 func node_label_size(n: Dictionary) -> int:
 	# Stage S13.6: a crowded rim's smaller nodes take smaller labels too (never under 11 pixels).
-	var crowd := _node_scale if n["kind"] in ["policy", "indicator"] else _group_scale
+	var crowd := _node_scale if n["kind"] in ["policy", "indicator", "introduce"] else _group_scale
 	var full := label_size() if n["tier"] == 3 else maxi(12, int(roundf(label_size() * 0.86)))
 	return maxi(11, int(roundf(full * lerpf(1.0, crowd, 0.6))))
 
@@ -1105,6 +1244,8 @@ func links_for(key: String) -> Array:
 	var node: Dictionary = nodes[key]
 	var out: Array = []
 	var targets := _targets()
+	if node.get("ghost", false):
+		return out  # stage S13.5: not in force yet; its popup's "In a year" says what it would do
 	if node["kind"] == "policy":
 		var best := {}  # target key -> [signed strength, measured]
 		# A policy of several levers is measured by its first, the one its gauge shows (the
@@ -1278,9 +1419,12 @@ func _curve(a: Dictionary, b: Dictionary, control: Vector2) -> PackedVector2Arra
 ## (a "-" in front negates), `lever_of(name)` a lever's setting and `start_of(name)` where it
 ## began, `pending` the changes waiting. Nodes that moved notably pulse.
 func refresh(value_of: Callable, before_of: Callable, lever_of: Callable, start_of: Callable, pending: Dictionary, pulse := false) -> void:
-	var relayout := false
+	# Stage S13.5: policies come onto the board and leave it as bills pass.
+	var relayout := _sync(lever_of, pending)
 	for key in nodes:
 		var n: Dictionary = nodes[key]
+		if n["kind"] == "introduce":
+			n["value"] = "%d to choose from" % int(n.get("count", 0))
 		if n["kind"] == "policy":
 			var lever: String = n["levers"][0]
 			var entry: Dictionary = _entries.get(lever, {})
@@ -1295,6 +1439,11 @@ func refresh(value_of: Callable, before_of: Callable, lever_of: Callable, start_
 			if pending.has(lever):
 				n["pending"] = _gauge(entry, pending[lever], start)
 			n["value"] = fmt.value(entry, now, false, false) if fmt != null and now != null else ""
+			if n.get("ghost", false):
+				n["fraction"] = -1.0
+				n["value"] = "to be introduced: %s" % fmt.value(entry, pending[lever], false, false) if fmt != null else ""
+			elif pending.has(lever) and is_off(n, pending[lever]):
+				n["value"] += " · to be repealed"
 		elif n["kind"] in ["indicator", "group"]:
 			var entry: Dictionary = _entries.get(n["name"], {})
 			var now: Variant = value_of.call(n["row"])
@@ -1532,6 +1681,8 @@ func _draw_nodes() -> void:
 		match n["kind"]:
 			"policy":
 				_draw_policy(n, a)
+			"introduce":
+				_draw_introduce(n, a)
 			"indicator":
 				_draw_indicator(n, a)
 			"group":
@@ -1546,7 +1697,7 @@ func _draw_nodes() -> void:
 
 
 func _radius(n: Dictionary) -> float:
-	return n["r"] * zoom * (1.0 + 0.06 * _lift.get(n["key"], 0.0))
+	return n["r"] * zoom * (1.0 + 0.06 * _lift.get(n["key"], 0.0)) * _appear.get(n["key"], 1.0)
 
 
 func _icon(texture: Texture2D, c: Vector2, half: float, colour: Color) -> void:
@@ -1558,6 +1709,17 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 	var r := _radius(n)
 	var ink := Color(Palette.INK, a)
 	var waiting: bool = n.get("waiting", 0) > 0
+	if n.get("ghost", false):
+		# Stage S13.5: a policy whose bill to introduce waits: a dashed outline on paper, its
+		# pictogram faint, the setting proposed on the gauge and the waiting mark.
+		_node_layer.draw_circle(c, r, Color(Palette.OCHRE.lerp(Palette.PAPER, 0.75), 0.85 * a))
+		for k in 16:
+			_node_layer.draw_arc(c, r, TAU * k / 16.0, TAU * (k + 0.55) / 16.0, 6, ink, maxf(2.0, 2.0 * _unit), true)
+		_icon(n["icon"], c, r * 0.6, Color(Palette.INK, 0.45 * a))
+		var m := c + Vector2(r * 0.72, -r * 0.72)
+		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a))
+		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
+		return
 	_node_layer.draw_circle(c + Vector2(3, 3) * _unit, r, Color(Palette.SHADOW, 0.9 * a))
 	_node_layer.draw_circle(c, r, Color(Palette.CARD, a) if not waiting else Color(Palette.OCHRE.lerp(Palette.CARD, 0.55), a))
 	_node_layer.draw_arc(c, r, 0, TAU, 48, ink, maxf(2.0, 2.0 * _unit), true)
@@ -1582,6 +1744,35 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 		var m := c + Vector2(r * 0.72, -r * 0.72)
 		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a))
 		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
+
+
+## Stage S13.5: an area's "introduce a policy" node: a plus on card stock in the policies'
+## style, with the number of policies there are to choose from on a small ochre badge.
+func _draw_introduce(n: Dictionary, a: float) -> void:
+	var c := to_screen(n["pos"])
+	var r := _radius(n)
+	var ink := Color(Palette.INK, a)
+	_node_layer.draw_circle(c + Vector2(2, 2) * _unit, r, Color(Palette.SHADOW, 0.5 * a))
+	_node_layer.draw_circle(c, r, Color(Palette.PAPER.lerp(Palette.CARD, 0.5), a))
+	for k in 12:
+		_node_layer.draw_arc(c, r, TAU * k / 12.0, TAU * (k + 0.6) / 12.0, 6, ink, maxf(1.5, 1.5 * _unit), true)
+	if n["key"] == hover or n["key"] == selected:
+		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+	var arm := r * 0.5
+	var w := maxf(3.0, r * 0.16)
+	_node_layer.draw_line(c - Vector2(arm, 0), c + Vector2(arm, 0), ink, w)
+	_node_layer.draw_line(c - Vector2(0, arm), c + Vector2(0, arm), ink, w)
+	var count := int(n.get("count", 0))
+	if count > 0:
+		var m := c + Vector2(r * 0.78, -r * 0.78)
+		var s := maxf(7.0, r * 0.42)
+		_node_layer.draw_circle(m, s, Color(Palette.OCHRE, a))
+		_node_layer.draw_arc(m, s, 0, TAU, 16, ink, 1.2, true)
+		var font := Palette.text(600)
+		var px := int(s * 1.3)
+		var t := str(count)
+		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		_node_layer.draw_string(font, m + Vector2(-tw / 2.0, px * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, px, ink)
 
 
 func _draw_indicator(n: Dictionary, a: float) -> void:

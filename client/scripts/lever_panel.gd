@@ -10,6 +10,13 @@ extends VBoxContainer
 ## wide (under them when not); the year's bars are sage or brick where the scenario says
 ## which way is better, and the groups most affected follow the indicators. Fields read as
 ## people write numbers: £12,570, 21%, 21.5%, £12.38bn.
+##
+## Stage S13.5: a level policy is chosen by name on a row of steps; an age or a year is a
+## whole number ("18 years", "2030"); a duty set as a multiple of 2024's rates reads as a
+## change on today's ("as now", "+20%"), fuel duty in pence. A policy not in force opens to be
+## introduced: its control starts at its `off` setting, "In a year" and the Commons vote
+## follow the setting picked, and nothing is put to the Commons until "Put to the Commons".
+## A policy in force that has an `off` setting can be repealed, with its cost and its vote.
 
 const Palette := preload("res://scripts/palette.gd")
 const Chart := preload("res://scripts/chart.gd")
@@ -21,6 +28,10 @@ signal lever_changed(name: String, raw: String)
 signal lever_cancelled(name: String)
 ## The player asked for an indicator's or a group's popup (from the year-ahead table).
 signal follow(name: String)
+## Stage S13.5: a setting picked for a policy being introduced (not yet a bill), and a
+## repeal asked for.
+signal draft_changed(name: String, raw: String)
+signal repeal_pressed(name: String)
 
 ## The popup's width with two columns, and the window width from which it has them.
 const WIDE := 1120.0
@@ -42,6 +53,18 @@ var _chart_lever := ""
 var year_shown: Array = []
 var year_groups: Array = []
 var year_all_groups: Array = []  # every group's change, shown or not
+var year_heading := ""
+## Stage S13.5 (set before build): true to introduce the policy, and its `off` setting as
+## the engine stores it (null for a policy that cannot be repealed).
+var introducing := false
+var off_stored: Variant = null
+## The setting picked while introducing: lever -> [raw as typed, value as stored].
+var draft := {}
+## What the setting picked would cost in political capital (set by the screen).
+var draft_cost := -1.0
+var put_button: Button
+var repeal_button: Button
+var repeal_note: Label
 var _controls: VBoxContainer
 var _body: BoxContainer
 var _left_scroll: ScrollContainer
@@ -68,6 +91,10 @@ class Field extends LineEdit:
 	## For money: the amount one unit of the value stands for (1, a million or a billion);
 	## the field shows the amount itself, short (£125,140, £812.4m, £12.38bn).
 	var money_unit := 0.0
+	## Stage S13.5: "+" before a rise, words for nought ("as now"), a year without separators.
+	var signed := false
+	var zero_text := ""
+	var plain := false
 
 	func _ready() -> void:
 		text_submitted.connect(func(_t: String) -> void: _read())
@@ -103,12 +130,16 @@ class Field extends LineEdit:
 			var amount := value * money_unit
 			text = ("−" if amount < 0.0 else "") + prefix + Format.compact(absf(amount))
 			return
+		if zero_text != "" and is_zero_approx(value):
+			text = zero_text
+			return
 		var places := 0
 		for d in [0, 1, 2, 3]:
 			places = d
 			if is_equal_approx(snappedf(value, pow(10.0, -d)), value):
 				break
-		text = prefix + Format.grouped(value, places) + suffix
+		var body := "%d" % int(roundf(value)) if plain else Format.grouped(value, places)
+		text = ("+" if signed and value > 0.0 else "") + prefix + body + suffix
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and event.keycode in [KEY_UP, KEY_DOWN]:
@@ -120,11 +151,17 @@ class Field extends LineEdit:
 ## or billions for large amounts; flows at the rate the screen shows them (a year or a
 ## step).
 func _scale(entry: Dictionary) -> float:
-	if fmt.is_rate(entry):
+	if fmt.is_rate(entry) or str(entry.get("show_as", "")) == "multiple":
 		return 100.0
 	if entry.get("money", false):
 		return fmt.factor(entry, false) / float(fmt.minor) / float(_units.get(entry["name"], 1.0))
 	return fmt.factor(entry, false)
+
+
+## Stage S13.5: what is taken from a stored value before scaling: a multiple of 2024's rates
+## is shown as its change on them.
+static func _offset(entry: Dictionary) -> float:
+	return 1.0 if str(entry.get("show_as", "")) == "multiple" else 0.0
 
 
 ## Large amounts are typed in millions or billions, judged by the top of the range.
@@ -164,7 +201,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	titles.add_theme_constant_override("separation", 0)
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(titles)
-	titles.add_child(Palette.caps(str(node.get("area", "Policy"))))
+	titles.add_child(Palette.caps(str(node.get("area", "Policy")) + (" · not in force" if introducing else "")))
 	var title := Label.new()
 	title.text = str(node.get("label", ""))
 	title.theme_type_variation = "Title"
@@ -200,7 +237,37 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 		_lever_row(entry, start_of.call(str(entry["name"])))
 		levers.append(str(entry["name"]))
 	hint = _muted("Changes are bills: the Commons votes on them next month." if legislature else "Changes take effect from next month.")
+	if introducing:
+		hint.text = "Pick a setting to see what it would do in a year and how the Commons would vote; then put it to the Commons." if legislature \
+			else "Pick a setting to see what it would do in a year; then bring it in."
 	_controls.add_child(hint)
+	# Stage S13.5: the bill that brings the policy in, or the one that repeals it.
+	if introducing and not levers.is_empty():
+		put_button = Button.new()
+		put_button.name = "put_to_commons"
+		put_button.text = "Put to the Commons" if legislature else "Bring it in"
+		put_button.theme_type_variation = "Primary"
+		put_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		put_button.disabled = true
+		var first := levers[0]
+		put_button.pressed.connect(func() -> void:
+			if draft.has(first):
+				lever_changed.emit(first, str(draft[first][0])))
+		_controls.add_child(put_button)
+	elif off_stored != null and not levers.is_empty():
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		repeal_button = Button.new()
+		repeal_button.name = "repeal"
+		repeal_button.text = "Repeal"
+		var first := levers[0]
+		repeal_button.pressed.connect(func() -> void: repeal_pressed.emit(first))
+		row.add_child(repeal_button)
+		repeal_note = _muted("")
+		repeal_note.custom_minimum_size.x = 300
+		repeal_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(repeal_note)
+		_controls.add_child(row)
 	capital_note = _muted("")
 	capital_note.name = "capital_note"
 	capital_note.visible = false
@@ -225,6 +292,10 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	_year.visible = wide
 	_chart_lever = levers[0] if not levers.is_empty() else ""
 	var holder: Control = _left_box if wide else self
+	# Stage S13.5: a policy not in force has no history to show, and a level policy's names
+	# do not fit a chart's axis (its setting and its changes are told above).
+	if introducing or (_chart_lever != "" and _rows[_chart_lever]["entry"].has("levels")):
+		return
 	holder.add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
 	chart = Chart.new()
 	chart.fmt = fmt
@@ -289,6 +360,30 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 	var controls := HBoxContainer.new()
 	controls.add_theme_constant_override("separation", 14)
 	box.add_child(controls)
+	var levels: Array = entry.get("levels", [])
+	if not levels.is_empty():
+		# Stage S13.5: a level policy's settings, each a labelled step; the one in force (or
+		# chosen) pressed.
+		controls.add_theme_constant_override("separation", 6)
+		var steps := []
+		var lowest := float(entry.get("min", 0.0))
+		for i in levels.size():
+			var step := Button.new()
+			step.name = "level_%s_%d" % [name, i]
+			step.text = str(levels[i])
+			step.theme_type_variation = "Step"
+			step.toggle_mode = true
+			step.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			step.custom_minimum_size = Vector2(60, 44)
+			var value := lowest + i
+			step.pressed.connect(func() -> void:
+				Sound.play("change")
+				_typed(name, value))
+			controls.add_child(step)
+			steps.append(step)
+		_finish_row(name, entry, box, null, null, steps)
+		return
 	var slider := HSlider.new()
 	slider.name = "slider_" + name
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -300,12 +395,28 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 	spin.name = "lever_" + name
 	spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var scale := _scale(entry)
+	var offset := _offset(entry)
 	var rate: bool = fmt.is_rate(entry)
 	var money: bool = entry.get("money", false)
+	var as_shown := str(entry.get("show_as", ""))
 	if entry.get("has_range", false):
-		spin.min_value = float(entry["min"]) * scale
-		spin.max_value = float(entry["max"]) * scale
-	if rate:
+		spin.min_value = (float(entry["min"]) - offset) * scale
+		spin.max_value = (float(entry["max"]) - offset) * scale
+	if as_shown == "multiple":
+		spin.step = 1.0
+		spin.arrow_step = 5.0
+		spin.suffix = "%"
+		spin.signed = true
+		spin.zero_text = "as now"
+	elif as_shown == "pence":
+		spin.step = 0.01
+		spin.arrow_step = 1.0
+		spin.suffix = "p"
+	elif as_shown in ["years", "year"]:
+		spin.step = 1.0
+		spin.suffix = " years" if as_shown == "years" else ""
+		spin.plain = as_shown == "year"
+	elif rate:
 		spin.step = 0.1
 		spin.arrow_step = 0.5
 		spin.suffix = "%"
@@ -336,6 +447,12 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 		_dragging = ""
 		if changed:
 			_typed(name, spin.value))
+	_finish_row(name, entry, box, spin, slider, [])
+
+
+## The rest of a lever's row: the change waiting (with Undo) and the vote it would get.
+func _finish_row(name: String, entry: Dictionary, box: VBoxContainer, spin: Field, slider: HSlider, steps: Array) -> void:
+	var now: Label = box.get_child(1).get_child(1)
 	var bottom := HBoxContainer.new()
 	box.add_child(bottom)
 	var pending := Label.new()
@@ -357,7 +474,7 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 	vote.visible = false
 	box.add_child(vote)
 	_controls.add_child(box)
-	_rows[name] = {"entry": entry, "spin": spin, "slider": slider, "now": now, "pending": pending, "cancel": cancel, "vote": vote}
+	_rows[name] = {"entry": entry, "spin": spin, "slider": slider, "steps": steps, "now": now, "pending": pending, "cancel": cancel, "vote": vote}
 
 
 static func _thin_rule() -> StyleBoxLine:
@@ -371,12 +488,27 @@ func _typed(name: String, value: float) -> void:
 	var entry: Dictionary = _rows[name]["entry"]
 	var raw := ""
 	var per_step: float = fmt.factor(entry, false)
-	if fmt.is_rate(entry):
+	if entry.has("levels") or (str(entry.get("type", "")) == "int" and not entry.get("money", false)):
+		raw = "%d" % int(roundf(value / per_step))
+	elif _offset(entry) != 0.0:
+		raw = String.num(value / 100.0 + _offset(entry), 6)
+	elif fmt.is_rate(entry):
 		raw = String.num(value / 100.0, 6)
 	elif entry.get("money", false):
 		raw = String.num(value * float(_units[name]) / per_step, 2)
 	else:
 		raw = String.num(value / per_step, 6)
+	if introducing:
+		# Stage S13.5: only a draft until it is put to the Commons.
+		var stored: float = float(raw) * (fmt.minor if entry.get("money", false) else 1)
+		if off_stored != null and absf(stored - float(off_stored)) < 1e-6:
+			draft.erase(name)
+		else:
+			draft[name] = [raw, stored]
+		if put_button != null:
+			put_button.disabled = draft.is_empty()
+		draft_changed.emit(name, raw)
+		return
 	lever_changed.emit(name, raw)
 
 
@@ -388,22 +520,48 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 		var row: Dictionary = _rows[name]
 		var entry: Dictionary = row["entry"]
 		var value: Variant = current.call(name)
-		row["now"].text = ("now " + fmt.value(entry, value, false, false)) if value != null else ""
-		var spin: Field = row["spin"]
+		var said: String = fmt.value(entry, value, false, false) if value != null else ""
+		row["now"].text = "" if value == null else ("not in force" if introducing else (said if said.to_lower().begins_with("as now") else "now " + said))
 		var shown: Variant = pending.get(name, value)
-		if shown != null and not spin.has_focus():
-			spin.apply(float(shown) * _scale(entry), false)
-		if shown != null and _dragging != name:
-			row["slider"].set_value_no_signal(float(shown) * _scale(entry))
-		if pending.has(name):
+		if introducing:
+			shown = draft[name][1] if draft.has(name) else off_stored
+		var spin: Field = row["spin"]
+		var at: float = (float(shown) - _offset(entry)) * _scale(entry) if shown != null else 0.0
+		if spin != null and shown != null and not spin.has_focus():
+			spin.apply(at, false)
+		if spin != null and shown != null and _dragging != name:
+			row["slider"].set_value_no_signal(at)
+		var steps: Array = row["steps"]
+		for i in steps.size():
+			var chosen: bool = shown != null and int(roundf(float(shown) - float(entry.get("min", 0.0)))) == i
+			var step: Button = steps[i]
+			step.set_pressed_no_signal(chosen)
+			# A step chosen but not yet in force is ochre, the colour of what waits.
+			var waits: bool = chosen and (introducing or pending.has(name))
+			if waits:
+				step.add_theme_stylebox_override("pressed", Palette._flat(Palette.OCHRE, Palette.INK, 2, 8, 6, 0))
+				step.add_theme_color_override("font_pressed_color", Palette.INK)
+			else:
+				step.remove_theme_stylebox_override("pressed")
+				step.remove_theme_color_override("font_pressed_color")
+		var repeal: bool = off_stored != null and pending.has(name) and absf(float(pending[name]) - float(off_stored)) < 1e-6
+		if repeal_button != null:
+			repeal_button.get_parent().visible = not repeal
+		if introducing:
+			row["pending"].text = "" if not draft.has(name) else "→ %s if the bill passes%s" % [fmt.value(entry, draft[name][1], false, false),
+				"" if draft_cost < 0.0 else " · costs %.1f political capital" % draft_cost]
+			row["cancel"].visible = false
+		elif pending.has(name):
 			var cost: float = costs.get(name, -1.0)
-			row["pending"].text = "→ %s from next month%s" % [fmt.value(entry, pending[name], false, false),
+			row["pending"].text = "→ %s from next month%s" % ["repealed" if repeal else fmt.value(entry, pending[name], false, false),
 				"" if cost < 0.0 else " · costs %.1f political capital" % cost]
 			row["cancel"].visible = true
 		else:
 			row["pending"].text = ""
 			row["cancel"].visible = false
 			row["vote"].visible = false
+	if introducing:
+		return
 	capital_note.visible = capital >= 0.0
 	if capital >= 0.0:
 		var total := 0.0
@@ -438,12 +596,29 @@ func show_vote(name: String, preview: Dictionary, left := -1.0) -> void:
 	vote.visible = true
 
 
+## Stage S13.5: what repealing the policy would cost in political capital and the vote it
+## would get (the bridge's vote_preview), with `left` the capital the other bills leave.
+func show_repeal(cost: float, preview: Dictionary, left := -1.0) -> void:
+	if repeal_note == null:
+		return
+	var words := PackedStringArray()
+	if cost >= 0.0:
+		words.append("Repealing it costs %.1f political capital." % cost)
+	if preview.get("bill", false):
+		var votes := int(preview.get("votes_for", 0))
+		var against := int(preview.get("seats", 0)) - votes
+		words.append(("The Commons would pass it %d to %d." if preview.get("passes", false) else "The Commons would vote it down, %d to %d.") % [votes, against])
+	if cost >= 0.0 and left >= 0.0 and cost > left:
+		words.append("Not enough political capital: %.1f left." % maxf(left, 0.0))
+	repeal_note.text = " ".join(words)
+
+
 ## What the changes waiting would do in a year, as signed bars: `rows` is the forecast's
 ## {row: [as is, without the change]}, `shown` the [row key, label, entry, kind, tier,
 ## better] that may be listed: the first always, then the three budget lines (kind
 ## "budget") and the six other rows that move most; and, under them, the five groups
 ## (kind "group") whose approval moves most.
-func show_year(rows: Dictionary, shown: Array, working := false) -> void:
+func show_year(rows: Dictionary, shown: Array, working := false, heading := "") -> void:
 	_year.visible = true
 	_year_note.visible = false
 	for grid in [_year_rows, _group_rows]:
@@ -453,7 +628,9 @@ func show_year(rows: Dictionary, shown: Array, working := false) -> void:
 	if working:
 		_year_title.text = "IN A YEAR: WORKING IT OUT…"
 		return
-	_year_title.text = "IN A YEAR, WITH THE CHANGE"
+	# Stage S13.5: the heading says the setting in the policy's own words ("at £2,500 a car").
+	_year_title.text = ("IN A YEAR, " + heading if heading != "" else "IN A YEAR, WITH THE CHANGE").to_upper()
+	year_heading = _year_title.text
 	var items := []
 	for item in shown:
 		var row := str(item[0]).trim_prefix("-")
@@ -536,7 +713,7 @@ func hide_year() -> void:
 
 ## The first lever's history, with the player's past changes to any of the policy's levers.
 func show_history(steps: PackedInt64Array, values: PackedFloat64Array, markers: Array) -> void:
-	if _chart_lever == "":
+	if _chart_lever == "" or chart == null:
 		return
 	var entry: Dictionary = _rows[_chart_lever]["entry"]
 	var k: float = fmt.factor(entry)
@@ -556,7 +733,11 @@ func chart_lever() -> String:
 func type_value(name: String, value: float) -> void:
 	var entry: Dictionary = _rows[name]["entry"]
 	var spin: Field = _rows[name]["spin"]
-	if fmt.is_rate(entry):
+	if spin == null:
+		_typed(name, value)  # a level, by its value
+	elif _offset(entry) != 0.0:
+		spin.apply((value - _offset(entry)) * _scale(entry))
+	elif fmt.is_rate(entry):
 		spin.apply(value)
 	elif entry.get("money", false):
 		spin.apply(value * float(fmt.minor) * _scale(entry))
@@ -566,7 +747,22 @@ func type_value(name: String, value: float) -> void:
 
 ## For tests: what a lever's field reads.
 func field_text(name: String) -> String:
-	return str(_rows[name]["spin"].text) if _rows.has(name) else ""
+	if not _rows.has(name):
+		return ""
+	if _rows[name]["spin"] == null:
+		for step in _rows[name]["steps"]:
+			if step.button_pressed:
+				return step.text
+		return ""
+	return str(_rows[name]["spin"].text)
+
+
+## Stage S13.5: the names on a level policy's steps, in order.
+func level_names(name: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for step in _rows.get(name, {}).get("steps", []):
+		out.append(step.text)
+	return out
 
 
 func pending_text(name: String) -> String:

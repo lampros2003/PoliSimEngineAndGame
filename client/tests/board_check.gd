@@ -11,7 +11,11 @@ extends SceneTree
 ## a label at rest for most nodes, none touching another node, label or flag at the three
 ## sizes; a group opens a group popup; models/mini's board has an empty middle. Stage S13.6:
 ## every node labelled at rest at 1920x1080 and 2560x1440, at least 95% at 1366x768; no
-## hover link passes under the centre medallion.
+## hover link passes under the centre medallion. Stage S13.5: exact counts from [play.web]:
+## the policies in force on the board, those not in force kept off it and counted on their
+## areas' introduce nodes, the indicators, and 23 groups in six families (the estimated
+## groups' "Ways of life" last); every lever is on the board or available to introduce; at
+## least 90% of nodes labelled at 1366x768.
 
 var main: Control
 
@@ -29,34 +33,51 @@ func _initialize() -> void:
 		return _fail("the board has %d areas (authored: %s)" % [board.areas.size(), board.authored])
 	var policies: int = board.keys_of("policy").size()
 	var indicators: int = board.keys_of("indicator").size()
-	# Stage S13.6: at least as many as [play.web] places (24 and 24 in S13.4; S13.5 adds more).
+	# Stage S13.5: exactly what [play.web] places: a policy with `off` whose lever stands
+	# there is not in force, off the board and counted on its area's introduce node.
 	var want_policies := 0
+	var want_available := 0
 	var want_indicators := 0
+	var want_introduce := 0
 	for area in main.play["web"]["areas"]:
+		var spare := 0
 		for p in area.get("policies", []):
 			if Array(p.get("levers", [])).any(func(l): return main.entries.has(str(l)) and main.entries[str(l)].get("player", true)):
-				want_policies += 1
+				var lever := str(p["levers"][0])
+				var stored: float = float(p.get("off", 0.0)) * (main.fmt.minor if main.entries[lever].get("money", false) else 1)
+				if p.has("off") and absf(float(main.game.latest(lever)) - stored) < 1e-6:
+					spare += 1
+				else:
+					want_policies += 1
 		for i in area.get("indicators", []):
 			if main.rows.has(str(i.get("row", "")).trim_prefix("-")):
 				want_indicators += 1
-	# A lever the table does not place gets a node of its own (checked below: every lever is on).
-	if policies < want_policies or indicators != want_indicators or want_policies < 24 or indicators < 24:
-		return _fail("the board has %d policies and %d indicators, [play.web] %d and %d" % [policies, indicators, want_policies, want_indicators])
+		want_available += spare
+		want_introduce += 1 if spare > 0 else 0
+		var node: Dictionary = board.nodes.get("introduce:" + str(area["name"]), {})
+		if (spare > 0) == node.is_empty() or (spare > 0 and int(node["count"]) != spare) or main.available_policies(str(area["name"])).size() != spare:
+			return _fail("%s: %d policies not in force, its introduce node %s" % [area["name"], spare, node.get("count", "missing")])
+	if policies != want_policies or board.available.size() != want_available or board.keys_of("introduce").size() != want_introduce \
+			or indicators != want_indicators or policies < 38 or want_available < 5 or indicators < 33:
+		return _fail("the board has %d policies in force, %d available, %d introduce nodes and %d indicators; [play.web] %d, %d, %d and %d" % [
+			policies, board.available.size(), board.keys_of("introduce").size(), indicators, want_policies, want_available, want_introduce, want_indicators])
 	var families := []
 	for key in board.keys_of("group"):
 		var family := str(board.nodes[key]["family"])
 		if families.is_empty() or families[-1] != family:
 			families.append(family)
-	if board.keys_of("group").size() != 18 or families != ["Ages", "Incomes", "Work", "Families", "Places"]:
+	if board.keys_of("group").size() != 23 or families != ["Ages", "Incomes", "Work", "Families", "Places", "Ways of life"]:
 		return _fail("the groups: %d in families %s" % [board.keys_of("group").size(), families])
 	var on_board: PackedStringArray = main.board_levers()
+	for key in board.available:
+		on_board.append_array(board.available[key]["levers"])
 	for name in main.entries:
 		var entry: Dictionary = main.entries[name]
 		if entry["kind"] != "lever" or not entry.get("player", true):
 			continue
 		var scottish := str(entry.get("group", "")) == "Scottish income tax"
 		if on_board.has(name) == scottish:
-			return _fail("%s is %s the board" % [name, "on" if scottish else "missing from"])
+			return _fail("%s is %s the board" % [name, "on" if scottish else "neither on nor available to"])
 	var own_size: Vector2 = board.size
 	var rested := []
 	for view in [Vector2(1366, 768), Vector2(1920, 1080), Vector2(2560, 1440)]:
@@ -76,7 +97,7 @@ func _initialize() -> void:
 				labelled += 1 if board.nodes[key]["rest"] else 0
 		# Stage S13.6: nineteen in twenty from 1920x1080 (every one on the S13.4 board), and
 		# the earlier 85% at 1366x768.
-		if labelled < labels * (0.85 if view.x < 1900.0 else 0.95):
+		if labelled < labels * (0.9 if view.x < 1900.0 else 0.95):
 			return _fail("at %dx%d only %d of %d nodes are labelled at rest" % [view.x, view.y, labelled, labels])
 		rested.append("%d of %d at %dx%d" % [labelled, labels, view.x, view.y])
 	board.size = own_size
@@ -88,7 +109,7 @@ func _initialize() -> void:
 			continue
 		main.open_node(key)
 		await process_frame
-		var want: String = {"policy": "policy", "indicator": "indicator", "group": "group", "centre": ""}[kind]
+		var want: String = {"policy": "policy", "indicator": "indicator", "group": "group", "introduce": "introduce", "centre": ""}[kind]
 		if main.popup_kind() != want or (kind == "centre" and main.overlay_open() != "parliament"):
 			return _fail("%s opened %s" % [key, main.popup_kind() if main.popup_kind() != "" else main.overlay_open()])
 		main.close_popup()
@@ -128,7 +149,7 @@ func _initialize() -> void:
 	await _settle()
 	if board.authored or board.keys_of("policy").size() != 2 or board.keys_of("indicator").is_empty() or not board.overlaps().is_empty() 			or not board.keys_of("group").is_empty():
 		return _fail("mini's automatic board: %d policies, %d indicators, %s" % [board.keys_of("policy").size(), board.keys_of("indicator").size(), board.overlaps()])
-	print("board: ten areas, %d policies, %d indicators and 18 groups in five families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown, none under the centre; budget lines open; an automatic board for mini, its middle empty" % [policies, indicators, ", ".join(rested)])
+	print("board: ten areas, %d policies in force, %d to introduce on %d introduce nodes, %d indicators and 23 groups in six families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown, none under the centre; budget lines open; an automatic board for mini, its middle empty" % [policies, want_available, want_introduce, indicators, ", ".join(rested)])
 	quit(0)
 
 

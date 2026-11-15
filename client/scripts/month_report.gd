@@ -5,12 +5,17 @@ extends PanelContainer
 ## direction in good or bad colour; any situation that began or ended. Each line opens its
 ## node's popup. It is not modal: it goes by itself after a while (not while the pointer is
 ## on it), or on a click, and the date on the top bar brings it back.
+##
+## Stage S13.5: it docks at the right: while it is open the board is fitted to the room
+## left of it (`docked`), so it never hides a node.
 
 const Palette := preload("res://scripts/palette.gd")
 
 ## A line was pressed: a board key ("policy:...", "indicator:...", "group:...") or
 ## "entry:<name>" for a value off the board.
 signal line_pressed(key: String)
+## The report came in (true) or is going (false): the board makes room for it.
+signal docked(open: bool)
 
 const WIDTH := 380.0
 const STAYS := 9.0  # seconds on screen
@@ -78,12 +83,14 @@ func reopen() -> void:
 	_tween.tween_property(self, "position:x", x, 0.28)
 	_tween.tween_property(self, "modulate:a", 1.0, 0.18)
 	_timer.start(STAYS)
+	docked.emit(true)
 
 
 func dismiss() -> void:
 	if not visible:
 		return
 	_timer.stop()
+	docked.emit(false)
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
