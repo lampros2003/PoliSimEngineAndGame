@@ -182,7 +182,8 @@ was renamed or is gone. A game saved before format 1 loads only with its own mod
 
 GDScript creates `PoliSim.new()` and calls `open(scenario_path)`. Requests (`advance`,
 `set_lever`, `cancel_lever`, `request_explanation`, `save_game`, `load_game`,
-`reload_model`) go to a worker thread in order; `poll()` returns what has finished, as
+`reload_model`, and from stage S13.1 `request_forecast`, `request_effects` and
+`request_records`) go to a worker thread in order; `poll()` returns what has finished, as
 dictionaries with a `kind` key. Everything the screen reads (`latest`, `previous`,
 `pending`, `series`, `changes`, `hashes`, `catalogue`, `play_settings`, `cells`) comes
 from a mirror the worker refreshes after each request, so reading never waits for the
@@ -210,6 +211,37 @@ return an empty dictionary.
 Values come back as the engine stores them (money in minor units). Lever settings go in
 as a person types them (money in major units, rates as fractions), and are checked
 against the lever's range before they are accepted.
+
+## Looking ahead (stage S13.1)
+
+A look ahead runs an in-memory copy of the game (a fork: `Session::fork`, a copy of the
+run with tracing off and no history kept) and never touches the game itself. In a fork,
+the lever changes waiting and those asked about are **applied directly** at the first
+month: not voted on and not charged political capital, since the question is what a change
+would do if it passed. Commands scheduled for later months run as in the game. A fork never
+answers a dilemma: one open, or opening on the way, stays unanswered, as the model runs it
+when nobody answers. A month that fails gives the error, never a crash.
+
+Events from these calls carry both `kind` and `type` (the same value).
+
+| Call | Answer |
+|---|---|
+| `request_forecast(changes, months, tag)` | A `forecast` event: `tag`, `months`, `rows` (every result row, as `latest()` names them, to `[as_is, changed]`), `cells` (every one-dimensional value of at most 64 cells to `{as_is, changed}`, each a `PackedFloat64Array`) and `error` ("" when it ran). "As is" is the game with the changes already waiting; "changed" adds `changes` (lever name to value as typed), replacing any waiting change to the same lever |
+| `request_effects(levers, months)` | One `effects` event per lever, in the order they finish: `lever`, `step`, `rows`, `cells` and `error`, each against one shared "as is" branch; then `effects_done` with `count` |
+| `vote_preview(lever, value)` | At once, from the mirror: `bill`, `votes_for`, `seats`, `passes` (the vote would carry), `cost` (-1 without political capital or when the change is no bill) and `affordable` (the capital less what the bills already waiting would spend before it, in the order they were made, covers the cost). Empty when the lever or value is not valid |
+| `request_records(entity, where_row, count, columns, tag)` | A `records` event: `tag`, `records` (each `id`, `weight` and the latest value of each of `columns`) and `error`. Up to `count` records for which `where_row` is true (a per-record true/false value, or a formula of the entity's values; "" for all), every k-th of those that match, so the same request gives the same records. Unknown names give an error naming them |
+
+**The step of the effects table.** A real lever, or a money lever, with a finite range
+moves by 5% of the range; one without a range by 5% of its value (1 if it is 0); any other
+whole-number lever by 1; each downwards instead when up would pass the top. A true/false
+lever takes the other value. `step` is the signed move in stored units (money in minor
+units; 1 or -1 for true/false). Levers the player cannot set (`player = false`, dilemmas,
+what bills spent) come back with an `error` saying why.
+
+**Staleness.** The table is computed off the worker, two levers at a time, so the next
+month never waits for it. A month, a load, a reload or a new table makes it stale: the
+computation stops at the next lever and nothing more of it reaches `poll()`. On the UK
+model a 12-month forecast takes about 0.3 s and a 12-month table of every lever about 8 s.
 
 ## How the client is tested
 

@@ -10,8 +10,8 @@ look is generic. The owner wants the Democracy 3 / Orbi Universo kind of game: *
 full-screen cause-and-effect graph that is the main way to play**, nodes sized by
 importance, everything opened by clicking a node, real-life policies (an EV incentive, a
 drinking age), approvals by interest group, households you can look at, and a crafted
-look. He has handed over the decisions and asked for Opus 5.5 agents to build it
-autonomously overnight.
+look. Written 2026-11-14, after S12, at the owner's request; the decisions below are made
+under his brief.
 
 This is an original game in that genre: its own layout, art and rules. Nothing is copied
 from another game's screen.
@@ -38,7 +38,7 @@ What research and the code established (so the plan stands on facts):
 - No indicator exists for crime, health outcomes, education outcomes, housing, transport
   or immigration.
 
-## Design decisions (mine, under the owner's brief)
+## Decisions
 
 | Question | Decision |
 |---|---|
@@ -58,26 +58,19 @@ What research and the code established (so the plan stands on facts):
 | Feel | Hover lift, popups that grow from their node and close faster than they open, links that draw in and flow, numbers that count, nodes that pulse after a month; CC0 interface sounds (Kenney) with a mute switch; a UI scale setting; readable from 1366x768 to 2560x1440 |
 | Presentation data | The board's areas, policy nodes, indicator tiers and "better high or low" live in the scenario's `[play.web]`, hand-written, so no model hash changes for layout; another model without it gets an automatic board |
 
-## Stages
+## Milestones
 
-Each stage is built by an Opus 5.5 agent from a written brief (this plan becomes
-`docs/S13-PLAN.md`), then I run the checks and look at screenshots myself, send
-corrections, and publish it to `claude/adoring-mayer-jfoxb4` as one commit, the same way as
-the last two (GitHub API with the `gh` login, no local `git commit`, no attribution lines).
-S12 as it stands is published first so nothing is lost and later diffs are clean.
+Each is checked as under Verification before the next begins, so the branch always holds a
+working game, most valuable part first.
 
 | # | Stage | Files | Done when |
 |---|---|---|---|
-| S13.0 | Publish S12 (pages, capital rule, checks all green) | - | Branch holds it; checkout matches |
 | S13.1 | **Engine and bridge: looking ahead.** Fork a session and run it ahead with and without changes; an effects table (each policy nudged one step, a year on); the Commons vote a change would get; sample records of an entity | `crates/core/src/session.rs`, `sim.rs`, `crates/godot/src/lib.rs`, `crates/core/tests/` | Rust tests: a forecast equals actually playing those months, byte for byte; forks never disturb the game; fmt, clippy, tests clean |
 | S13.2 | **Client: the web as the screen**, popups, overlays, the new look and motion; pages, map, Connections and the right column removed. Runs alongside S13.1 against the contract below | `client/scripts/*` (new `web.gd`, `popup_*.gd`; `palette.gd` rewritten; `map_panel.gd`, `web_panel.gd`, `policy_web.gd` deleted), `client/fonts`, `client/icons`, `client/tests/*`, `tools/check_client.py`, `models/uk/scenarios/2025.toml` (`[play.web]`) | Every scripted check passes (rewritten where it reached into a removed panel, still proving the same thing); screenshots at three sizes reviewed |
 | S13.3 | **Join them:** measured links, the year-ahead table and the vote in the policy popup | client | A scripted check: raising the basic rate shows revenue up and the top fifth's approval down; hover links match the effects table |
 | S13.4 | **People:** group approvals in the UK model, groups at the centre, the group popup with drivers and households | `tools/uk/voters.py`, `models/uk/politics.toml`, recordings, `oracle/tests`, client | Oracle and engine agree (recordings regenerated, random scenarios, hindcast check); group approvals weighted by size reproduce the national poll rating |
 | S13.5 | **Real policies and indicators**, introduce and cancel, estimated groups | `models/uk` (new hand-written policy file and `POLICIES.md` with every source and judgement), `tools/uk`, scenario, client | Defaults leave the base month and hindcast unchanged; each policy has a test that it moves what it claims; both implementations agree |
 | S13.6 | **Finish:** sound, UI scale, first-minutes guidance, `docs/GUIDE.md`, spec 05, the wiki page and the build skill | docs, client | A full five-year scripted game through the new screen; final screenshot review |
-
-If usage runs out, the order above means what is published is always a working game, most
-valuable part first.
 
 ### Bridge contract for S13.1 and S13.2 (fixed now so both can proceed)
 
@@ -102,16 +95,25 @@ dialog, saves, mods, languages.
 
 ## Verification
 
-After every stage, from `D:\Games\Projects\PoliSimEngineAndGame` (the game window now open
-is closed first; it locks the bridge DLL):
+After every milestone, from the repository root (an open game window locks the bridge DLL:
+close it first):
 
 - `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --release -- -D warnings`; `cargo test --release --workspace`
 - `cd oracle; python -m unittest discover -s tests`; `python tools/uk/hindcast.py --check`
 - `python tools/diff_engine.py --count 150`, and with `--model models/uk --count 10 --max-steps 4`, `models/cohort --count 40`, `models/raking --count 40`
 - `python tools/build_client.py --godot <console exe>`; `python tools/check_client.py --godot <console exe>`
 - Screenshots of the board, each popup kind and each overlay at 1366x768, 1920x1080 and
-  2560x1440, which I read before accepting a stage.
-- After each publish: the commit's author checked, the checkout compared with the branch
-  byte for byte, then reset to it.
+  2560x1440, looked at before a milestone is accepted.
+
+## Status
+
+| # | Status |
+|---|---|
+| S13.1 | Done. `Session::fork`, `forecast`, `vote_preview` and `records`, and `Fork::effects` (`crates/core/src/session.rs`); the vote moved into `Chamber::ballot` and `preview` (`sim.rs`), unchanged in what it decides; the bridge's `request_forecast`, `request_effects`, `vote_preview` and `request_records` (spec 05, "Looking ahead"). A fork is a direct copy of the simulation (about 8 ms for the UK), applies changes without a vote or a charge of capital, and never answers a dilemma. A twelve-month UK forecast takes 0.3 s; the effects table for every lever about 8 s on its own thread, two levers at a time, dropped when the game moves on. Ten tests (`crates/core/tests/forecast.rs`): a forecast equals playing the months; nothing disturbs the game; the preview agrees with the Commons for a passed, a defeated and a refused bill |
+| S13.2 | Under way |
+| S13.3 | Not started |
+| S13.4 | Not started |
+| S13.5 | Not started |
+| S13.6 | Not started |
 
 Not in this stage: ministers and a cabinet, media, constituency maps, release work.

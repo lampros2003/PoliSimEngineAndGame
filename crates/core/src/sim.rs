@@ -81,6 +81,139 @@ pub struct Vote {
     pub refused: bool,
 }
 
+/// Stage S13.1: what a vote in the legislature reads, copied out of a run so that a vote
+/// can be foreseen without it: each bloc's seats, whether it governs and its position,
+/// and, with political capital, the capital held and what any bill and a whole-range move
+/// cost.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Chamber {
+    pub seats: Vec<i64>,
+    pub governing: Vec<bool>,
+    pub position: Vec<f64>,
+    /// (capital, bill cost, swing cost).
+    pub capital: Option<(f64, f64, f64)>,
+}
+
+/// Stage S13.1: how a bill would fare: the seats for it and in all, its cost in political
+/// capital (`None` without capital), and whether that cost is within what is left.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Ballot {
+    pub votes_for: i128,
+    pub seats: i128,
+    pub cost: Option<f64>,
+    pub affordable: bool,
+}
+
+impl Ballot {
+    /// More than half the seats vote for it.
+    pub fn carried(&self) -> bool {
+        2 * self.votes_for > self.seats
+    }
+}
+
+/// Stage S13.1: what the legislature would do with a change to a lever next step, if it
+/// were made now (see [`Simulation::vote_preview`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VotePreview {
+    /// The change is a bill: there is a legislature, the lever has a leaning, the value moves.
+    pub bill: bool,
+    pub votes_for: i64,
+    pub seats: i64,
+    /// More than half the seats would vote for it. It takes effect only if also affordable.
+    pub passes: bool,
+    /// Its cost in political capital (`None` without capital or when it is no bill).
+    pub cost: Option<f64>,
+    /// The capital now, less what the bills already waiting would spend before it, covers
+    /// the cost (true without capital or when it is no bill).
+    pub affordable: bool,
+}
+
+/// Stage S13.1: a lever change that would be a bill: the lever has a leaning.
+fn is_bill(d: &Decl) -> bool {
+    d.kind == Kind::Lever && d.spec.get("leaning").and_then(Value::as_str).is_some()
+}
+
+impl Chamber {
+    /// Format 1 (S5.4): the vote on moving lever `d` from `old` to `new`, with `spent`
+    /// capital already spent in the step; `None` when it is no bill (no leaning, or no
+    /// move). The leading bloc (the governing bloc with the most seats, the first on a tie)
+    /// votes for it; every other bloc votes for it if the move is towards it from the
+    /// leader's position (from 0 with no leader). Stage S12.4: with capital, it costs
+    /// [`bill_cost`], affordable when that is no more than the capital less `spent`.
+    pub fn ballot(&self, d: &Decl, new: Val, old: Val, spent: f64) -> Option<Ballot> {
+        let leaning = d.spec.get("leaning").and_then(Value::as_str).filter(|_| d.kind == Kind::Lever)?;
+        let up = match (new, old) {
+            (Val::I(a), Val::I(b)) if a != b => a > b,
+            (Val::F(a), Val::F(b)) if a != b => a > b,
+            _ => return None,
+        };
+        let left = up == (leaning == "left");
+        let everyone: i128 = self.seats.iter().map(|n| *n as i128).sum();
+        let (cost, affordable) = match self.capital {
+            Some((capital, bill, swing)) => {
+                let price = bill_cost(bill, swing, d, new, old);
+                let refused = price > capital - spent;
+                (Some(price), !refused)
+            }
+            None => (None, true),
+        };
+        let mut leader: Option<usize> = None;
+        for (b, (n, g)) in self.seats.iter().zip(&self.governing).enumerate() {
+            if *g && leader.is_none_or(|l| *n > self.seats[l]) {
+                leader = Some(b);
+            }
+        }
+        let here = leader.map_or(0.0, |l| self.position[l]);
+        let mut votes_for: i128 = 0;
+        for (b, (n, p)) in self.seats.iter().zip(&self.position).enumerate() {
+            if Some(b) == leader || (left && *p < here) || (!left && *p > here) {
+                votes_for += *n as i128;
+            }
+        }
+        Some(Ballot { votes_for, seats: everyone, cost, affordable })
+    }
+
+    /// Stage S13.1: the vote a change of `lever` to `new` would get next step if it were
+    /// made now. `current` gives a lever's value now; `waiting` lists the changes already
+    /// waiting, in command order. As in a step, the waiting bills are voted first, in
+    /// order, each passed one spending its cost, and this change last (a change to a lever
+    /// already waiting replaces it and goes last, as [`crate::Session::set_lever`] does).
+    pub fn preview(
+        &self,
+        model: &Model,
+        lever: &str,
+        new: Val,
+        current: impl Fn(&str) -> Option<Val>,
+        waiting: &[(String, Val)],
+    ) -> VotePreview {
+        let mut spent = 0.0;
+        for (name, value) in waiting.iter().filter(|(name, _)| name != lever) {
+            let (Some(d), Some(old)) = (model.sym(name), current(name)) else { continue };
+            if let Some(b) = self.ballot(d, *value, old, spent)
+                && b.affordable
+                && b.carried()
+                && let Some(cost) = b.cost
+            {
+                spent += cost;
+            }
+        }
+        let ballot = model.sym(lever).zip(current(lever)).and_then(|(d, old)| self.ballot(d, new, old, spent));
+        let Some(b) = ballot else {
+            return VotePreview { bill: false, votes_for: 0, seats: 0, passes: true, cost: None, affordable: true };
+        };
+        let whole = |n: i128| i64::try_from(n).unwrap_or(i64::MAX);
+        VotePreview {
+            bill: true,
+            votes_for: whole(b.votes_for),
+            seats: whole(b.seats),
+            passes: b.carried(),
+            cost: b.cost,
+            affordable: b.affordable,
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Phase {
     order: Vec<usize>,
     states: Vec<usize>,
@@ -144,12 +277,14 @@ struct Pairs {
 }
 
 /// Format 1 (S4.4): a compiled rake (docs/spec/06-model-format-1.md).
+#[derive(Clone)]
 struct RakeProg {
     when: Program,
     passes: u32,
     margins: Vec<MarginProg>,
 }
 
+#[derive(Clone)]
 struct MarginProg {
     target: usize,
     /// Every slot formula reads only data columns and parameters (no `prev`, random draw
@@ -719,84 +854,140 @@ impl Simulation {
         self.store(id, Computed::One(value))
     }
 
-    /// Format 1 (S5.4): a change to a lever with a leaning is a bill. The leading bloc (the
-    /// governing bloc with the most seats, the first on a tie) votes for it; every other bloc
-    /// votes for it if the move is towards it from the leader's position (from 0 with no
-    /// leader). It passes with more than half the seats. Every vote is kept (see
-    /// [`Simulation::votes`]).
+    /// Format 1 (S5.4): a change to a lever with a leaning is a bill, voted as
+    /// [`Chamber::ballot`] says. It passes with more than half the seats. Stage S12.4: one
+    /// that costs more than the capital left is refused before any vote. Every vote is kept
+    /// (see [`Simulation::votes`]).
     fn passes(&mut self, name: &str, raw: &Value) -> Result<bool> {
         let model = Arc::clone(&self.model);
-        let Some(legislature) = model.legislature else { return Ok(true) };
         let Some(&id) = model.sym_index.get(name) else { return Ok(true) };
         let d = &model.symbols[id];
-        let Some(leaning) = d.spec.get("leaning").and_then(Value::as_str).filter(|_| d.kind == Kind::Lever) else {
+        if model.legislature.is_none() || !is_bill(d) {
             return Ok(true);
-        };
+        }
         let new = convert(Raw::Toml(raw), d.ty, d.money, model.minor, &format!("lever {name}"))?;
-        let old = self.scal[id];
-        let up = match (new, old) {
-            (Val::I(a), Val::I(b)) if a != b => a > b,
-            (Val::F(a), Val::F(b)) if a != b => a > b,
-            _ => return Ok(true),
-        };
-        let left = up == (leaning == "left");
+        let chamber = self.chamber().expect("a legislature");
+        let Some(ballot) = chamber.ballot(d, new, self.scal[id], self.spent) else { return Ok(true) };
+        if !ballot.affordable {
+            self.votes.push(Vote {
+                step: self.step,
+                lever: name.to_string(),
+                value: new,
+                votes_for: 0,
+                seats: fits(ballot.seats, "seats")?,
+                passed: false,
+                cost: ballot.cost,
+                refused: true,
+            });
+            return Ok(false);
+        }
+        let passed = ballot.carried();
+        self.votes.push(Vote {
+            step: self.step,
+            lever: name.to_string(),
+            value: new,
+            votes_for: fits(ballot.votes_for, "seats")?,
+            seats: fits(ballot.seats, "seats")?,
+            passed,
+            cost: ballot.cost,
+            refused: false,
+        });
+        if !passed {
+            self.defeated += 1;
+        } else if let Some(price) = ballot.cost {
+            self.spent += price;
+        }
+        Ok(passed)
+    }
+
+    /// Stage S13.1: what a vote in the legislature reads now; `None` without one.
+    pub fn chamber(&self) -> Option<Chamber> {
+        let legislature = self.model.legislature?;
         let (Col::I(seats), Col::B(governing), Col::F(position)) =
             (&self.cols[legislature.seats], &self.cols[legislature.governing], &self.cols[legislature.position])
         else {
             unreachable!("checked by the loader")
         };
-        let everyone: i128 = seats.iter().map(|n| *n as i128).sum();
-        // Stage S12.4: a bill costs political capital; one that costs more than is left is
-        // refused before any vote.
-        let mut cost = None;
-        if let Some(capital) = legislature.capital {
-            let (bill, swing) = (as_real(&self.scal[capital.bill_cost]), as_real(&self.scal[capital.swing_cost]));
-            let price = bill_cost(bill, swing, d, new, old);
-            if price > as_real(&self.scal[capital.capital]) - self.spent {
-                self.votes.push(Vote {
-                    step: self.step,
-                    lever: name.to_string(),
-                    value: new,
-                    votes_for: 0,
-                    seats: fits(everyone, "seats")?,
-                    passed: false,
-                    cost: Some(price),
-                    refused: true,
-                });
-                return Ok(false);
-            }
-            cost = Some(price);
-        }
-        let mut leader: Option<usize> = None;
-        for (b, (n, g)) in seats.iter().zip(governing).enumerate() {
-            if *g && leader.is_none_or(|l| *n > seats[l]) {
-                leader = Some(b);
-            }
-        }
-        let here = leader.map_or(0.0, |l| position[l]);
-        let mut votes_for: i128 = 0;
-        for (b, (n, p)) in seats.iter().zip(position).enumerate() {
-            if Some(b) == leader || (left && *p < here) || (!left && *p > here) {
-                votes_for += *n as i128;
-            }
-        }
-        let passed = 2 * votes_for > everyone;
-        self.votes.push(Vote {
-            step: self.step,
-            lever: name.to_string(),
-            value: new,
-            votes_for: fits(votes_for, "seats")?,
-            seats: fits(everyone, "seats")?,
-            passed,
-            cost,
-            refused: false,
+        let capital = legislature.capital.map(|c| {
+            (as_real(&self.scal[c.capital]), as_real(&self.scal[c.bill_cost]), as_real(&self.scal[c.swing_cost]))
         });
-        if !passed {
-            self.defeated += 1;
-        } else if let Some(price) = cost {
-            self.spent += price;
+        Some(Chamber { seats: seats.clone(), governing: governing.clone(), position: position.clone(), capital })
+    }
+
+    /// Stage S13.1: the vote a change of lever `name` to `raw` would get in the next step
+    /// if it were made now, after the changes already scheduled for that step (see
+    /// [`Chamber::preview`]). Nothing changes. An error when the value is not one the
+    /// lever can take.
+    pub fn vote_preview(&self, name: &str, raw: &Value) -> Result<VotePreview> {
+        let new = self.check_lever(name, raw)?;
+        let waiting: Vec<(String, Val)> = self
+            .commands
+            .get(&self.step)
+            .into_iter()
+            .flatten()
+            .filter_map(|(lever, raw)| self.check_lever(lever, raw).ok().map(|v| (lever.clone(), v)))
+            .collect();
+        Ok(match self.chamber() {
+            Some(chamber) => chamber.preview(&self.model, name, new, |l| self.scalar(l), &waiting),
+            None => VotePreview { bill: false, votes_for: 0, seats: 0, passes: true, cost: None, affordable: true },
+        })
+    }
+
+    /// Stage S13.1: a copy of the run to look ahead with: the same state, commands and
+    /// seed, so it steps exactly as this run would, but with tracing off, no snapshots and
+    /// no votes kept. Cheaper than a save and load, and exact: nothing is converted.
+    pub fn fork(&self) -> Simulation {
+        Simulation {
+            model: Arc::clone(&self.model),
+            seed: self.seed,
+            step: self.step,
+            scal: self.scal.clone(),
+            cols: self.cols.clone(),
+            prev_scal: self.prev_scal.clone(),
+            prev_cols: self.prev_cols.clone(),
+            progs: self.progs.clone(),
+            plan: self.plan.clone(),
+            lagged: self.lagged.clone(),
+            hashed: self.hashed.clone(),
+            commands: self.commands.clone(),
+            flow_totals: self.flow_totals.clone(),
+            row_names: self.row_names.clone(),
+            row_sources: self.row_sources.clone(),
+            deps: self.deps.clone(),
+            lagged_deps: self.lagged_deps.clone(),
+            tracing: false,
+            snapshots: VecDeque::new(),
+            phase_time: self.phase_time.clone(),
+            sym_time: Vec::new(),
+            heavy: self.heavy.clone(),
+            weights: self.weights.clone(),
+            votes: Vec::new(),
+            defeated: 0,
+            spent: 0.0,
+            rakes: self.rakes.clone(),
         }
-        Ok(passed)
+    }
+
+    /// Stage S13.1: sets levers to these stored values at once, unvoted and uncharged, as a
+    /// look ahead does with the changes it asks about. Each must be a value the lever can
+    /// take (an error otherwise, with the levers before it already set).
+    pub fn put_levers(&mut self, levers: &[(String, Val)]) -> Result<()> {
+        for (name, value) in levers {
+            let id = match self.model.sym_index.get(name) {
+                Some(&id) if self.model.symbols[id].kind == Kind::Lever => id,
+                _ => return model_err(format!("{name:?} is not a lever")),
+            };
+            if type_of(value) != self.model.symbols[id].ty {
+                return sim_err(format!("lever {name}: a value of the wrong type"));
+            }
+            self.store(id, Computed::One(*value))?;
+        }
+        Ok(())
+    }
+
+    /// Stage S13.1: an entity's current weights, by its index in the model.
+    pub fn entity_weights(&self, entity: usize) -> &[i64] {
+        &self.weights[entity]
     }
 
     /// Stage S12.4: the lever the engine sets to what the step's bills spent, if any.

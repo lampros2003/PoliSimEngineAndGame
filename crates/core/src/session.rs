@@ -27,6 +27,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use toml::{Table as Toml, Value};
 
@@ -34,9 +35,9 @@ use crate::describe::Catalogue;
 use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
 use crate::model::{Kind, Model, Scenario, load_model_with_mods, load_scenario_with_mods};
-use crate::program::{Col, Val};
+use crate::program::{Col, Ty, Val};
 use crate::save::Migration;
-use crate::sim::Simulation;
+use crate::sim::{Computed, Row, Simulation, VotePreview};
 use crate::text::load_text;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
@@ -112,6 +113,206 @@ pub fn as_f64(value: &Val) -> f64 {
         Val::I(v) => *v as f64,
         Val::F(v) => *v,
         Val::B(v) => *v as u8 as f64,
+    }
+}
+
+/// Stage S13.1: one-dimensional values with at most this many cells are shown in full: the
+/// game client mirrors them each step, and a look ahead reports them.
+pub const MIRRORED_CELLS: usize = 64;
+
+/// Stage S13.1: where a look ahead ends: every national result row (the names
+/// [`Session::latest`] accepts) and the cells of every one-dimensional var or state of at
+/// most [`MIRRORED_CELLS`] cells, after its last step, with the state hash then.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Outlook {
+    pub hash: [u8; 32],
+    pub rows: Vec<(String, Val)>,
+    pub cells: Vec<(String, Vec<f64>)>,
+}
+
+/// Stage S13.1: the game run `months` ahead as it is (with the changes waiting) and with
+/// some lever changes besides.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Forecast {
+    pub months: u64,
+    pub as_is: Outlook,
+    pub changed: Outlook,
+}
+
+/// Stage S13.1: one line of the effects table: a lever, the signed step it was moved by
+/// (stored units: money in minor units; a true/false lever 1 or -1), and the forecast, or
+/// why there is none.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Effect {
+    pub lever: String,
+    pub step: f64,
+    pub forecast: Result<Forecast>,
+}
+
+/// Stage S13.1: one record of an entity: its id, its current weight and the values asked
+/// for, by name (money in minor units).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Record {
+    pub id: u64,
+    pub weight: i64,
+    pub values: Vec<(String, Val)>,
+}
+
+/// Stage S13.1: an in-memory copy of a game for looking ahead, with tracing off and no
+/// history kept; nothing done with it touches the game.
+///
+/// The lever changes waiting for the next step, and those a look ahead asks about, are
+/// applied directly at its first step: not voted on and not charged political capital,
+/// because the question it answers is what a change would do if it passed (so political
+/// capital and `capital_spent` differ from a game that paid for the bills). Commands
+/// scheduled for later steps run as in the game, votes and all. A fork never answers a
+/// dilemma: one open, or opening during the look ahead, stays unanswered, which is how the
+/// model runs while nobody answers (its answer in force and its effects stay as they were),
+/// the same in every branch; an answer already waiting is applied like any waiting change.
+pub struct Fork {
+    sim: Simulation,
+    waiting: Vec<(String, Val)>,
+}
+
+fn reals(column: &Col) -> Vec<f64> {
+    match column {
+        Col::I(v) => v.iter().map(|x| *x as f64).collect(),
+        Col::F(v) => v.clone(),
+        Col::B(v) => v.iter().map(|x| *x as i64 as f64).collect(),
+    }
+}
+
+fn cell(column: &Col, index: usize) -> Val {
+    match column {
+        Col::I(v) => Val::I(v[index]),
+        Col::F(v) => Val::F(v[index]),
+        Col::B(v) => Val::B(v[index]),
+    }
+}
+
+impl Fork {
+    /// Runs a copy of the fork `months` steps (at least one) with the waiting changes and
+    /// then `changes` (stored values; one to a lever already waiting replaces it) applied
+    /// at the first step. A step that fails returns its error.
+    pub fn run(&self, changes: &[(String, Val)], months: u64) -> Result<Outlook> {
+        if months == 0 {
+            return sim_err("a look ahead needs at least one month");
+        }
+        let mut sim = self.sim.fork();
+        let mut now = self.waiting.clone();
+        for (lever, value) in changes {
+            now.retain(|(l, _)| l != lever);
+            now.push((lever.clone(), *value));
+        }
+        sim.put_levers(&now)?;
+        let mut row: Option<Row> = None;
+        for _ in 0..months {
+            row = Some(sim.step()?);
+        }
+        let row = row.expect("at least one step");
+        let model = sim.model();
+        let cells = model
+            .symbols
+            .iter()
+            .filter(|d| d.dims.len() == 1 && matches!(d.kind, Kind::Var | Kind::State))
+            .filter(|d| model.dims[d.dims[0]].size() <= MIRRORED_CELLS)
+            .filter_map(|d| sim.column(&d.name).map(|c| (d.name.clone(), reals(c))))
+            .collect();
+        Ok(Outlook { hash: row.hash, rows: sim.row_names().iter().cloned().zip(row.values).collect(), cells })
+    }
+
+    /// One step up in a lever, from the value it has in the "as is" branch: for a real
+    /// lever, or a money lever, with a finite range, 5% of the range; without one, 5% of
+    /// its magnitude (1 if it is 0); for another whole-number lever 1; downwards when up
+    /// would pass the top of the range; a true/false lever takes the other value. Returns
+    /// the value and the signed step in stored units (1 or -1 for true/false). Levers the
+    /// player cannot set (`player = false`, dilemmas, what bills spent) are refused.
+    pub fn nudge(&self, lever: &str) -> Result<(Val, f64)> {
+        let model = self.sim.model();
+        let Some(d) = model.sym(lever).filter(|d| d.kind == Kind::Lever) else {
+            return model_err(format!("{lever:?} is not a lever"));
+        };
+        if d.spec.contains_key("dilemma") {
+            return sim_err(format!("lever {lever}: a dilemma's answer, not a policy"));
+        }
+        if model.legislature.and_then(|l| l.capital).is_some_and(|c| model.symbols[c.spent].name == lever) {
+            return sim_err(format!("lever {lever}: the engine sets it (the capital bills spent)"));
+        }
+        if !d.spec.get("player").and_then(Value::as_bool).unwrap_or(true) {
+            return sim_err(format!("lever {lever}: the player cannot set it"));
+        }
+        let waiting = self.waiting.iter().rev().find(|(l, _)| l == lever).map(|(_, v)| *v);
+        let Some(now) = waiting.or_else(|| self.sim.scalar(lever)) else {
+            return sim_err(format!("lever {lever}: no value"));
+        };
+        let top = d.range.map_or(f64::INFINITY, |(_, hi)| hi);
+        let span = d.range.filter(|(lo, hi)| lo.is_finite() && hi.is_finite() && hi > lo).map(|(lo, hi)| hi - lo);
+        let new = match now {
+            Val::B(b) => Val::B(!b),
+            Val::I(v) => {
+                let step = match (d.money, span) {
+                    (false, _) => 1,
+                    (true, Some(span)) => ((span * 0.05).round() as i64).max(1),
+                    (true, None) => (((v as f64).abs() * 0.05).round() as i64).max(1),
+                };
+                if v.saturating_add(step) as f64 > top { Val::I(v - step) } else { Val::I(v + step) }
+            }
+            Val::F(x) => {
+                let step = match span {
+                    Some(span) => span * 0.05,
+                    None if x != 0.0 => x.abs() * 0.05,
+                    None => 1.0,
+                };
+                if x + step > top { Val::F(x - step) } else { Val::F(x + step) }
+            }
+        };
+        let step = match (new, now) {
+            (Val::B(b), _) => {
+                if b {
+                    1.0
+                } else {
+                    -1.0
+                }
+            }
+            (Val::I(a), Val::I(b)) => (a - b) as f64,
+            (Val::F(a), Val::F(b)) => a - b,
+            _ => unreachable!("a lever keeps its type"),
+        };
+        Ok((new, step))
+    }
+
+    /// The effects table: for each lever, one step up ([`Fork::nudge`]) against one shared
+    /// "as is" branch, `months` ahead. Levers are taken in order, `threads` at a time, and
+    /// each result goes to `each` as it is ready (so not always in order). It stops early,
+    /// before the next lever, once `stop` says so.
+    pub fn effects(
+        &self,
+        levers: &[String],
+        months: u64,
+        threads: usize,
+        stop: &(dyn Fn() -> bool + Sync),
+        each: &(dyn Fn(Effect) + Sync),
+    ) {
+        let as_is = self.run(&[], months);
+        let next = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..threads.max(1) {
+                scope.spawn(|| {
+                    while !stop() {
+                        let Some(lever) = levers.get(next.fetch_add(1, Ordering::SeqCst)) else { break };
+                        let (step, forecast) = match (&as_is, self.nudge(lever)) {
+                            (Err(e), _) => (0.0, Err(e.clone())),
+                            (_, Err(e)) => (0.0, Err(e)),
+                            (Ok(base), Ok((value, step))) => {
+                                let changed = self.run(&[(lever.clone(), value)], months);
+                                (step, changed.map(|changed| Forecast { months, as_is: base.clone(), changed }))
+                            }
+                        };
+                        each(Effect { lever: lever.clone(), step, forecast });
+                    }
+                });
+            }
+        });
     }
 }
 
@@ -322,12 +523,7 @@ impl Session {
         self.previous_cells = std::mem::take(&mut self.latest_cells);
         for d in self.model.symbols.iter().filter(|d| !d.dims.is_empty() && matches!(d.kind, Kind::Var | Kind::State)) {
             if let Some(column) = self.sim.column(&d.name) {
-                let values = match column {
-                    Col::I(v) => v.iter().map(|x| *x as f64).collect(),
-                    Col::F(v) => v.clone(),
-                    Col::B(v) => v.iter().map(|x| *x as i64 as f64).collect(),
-                };
-                self.latest_cells.insert(d.name.clone(), values);
+                self.latest_cells.insert(d.name.clone(), reals(column));
             }
         }
         self.latest = named.into_iter().collect();
@@ -399,6 +595,96 @@ impl Session {
             }
         }
         out
+    }
+
+    /// Stage S13.1: a copy of the game to look ahead with (see [`Fork`]). Refused after a
+    /// step failed part-way.
+    pub fn fork(&self) -> Result<Fork> {
+        if self.broken {
+            return sim_err("a step failed part-way and could not be undone; load a saved game");
+        }
+        let mut sim = self.sim.fork();
+        let next = sim.steps_done();
+        let mut commands = sim.commands();
+        commands.retain(|(step, _, _)| *step != next);
+        sim.set_commands(commands);
+        Ok(Fork { sim, waiting: self.pending() })
+    }
+
+    /// Stage S13.1: the game run `months` ahead as it is (the changes waiting included) and
+    /// with `changes` (lever name and value as a person types it) besides, overriding any
+    /// change waiting for the same lever. Changes are applied directly, unvoted and
+    /// uncharged (see [`Fork`]). The two branches run at the same time.
+    pub fn forecast(&self, changes: &[(String, Value)], months: u64) -> Result<Forecast> {
+        let fork = self.fork()?;
+        let changes = changes
+            .iter()
+            .map(|(lever, raw)| self.sim.check_lever(lever, raw).map(|v| (lever.clone(), v)))
+            .collect::<Result<Vec<_>>>()?;
+        let (as_is, changed) = rayon::join(|| fork.run(&[], months), || fork.run(&changes, months));
+        Ok(Forecast { months, as_is: as_is?, changed: changed? })
+    }
+
+    /// Stage S13.1: what the legislature would do with a change of `lever` to `raw` (as a
+    /// person types it) next month, after the changes already waiting (see
+    /// [`Simulation::vote_preview`]).
+    pub fn vote_preview(&self, lever: &str, raw: &Value) -> Result<VotePreview> {
+        self.sim.vote_preview(lever, raw)
+    }
+
+    /// Stage S13.1: up to `count` records of `entity` for which `where_row` is true (a
+    /// per-record true/false value of the entity, or a formula of them; "" for every
+    /// record), spread evenly over the matching records in their order (every k-th), with
+    /// the latest value of each per-record value named in `columns`. The same request
+    /// gives the same records. Unknown names are an error that names them.
+    pub fn records(&self, entity: &str, where_row: &str, count: usize, columns: &[String]) -> Result<Vec<Record>> {
+        let model = &self.model;
+        let Some(&e) = model.entity_index.get(entity) else { return model_err(format!("unknown entity {entity:?}")) };
+        let size = model.entities[e].len();
+        // A per-record value of this entity that has been computed.
+        let per_record = |name: &str| {
+            model.sym(name).filter(|d| d.entity == Some(e)).and(self.sim.column(name)).filter(|c| c.len() == size)
+        };
+        let plain = |name: &str| name.chars().all(|c| c.is_alphanumeric() || c == '_');
+        let mut unknown: Vec<&str> = columns.iter().map(String::as_str).filter(|n| per_record(n).is_none()).collect();
+        if !where_row.is_empty() && plain(where_row) && per_record(where_row).is_none() {
+            unknown.insert(0, where_row);
+        }
+        if !unknown.is_empty() {
+            return model_err(format!("{entity} has no per-record value named {}", unknown.join(", ")));
+        }
+        let computed;
+        let chosen: Option<&Col> = if where_row.is_empty() {
+            None
+        } else if let Some(column) = per_record(where_row) {
+            Some(column)
+        } else {
+            computed = self.sim.evaluate(where_row, Some(entity), Ty::Bool, "1")?;
+            match &computed {
+                Computed::Each(column) => Some(column),
+                Computed::One(_) => return model_err(format!("{where_row:?} is not a per-record value")),
+            }
+        };
+        let matching: Vec<usize> = match chosen {
+            None => (0..size).collect(),
+            Some(Col::B(flags)) => (0..size).filter(|i| flags[*i]).collect(),
+            Some(_) => return model_err(format!("{where_row:?} is not a true/false value")),
+        };
+        let picked: Vec<usize> = if matching.len() <= count {
+            matching
+        } else {
+            (0..count).map(|k| matching[k * matching.len() / count]).collect()
+        };
+        let weights = self.sim.entity_weights(e);
+        let values: Vec<&Col> = columns.iter().map(|n| per_record(n).expect("checked above")).collect();
+        Ok(picked
+            .into_iter()
+            .map(|i| Record {
+                id: model.entities[e].ids[i],
+                weight: weights[i],
+                values: columns.iter().cloned().zip(values.iter().map(|c| cell(c, i))).collect(),
+            })
+            .collect())
     }
 
     pub fn explain(&self, name: &str) -> Result<Explanation> {

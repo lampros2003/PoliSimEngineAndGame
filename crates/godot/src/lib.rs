@@ -11,15 +11,15 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::JoinHandle;
 
 use godot::prelude::*;
 use polisim_core::describe::Catalogue;
 use polisim_core::model::Kind;
-use polisim_core::session::{Change, History};
-use polisim_core::{Explanation, Migration, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
+use polisim_core::session::{Change, Effect, Forecast, History, MIRRORED_CELLS, Outlook, Record};
+use polisim_core::{Chamber, Explanation, Migration, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
 
 struct PoliSimExtension;
 
@@ -36,7 +36,18 @@ enum Request {
     Save(PathBuf),
     Load(PathBuf),
     Reload,
+    /// Stage S13.1: lever changes (as typed), months, tag.
+    Forecast(Vec<(String, RawValue)>, u64, String),
+    /// Stage S13.1: levers, months.
+    Effects(Vec<String>, u64),
+    /// Stage S13.1: entity, condition, count, columns, tag.
+    Records(String, String, usize, Vec<String>, String),
 }
+
+/// Stage S13.1: how many levers of the effects table are computed at a time, off the
+/// worker. Two leave room for the game's own month (the engine uses every core within a
+/// step); a third gained about a tenth on the UK.
+const EFFECT_THREADS: usize = 2;
 
 /// What the interface may read without asking the worker.
 #[derive(Clone, Default)]
@@ -52,10 +63,9 @@ struct View {
     cells: BTreeMap<String, (Vec<f64>, Vec<f64>)>,
     /// Stage S12.4: what any bill costs and what a whole-range move costs, with capital.
     capital_prices: Option<(f64, f64)>,
+    /// Stage S13.1: what a vote reads, so `vote_preview` never waits for the worker.
+    chamber: Option<Chamber>,
 }
-
-/// Cells of dimensions longer than this are not mirrored to the interface each step.
-const MIRRORED_CELLS: usize = 64;
 
 /// Sent when the model changes: on opening, loading and reloading.
 struct ModelInfo {
@@ -70,12 +80,47 @@ enum Reply {
 }
 
 enum EventData {
-    Stepped { count: u64 },
+    Stepped {
+        count: u64,
+    },
     Failed(String),
-    Explained { name: String, result: Result<Box<Explanation>, String> },
-    Saved { path: String, error: Option<String> },
-    Loaded { migration: Option<Migration>, missing_mods: Vec<String>, error: Option<String> },
-    Reloaded { reset: Vec<String>, error: Option<String> },
+    Explained {
+        name: String,
+        result: Result<Box<Explanation>, String>,
+    },
+    Saved {
+        path: String,
+        error: Option<String>,
+    },
+    Loaded {
+        migration: Option<Migration>,
+        missing_mods: Vec<String>,
+        error: Option<String>,
+    },
+    Reloaded {
+        reset: Vec<String>,
+        error: Option<String>,
+    },
+    /// Stage S13.1.
+    Forecast {
+        tag: String,
+        months: u64,
+        result: Result<Box<Forecast>, String>,
+    },
+    /// Stage S13.1: one lever of an effects table, and the end of one, each with the
+    /// generation of the game it was computed for (older ones are dropped in `poll`).
+    Effect {
+        generation: u64,
+        effect: Box<Effect>,
+    },
+    EffectsDone {
+        generation: u64,
+        count: u64,
+    },
+    Records {
+        tag: String,
+        result: Result<Vec<Record>, String>,
+    },
 }
 
 fn view_of(session: &Session, failed: &Option<String>) -> View {
@@ -109,6 +154,7 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
         failed: failed.clone(),
         cells,
         capital_prices: session.capital_prices(),
+        chamber: session.simulation().chamber(),
     }
 }
 
@@ -159,7 +205,13 @@ fn model_info(session: &Session) -> ModelInfo {
     ModelInfo { model: Arc::new(session.model().clone()), catalogue: session.catalogue().clone() }
 }
 
-fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Reply>, outstanding: Arc<AtomicUsize>) {
+fn worker(
+    mut session: Session,
+    requests: Receiver<Request>,
+    replies: Sender<Reply>,
+    outstanding: Arc<AtomicUsize>,
+    generation: Arc<AtomicU64>,
+) {
     // Stage S7.4: a loaded game keeps the language the game was opened in.
     let language = session.language().to_string();
     let mut failed: Option<String> = None;
@@ -168,7 +220,7 @@ fn worker(mut session: Session, requests: Receiver<Request>, replies: Sender<Rep
         // has died. It is caught, the run is marked failed (loading a save or reloading the
         // model recovers), and the player is told.
         let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            handle(&mut session, request, &mut failed, &language, &replies)
+            handle(&mut session, request, &mut failed, &language, &replies, &generation)
         }));
         let event = match handled {
             Ok(event) => event,
@@ -198,10 +250,13 @@ fn handle(
     failed: &mut Option<String>,
     language: &str,
     replies: &Sender<Reply>,
+    generation: &Arc<AtomicU64>,
 ) -> Option<EventData> {
     {
         match request {
             Request::Step(count) => {
+                // Stage S13.1: effects computed for the month before are stale.
+                generation.fetch_add(1, Ordering::SeqCst);
                 let mut done = 0;
                 let mut error = None;
                 if let Some(message) = failed.as_ref() {
@@ -255,6 +310,7 @@ fn handle(
                         }
                         *session = next;
                         *failed = None;
+                        generation.fetch_add(1, Ordering::SeqCst);
                         let _ = replies.send(Reply::Model(Box::new(model_info(session))));
                         Some(EventData::Loaded {
                             migration: session.migration().cloned(),
@@ -269,6 +325,7 @@ fn handle(
             }
             Request::Reload => match session.reload() {
                 Ok(reset) => {
+                    generation.fetch_add(1, Ordering::SeqCst);
                     // A failed step was undone, so a corrected model carries on from the
                     // end of the last good month.
                     *failed = None;
@@ -277,6 +334,51 @@ fn handle(
                 }
                 Err(e) => Some(EventData::Reloaded { reset: Vec::new(), error: Some(e.to_string()) }),
             },
+            Request::Forecast(changes, months, tag) => {
+                let result = session.forecast(&changes, months).map(Box::new).map_err(|e| e.to_string());
+                Some(EventData::Forecast { tag, months, result })
+            }
+            Request::Records(entity, where_row, count, columns, tag) => {
+                let result = session.records(&entity, &where_row, count, &columns).map_err(|e| e.to_string());
+                Some(EventData::Records { tag, result })
+            }
+            Request::Effects(levers, months) => {
+                // Stage S13.1: a new table makes any earlier one stale. The worker only
+                // copies the game; the table is computed on a thread of its own, so the
+                // next month never waits for it.
+                let mine = generation.fetch_add(1, Ordering::SeqCst) + 1;
+                let fork = session.fork();
+                let (replies, generation) = (replies.clone(), Arc::clone(generation));
+                let spawned = std::thread::Builder::new().name("polisim-effects".to_string()).spawn(move || {
+                    let stale = || generation.load(Ordering::SeqCst) != mine;
+                    let sent = AtomicU64::new(0);
+                    let each = |effect: Effect| {
+                        if !stale() {
+                            sent.fetch_add(1, Ordering::SeqCst);
+                            let event = EventData::Effect { generation: mine, effect: Box::new(effect) };
+                            let _ = replies.send(Reply::Event(event));
+                        }
+                    };
+                    match fork {
+                        Ok(fork) => {
+                            // A panic in the engine ends the table early, not the game.
+                            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                fork.effects(&levers, months, EFFECT_THREADS, &stale, &each)
+                            }));
+                        }
+                        Err(e) => {
+                            for lever in levers {
+                                each(Effect { lever, step: 0.0, forecast: Err(e.clone()) });
+                            }
+                        }
+                    }
+                    if !stale() {
+                        let count = sent.load(Ordering::SeqCst);
+                        let _ = replies.send(Reply::Event(EventData::EffectsDone { generation: mine, count }));
+                    }
+                });
+                spawned.err().map(|e| EventData::Failed(format!("cannot start the effects thread: {e}")))
+            }
         }
     }
 }
@@ -531,8 +633,67 @@ fn event_dict(event: EventData) -> VarDictionary {
             d.set("reset", &strings(&reset));
             d.set("error", error.unwrap_or_default().as_str());
         }
+        EventData::Forecast { tag, months, result } => {
+            d.set("kind", "forecast");
+            d.set("tag", tag.as_str());
+            d.set("months", months as i64);
+            look_ahead(&mut d, result.as_deref().map_err(String::as_str));
+        }
+        EventData::Effect { effect, .. } => {
+            d.set("kind", "effects");
+            d.set("lever", effect.lever.as_str());
+            d.set("step", effect.step);
+            let message = effect.forecast.as_ref().err().map(|e| e.to_string()).unwrap_or_default();
+            look_ahead(&mut d, effect.forecast.as_ref().map_err(|_| message.as_str()));
+        }
+        EventData::EffectsDone { count, .. } => {
+            d.set("kind", "effects_done");
+            d.set("count", count as i64);
+        }
+        EventData::Records { tag, result } => {
+            d.set("kind", "records");
+            d.set("tag", tag.as_str());
+            let mut records = VarArray::new();
+            for r in result.as_deref().unwrap_or_default() {
+                let mut x = VarDictionary::new();
+                x.set("id", r.id as i64);
+                x.set("weight", r.weight);
+                for (name, value) in &r.values {
+                    x.set(name.as_str(), &val(*value));
+                }
+                records.push(&x.to_variant());
+            }
+            d.set("records", &records);
+            d.set("error", result.err().unwrap_or_default().as_str());
+        }
     }
+    // Stage S13.1: the S13 client reads `type`; earlier clients read `kind`.
+    let kind = d.get("kind").unwrap_or_default();
+    d.set("type", &kind);
     d
+}
+
+/// Stage S13.1: a forecast's `rows` (row name to `[as_is, changed]`), `cells` (name to
+/// `{as_is, changed}`) and `error` ("" when it ran; otherwise the rest is empty).
+fn look_ahead(d: &mut VarDictionary, result: Result<&Forecast, &str>) {
+    let mut rows = VarDictionary::new();
+    let mut cells = VarDictionary::new();
+    if let Ok(f) = result {
+        let (a, b): (&Outlook, &Outlook) = (&f.as_is, &f.changed);
+        for ((name, x), (_, y)) in a.rows.iter().zip(&b.rows) {
+            let pair: VarArray = [val(*x), val(*y)].into_iter().collect();
+            rows.set(name.as_str(), &pair);
+        }
+        for ((name, x), (_, y)) in a.cells.iter().zip(&b.cells) {
+            let mut pair = VarDictionary::new();
+            pair.set("as_is", &PackedFloat64Array::from(x.as_slice()));
+            pair.set("changed", &PackedFloat64Array::from(y.as_slice()));
+            cells.set(name.as_str(), &pair);
+        }
+    }
+    d.set("rows", &rows);
+    d.set("cells", &cells);
+    d.set("error", result.err().unwrap_or_default());
 }
 
 // ---------------------------------------------------------------------------- the class
@@ -545,6 +706,8 @@ pub struct PoliSim {
     replies: Option<Receiver<Reply>>,
     thread: Option<JoinHandle<()>>,
     outstanding: Arc<AtomicUsize>,
+    /// Stage S13.1: bumped whenever effects already computed go stale.
+    generation: Arc<AtomicU64>,
     model: Option<Arc<Model>>,
     catalogue: Option<Catalogue>,
     play: VarDictionary,
@@ -561,6 +724,7 @@ impl IRefCounted for PoliSim {
             replies: None,
             thread: None,
             outstanding: Arc::new(AtomicUsize::new(0)),
+            generation: Arc::new(AtomicU64::new(0)),
             model: None,
             catalogue: None,
             play: VarDictionary::new(),
@@ -646,9 +810,12 @@ impl PoliSim {
         let (reply_tx, reply_rx) = channel();
         let outstanding = Arc::clone(&self.outstanding);
         outstanding.store(0, Ordering::SeqCst);
+        // A new game makes any table still being computed for the old one stale.
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        let generation = Arc::clone(&self.generation);
         let spawned = std::thread::Builder::new()
             .name("polisim-simulation".to_string())
-            .spawn(move || worker(session, request_rx, reply_tx, outstanding));
+            .spawn(move || worker(session, request_rx, reply_tx, outstanding, generation));
         match spawned {
             Ok(handle) => {
                 self.thread = Some(handle);
@@ -699,7 +866,14 @@ impl PoliSim {
             self.model = Some(info.model);
             self.catalogue = Some(info.catalogue);
         }
+        let now = self.generation.load(Ordering::SeqCst);
         for e in out {
+            // Stage S13.1: effects of a game since stepped, loaded or reloaded are dropped.
+            if let EventData::Effect { generation, .. } | EventData::EffectsDone { generation, .. } = &e
+                && *generation != now
+            {
+                continue;
+            }
             events.push(&event_dict(e).to_variant());
         }
         events
@@ -745,6 +919,83 @@ impl PoliSim {
             return -1.0;
         }
         polisim_core::bill_cost(bill, swing, d, new, old)
+    }
+
+    /// Stage S13.1: what the legislature would do with a change of `lever` to `value` next
+    /// month, after the changes already waiting, answered at once from the mirror: `bill`,
+    /// `votes_for`, `seats`, `passes` (the vote would carry), `cost` (-1 without capital or
+    /// when it is no bill) and `affordable` (the capital less the waiting bills' costs
+    /// covers it). Empty when the lever or value is not valid.
+    #[func]
+    fn vote_preview(&self, lever: GString, value: Variant) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let Some(model) = &self.model else { return d };
+        let name = lever.to_string();
+        let Some(raw) = raw_from_variant(&value) else { return d };
+        let Ok(new) = check_lever(model, &name, &raw) else { return d };
+        let decl = &model.symbols[model.sym_index[&name]];
+        let spent = model.legislature.and_then(|l| l.capital).is_some_and(|c| model.symbols[c.spent].name == name);
+        if spent || decl.spec.contains_key("dilemma") {
+            return d;
+        }
+        let preview = match &self.view.chamber {
+            Some(chamber) => {
+                chamber.preview(model, &name, new, |l| self.view.latest.get(l).copied(), &self.view.pending)
+            }
+            None => polisim_core::VotePreview {
+                bill: false,
+                votes_for: 0,
+                seats: 0,
+                passes: true,
+                cost: None,
+                affordable: true,
+            },
+        };
+        d.set("bill", preview.bill);
+        d.set("votes_for", preview.votes_for);
+        d.set("seats", preview.seats);
+        d.set("passes", preview.passes);
+        d.set("cost", preview.cost.unwrap_or(-1.0));
+        d.set("affordable", preview.affordable);
+        d
+    }
+
+    /// Stage S13.1: runs the game `months` ahead as it is and with `changes` (lever name to
+    /// value, as typed) besides, applied directly; the answer arrives as a "forecast" event
+    /// with this `tag`.
+    #[func]
+    fn request_forecast(&mut self, changes: VarDictionary, months: i64, tag: GString) -> bool {
+        let changes = changes
+            .iter_shared()
+            .map(|(k, v)| (k.to_string(), raw_from_variant(&v).unwrap_or_else(|| RawValue::String(v.to_string()))))
+            .collect();
+        self.send(Request::Forecast(changes, months.max(0) as u64, tag.to_string()))
+    }
+
+    /// Stage S13.1: the effects table: one "effects" event per lever (each nudged one step,
+    /// `months` ahead), computed off the worker, then "effects_done". A month, a load, a
+    /// reload or a new table makes it stale: what is left of it is dropped.
+    #[func]
+    fn request_effects(&mut self, levers: PackedStringArray, months: i64) -> bool {
+        let levers = levers.as_slice().iter().map(|l| l.to_string()).collect();
+        self.send(Request::Effects(levers, months.max(0) as u64))
+    }
+
+    /// Stage S13.1: up to `count` records of `entity` for which `where_row` is true ("" for
+    /// all), each with id, weight and the latest value of each of `columns`, as a "records"
+    /// event with this `tag`.
+    #[func]
+    fn request_records(
+        &mut self,
+        entity: GString,
+        where_row: GString,
+        count: i64,
+        columns: PackedStringArray,
+        tag: GString,
+    ) -> bool {
+        let columns = columns.as_slice().iter().map(|c| c.to_string()).collect();
+        let count = usize::try_from(count.max(0)).unwrap_or(usize::MAX);
+        self.send(Request::Records(entity.to_string(), where_row.to_string(), count, columns, tag.to_string()))
     }
 
     #[func]
