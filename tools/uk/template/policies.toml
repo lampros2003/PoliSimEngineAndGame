@@ -1,0 +1,1307 @@
+# Real policies and the indicators they move (stage S13.5, docs/S13-PLAN.md). GENERATED:
+# copied from tools/uk/template/policies.toml by tools/uk/calibrate.py. Edit the template.
+#
+# Nineteen policies in real units (a drinking age in years, fuel duty in pence a litre, an
+# electric car grant in pounds a car) or levels (sentencing, planning rules, rent controls),
+# and six indicators: crime, healthy life expectancy, school attainment, homes built, net
+# migration and the electric share of new cars. Every figure, its source and every
+# judgement are in models/uk/POLICIES.md.
+#
+# How a policy reaches the rest of the model, each through a single term that is zero, or a
+# factor of one, with every policy at its 2024 setting, so the base month and the hindcast
+# do not move:
+#
+#   money       policy_duties (taxes on production), policy_charges (other receipts),
+#               policy_purchases (public purchases), policy_investment (public investment),
+#               policy_subsidies (subsidies), policy_benefits (benefits): economy.toml
+#   prices      policy_duties / consumption, on the tax wedge: prices.toml
+#   emissions   household_emissions_factor, on households' emissions: emissions.toml
+#   homes       homes_policy_level, on households' investment in homes: economy.toml
+#   people      policy_migration_factor on net arrivals (population.toml) and
+#               policy_labour_force_growth on the labour force (model.toml)
+#   health      health_demand_factor, on referrals for treatment: nhs.toml
+#   voters      policy_standing, on government_standing; crime_policy_level, on the
+#               policing issue: politics.toml
+#
+# Real values in pounds are held in pence, as every money value is (docs/spec/01): fuel
+# duty's 52.95 is pence a litre.
+
+# ================================================================= law and order
+
+[lever.drinking_age]
+label = "Legal age to buy alcohol"
+group = "Law and order"
+type = "int"
+unit = "1"
+default = 18
+range = [16, 21]
+leaning = "right"
+capital_weight = 0.5
+doc = "The youngest age at which people may buy alcohol, in years: 18 in 2024. Raising it cuts drinking and alcohol-related crime among the young a little; the young resent it."
+
+[lever.sentencing]
+label = "Sentencing"
+group = "Law and order"
+type = "int"
+unit = "1"
+default = 2
+range = [0, 4]
+leaning = "right"
+capital_weight = 0.8
+doc = "How tough sentences are, from lenient (0) to tough (4); 2 is the 2024 practice. Each step up holds about 8% more prisoners within two years, at about £52,000 a year each, and keeps a little more crime off the streets."
+
+[lever.cannabis_law]
+label = "Cannabis law"
+group = "Law and order"
+type = "int"
+unit = "1"
+default = 0
+range = [0, 2]
+leaning = "left"
+capital_weight = 1.0
+doc = "Cannabis is illegal (0, as in 2024), decriminalised for personal use (1), or legal, sold under licence and taxed (2). Legal sale raises about £1bn a year and takes some trade from criminal markets; older voters dislike it."
+
+[param.prison_population_2024]
+doc = "Prisoners in England and Wales at 31 December 2024 (Ministry of Justice, Offender management statistics quarterly)"
+type = "real"
+unit = "person"
+value = 85372.0
+
+[param.sentencing_step]
+doc = "How much each step of sentencing moves the prison population in time (a judgement: two steps tougher holds about 100,000, near the Ministry of Justice's central projection for 2029)"
+type = "real"
+unit = "1"
+value = 0.08
+
+[param.prison_adjust_months]
+doc = "Months over which the prison population follows a change in sentencing (a judgement: sentences already passed run their course)"
+type = "real"
+unit = "1"
+value = 24.0
+
+[param.prison_cost_per_prisoner]
+doc = "What a prison place costs a month: £51,724 a year, the overall average for 2022-23 (Ministry of Justice, Costs per place and costs per prisoner), in pence"
+type = "real"
+unit = "GBP/month/person"
+value = 431033.3333333333
+
+[state.prison_population]
+label = "Prison population"
+doc = "Prisoners in England and Wales, following sentencing over about two years"
+type = "real"
+unit = "person"
+phase = "accounts"
+initial = 85372.0
+next = "prison_population + (prison_population_2024 * (1.0 + sentencing_step * (sentencing - 2)) - prison_population) / prison_adjust_months"
+
+[param.cannabis_tax]
+doc = "What legal, taxed cannabis would raise a month, in 2024 prices: about £1bn a year (a judgement in the range of published estimates)"
+type = "money"
+unit = "GBP/month"
+value = 83333333.33
+
+[var.prison_cost_change]
+label = "Prisons: cost of sentencing"
+doc = "Prisoners above or below December 2024's, at the average cost of a place"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round((prison_population - prison_population_2024) * prison_cost_per_prisoner * trend_index)"
+
+[var.cannabis_tax_receipts]
+label = "Cannabis tax"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(select(cannabis_law == 2, 1.0, 0.0) * cannabis_tax * trend_index)"
+
+# ---- crime
+
+[param.crime_2024]
+doc = "Crimes against households and adults in England and Wales a year, the Crime Survey's headline measure, in the year to June 2024 (ONS, Crime in England and Wales)"
+type = "real"
+unit = "1"
+value = 9200000.0
+
+[param.police_crime_elasticity]
+doc = "Crime falls this share for each unit rise in the police, courts and prisons service level (a judgement from studies of police numbers and crime, about -0.3)"
+type = "real"
+unit = "1"
+value = 0.3
+
+[param.prison_crime_elasticity]
+doc = "Crime falls this share for each unit rise in the prison population against 2024's (a judgement: incapacitation, smaller than the American estimates at far higher imprisonment)"
+type = "real"
+unit = "1"
+value = 0.15
+
+[param.alcohol_crime_elasticity]
+doc = "Crime rises this share for each unit rise in alcohol drunk (a judgement: alcohol is involved in about two fifths of violent incidents, a smaller share of all crime)"
+type = "real"
+unit = "1"
+value = 0.1
+
+[param.drinking_age_crime]
+doc = "Crime falls this share for each year the drinking age rises above 18 (a judgement from studies of the American drinking age of 21)"
+type = "real"
+unit = "1"
+value = 0.005
+
+[param.crime_adjust_months]
+doc = "Months over which crime follows the policies that move it (a judgement)"
+type = "real"
+unit = "1"
+value = 12.0
+
+[var.crime_policy_target]
+doc = "Where the policies are taking crime, against 2024's: prisons, alcohol, the drinking age and cannabis law"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "(1.0 - prison_crime_elasticity * (prison_population / prison_population_2024 - 1.0)) * (1.0 + alcohol_crime_elasticity * (alcohol_use - 1.0)) * (1.0 - drinking_age_crime * (drinking_age - 18)) * (1.0 - select(cannabis_law == 1, 0.005, select(cannabis_law == 2, 0.015, 0.0)))"
+
+[state.crime_policy_level]
+label = "Crime: the policies' effect"
+doc = "Crime against what it would be with every policy as in 2024, following the policies over about a year; voters weigh it with the police service"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "crime_policy_level + (crime_policy_target - crime_policy_level) / crime_adjust_months"
+
+[var.crime_incidents]
+label = "Crime (incidents a year)"
+doc = "Crimes against households and adults in England and Wales a year, as the Crime Survey counts them: 9.2 million in the year to June 2024. Fewer with more police, tougher sentences and less drinking"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "crime_2024 * (1.0 - police_crime_elasticity * (service_level[function: 3] - 1.0)) * crime_policy_level"
+
+# ================================================================= health
+
+[lever.alcohol_duty]
+label = "Alcohol duty"
+group = "Health"
+type = "real"
+unit = "1"
+default = 1.0
+range = [0.5, 2.0]
+leaning = "left"
+capital_weight = 0.6
+doc = "Duty on beer, wine, cider and spirits, as a multiple of the 2024 rates (1), which raised £12.6bn in 2023-24. A higher duty raises prices and receipts, and cuts drinking, alcohol deaths and some crime; drinkers dislike it."
+
+[lever.tobacco_duty]
+label = "Tobacco duty"
+group = "Health"
+type = "real"
+unit = "1"
+default = 1.0
+range = [0.5, 2.0]
+leaning = "left"
+capital_weight = 0.4
+doc = "Duty on cigarettes and tobacco, as a multiple of the 2024 rates (1), which raised £7.9bn in 2024-25. A higher duty cuts smoking, but pushes sales abroad and underground, so receipts rise little; smokers dislike it."
+
+[lever.sugar_levy]
+label = "Soft drinks levy"
+group = "Health"
+type = "real"
+unit = "1"
+default = 1.0
+range = [0.0, 3.0]
+leaning = "left"
+capital_weight = 0.2
+doc = "The levy on sugary soft drinks, as a multiple of the 2024 rates (1), which raised £338m in 2023-24. A higher levy speeds the cut in sugar, a small gain to health."
+
+[lever.prescription_charge]
+label = "Prescription charge"
+group = "Health"
+type = "money"
+unit = "GBP/item"
+default = 9.90
+range = [0, 20]
+leaning = "right"
+capital_weight = 0.3
+doc = "What a prescription item costs in England, where nine in ten are free: £9.90 from May 2024, raising about £600m a year. A higher charge raises a little money; some go without, a small loss to health."
+
+# ---- alcohol
+
+[param.alcohol_duty_2024]
+doc = "Alcohol duty receipts in 2023-24, a month: £12.6bn a year (HMRC, Alcohol Bulletin)"
+type = "money"
+unit = "GBP/month"
+value = 1050000000
+
+[param.alcohol_duty_price_share]
+doc = "The share of the price of a drink that is duty, so how much prices rise when duty doubles (a judgement, about a quarter across on- and off-trade drinks)"
+type = "real"
+unit = "1"
+value = 0.25
+
+[param.alcohol_price_elasticity]
+doc = "Alcohol drunk against its price (a judgement of the average of HMRC's estimates, from -0.08 for wine bought in shops to -1.25 for spirits in pubs; HMRC Working Paper 16)"
+type = "real"
+unit = "1"
+value = -0.5
+
+[param.drinking_age_alcohol]
+doc = "The share by which alcohol drunk falls for each year the drinking age rises above 18 (a judgement: people under 21 drink about a twentieth of it, and a ban cuts theirs by a quarter or so)"
+type = "real"
+unit = "1"
+value = 0.003
+
+[param.alcohol_harm_elasticity]
+doc = "Alcohol deaths against alcohol drunk (a judgement: minimum unit pricing in Scotland cut sales 3% and deaths an estimated 13%, but it bore on the heaviest drinkers; a duty is spread wider)"
+type = "real"
+unit = "1"
+value = 2.0
+
+[param.alcohol_deaths_2024]
+doc = "Alcohol-specific deaths registered in the UK in 2023 (ONS, Alcohol-specific deaths in the UK)"
+type = "real"
+unit = "1"
+value = 10473.0
+
+[var.alcohol_use_target]
+doc = "Alcohol drunk against 2024, once prices and the drinking age have taken effect"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "max(1.0 + alcohol_price_elasticity * alcohol_duty_price_share * (alcohol_duty - 1.0), 0.2) * (1.0 - drinking_age_alcohol * (drinking_age - 18))"
+
+[state.alcohol_use]
+label = "Alcohol drunk, against 2024"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "alcohol_use + (alcohol_use_target - alcohol_use) / 3.0"
+
+[state.alcohol_harm]
+label = "Alcohol harm, against 2024"
+doc = "Alcohol deaths and illness against 2024's, following alcohol drunk over about two years"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "alcohol_harm + (1.0 + alcohol_harm_elasticity * (alcohol_use - 1.0) - alcohol_harm) / 24.0"
+
+[var.alcohol_deaths]
+label = "Alcohol-specific deaths (a year)"
+doc = "Deaths wholly caused by alcohol in the UK a year: 10,473 in 2023"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "alcohol_deaths_2024 * alcohol_harm"
+
+[var.alcohol_duty_change]
+label = "Alcohol duty: change from 2024 rates"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(alcohol_duty_2024 * trend_index * (alcohol_duty * alcohol_use - 1.0))"
+
+# ---- tobacco
+
+[param.tobacco_duty_2024]
+doc = "Tobacco duty receipts in 2024-25, a month: £7,926m a year (HMRC, Tobacco Bulletin)"
+type = "money"
+unit = "GBP/month"
+value = 660500000
+
+[param.tobacco_duty_price_share]
+doc = "How much the price of a packet rises when duty doubles: duty and the VAT on it are about seven tenths of the price (a judgement from the 2024 rates)"
+type = "real"
+unit = "1"
+value = 0.7
+
+[param.tobacco_sales_elasticity]
+doc = "Duty-paid tobacco sales against their price, including smuggling and buying abroad (an estimate, about -1, as HMRC has found for cigarettes)"
+type = "real"
+unit = "1"
+value = -1.0
+
+[param.smoking_price_elasticity]
+doc = "The share of adults who smoke against the price of tobacco (a judgement: about a third of the response of sales)"
+type = "real"
+unit = "1"
+value = -0.3
+
+[param.smoking_2024]
+doc = "Adults who smoke cigarettes, UK, 2024 (ONS, Adult smoking habits in the UK)"
+type = "real"
+unit = "1"
+value = 0.106
+
+[state.tobacco_sales]
+label = "Duty-paid tobacco sold, against 2024"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "tobacco_sales + (max(1.0 + tobacco_sales_elasticity * tobacco_duty_price_share * (tobacco_duty - 1.0), 0.2) - tobacco_sales) / 6.0"
+
+[state.smoking_prevalence]
+label = "Adults who smoke"
+doc = "The share of adults who smoke: 10.6% in 2024; it follows the price of tobacco over about two years"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.106
+next = "smoking_prevalence + (smoking_2024 * max(1.0 + smoking_price_elasticity * tobacco_duty_price_share * (tobacco_duty - 1.0), 0.2) - smoking_prevalence) / 24.0"
+
+[var.tobacco_duty_change]
+label = "Tobacco duty: change from 2024 rates"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(tobacco_duty_2024 * trend_index * (tobacco_duty * tobacco_sales - 1.0))"
+
+# ---- soft drinks and prescriptions
+
+[param.sugar_levy_2024]
+doc = "Soft Drinks Industry Levy receipts in 2023-24, a month: £338m a year (HMRC)"
+type = "money"
+unit = "GBP/month"
+value = 28166666.67
+
+[state.sugar_levy_volume]
+label = "Levied soft drinks, against 2024"
+doc = "Drinks paying the levy: makers cut sugar below its thresholds when it rises (a judgement, half as much again as the levy's proportional rise)"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "sugar_levy_volume + (max(1.0 - 0.5 * (sugar_levy - 1.0), 0.2) - sugar_levy_volume) / 12.0"
+
+[var.sugar_levy_change]
+label = "Soft drinks levy: change from 2024 rates"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(sugar_levy_2024 * trend_index * (sugar_levy * sugar_levy_volume - 1.0))"
+
+[param.prescription_charge_2024]
+doc = "The prescription charge in England from 1 May 2024 (Department of Health and Social Care)"
+type = "money"
+unit = "GBP/item"
+value = 9.90
+
+[param.prescription_items]
+doc = "Items paid for a month: about £600m a year at £9.90 (the Department of Health and Social Care's figure for the charges' yield)"
+type = "real"
+unit = "item/month"
+value = 5050505.05
+
+[var.prescription_items_ratio]
+doc = "Items paid for against 2024: a tenth fewer for each doubling of the charge (a judgement: most who pay buy a prepayment certificate or go on paying)"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "max(1.0 - 0.1 * (prescription_charge / prescription_charge_2024 - 1.0), 0.2)"
+
+[var.prescription_charge_change]
+label = "Prescription charges: change from 2024"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(prescription_items * (prescription_charge * prescription_items_ratio - prescription_charge_2024))"
+
+# ---- public health
+
+[param.hle_2024]
+doc = "Healthy life expectancy at birth, UK, 2022-24: 60.7 years for men, 60.9 for women (ONS, Health state life expectancies)"
+type = "real"
+unit = "1"
+value = 60.8
+
+[param.hle_service_effect]
+doc = "Years of healthy life per unit of the health service level (a judgement: a tenth more care per person needing it adds about a third of a year)"
+type = "real"
+unit = "1"
+value = 3.0
+
+[param.hle_smoking_effect]
+doc = "Years of healthy life lost per unit of the share of adults who smoke (a judgement: a point less smoking adds about 0.15 years)"
+type = "real"
+unit = "1"
+value = 15.0
+
+[param.hle_alcohol_effect]
+doc = "Years of healthy life lost per unit of alcohol harm against 2024 (a judgement: a tenth less harm adds about 0.06 years)"
+type = "real"
+unit = "1"
+value = 0.6
+
+[state.hle_other]
+label = "Healthy life: other policies"
+doc = "Years of healthy life from the soft drinks levy, prescription charges and cannabis law, following them over about three years (judgements: 0.02 years for each multiple of the levy; 0.03 lost when the charge doubles; 0.03 lost with legal cannabis)"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.0
+next = "hle_other + (0.02 * (sugar_levy - 1.0) - 0.03 * (prescription_charge / prescription_charge_2024 - 1.0) - select(cannabis_law == 2, 0.03, 0.0) - hle_other) / 36.0"
+
+[var.healthy_life_expectancy]
+label = "Healthy life expectancy"
+doc = "Years a newborn can expect to live in good health, UK: 60.8 in 2022-24. Longer with a better-funded health service, less smoking and less drinking"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "hle_2024 + hle_service_effect * (service_level[function: 0] - 1.0) - hle_smoking_effect * (smoking_prevalence - smoking_2024) - hle_alcohol_effect * (alcohol_harm - 1.0) + hle_other"
+
+[var.health_demand_factor]
+doc = "Referrals for treatment against what they would be with 2024's smoking and drinking (judgements: smoking causes about 4% of hospital work and alcohol about 2%)"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "1.0 + 0.04 * (smoking_prevalence / smoking_2024 - 1.0) + 0.02 * (alcohol_harm - 1.0)"
+
+# ================================================================= transport
+
+[lever.fuel_duty]
+label = "Fuel duty"
+group = "Transport"
+type = "real"
+unit = "GBP/litre"
+default = 52.95
+range = [0.0, 100.0]
+leaning = "left"
+capital_weight = 1.2
+doc = "Duty on petrol and diesel, in pence a litre: 52.95 since 2022, raising £24.4bn in 2024-25. A higher duty raises receipts, prices and motoring costs, and cuts driving and emissions; motorists dislike it."
+
+[lever.ev_grant]
+label = "Electric car grant"
+group = "Transport"
+type = "money"
+unit = "GBP/car"
+default = 0
+range = [0, 6000]
+leaning = "left"
+capital_weight = 0.5
+doc = "A grant towards each new battery-electric car, in pounds: none in 2024 (the plug-in car grant ended in 2022). It raises the electric share of new cars, and cuts emissions and fuel duty, at a cost of the grant for every electric car sold."
+
+[lever.bus_fare_cap]
+label = "Bus fare cap"
+group = "Transport"
+type = "money"
+unit = "GBP/journey"
+default = 2.00
+range = [1, 5]
+leaning = "right"
+capital_weight = 0.3
+doc = "The most a single bus fare may cost in England outside London: £2 in 2024. A lower cap costs more in support to bus companies and helps those who ride buses."
+
+[param.fuel_duty_2024]
+doc = "Fuel duty on petrol and diesel from March 2022, in pence a litre"
+type = "real"
+unit = "GBP/litre"
+value = 52.95
+
+[param.fuel_duty_penny]
+doc = "A penny a litre"
+type = "real"
+unit = "GBP/litre"
+value = 1.0
+
+[param.fuel_litres]
+doc = "Petrol and diesel paying duty a month: £24.4bn a year in 2024-25 (OBR) over 52.95 pence a litre, about 46bn litres a year"
+type = "real"
+unit = "litre/month"
+value = 3840000000.0
+
+[param.pump_price_2024]
+doc = "The average price of a litre at the pump in 2024, in pence (a judgement, about £1.40)"
+type = "real"
+unit = "GBP/litre"
+value = 140.0
+
+[param.fuel_price_elasticity]
+doc = "Fuel bought against its price, within a year or two (a judgement between the short-run -0.25 and long-run -0.6 of the transport literature)"
+type = "real"
+unit = "1"
+value = -0.4
+
+[state.fuel_volume]
+label = "Fuel bought, against 2024"
+doc = "Petrol and diesel bought against 2024, as the pump price follows fuel duty (with VAT on the duty), over about a year"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "fuel_volume + (max(1.0 + fuel_price_elasticity * 1.2 * (fuel_duty - fuel_duty_2024) / pump_price_2024, 0.2) - fuel_volume) / 12.0"
+
+[var.fuel_duty_change]
+label = "Fuel duty: change from 2024"
+doc = "Duty at the rate set on the fuel now bought, less 2024's rate on 2024's fuel: a higher rate, less driving and more electric cars all count"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(fuel_litres * (fuel_duty * fuel_volume * (1.0 - ev_fleet_extra) - fuel_duty_2024))"
+
+# ---- electric cars
+
+[lever.petrol_ban_year]
+label = "Ban on new petrol and diesel cars"
+group = "Environment and energy"
+type = "int"
+unit = "1"
+default = 2030
+range = [2028, 2040]
+leaning = "right"
+capital_weight = 0.6
+doc = "The year from which new cars must be zero-emission or hybrid: 2030, as the government restored it in 2025 (2035 under the previous one). An earlier year speeds the switch to electric cars and cuts emissions; motorists dislike it."
+
+[param.petrol_ban_2024]
+doc = "The year of the ban as policy stands at the start"
+type = "int"
+unit = "1"
+value = 2030
+
+[param.ev_share_2024]
+doc = "Zero-emission cars among new cars registered in the UK in 2024: 382,000 of 2.0 million (DfT, Vehicle licensing statistics 2024)"
+type = "real"
+unit = "1"
+value = 0.191
+
+[param.ev_share_at_ban]
+doc = "The electric share of new cars by the year of the ban: 80%, the zero-emission vehicle mandate's figure for 2030 (hybrids are sold to 2035)"
+type = "real"
+unit = "1"
+value = 0.8
+
+[table.ev_path_shape]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+# The electric share of new cars against the way from the first month (0) to the year of the
+# ban (1), a judgement shaped like the zero-emission vehicle mandate's targets (28% in 2025,
+# 33% in 2026, 38% in 2027, then 52%, 66% and 80% in 2030) with the ban in 2030: from 2024's
+# 19.1%, a year behind the targets at first, as sales fell short in 2025, and on them from 2027.
+points = [{ x = 0.0, y = 0.191 }, { x = 0.2, y = 0.28 }, { x = 0.4, y = 0.38 }, { x = 0.6, y = 0.52 },
+          { x = 0.8, y = 0.66 }, { x = 1.0, y = 0.8 }]
+
+[param.ev_grant_reference]
+doc = "£3,000 a car: the grant at which the effect below is stated"
+type = "money"
+unit = "GBP/car"
+value = 3000
+
+[table.ev_grant_effect]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+# A judgement: £3,000, about 7% off an electric car, adds 3 points to its share of new cars
+# (a demand elasticity near -1.5), and £6,000 another 1.5: the plug-in car grant's own
+# evaluation found it mattered most early, less once electric cars were common.
+points = [{ x = 0.0, y = 0.0 }, { x = 1.0, y = 0.03 }, { x = 2.0, y = 0.045 }]
+
+[param.fuel_ev_response]
+doc = "Points of electric share of new cars per penny a litre of fuel duty above 2024's (a judgement: half a point for 10p)"
+type = "real"
+unit = "litre/GBP"
+value = 0.0005
+
+[param.new_cars_month]
+doc = "New cars registered a month, UK, 2024: 2.0 million a year (DfT)"
+type = "real"
+unit = "car/month"
+value = 166666.66666666666
+
+[param.new_car_share_of_fleet]
+doc = "New cars a month as a share of the cars on the road, about 34 million (an estimate from DfT's licensing statistics)"
+type = "real"
+unit = "1"
+value = 0.0049
+
+[var.ev_year]
+doc = "The year, with months as fractions: 2025 in the first month"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "2025.0 + months_elapsed / 12.0"
+
+[var.ev_share_path]
+label = "Electric share of new cars, on the path to the ban"
+doc = "Rising from 2024's share in the first month to 80% in the year of the ban along the zero-emission vehicle mandate's path, then in a straight line to all new cars five years after"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "select(ev_year < 1.0 * petrol_ban_year, curve((ev_year - 2025.0) / (petrol_ban_year - 2025.0), ev_path_shape), min(ev_share_at_ban + (1.0 - ev_share_at_ban) * (ev_year - petrol_ban_year) / 5.0, 1.0))"
+
+[var.ev_share_path_2024]
+doc = "The same path with the ban in its year at the start"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "select(ev_year < 1.0 * petrol_ban_2024, curve((ev_year - 2025.0) / (petrol_ban_2024 - 2025.0), ev_path_shape), min(ev_share_at_ban + (1.0 - ev_share_at_ban) * (ev_year - petrol_ban_2024) / 5.0, 1.0))"
+
+[state.ev_policy_extra]
+doc = "Points of electric share of new cars from the grant and fuel duty, following them over about six months"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.0
+next = "ev_policy_extra + (curve(ev_grant / ev_grant_reference, ev_grant_effect) + fuel_ev_response * (fuel_duty - fuel_duty_2024) - ev_policy_extra) / 6.0"
+
+[var.ev_share]
+label = "Electric share of new cars"
+doc = "Battery-electric cars among new cars: 19.1% in 2024. Rises toward the ban on petrol and diesel cars, faster with a grant or dearer fuel"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "clamp(ev_share_path + ev_policy_extra, 0.0, 1.0)"
+
+[var.ev_share_extra]
+doc = "The electric share of new cars above what it would be with every policy as at the start"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "ev_share - clamp(ev_share_path_2024, 0.0, 1.0)"
+
+[state.ev_fleet_extra]
+label = "Electric cars on the road from the policies"
+doc = "The share of the cars on the road that are electric because of the policies: each month's extra electric share of new cars, times new cars over all cars"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.0
+next = "clamp(ev_fleet_extra + ev_share_extra * new_car_share_of_fleet, -1.0, 1.0)"
+
+[var.ev_grant_cost]
+label = "Electric car grant"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(ev_grant * new_cars_month * ev_share)"
+
+# ---- buses
+
+[param.bus_fare_cap_2024]
+doc = "The single bus fare cap in England outside London in 2024"
+type = "money"
+unit = "GBP/journey"
+value = 2.00
+
+[param.bus_fare_uncapped]
+doc = "The average single fare the cap replaced (a judgement, about £2.80)"
+type = "money"
+unit = "GBP/journey"
+value = 2.80
+
+[param.bus_capped_journeys]
+doc = "Journeys a month whose fare the cap lowers, so that the £2 cap costs about £0.3bn a year (an estimate: the cost was not found published)"
+type = "real"
+unit = "journey/month"
+value = 31250000.0
+
+[var.bus_fare_cost_change]
+label = "Bus fare cap: cost against 2024"
+doc = "Support to bus companies for fares the cap holds below the uncapped fare, against the £2 cap"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(bus_capped_journeys * (max(bus_fare_uncapped - bus_fare_cap, 0) - (bus_fare_uncapped - bus_fare_cap_2024)))"
+
+# ================================================================= environment and energy
+
+[lever.insulation_programme]
+label = "Home insulation programme"
+group = "Environment and energy"
+type = "money"
+unit = "GBP/month"
+default = 0
+range = [0, 400000000]
+leaning = "left"
+capital_weight = 0.5
+doc = "Public money to insulate homes, beyond the schemes of 2024, in 2024 prices: none at the start. About £5,000 treats a home, cutting its heating, its bills and its emissions for good."
+
+[param.insulation_cost_per_home]
+doc = "Public money to insulate a home (a judgement across loft, cavity and solid wall insulation)"
+type = "money"
+unit = "GBP/home"
+value = 5000
+
+[param.homes_2024]
+doc = "Households in the UK, about 28.4 million (an estimate from ONS's Families and households)"
+type = "real"
+unit = "home"
+value = 28400000.0
+
+[param.insulation_saving]
+doc = "The share of a home's heating that insulation saves (a judgement)"
+type = "real"
+unit = "1"
+value = 0.15
+
+[param.household_heating_share]
+doc = "Heating's share of households' own emissions (a judgement; the rest is mostly driving)"
+type = "real"
+unit = "1"
+value = 0.55
+
+[param.household_car_share]
+doc = "Driving's share of households' own emissions (a judgement)"
+type = "real"
+unit = "1"
+value = 0.45
+
+[param.insulation_bill_saving]
+doc = "What an insulated home saves on its energy bills a month (a judgement, about £180 a year)"
+type = "money"
+unit = "GBP/month/home"
+value = 15
+
+[state.homes_insulated]
+label = "Homes insulated by the programme"
+type = "real"
+unit = "home"
+phase = "accounts"
+initial = 0.0
+next = "homes_insulated + times_step(insulation_programme / insulation_cost_per_home)"
+
+[var.insulation_cost]
+label = "Home insulation programme"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(insulation_programme * trend_index)"
+
+[var.energy_bills_saved]
+label = "Energy bills saved by insulation"
+type = "money"
+unit = "GBP/month"
+phase = "accounts"
+expr = "round(homes_insulated * insulation_bill_saving * trend_index)"
+
+[var.household_emissions_factor]
+doc = "Households' emissions against what they would be with every policy as in 2024: less driving, more electric cars and insulated homes"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "1.0 - household_car_share * (1.0 - fuel_volume * (1.0 - ev_fleet_extra)) - household_heating_share * insulation_saving * min(homes_insulated / homes_2024, 1.0)"
+
+# ================================================================= education
+
+[lever.tuition_fee_cap]
+label = "University tuition fee cap"
+group = "Education"
+type = "money"
+unit = "GBP/student"
+default = 9250
+range = [0, 15000]
+leaning = "right"
+capital_weight = 1.0
+doc = "The most English universities may charge a home student a year: £9,250 in 2024, paid with student loans. A higher cap gives universities more, at a public cost for the loans never repaid, and puts some students off; the young dislike it."
+
+[lever.free_school_meals]
+label = "Free school meals"
+group = "Education"
+type = "int"
+unit = "1"
+default = 0
+range = [0, 2]
+leaning = "left"
+capital_weight = 0.5
+doc = "Who gets free school meals in England: the poorest families (0, as in 2024, about a quarter of pupils), all families on Universal Credit (1), or all pupils (2). Wider meals cost more and lift attainment a little; parents welcome them."
+
+[param.tuition_fee_2024]
+doc = "The tuition fee cap in England for 2024-25"
+type = "money"
+unit = "GBP/student"
+value = 9250
+
+[param.fee_paying_students]
+doc = "Students paying the full fee, about 1.08 million (an estimate: about £10bn of fee income over £9,250)"
+type = "real"
+unit = "student"
+value = 1080000.0
+
+[param.tuition_unrepaid_share]
+doc = "The share of fee loans never repaid, a public cost (a judgement, about three tenths)"
+type = "real"
+unit = "1"
+value = 0.3
+
+[param.tuition_fee_step]
+doc = "£1,000 a year: the step at which reactions to fees are stated"
+type = "money"
+unit = "GBP/student"
+value = 1000
+
+[var.fee_paying_students_now]
+label = "Students paying fees"
+doc = "A tenth fewer for each doubling of the fee (a judgement: the tripling of 2012 did little to numbers)"
+type = "real"
+unit = "student"
+phase = "labour"
+expr = "fee_paying_students * max(1.0 - 0.1 * (tuition_fee_cap / tuition_fee_2024 - 1.0), 0.5)"
+
+[var.tuition_cost_change]
+label = "Tuition fees: public cost against 2024"
+doc = "The share of fee loans never repaid, on fees above or below 2024's"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(per_step(tuition_fee_cap * fee_paying_students_now - tuition_fee_2024 * fee_paying_students) * tuition_unrepaid_share / 12.0)"
+
+[param.school_meal_cost]
+doc = "Free meals for a pupil a month: £2.61 a meal over 190 school days, about £496 a year (the 2024-25 rate), in pence"
+type = "real"
+unit = "GBP/month/pupil"
+value = 4133.333333333333
+
+[param.meals_pupils_universal_credit]
+doc = "Pupils who would gain free meals if all families on Universal Credit had them (an estimate, about half a million)"
+type = "real"
+unit = "pupil"
+value = 500000.0
+
+[param.meals_pupils_all]
+doc = "Pupils in England without free meals in 2024: about 9 million less 2.1 million eligible and 1.3 million infants already fed (an estimate)"
+type = "real"
+unit = "pupil"
+value = 5500000.0
+
+[var.school_meals_cost]
+label = "Free school meals: cost of wider meals"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(select(free_school_meals == 1, meals_pupils_universal_credit, select(free_school_meals == 2, meals_pupils_all, 0.0)) * school_meal_cost * trend_index)"
+
+[param.attainment_2024]
+doc = "Pupils in England reaching grade 5 or above in English and maths GCSE, 2023-24 (DfE, Key stage 4 performance)"
+type = "real"
+unit = "1"
+value = 0.459
+
+[param.attainment_service_effect]
+doc = "Points of attainment per unit of the education service level (a judgement: a tenth more spending per pupil adds about 1.5 points over some years)"
+type = "real"
+unit = "1"
+value = 0.15
+
+[state.school_attainment]
+label = "School attainment"
+doc = "Pupils in England reaching grade 5 in English and maths GCSE: 45.9% in 2023-24. It follows spending per pupil and free school meals over about two years (meals for all families on Universal Credit add 0.2 points, for all pupils 0.8: judgements)"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.459
+next = "school_attainment + (attainment_2024 + attainment_service_effect * (service_level[function: 1] - 1.0) + select(free_school_meals == 1, 0.002, select(free_school_meals == 2, 0.008, 0.0)) - school_attainment) / 24.0"
+
+# ================================================================= housing
+
+[lever.planning_rules]
+label = "Planning rules"
+group = "Housing"
+type = "int"
+unit = "1"
+default = 2
+range = [0, 4]
+leaning = "right"
+capital_weight = 1.0
+doc = "How readily new homes get permission, from very restrictive (0) to very liberal (4); 2 is the 2024 rules. Each step toward liberal builds about 7.5% more homes within two years and more construction; home owners resist it, renters welcome it."
+
+[lever.social_housing]
+label = "Social housing programme"
+group = "Housing"
+type = "money"
+unit = "GBP/month"
+default = 0
+range = [0, 500000000]
+leaning = "left"
+capital_weight = 0.6
+doc = "Public money for new social homes, beyond the programmes of 2024, in 2024 prices: none at the start. About £150,000 builds a home, finished about two years on."
+
+[lever.rent_controls]
+label = "Rent controls"
+group = "Housing"
+type = "int"
+unit = "1"
+default = 0
+range = [0, 2]
+leaning = "left"
+capital_weight = 1.0
+doc = "Limits on private rents: none (0, England in 2024), rises capped each year (1), or strict limits (2). Renters welcome them; landlords build and let fewer homes."
+
+[param.homes_built_2024]
+doc = "Net additional dwellings in England, 2023-24 (Ministry of Housing, Housing supply: net additional dwellings)"
+type = "real"
+unit = "home"
+value = 221070.0
+
+[param.planning_step]
+doc = "Homes built for each step of planning rules (a judgement from the OBR's estimate that the 2024 reforms add about 170,000 homes over five years, some 15%)"
+type = "real"
+unit = "1"
+value = 0.075
+
+[param.social_home_cost]
+doc = "Public money for a new social home (a judgement)"
+type = "money"
+unit = "GBP/home"
+value = 150000
+
+[state.homes_policy_level]
+label = "Homes built: the policies' effect"
+doc = "Private homes built against what they would be with 2024's rules, following planning rules and rent controls over about two years (rent controls: 2% fewer when capped, 6% when strict, judgements); households' investment in homes follows it"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 1.0
+next = "homes_policy_level + ((1.0 + planning_step * (planning_rules - 2)) * (1.0 - select(rent_controls == 1, 0.02, select(rent_controls == 2, 0.06, 0.0))) - homes_policy_level) / 24.0"
+
+[state.social_homes_rate]
+label = "Social homes built a year by the programme"
+type = "real"
+unit = "home"
+phase = "accounts"
+initial = 0.0
+next = "social_homes_rate + (12.0 * times_step(social_housing / social_home_cost) - social_homes_rate) / 24.0"
+
+[var.homes_built]
+label = "Homes built (a year)"
+doc = "Net additional homes in England a year: 221,070 in 2023-24. More with liberal planning and a social housing programme, fewer with rent controls"
+type = "real"
+unit = "home"
+phase = "accounts"
+expr = "homes_built_2024 * homes_policy_level + social_homes_rate"
+
+[var.social_housing_cost]
+label = "Social housing programme"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(social_housing * trend_index)"
+
+# ================================================================= welfare
+
+[lever.winter_fuel_payment]
+label = "Winter Fuel Payment"
+group = "Welfare"
+type = "int"
+unit = "1"
+default = 1
+range = [0, 2]
+leaning = "left"
+capital_weight = 1.0
+doc = "A payment of £200 or £300 to pensioners each winter: none (0), only to those on Pension Credit (1, from the winter of 2024), or to every pensioner (2), which costs about £1.4bn a year more. Pensioners care about it a great deal."
+
+[param.winter_fuel_universal]
+doc = "What paying every pensioner costs more than the means test, a month: about £1.4bn a year (as reported when the means test was brought in)"
+type = "money"
+unit = "GBP/month"
+value = 116666666.67
+
+[param.winter_fuel_means_tested]
+doc = "What the means-tested payment costs a month: about 1.5 million pensioners, about £0.4bn a year (an estimate)"
+type = "money"
+unit = "GBP/month"
+value = 33333333.33
+
+[var.winter_fuel_change]
+label = "Winter Fuel Payment: cost against 2024"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "round(select(winter_fuel_payment == 2, winter_fuel_universal, select(winter_fuel_payment == 0, 0 - winter_fuel_means_tested, 0)) * trend_index)"
+
+# ================================================================= foreign and trade
+
+[lever.visa_threshold]
+label = "Skilled worker visa salary threshold"
+group = "Foreign and trade"
+type = "money"
+unit = "GBP/worker"
+default = 38700
+range = [20000, 60000]
+leaning = "right"
+capital_weight = 0.8
+doc = "The least a job must pay for a skilled worker visa: £38,700 from April 2024 (up from £26,200). A higher threshold cuts net migration and the labour force; older voters welcome it, business does not."
+
+[param.visa_threshold_2024]
+doc = "The skilled worker salary threshold from 4 April 2024"
+type = "money"
+unit = "GBP/worker"
+value = 38700
+
+[param.visa_reaction_step]
+doc = "£10,000: the step at which reactions to the threshold are stated"
+type = "money"
+unit = "GBP/worker"
+value = 10000
+
+[table.visa_migration]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+# Net migration a year, in thousands, against the threshold over 2024's (a judgement: the Home
+# Office reckoned the 2024 rise would stop about 300,000 visas a year, with dependants, and
+# about a third of that shows in net migration; the effect tails off far from today's).
+points = [{ x = 0.517, y = 100.0 }, { x = 1.0, y = 0.0 }, { x = 1.55, y = -110.0 }]
+
+[param.visa_migration_scale]
+doc = "A thousand people: the curve's unit"
+type = "real"
+unit = "person"
+value = 1000.0
+
+[param.migrant_labour_share]
+doc = "The share of net migrants who join the labour force (a judgement)"
+type = "real"
+unit = "1"
+value = 0.6
+
+[state.migration_change]
+label = "Net migration from the policies (a year)"
+doc = "Net migration a year above or below what the population model has, following the visa threshold over about a year"
+type = "real"
+unit = "person"
+phase = "accounts"
+initial = 0.0
+next = "migration_change + (visa_migration_scale * curve(visa_threshold / visa_threshold_2024, visa_migration) - migration_change) / 12.0"
+
+[var.policy_migration_factor]
+doc = "Net arrivals against the population model's own, the rate of the year to mid-2024"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "1.0 + migration_change / (12.0 * sum(net_migration, region))"
+
+[var.net_migration_annual]
+label = "Net migration (a year)"
+doc = "Net arrivals in the UK a year: 739,000 in the year to June 2024 (ONS), as the population model has them. A higher visa salary threshold cuts it"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "12.0 * sum(net_migration, region) * policy_migration_factor"
+
+[var.policy_labour_force_growth]
+doc = "This month's growth in the labour force from the policies' net migration"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "migrant_labour_share * migration_change / 12.0 / labour_force"
+
+# ================================================================= the money, in the accounts
+
+[var.policy_duties]
+label = "Duties and levies: change from 2024 rates"
+doc = "Fuel, alcohol and tobacco duty, the soft drinks levy and a cannabis tax against 2024's; paid with the taxes on production, and passed on to shop prices"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "fuel_duty_change + alcohol_duty_change + tobacco_duty_change + sugar_levy_change + cannabis_tax_receipts"
+
+[var.policy_charges]
+label = "Charges: change from 2024"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "prescription_charge_change"
+
+[var.policy_purchases]
+label = "Policies' purchases"
+doc = "Prisons, the public cost of tuition fees and free school meals, against 2024's"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "prison_cost_change + tuition_cost_change + school_meals_cost"
+
+[var.policy_investment]
+label = "Policies' investment"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "insulation_cost + social_housing_cost"
+
+[var.policy_subsidies]
+label = "Policies' subsidies"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "ev_grant_cost + bus_fare_cost_change"
+
+[var.policy_benefits]
+label = "Policies' benefits"
+type = "money"
+unit = "GBP/month"
+phase = "labour"
+expr = "winter_fuel_change"
+
+# ================================================================= reactions
+
+[param.billion_a_year]
+doc = "£1bn a year, a month: the step at which reactions to spending are stated"
+type = "money"
+unit = "GBP/month"
+value = 83333333.33
+
+# What each kind of voter thinks of a policy for itself, apart from what it does: utility for
+# the governing blocs, by voter type, through the groups' membership (politics.toml). All are
+# judgements, sized so that a policy at an end of its range moves its groups' approval by a
+# point or two and the national rating by tenths of a point (models/uk/POLICIES.md). A
+# standing of -0.02 weighs on a voter type as much as about a third of a point more
+# unemployment in its region.
+
+[var.standing_drinking_age]
+doc = "The young: -0.02 for each year above 18, +0.005 below; drinkers -0.01 above; pensioners +0.005 above, -0.01 below"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "group_member[group: young] * (0.005 * max(18 - drinking_age, 0) - 0.02 * max(drinking_age - 18, 0)) - group_member[group: drinkers] * 0.01 * max(drinking_age - 18, 0) + group_member[group: pensioner] * (0.005 * max(drinking_age - 18, 0) - 0.01 * max(18 - drinking_age, 0))"
+
+[var.standing_sentencing]
+doc = "Pensioners +0.01 for each step tougher, the young -0.01"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(group_member[group: pensioner] - group_member[group: young]) * 0.01 * (sentencing - 2)"
+
+[var.standing_cannabis]
+doc = "For each step toward legal sale: the young +0.015, pensioners -0.02, parents -0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.015 * group_member[group: young] - 0.02 * group_member[group: pensioner] - 0.005 * group_member[group: parents]) * cannabis_law"
+
+[var.standing_alcohol_duty]
+doc = "Drinkers -0.04 for each multiple of the 2024 duty above it, +0.04 below"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.0 - 0.04 * group_member[group: drinkers] * (alcohol_duty - 1.0)"
+
+[var.standing_tobacco_duty]
+doc = "Smokers -0.06 for each multiple of the 2024 duty above it, +0.06 below"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.0 - 0.06 * group_member[group: smokers] * (tobacco_duty - 1.0)"
+
+[var.standing_sugar_levy]
+doc = "Low incomes and parents -0.005 each for each multiple of the 2024 levy above it"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.0 - 0.005 * (group_member[group: low_income] + group_member[group: parents]) * (sugar_levy - 1.0)"
+
+[var.standing_prescription_charge]
+doc = "Mid-life and low incomes -0.02 each for a doubling of the charge (most pensioners and children are exempt)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.0 - 0.02 * (group_member[group: midlife] + group_member[group: low_income]) * (prescription_charge / prescription_charge_2024 - 1.0)"
+
+[var.standing_fuel_duty]
+doc = "Motorists -0.004 for each penny above 52.95, +0.002 for each penny below (a rise is resented more than a cut is thanked); the young +0.0005 a penny"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "group_member[group: motorists] * (0.002 * max(fuel_duty_2024 - fuel_duty, 0.0) - 0.004 * max(fuel_duty - fuel_duty_2024, 0.0)) / fuel_duty_penny + group_member[group: young] * 0.0005 * (fuel_duty - fuel_duty_2024) / fuel_duty_penny"
+
+[var.standing_ev_grant]
+doc = "For each £1,000 a car: the young +0.005, motorists +0.002"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.005 * group_member[group: young] + 0.002 * group_member[group: motorists]) * 3.0 * (ev_grant / ev_grant_reference)"
+
+[var.standing_bus_fare_cap]
+doc = "Low incomes and the young -0.01 each for each pound above £2, +0.01 below"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.0 - 0.01 * (group_member[group: low_income] + group_member[group: young]) * (bus_fare_cap / bus_fare_cap_2024 - 1.0) * 2.0"
+
+[var.standing_insulation]
+doc = "For each £1bn a year: low incomes +0.008, the young +0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.008 * group_member[group: low_income] + 0.005 * group_member[group: young]) * insulation_programme / billion_a_year"
+
+[var.standing_petrol_ban]
+doc = "For each year earlier than 2030: motorists -0.01, the young +0.012 (most of the young are motorists too, so on balance they gain); for each year later: motorists +0.004, the young -0.012"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "group_member[group: motorists] * (0.004 * max(petrol_ban_year - petrol_ban_2024, 0) - 0.01 * max(petrol_ban_2024 - petrol_ban_year, 0)) + group_member[group: young] * (0.012 * max(petrol_ban_2024 - petrol_ban_year, 0) - 0.012 * max(petrol_ban_year - petrol_ban_2024, 0))"
+
+[var.standing_tuition]
+doc = "For each £1,000 above £9,250: the young -0.01, parents -0.003; for each £1,000 below: the young +0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(group_member[group: young] * (0.005 * max(tuition_fee_2024 - tuition_fee_cap, 0) - 0.01 * max(tuition_fee_cap - tuition_fee_2024, 0)) - group_member[group: parents] * 0.003 * max(tuition_fee_cap - tuition_fee_2024, 0)) / tuition_fee_step"
+
+[var.standing_school_meals]
+doc = "For each step wider: parents +0.01, lone parents +0.02 more, high incomes -0.003"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.01 * group_member[group: parents] + 0.02 * group_member[group: lone_parents] - 0.003 * group_member[group: high_income]) * free_school_meals"
+
+[var.standing_planning]
+doc = "For each step toward liberal: home owners -0.01, renters +0.008, the young +0.005; toward restrictive: home owners +0.005, renters -0.008, the young -0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "group_member[group: home_owners] * (0.005 * max(2 - planning_rules, 0) - 0.01 * max(planning_rules - 2, 0)) + (0.008 * group_member[group: renters] + 0.005 * group_member[group: young]) * (planning_rules - 2)"
+
+[var.standing_social_housing]
+doc = "For each £1bn a year: renters +0.01, low incomes +0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.01 * group_member[group: renters] + 0.005 * group_member[group: low_income]) * social_housing / billion_a_year"
+
+[var.standing_rent_controls]
+doc = "For each step tighter: renters +0.03, home owners -0.01, the self-employed -0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.03 * group_member[group: renters] - 0.01 * group_member[group: home_owners] - 0.005 * group_member[group: self_employed]) * rent_controls"
+
+[var.standing_winter_fuel]
+doc = "Pensioners +0.04 for paying every pensioner, -0.04 for paying none, against the means test"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "0.04 * group_member[group: pensioner] * (winter_fuel_payment - 1)"
+
+[var.standing_visa_threshold]
+doc = "For each £10,000 above £38,700: pensioners +0.01, the young -0.01, the self-employed -0.005"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "(0.01 * group_member[group: pensioner] - 0.01 * group_member[group: young] - 0.005 * group_member[group: self_employed]) * (visa_threshold - visa_threshold_2024) / visa_reaction_step"
+
+[var.policy_standing]
+label = "Policies, on the government's standing"
+doc = "What voters of each type think of the government's policies for themselves, apart from what they do: added to government_standing"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "standing_drinking_age + standing_sentencing + standing_cannabis + standing_alcohol_duty + standing_tobacco_duty + standing_sugar_levy + standing_prescription_charge + standing_fuel_duty + standing_ev_grant + standing_bus_fare_cap + standing_insulation + standing_petrol_ban + standing_tuition + standing_school_meals + standing_planning + standing_social_housing + standing_rent_controls + standing_winter_fuel + standing_visa_threshold"

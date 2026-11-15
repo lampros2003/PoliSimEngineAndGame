@@ -55,7 +55,7 @@ label = "Social benefits"
 from = "government"
 to = "households"
 phase = "income"
-expr = "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index) + child_benefit_total + universal_credit_total"
+expr = "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index) + child_benefit_total + universal_credit_total + policy_benefits"
 
 [var.payout_factor]
 label = "Firms' payout relative to 2024"
@@ -142,28 +142,28 @@ label = "Household investment in homes"
 from = "households"
 to = "firms"
 phase = "spending"
-expr = "round(dwellings_share * disposable_income)"
+expr = "round(dwellings_share * disposable_income * homes_policy_level)"
 
 [flow.procurement]
 label = "Public purchases"
 from = "government"
 to = "firms"
 phase = "spending"
-expr = "round(procurement_bill * trend_index)"
+expr = "round(procurement_bill * trend_index) + policy_purchases"
 
 [flow.public_investment]
 label = "Public investment"
 from = "government"
 to = "firms"
 phase = "spending"
-expr = "round(public_investment_bill * trend_index)"
+expr = "round(public_investment_bill * trend_index) + policy_investment"
 
 [flow.subsidies]
 label = "Subsidies"
 from = "government"
 to = "firms"
 phase = "spending"
-expr = "round(subsidies_bill * trend_index)"
+expr = "round(subsidies_bill * trend_index) + policy_subsidies"
 
 [flow.transfers_abroad]
 label = "Aid and other transfers"
@@ -214,7 +214,7 @@ from = "firms"
 to = "government"
 phase = "spending"
 doc = "Business rates, fuel duty, alcohol and tobacco duties, stamp duty and the like"
-expr = "round(production_tax_rate * private_demand)"
+expr = "round(production_tax_rate * private_demand) + policy_duties"
 
 [var.operating_profit]
 label = "Firms' operating profit"
@@ -236,7 +236,7 @@ from = "firms"
 to = "government"
 phase = "spending"
 doc = "Interest and dividends received, rents, other taxes and fees"
-expr = "round(other_receipts_share * private_demand)"
+expr = "round(other_receipts_share * private_demand) + policy_charges"
 
 # ================================================================= phase: finance
 

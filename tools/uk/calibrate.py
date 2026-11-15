@@ -473,7 +473,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
-               "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml")
+               "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml")
               if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
@@ -527,6 +527,15 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     fills["customs_receipts"] = " + customs_duties + carbon_tax_firms + carbon_tax_households" if people else ""
     # Stage S9.3: private pay makes up part of consumer prices' rise above the deflator's.
     fills["pay_catchup"] = " + wage_catchup * price_wedge_growth" if people else ""
+    # Stage S13.5: where the policies of policies.toml reach the economy, each a single term
+    # that is zero (or a factor of one) with every policy at its 2024 setting.
+    hooks = {"policy_purchases": " + policy_purchases", "policy_investment": " + policy_investment",
+             "policy_subsidies": " + policy_subsidies", "policy_duties": " + policy_duties",
+             "policy_charges": " + policy_charges", "dwellings_factor": " * homes_policy_level",
+             "policy_labour": " + policy_labour_force_growth"}
+    fills.update({k: (v if people else "") for k, v in hooks.items()})
+    if people:
+        fills["benefits_expr"] += " + policy_benefits"
     for name in ("model.toml", "economy.toml",
                  *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml", "functions.toml",
                                                   "emissions.toml", "nhs.toml"))):

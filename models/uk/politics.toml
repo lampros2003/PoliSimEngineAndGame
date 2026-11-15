@@ -319,12 +319,12 @@ high = 1.5
 
 [var.issue_measure]
 label = "The issues, by measure"
-doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels, and the path to net zero over actual emissions"
+doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels (policing also over the policies' effect on crime, stage S13.5), and the path to net zero over actual emissions"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["issue"]
-expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3], net_zero_path / emissions)))"
+expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3] / crime_policy_level, net_zero_path / emissions)))"
 
 [state.issue_at_election]
 doc = "Each issue's measure at the last election; the base month's stands in for July 2024's (-1 until it is known)"
@@ -336,13 +336,13 @@ initial = -1.0
 next = "select(issue_at_election < 0.0 or election_now, issue_measure, issue_at_election)"
 
 [var.government_standing]
-label = "Answers to dilemmas, on the government's standing"
-doc = "What the government's answers to the questions put to it add to or take from its standing with each kind of voter (stage S9.2); nothing until an answer that changes it is in force"
+label = "Answers to dilemmas and policies, on the government's standing"
+doc = "What the government's answers to the questions put to it (stage S9.2) and its policies (policy_standing, stage S13.5) add to or take from its standing with each kind of voter; nothing until an answer or a policy that changes it is in force"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 * type_age"
+expr = "0.0 * type_age + policy_standing"
 
 [var.voter_jobs]
 doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
@@ -438,8 +438,8 @@ expr = "sum(select(governing, vote_intention, 0.0), bloc)"
 # ---- stage S13.4: interest groups (models/uk/politics/README.md, Groups)
 
 [dim.group]
-members = ["young", "midlife", "pensioner", "low_income", "middle_income", "high_income", "in_work", "out_of_work", "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"]
-labels = ["The young", "Mid-life", "Pensioners", "Low incomes", "Middle incomes", "High incomes", "In work", "Out of work", "Parents", "Lone parents", "The self-employed", "Scotland", "Wales", "Northern Ireland", "London", "The North", "The Midlands", "The South"]
+members = ["young", "midlife", "pensioner", "low_income", "middle_income", "high_income", "in_work", "out_of_work", "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north", "midlands", "south", "motorists", "home_owners", "renters", "drinkers", "smokers"]
+labels = ["The young", "Mid-life", "Pensioners", "Low incomes", "Middle incomes", "High incomes", "In work", "Out of work", "Parents", "Lone parents", "The self-employed", "Scotland", "Wales", "Northern Ireland", "London", "The North", "The Midlands", "The South", "Motorists", "Home owners", "Renters", "Drinkers", "Smokers"]
 
 [var.voters_parents]
 doc = "Adults aged 18 and over in the group 'parents', by voter type, from the households"
@@ -465,13 +465,53 @@ phase = "politics"
 dims = ["voter_type"]
 expr = "wsum_by(household, select(self_employed1, adult_voter1, 0), voter_type, voter_type_of1) + wsum_by(household, select(self_employed2, adult_voter2, 0), voter_type, voter_type_of2) + wsum_by(household, select(self_employed3, adult_voter3, 0), voter_type, voter_type_of3) + wsum_by(household, select(self_employed4, adult_voter4, 0), voter_type, voter_type_of4)"
 
+[param.estimated_member_motorists]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'motorists', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "motorists"
+
+[param.estimated_member_home_owners]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'home_owners', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "home_owners"
+
+[param.estimated_member_renters]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'renters', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "renters"
+
+[param.estimated_member_drinkers]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'drinkers', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "drinkers"
+
+[param.estimated_member_smokers]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'smokers', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "smokers"
+
 [var.group_member]
-doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed"
+doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed; estimated for motorists, home owners, renters, drinkers and smokers (stage S13.5)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type", "group"]
-expr = "select(coord(group) == 0, select(type_age <= 1, 1.0, 0.0), select(coord(group) == 1, select(type_age == 2 or type_age == 3, 1.0, 0.0), select(coord(group) == 2, select(type_age == 4, 1.0, 0.0), select(coord(group) == 3, select(type_quintile == 0, 1.0, 0.0), select(coord(group) == 4, select(type_quintile >= 1 and type_quintile <= 3, 1.0, 0.0), select(coord(group) == 5, select(type_quintile == 4, 1.0, 0.0), select(coord(group) == 6, select(type_in_work == 1, 1.0, 0.0), select(coord(group) == 7, select(type_in_work == 0 and type_age <= 3, 1.0, 0.0), select(coord(group) == 8, safe_div(1.0 * voters_parents, 1.0 * voters, 0.0), select(coord(group) == 9, safe_div(1.0 * voters_lone_parents, 1.0 * voters, 0.0), select(coord(group) == 10, safe_div(1.0 * voters_self_employed, 1.0 * voters, 0.0), select(coord(group) == 11, select(type_region == 10, 1.0, 0.0), select(coord(group) == 12, select(type_region == 9, 1.0, 0.0), select(coord(group) == 13, select(type_region == 11, 1.0, 0.0), select(coord(group) == 14, select(type_region == 6, 1.0, 0.0), select(coord(group) == 15, select(type_region <= 2, 1.0, 0.0), select(coord(group) == 16, select(type_region == 3 or type_region == 4, 1.0, 0.0), select(type_region == 5 or type_region == 7 or type_region == 8, 1.0, 0.0))))))))))))))))))"
+expr = "select(coord(group) == 0, select(type_age <= 1, 1.0, 0.0), select(coord(group) == 1, select(type_age == 2 or type_age == 3, 1.0, 0.0), select(coord(group) == 2, select(type_age == 4, 1.0, 0.0), select(coord(group) == 3, select(type_quintile == 0, 1.0, 0.0), select(coord(group) == 4, select(type_quintile >= 1 and type_quintile <= 3, 1.0, 0.0), select(coord(group) == 5, select(type_quintile == 4, 1.0, 0.0), select(coord(group) == 6, select(type_in_work == 1, 1.0, 0.0), select(coord(group) == 7, select(type_in_work == 0 and type_age <= 3, 1.0, 0.0), select(coord(group) == 8, safe_div(1.0 * voters_parents, 1.0 * voters, 0.0), select(coord(group) == 9, safe_div(1.0 * voters_lone_parents, 1.0 * voters, 0.0), select(coord(group) == 10, safe_div(1.0 * voters_self_employed, 1.0 * voters, 0.0), select(coord(group) == 11, select(type_region == 10, 1.0, 0.0), select(coord(group) == 12, select(type_region == 9, 1.0, 0.0), select(coord(group) == 13, select(type_region == 11, 1.0, 0.0), select(coord(group) == 14, select(type_region == 6, 1.0, 0.0), select(coord(group) == 15, select(type_region <= 2, 1.0, 0.0), select(coord(group) == 16, select(type_region == 3 or type_region == 4, 1.0, 0.0), select(coord(group) == 17, select(type_region == 5 or type_region == 7 or type_region == 8, 1.0, 0.0), select(coord(group) == 18, estimated_member_motorists, select(coord(group) == 19, estimated_member_home_owners, select(coord(group) == 20, estimated_member_renters, select(coord(group) == 21, estimated_member_drinkers, estimated_member_smokers))))))))))))))))))))))"
 
 [var.governing_choice]
 doc = "Share of each voter type choosing a governing bloc"
@@ -801,6 +841,76 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "group_share[group: 17]"
+
+[var.approval_motorists]
+label = "Approval: motorists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 18]"
+
+[var.share_motorists]
+label = "Share of the electorate: motorists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 18]"
+
+[var.approval_home_owners]
+label = "Approval: home owners"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 19]"
+
+[var.share_home_owners]
+label = "Share of the electorate: home owners"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 19]"
+
+[var.approval_renters]
+label = "Approval: renters"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 20]"
+
+[var.share_renters]
+label = "Share of the electorate: renters"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 20]"
+
+[var.approval_drinkers]
+label = "Approval: drinkers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 21]"
+
+[var.share_drinkers]
+label = "Share of the electorate: drinkers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 21]"
+
+[var.approval_smokers]
+label = "Approval: smokers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 22]"
+
+[var.share_smokers]
+label = "Share of the electorate: smokers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 22]"
 
 [var.household_support]
 label = "Support for the government in the household"

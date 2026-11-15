@@ -61,7 +61,37 @@ GROUPS = [
     ("north", "The North", "the North", "type_region <= 2"),
     ("midlands", "The Midlands", "the Midlands", "type_region == 3 or type_region == 4"),
     ("south", "The South", "the South", "type_region == 5 or type_region == 7 or type_region == 8"),
+    # Stage S13.5: groups the policies of policies.toml need, estimated (below, ESTIMATED).
+    ("motorists", "Motorists", "motorists", "estimated_member_motorists"),
+    ("home_owners", "Home owners", "home owners", "estimated_member_home_owners"),
+    ("renters", "Renters", "renters", "estimated_member_renters"),
+    ("drinkers", "Drinkers", "drinkers", "estimated_member_drinkers"),
+    ("smokers", "Smokers", "smokers", "estimated_member_smokers"),
 ]
+# Stage S13.5: the estimated groups' membership, the share of a voter type's adults in the
+# group, from published shares by household income quintile and age band (models/uk/POLICIES.md,
+# Groups). A share is the age band's figure times the quintile's factor, scaled so that the
+# share of all adults is the published total where one is given, and at most 0.98. The tables
+# count households or adults as their sources do; every figure not marked as published is an
+# estimate. Renters are the adults who are not home owners.
+ESTIMATED = {
+    # DfT, National Travel Survey 2024, households with a car or van, England: 60% of the
+    # poorest fifth, 86% of the richest (published); the middle fifths are read off its chart
+    # (estimates); 78% of all households.
+    "motorists": {"quintile": [0.60, 0.73, 0.83, 0.88, 0.86]},
+    # English Housing Survey 2023-24: 65% of households own their home (published); by the
+    # age of the household reference person and by income, estimates shaped like its tables
+    # (social renting is concentrated in the poorest two fifths, mortgagors in the richest).
+    "home_owners": {"age": [0.11, 0.42, 0.64, 0.74, 0.79], "quintile": [0.65, 0.9, 1.05, 1.15, 1.2],
+                    "total": 0.65},
+    # Health Survey for England: adults who drank in the last week, about 46% at 18 to 24 (a
+    # secondary report); the rest by age and income, and the total of 49%, are estimates.
+    "drinkers": {"age": [0.46, 0.50, 0.52, 0.58, 0.55], "quintile": [0.75, 0.9, 1.0, 1.1, 1.25], "total": 0.49},
+    # ONS, Adult smoking habits in the UK 2024: 10.6% of adults, 8.1% at 18 to 24, 12.6% at 25
+    # to 34, 7.1% at 65 and over (published); 35 to 64 and the income factors (routine and
+    # manual workers smoke three times as often as managers and professionals) are estimates.
+    "smokers": {"age": [0.081, 0.126, 0.115, 0.110, 0.071], "quintile": [1.6, 1.25, 1.0, 0.8, 0.6], "total": 0.106},
+}
 # The group dimension's member where the key is already an element's name (households.toml).
 MEMBER = {"pensioners": "pensioner"}
 # Each household group: the adult slots counted, and the condition on the household and slot.
@@ -242,6 +272,18 @@ def fit(voters: list[float], targets: list[list[float]], preset: str = "central"
     return alpha, worst
 
 
+def estimated_members(voters: list[float]) -> dict[str, list[float]]:
+    """Stage S13.5: each estimated group's share of each voter type's adults (ESTIMATED)."""
+    types = voter_types()
+    out = {}
+    for key, table in ESTIMATED.items():
+        raw = [table.get("age", [1.0] * 5)[a] * table.get("quintile", [1.0] * 5)[q] for _, a, q, _ in types]
+        scale = table["total"] * sum(voters) / sum(n * s for n, s in zip(voters, raw)) if "total" in table else 1.0
+        out[key] = [min(s * scale, 0.98) for s in raw]
+    out["renters"] = [1.0 - s for s in out["home_owners"]]
+    return out
+
+
 def write(out_dir: Path, households: Path) -> tuple[str, float]:
     """Writes out_dir/politics/ and returns the text of politics.toml and the fit."""
     folder = out_dir / "politics"
@@ -259,6 +301,10 @@ def write(out_dir: Path, households: Path) -> tuple[str, float]:
            for r in range(len(REGIONS)) for k, o in enumerate(OPTIONS)])
     table("age_effects.csv", "voter_age,option,value",
           [f"{AGES[g][0]},{o},{ASSUMPTIONS['age_effect'][o][g]!r}" for g in range(len(AGES)) for o in OPTIONS])
+    estimated = estimated_members(voters)
+    keys = [g[0] for g in GROUPS if g[0] in estimated]
+    table("estimated_groups.csv", "voter_type," + ",".join(keys),
+          [f"{t}," + ",".join(repr(estimated[k][t]) for k in keys) for t in range(len(voters))])
     table("voter_ages.csv", "age,value", [f"{age},{age_band(age)}" for age in range(91)])
     table("quintiles.csv", "decile,value", [f"{d},{(d - 1) // 2}" for d in range(1, 11)])
     table("governing.csv", "bloc,value", [f"{b},{str(b in ASSUMPTIONS['governing']).lower()}" for b in BLOCS])
@@ -319,14 +365,26 @@ phase = "politics"
 dims = ["voter_type"]
 expr = "{terms}"
 '''
+    for key, _, _, cond in GROUPS:
+        if cond == f"estimated_member_{key}":
+            out += f'''
+[param.estimated_member_{key}]
+doc = "Stage S13.5: the share of each voter type's adults in the group '{key}', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "{key}"
+'''
     member = "0.0"
     for k in reversed(range(len(GROUPS))):
         key, _, _, cond = GROUPS[k]
-        here = f"safe_div(1.0 * voters_{key}, 1.0 * voters, 0.0)" if cond is None else f"select({cond}, 1.0, 0.0)"
+        here = (f"safe_div(1.0 * voters_{key}, 1.0 * voters, 0.0)" if cond is None else cond
+                if cond.startswith("estimated_member_") else f"select({cond}, 1.0, 0.0)")
         member = here if k == len(GROUPS) - 1 else f"select(coord(group) == {k}, {here}, {member})"
     out += f'''
 [var.group_member]
-doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed"
+doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed; estimated for motorists, home owners, renters, drinkers and smokers (stage S13.5)"
 type = "real"
 unit = "1"
 phase = "politics"
@@ -413,6 +471,8 @@ entity = "household"
 expr = "safe_div({" + ".join(f"select({voter.format(i=i)}, governing_choice[voter_type: voter_type_of{i}], 0.0)" for i in range(1, ADULTS + 1))}, 1.0 * adults, 0.0)"
 '''
     for key, label, _, _ in GROUPS:
+        if key not in HOUSEHOLD_FLAGS:  # an estimated group: only a share by voter type
+            continue
         flag = HOUSEHOLD_FLAGS[key]
         expr = " or ".join(f"({flag.format(i=i)})" for i in range(1, ADULTS + 1)) if "{i}" in flag else flag
         out += f'''
@@ -721,12 +781,12 @@ high = {scale_high!r}
 
 [var.issue_measure]
 label = "The issues, by measure"
-doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels, and the path to net zero over actual emissions"
+doc = "Where each issue stands, 1 as at the start: the health, education and policing service levels (policing also over the policies' effect on crime, stage S13.5), and the path to net zero over actual emissions"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["issue"]
-expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3], net_zero_path / emissions)))"
+expr = "select(coord(issue) == 0, service_level[function: 0], select(coord(issue) == 1, service_level[function: 1], select(coord(issue) == 2, service_level[function: 3] / crime_policy_level, net_zero_path / emissions)))"
 
 [state.issue_at_election]
 doc = "Each issue's measure at the last election; the base month's stands in for July 2024's (-1 until it is known)"
@@ -738,13 +798,13 @@ initial = -1.0
 next = "select(issue_at_election < 0.0 or election_now, issue_measure, issue_at_election)"
 
 [var.government_standing]
-label = "Answers to dilemmas, on the government's standing"
-doc = "What the government's answers to the questions put to it add to or take from its standing with each kind of voter (stage S9.2); nothing until an answer that changes it is in force"
+label = "Answers to dilemmas and policies, on the government's standing"
+doc = "What the government's answers to the questions put to it (stage S9.2) and its policies (policy_standing, stage S13.5) add to or take from its standing with each kind of voter; nothing until an answer or a policy that changes it is in force"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 * type_age"
+expr = "0.0 * type_age + policy_standing"
 
 [var.voter_jobs]
 doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"

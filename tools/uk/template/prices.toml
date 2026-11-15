@@ -63,7 +63,7 @@ doc = "How much higher consumer prices would be, once adjusted, from VAT above i
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "vat_pass_through * (vat_factor / vat_factor_first - 1.0) + cost_pass_through * (carbon_tax_firms + customs_duties) / private_demand + carbon_tax_households / consumption"
+expr = "vat_pass_through * (vat_factor / vat_factor_first - 1.0) + cost_pass_through * (carbon_tax_firms + customs_duties) / private_demand + carbon_tax_households / consumption + policy_duties / consumption"
 
 [var.tax_wedge]
 label = "Taxes on spending, on shop prices"

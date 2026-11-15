@@ -110,7 +110,7 @@ doc = "Greenhouse gases households emit themselves, heating homes and driving, a
 type = "real"
 unit = "tonne/month"
 phase = "accounts"
-expr = "household_emissions_2024 * (consumption / consumer_price_index) / consumption_first * emission_intensity"
+expr = "household_emissions_2024 * (consumption / consumer_price_index) / consumption_first * emission_intensity * household_emissions_factor"
 initial = 10323333.333333334
 
 [var.emissions]

@@ -185,6 +185,16 @@ and self-employment follow the published tables they were built from
 (`../households/README.md`); and approval is what the model's vote gives, with the age
 effects and fundamentals above, not a poll of the group.
 
+**Estimated groups (stage S13.5).** Five more groups follow the eighteen: motorists, home
+owners, renters, drinkers and smokers. The households do not say who has a car, owns a home,
+drinks or smokes, so membership is a share of each voter type's adults estimated from
+published shares by income quintile and age band (`estimated_groups.csv`, the parameters
+`estimated_member_<group>`), with the same rows as the other groups but no
+`household_in_<group>`. Sources and estimates are in `../POLICIES.md`, Groups. The policies of
+`../policies.toml` add their reactions to `government_standing` through `policy_standing`,
+and the policing issue is the police service level over the policies' effect on crime
+(`crime_policy_level`); both are nil, or one, with every policy as in 2024.
+
 ## Against past elections (stage S9.4)
 
 `tools/uk/history.py` fits the government's reactions to income and unemployment to the

@@ -57,7 +57,7 @@ doc = "People referred for planned hospital treatment in England this month; mor
 type = "real"
 unit = "person/month"
 phase = "accounts"
-expr = "referrals_2024 * health_need / people_served_first[function: health]"
+expr = "referrals_2024 * health_need / people_served_first[function: health] * health_demand_factor"
 
 [var.treatments]
 label = "Treatments"

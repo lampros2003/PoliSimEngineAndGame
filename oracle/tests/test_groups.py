@@ -18,10 +18,13 @@ UK = ROOT / "models" / "uk"
 SEED = 2025
 GROUPS = ["young", "midlife", "pensioners", "low_income", "middle_income", "high_income", "in_work", "out_of_work",
           "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north",
-          "midlands", "south"]
+          "midlands", "south",
+          # Stage S13.5: estimated from published shares (models/uk/POLICIES.md, Groups).
+          "motorists", "home_owners", "renters", "drinkers", "smokers"]
 PARTITIONS = {"age": ["young", "midlife", "pensioners"],
               "income": ["low_income", "middle_income", "high_income"],
-              "place": ["scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"]}
+              "place": ["scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"],
+              "tenure": ["home_owners", "renters"]}
 DRIVERS = ["income", "jobs", "prices_and_time", "services", "standing"]
 OPTIONS = 10  # nine blocs and not voting, the last
 YEAR = 13  # the base month and a year after a change made in the second
@@ -90,6 +93,13 @@ class BaseMonth(unittest.TestCase):
         self.assertLess(row["share_lone_parents"], 0.06)
         self.assertGreater(row["share_pensioners"], 0.2)
         self.assertLess(row["share_pensioners"], 0.3)
+        # Stage S13.5: the estimated groups hold their published shares of all adults where one
+        # is given (smokers 10.6%, home owners 65%), give or take the cap at 98% and the
+        # households' reweighting in the first month.
+        self.assertAlmostEqual(row["share_smokers"], 0.106, places=2)
+        self.assertAlmostEqual(row["share_home_owners"], 0.65, places=2)
+        self.assertGreater(row["share_motorists"], 0.7)
+        self.assertLess(row["share_motorists"], 0.85)
 
 
 class Drivers(unittest.TestCase):

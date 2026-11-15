@@ -21,7 +21,7 @@ currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "alignment", "income", "spending", "finance", "accounts", "politics"]
-files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml"]
 
 [sector.households]
 label = "Households"
@@ -235,7 +235,7 @@ type = "real"
 unit = "person"
 phase = "accounts"
 initial = 35128000.0
-next = "labour_force * (1.0 + labour_force_growth + labour_force_shock)"
+next = "labour_force * (1.0 + labour_force_growth + labour_force_shock + policy_labour_force_growth)"
 
 [state.effective_rate]
 label = "Average interest rate on public debt"

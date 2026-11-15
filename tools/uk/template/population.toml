@@ -101,7 +101,7 @@ type = "real"
 unit = "person"
 phase = "accounts"
 dims = ["region", "sex", "age"]
-expr = "net_migration * migration_profile"
+expr = "net_migration * migration_profile * policy_migration_factor"
 
 [state.population]
 label = "People"

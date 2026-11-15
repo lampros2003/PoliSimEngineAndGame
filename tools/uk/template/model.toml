@@ -235,7 +235,7 @@ type = "real"
 unit = "person"
 phase = "accounts"
 initial = {{opening.labour_force}}
-next = "labour_force * (1.0 + labour_force_growth + labour_force_shock)"
+next = "labour_force * (1.0 + labour_force_growth + labour_force_shock{{policy_labour}})"
 
 [state.effective_rate]
 label = "Average interest rate on public debt"
