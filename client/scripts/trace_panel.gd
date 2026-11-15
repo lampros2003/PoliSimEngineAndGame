@@ -21,8 +21,10 @@ var _note: Label
 var _back: Button
 
 
-func _ready() -> void:
-	add_theme_stylebox_override("panel", Palette.panel_style())
+## Built at once (stage S13.2), so a popup can fill it before it is on screen.
+func _init() -> void:
+	# Stage S13.2: inside an indicator's popup, which carries the title and Back.
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
@@ -39,23 +41,21 @@ func _ready() -> void:
 	_back.disabled = true
 	_back.pressed.connect(func() -> void: back.emit())
 	head.add_child(_back)
+	head.visible = false
 	_crumbs = Label.new()
 	_crumbs.add_theme_color_override("font_color", Palette.MUTED)
 	_crumbs.add_theme_font_size_override("font_size", Palette.SMALL)
 	_crumbs.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_crumbs.visible = false
 	box.add_child(_crumbs)
 	_summary = Label.new()
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary.text = "Press Why next to any figure to see what moved it last month."
+	_summary.text = ""
 	box.add_child(_summary)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	box.add_child(scroll)
 	_rows = VBoxContainer.new()
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rows.add_theme_constant_override("separation", 4)
-	scroll.add_child(_rows)
+	box.add_child(_rows)
 	_note = Label.new()
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.add_theme_color_override("font_color", Palette.MUTED)
@@ -104,6 +104,7 @@ func show_explanation(e: Dictionary) -> void:
 	var entry: Dictionary = entries.get(name, {})
 	_back.disabled = trail.size() <= 1
 	_crumbs.text = " › ".join(Array(trail).map(func(n): return label_of(n))) if trail.size() > 1 else ""
+	_crumbs.visible = _crumbs.text != ""
 	_title.text = label_of(name)
 	var month: String = fmt.month_name(int(e["step"]))
 	var total_note := ""
@@ -162,7 +163,7 @@ func show_explanation(e: Dictionary) -> void:
 		row.add_child(amount)
 		if symbol != "" and str(input_entry.get("row", "")) != "":
 			var plot := Button.new()
-			plot.text = "Chart"
+			plot.text = "Compare"
 			plot.theme_type_variation = "Link"
 			var input_row: String = input_entry["row"]
 			plot.pressed.connect(func() -> void: chart.emit(input_row))

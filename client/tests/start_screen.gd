@@ -2,7 +2,7 @@ extends SceneTree
 ## Stage S7.1: the start screen, through the interface. Opens the client without
 ## --scenario, checks that it lists the United Kingdom and Valmora and offers the example
 ## mod (mods/wealth_tax) for the UK only, ticks it, starts a new game, and checks that the
-## mod's lever is in the policy panel, its tax in the budget once set, and its name in the
+## mod's lever is on the board, its tax in the budget once set, and its name in the
 ## title.
 
 var main: Control
@@ -32,11 +32,11 @@ func _initialize() -> void:
 	screen._new.pressed.emit()
 	await _settle()
 	if not main.started or main.start_screen != null:
-		return _fail("the game did not start: %s" % main._message_text.text)
-	if not main.levers._rows.has("wealth_tax_rate"):
-		return _fail("the mod's lever is not in the policy panel")
-	if not main._date.text.contains("with A wealth tax"):
-		return _fail("the title does not name the mod: %s" % main._date.text)
+		return _fail("the game did not start: %s" % main.notice_text())
+	if not main.board_levers().has("wealth_tax_rate"):
+		return _fail("the mod's lever is not on the board")
+	if not main.title_text().contains("WITH A WEALTH TAX"):
+		return _fail("the title does not name the mod: %s" % main.title_text())
 	var refused: String = main.game.set_lever("wealth_tax_rate", 0.01)
 	if refused != "":
 		return _fail(refused)

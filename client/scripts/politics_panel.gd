@@ -3,13 +3,16 @@ extends PanelContainer
 ## from the scenario's `[play.politics]` table, which names the model's values: voting
 ## intention, seats and the projection by bloc, which blocs govern, the government's poll
 ## rating, turnout, the election flag and the months to the next election; and (stage S8.3)
-## the issues voters weigh, each against where it stood at the last election.
+## the issues voters weigh, each against where it stood at the last election. Stage S13.2:
+## the Parliament sheet, with the House drawn as rows of seats, one dot each.
 
 const Palette := preload("res://scripts/palette.gd")
 
 ## One colour per bloc, in the dimension's order.
-const BLOC_COLOURS := [Color("#d6534f"), Color("#4f86d6"), Color("#e8a948"), Color("#3fb5c4"), Color("#5cbf7a"),
-	Color("#e8d548"), Color("#4fa36b"), Color("#a98ee0"), Color("#94a0ab"), Color("#c47a9b")]
+const BLOC_COLOURS := [Color("#b0412c"), Color("#1f4e79"), Color("#d99a27"), Color("#3d8a8f"), Color("#5f7f55"),
+	Color("#c2b03a"), Color("#2e5e44"), Color("#76609a"), Color("#8a8f96"), Color("#a3586f")]
+## Seats per column of the House.
+const SEAT_ROWS := 10
 
 var fmt: RefCounted
 var settings := {}
@@ -24,33 +27,29 @@ var _governing := PackedFloat64Array()
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", Palette.panel_style())
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 	var top := HBoxContainer.new()
 	box.add_child(top)
-	var title := Label.new()
-	title.text = "Politics"
-	title.theme_type_variation = "Title"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title)
 	_election = Label.new()
-	_election.add_theme_color_override("font_color", Palette.MUTED)
+	_election.add_theme_font_override("font", Palette.display(500))
+	_election.add_theme_font_size_override("font_size", 20)
 	top.add_child(_election)
 	_summary = Label.new()
 	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary.custom_minimum_size = Vector2(600, 0)
+	_summary.custom_minimum_size = Vector2(560, 0)
 	box.add_child(_summary)
 	_issues = Label.new()
 	_issues.name = "issues"
 	_issues.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_issues.custom_minimum_size = Vector2(600, 0)
+	_issues.custom_minimum_size = Vector2(560, 0)
 	_issues.add_theme_color_override("font_color", Palette.MUTED)
 	_issues.visible = false
 	box.add_child(_issues)
 	_bar = Control.new()
-	_bar.custom_minimum_size = Vector2(600, 22)
+	_bar.custom_minimum_size = Vector2(600, 150)
 	_bar.draw.connect(_draw_bar)
 	box.add_child(_bar)
 	_grid = GridContainer.new()
@@ -206,16 +205,14 @@ static func _listed(names: PackedStringArray) -> String:
 	return ", ".join(names.slice(0, names.size() - 1)) + " and " + names[names.size() - 1]
 
 
-## The House of Commons as one bar: each bloc's seats in its colour, the governing blocs
-## first, and a line at the majority.
+## The House of Commons as rows of seats, one dot per seat, the governing blocs first,
+## filled column by column so each bloc reads as a band; a rule marks the majority.
 func _draw_bar() -> void:
 	var total := 0.0
 	for s in _seats:
 		total += s
 	if total <= 0.0:
 		return
-	var width := _bar.size.x
-	var x := 0.0
 	var order := []
 	for i in _seats.size():
 		if i < _governing.size() and _governing[i] > 0.5:
@@ -223,14 +220,21 @@ func _draw_bar() -> void:
 	for i in _seats.size():
 		if not (i < _governing.size() and _governing[i] > 0.5):
 			order.append(i)
+	var columns := ceili(total / SEAT_ROWS)
+	var cell := minf(_bar.size.x / columns, (_bar.size.y - 26.0) / SEAT_ROWS)
+	var r := cell * 0.38
+	var seat := 0
 	for i in order:
-		var w := _seats[i] / total * width
-		_bar.draw_rect(Rect2(x, 2, w, _bar.size.y - 4), BLOC_COLOURS[i % BLOC_COLOURS.size()])
-		x += w
+		for k in int(_seats[i]):
+			var p := Vector2((seat / SEAT_ROWS + 0.5) * cell, (seat % SEAT_ROWS + 0.5) * cell)
+			_bar.draw_circle(p, r, BLOC_COLOURS[i % BLOC_COLOURS.size()])
+			seat += 1
 	var majority := float(_bar.get_meta("majority", total / 2.0))
-	var m := majority / total * width
-	_bar.draw_line(Vector2(m, 0), Vector2(m, _bar.size.y), Palette.TEXT, 2.0)
-
+	var x := ceilf((majority - 1.0) / SEAT_ROWS) * cell
+	var bottom := SEAT_ROWS * cell
+	_bar.draw_line(Vector2(x, -2.0), Vector2(x, bottom + 6.0), Palette.INK, 2.0)
+	var font := Palette.display(600, 1)
+	_bar.draw_string(font, Vector2(x + 6.0, bottom + 20.0), "MAJORITY: %d" % int(majority), HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.INK)
 
 ## Election night: the new House against the last one, as bbcode for a dialog.
 func election_report(cells_of: Callable, player_governs: bool) -> String:

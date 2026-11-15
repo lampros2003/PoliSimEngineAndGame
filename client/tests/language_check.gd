@@ -27,17 +27,17 @@ func _initialize() -> void:
 	screen._new.pressed.emit()
 	await _settle()
 	if not main.started:
-		return _fail("the game did not start: %s" % main._message_text.text)
+		return _fail("the game did not start: %s" % main.notice_text())
 	main.save_path = save
 	main.advance(1)
 	await _settle()
 	if not _budget_says("Impôt sur le revenu"):
 		return _fail("the budget is not in French")
-	if not main.levers._rows.has("basic_rate") or str(main.entries["basic_rate"]["label"]) != "Taux de base de l'impôt sur le revenu":
+	if not main.board_levers().has("basic_rate") or str(main.entries["basic_rate"]["label"]) != "Taux de base de l'impôt sur le revenu":
 		return _fail("the policy panel is not in French: %s" % main.entries.get("basic_rate", {}).get("label", ""))
-	main._save_game()
+	main.save_game()
 	await _settle()
-	main._load_game()
+	main.load_game()
 	await _settle()
 	if not _budget_says("Impôt sur le revenu"):
 		return _fail("the loaded game is not in French")

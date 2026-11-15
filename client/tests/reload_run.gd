@@ -24,10 +24,10 @@ func _initialize() -> void:
 	var original := FileAccess.get_file_as_string(economy)
 	# 1. A typo in a formula.
 	_write(economy, original.replace('expr = "consumption_total - vat + gov_spending"', 'expr = "consumption_totl - vat + gov_spending"'))
-	main._reload.pressed.emit()
+	main.menu_action("reload")
 	await _settle()
-	var message: String = main._message_text.get_parsed_text()
-	if not main._message.visible or not message.contains("consumption_totl"):
+	var message: String = main.notice_text()
+	if not main.notice_visible() or not message.contains("consumption_totl"):
 		_fail("the typo was not reported: " + message)
 		return
 	if shots != "":
@@ -41,10 +41,10 @@ func _initialize() -> void:
 	var spending_before := int(main.game.latest("consumption_total"))
 	# 2. A real change: households spend 90% of income instead of 80%.
 	_write(economy, original.replace("central = 0.80", "central = 0.90"))
-	main._reload.pressed.emit()
+	main.menu_action("reload")
 	await _settle()
-	if not main._message_text.get_parsed_text().begins_with("Model reloaded"):
-		_fail("the corrected model was not reloaded: " + main._message_text.get_parsed_text())
+	if not main.notice_text().begins_with("Model reloaded"):
+		_fail("the corrected model was not reloaded: " + main.notice_text())
 		return
 	main.advance(1)
 	await _settle()
@@ -56,7 +56,7 @@ func _initialize() -> void:
 	# good month once the corrected model is reloaded.
 	var phase := "government"
 	_write(economy, original + '\n[var.trap]\ntype = "int"\nunit = "1"\nphase = "%s"\nrange = [0, 0]\nexpr = "1"\n' % phase)
-	main._reload.pressed.emit()
+	main.menu_action("reload")
 	await _settle()
 	var good: int = main.game.steps_done()
 	main.advance(1)
@@ -65,7 +65,7 @@ func _initialize() -> void:
 		_fail("the run-time error did not stop the game")
 		return
 	_write(economy, original)
-	main._reload.pressed.emit()
+	main.menu_action("reload")
 	await _settle()
 	main.advance(1)
 	await _settle()

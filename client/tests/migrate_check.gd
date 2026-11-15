@@ -32,18 +32,18 @@ func _initialize() -> void:
 		await _settle()
 		main.advance(1)
 		await _settle()
-		main._save_game()
+		main.save_game()
 		await _settle()
 		if not FileAccess.file_exists(save):
 			return _fail("the game was not saved")
 		print("saved after %d months" % main.game.steps_done())
 		quit(0)
 		return
-	main._load_game()
+	main.load_game()
 	await _settle()
 	if main.game.steps_done() != 4:
-		return _fail("the saved game did not load: %d months, message %s" % [main.game.steps_done(), main._message_text.text])
-	var said: String = main._message_text.text
+		return _fail("the saved game did not load: %d months, message %s" % [main.game.steps_done(), main.notice_text()])
+	var said: String = main.notice_text()
 	for words in ["earlier version of the model", "Months run", "Basic income tax rate"]:
 		if not said.contains(words):
 			return _fail("the player was not told %s: %s" % [words, said])

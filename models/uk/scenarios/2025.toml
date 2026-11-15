@@ -18,7 +18,9 @@ term = 60
 government = "government"
 # Amounts paid each month are shown at an annual rate, as the public finances are published.
 amounts = "year"
-headline = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "government_support", "waiting_list"]
+# Stage S13.2: short names for the top bar and the board.
+labels = { government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Home building" }
+headline = ["government_support", "gdp", "unemployment_rate", "consumer_inflation_annual", "budget_balance", "debt_to_gdp"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_inflation_annual", "waiting_list"]
 # "Who gains, who loses": net income per household by group, from the households; jobs and
 # pay by industry (stage S6.4).
@@ -27,29 +29,6 @@ breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_incom
               "industry_emissions", "poverty_by_group"]
 breakdown_all = "net_income_average"
 breakdown_totals = { poverty_by_group = "poverty_rate", industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job", service_level = "service_level_overall", spending_by_function = "public_services_spending", industry_emissions = "firm_emissions" }
-
-# Stage S12.2: an icon for each policy area (the levers' `group`), by name from the
-# client's icon set (client/icons, Lucide); an area without one gets a plain square.
-[play.icons]
-"Spending" = "wallet"
-"Taxes" = "landmark"
-"Income tax" = "receipt"
-"Scottish income tax" = "mountain-snow"
-"National Insurance" = "shield-check"
-"Child Benefit" = "baby"
-"Universal Credit" = "hand-coins"
-"Pensions" = "piggy-bank"
-"Trade" = "ship"
-"Public services" = "hospital"
-"Environment" = "leaf"
-
-# Stage S12.6: the map, a tile cartogram of the regions and nations, north at the top.
-[play.map]
-dim = "region"
-statistics = ["net_income_by_region", "regional_unemployment", "income_tax_by_region"]
-# [column, row] for north_east, north_west, yorkshire, east_midlands, west_midlands, east,
-# london, south_east, south_west, wales, scotland, northern_ireland (the dimension's order).
-tiles = [[3, 1], [2, 2], [3, 2], [3, 3], [2, 3], [4, 3], [3, 4], [2, 4], [1, 4], [1, 3], [2, 0], [0, 1]]
 
 # Stage S5.5: the politics panel and election night.
 [play.politics]
@@ -66,3 +45,158 @@ majority = 326
 # Stage S8.3: the issues voters weigh, now and at the last election.
 issues = "issue_measure"
 issues_at_election = "issue_at_election"
+
+# Stage S13.2: the board, the game's one screen. Read by the client only; the engine
+# ignores it, so no model hash changes with the layout.
+#
+#   [play.web]
+#   hide = [lever, ...]            levers the player does not hold here (Scotland sets its
+#                                  own income tax rates)
+#   groups = [{ key, label, icon, row, share }, ...]
+#                                  interest groups round the centre: `row` is the group's
+#                                  approval and `share` its share of the electorate (national
+#                                  result rows); none until the model has them (stage S13.4)
+#   group_drivers = { name = "value over the group dimension", ... }
+#                                  what moves each group, read with cells()
+#   [[play.web.areas]]             one per policy area, in order round the board
+#   name, icon                     the area's name (set along the rim) and pictogram
+#   policies = [{ key, label, icon, size, levers = [...] }]
+#                                  a policy is one lever or several under one name; its
+#                                  first lever sets its gauge; size 1 to 3 is importance
+#   indicators = [{ row, icon, size, better }]
+#                                  a national result row; `better` is "high" or "low" where
+#                                  that is clear, and tints its rises and falls
+#
+# Icons are file names in client/icons (game-icons.net, credited in client/icons/CREDITS.md).
+[play.web]
+hide = ["starter_rate", "scottish_basic_rate", "scottish_basic_threshold", "intermediate_rate",
+        "intermediate_threshold", "scottish_higher_rate", "scottish_higher_threshold", "advanced_rate",
+        "advanced_threshold", "top_rate", "top_threshold"]
+groups = []
+group_drivers = {}
+
+[[play.web.areas]]
+name = "Economy"
+icon = "economy"
+policies = [
+  { key = "public_investment", label = "Public investment", icon = "public-investment", size = 2, levers = ["public_investment_bill"] },
+  { key = "subsidies", label = "Subsidies to business", icon = "subsidies", size = 1, levers = ["subsidies_bill"] },
+  { key = "government", label = "Running the government", icon = "government", size = 1, levers = ["spending_general"] },
+]
+indicators = [
+  { row = "gdp", icon = "gdp", size = 3, better = "high" },
+  { row = "unemployment_rate", icon = "unemployment", size = 3, better = "low" },
+  { row = "consumer_inflation_annual", icon = "prices", size = 3, better = "low" },
+  { row = "output_growth", icon = "growth", size = 2, better = "high" },
+  { row = "pay_per_employee_job", icon = "pay", size = 2, better = "high" },
+  { row = "workforce_jobs", icon = "jobs", size = 1, better = "high" },
+  { row = "business_investment", icon = "investment", size = 1, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Tax"
+icon = "tax"
+policies = [
+  { key = "income_tax", label = "Income tax", icon = "income-tax", size = 3, levers = ["basic_rate", "higher_rate", "additional_rate", "personal_allowance", "higher_threshold", "additional_threshold", "allowance_taper_start"] },
+  { key = "national_insurance", label = "National Insurance", icon = "national-insurance", size = 3, levers = ["ni_main_rate", "ni_upper_rate", "ni_primary_threshold", "ni_upper_limit", "ni_employer_rate", "ni_secondary_threshold", "class4_main_rate", "class4_upper_rate", "class4_lower", "class4_upper"] },
+  { key = "vat", label = "VAT", icon = "vat", size = 3, levers = ["vat_rate"] },
+  { key = "corporation_tax", label = "Corporation tax", icon = "corporation-tax", size = 2, levers = ["corporation_tax_rate"] },
+  { key = "council_tax", label = "Council tax", icon = "council-tax", size = 1, levers = ["council_tax_bill"] },
+]
+indicators = [
+  { row = "budget_balance", icon = "balance", size = 3, better = "high" },
+  { row = "debt_to_gdp", icon = "debt", size = 3, better = "low" },
+  { row = "public_receipts", icon = "tax", size = 1 },
+]
+
+[[play.web.areas]]
+name = "Welfare"
+icon = "welfare"
+policies = [
+  { key = "universal_credit", label = "Universal Credit", icon = "universal-credit", size = 3, levers = ["uc_single", "uc_single_young", "uc_couple", "uc_couple_young", "uc_child", "uc_first_child_older", "uc_work_allowance", "uc_taper", "uc_child_limit"] },
+  { key = "child_benefit", label = "Child Benefit", icon = "child-benefit", size = 2, levers = ["child_benefit_eldest", "child_benefit_other", "hicbc_start", "hicbc_width"] },
+  { key = "pensions", label = "Pensions and benefits", icon = "pensions", size = 3, levers = ["benefits_bill"] },
+  { key = "state_pension_age", label = "State Pension age", icon = "pension-age", size = 2, levers = ["state_pension_age"] },
+  { key = "jobseekers", label = "Benefit for the unemployed", icon = "jobseekers", size = 1, levers = ["benefit_per_unemployed"] },
+]
+indicators = [
+  { row = "poverty_rate", icon = "poverty", size = 3, better = "low" },
+  { row = "child_poverty_rate", icon = "child", size = 2, better = "low" },
+  { row = "median_income", icon = "income", size = 2, better = "high" },
+  { row = "net_income_average", icon = "net-income", size = 3, better = "high" },
+  { row = "pensioner_poverty_rate", icon = "pensioner", size = 1, better = "low" },
+  { row = "working_age_poverty_rate", icon = "poverty", size = 1, better = "low" },
+]
+
+[[play.web.areas]]
+name = "Health"
+icon = "health"
+policies = [
+  { key = "nhs", label = "The NHS", icon = "hospital", size = 3, levers = ["spending_health"] },
+  { key = "social_care", label = "Social care", icon = "social-care", size = 2, levers = ["spending_social_care"] },
+]
+indicators = [
+  { row = "waiting_list", icon = "waiting-list", size = 3, better = "low" },
+  { row = "treatments", icon = "treatments", size = 1, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Education"
+icon = "education"
+policies = [
+  { key = "schools", label = "Schools and universities", icon = "school", size = 3, levers = ["spending_education"] },
+  { key = "culture", label = "Culture and sport", icon = "culture", size = 1, levers = ["spending_culture"] },
+]
+indicators = [
+  { row = "service_level_overall", icon = "service", size = 2, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Law and order"
+icon = "law"
+policies = [
+  { key = "policing", label = "Police, courts and prisons", icon = "police", size = 3, levers = ["spending_public_order"] },
+]
+indicators = []
+
+[[play.web.areas]]
+name = "Transport"
+icon = "transport"
+policies = [
+  { key = "transport", label = "Roads and railways", icon = "train", size = 2, levers = ["spending_transport"] },
+]
+indicators = []
+
+[[play.web.areas]]
+name = "Environment and energy"
+icon = "environment"
+policies = [
+  { key = "carbon_price", label = "Carbon price", icon = "carbon-price", size = 3, levers = ["carbon_price"] },
+]
+indicators = [
+  { row = "emissions", icon = "emissions", size = 3, better = "low" },
+  { row = "household_emissions", icon = "homes", size = 1, better = "low" },
+]
+
+[[play.web.areas]]
+name = "Housing"
+icon = "housing"
+policies = [
+  { key = "housing", label = "Housing and local environment", icon = "homes", size = 2, levers = ["spending_environment_housing"] },
+]
+indicators = [
+  { row = "dwellings", icon = "housing", size = 1, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Foreign and trade"
+icon = "trade"
+policies = [
+  { key = "defence", label = "Defence", icon = "defence", size = 3, levers = ["spending_defence"] },
+  { key = "trade_barriers", label = "Trade barriers", icon = "trade-barriers", size = 2, levers = ["trade_barrier_eu", "trade_barrier_united_states", "trade_barrier_china", "trade_barrier_rest_of_world"] },
+  { key = "aid", label = "Overseas aid", icon = "aid", size = 1, levers = ["transfers_abroad_bill"] },
+]
+indicators = [
+  { row = "exports", icon = "exports", size = 2, better = "high" },
+  { row = "imports", icon = "imports", size = 1 },
+]

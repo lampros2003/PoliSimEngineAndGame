@@ -2,9 +2,11 @@ extends PanelContainer
 ## Stage S7.1: the start screen. The player picks a scenario (every scenario file with a
 ## `[play] title` under the game's models folder) and any mods for its model (folders with
 ## a mod.toml, in the game's mods folder and the player's own), then starts a new game or
-## continues the saved one. Shown when the client starts without `--scenario`.
+## continues the saved one. Shown when the client starts without `--scenario`. Stage S13.2: a
+## card of the board's stock on the paper, with a row of the areas' pictograms over the title.
 
 const Palette := preload("res://scripts/palette.gd")
+const ICONS := ["economy", "tax", "welfare", "health", "education", "law", "transport", "environment", "housing", "trade"]
 
 ## A new game (`resume` false) or the saved one (`resume` true), with the game's words in
 ## `language` ("" for the model's own; stage S7.4).
@@ -27,26 +29,45 @@ var _continue: Button
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_theme_stylebox_override("panel", Palette.panel_style(Palette.BG, 0, 0))
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	add_child(Palette.paper())
 	var center := CenterContainer.new()
 	add_child(center)
 	var card := PanelContainer.new()
-	var style := Palette.panel_style(Palette.PANEL, 0, 32)  # a sheet with a navy rule on top
-	style.set_border_width_all(0)
-	style.border_color = Palette.ACCENT
-	style.border_width_top = 6
-	card.add_theme_stylebox_override("panel", style)
-	card.custom_minimum_size = Vector2(680, 0)
+	card.add_theme_stylebox_override("panel", Palette.card(40, 10, 2))
+	card.custom_minimum_size = Vector2(700, 0)
 	center.add_child(card)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	card.add_child(box)
+	# A row of pictograms, the areas of government, as on a public-information poster.
+	var band := HBoxContainer.new()
+	band.add_theme_constant_override("separation", 14)
+	for name in ICONS:
+		var icon := TextureRect.new()
+		icon.texture = Palette.icon(name)
+		icon.custom_minimum_size = Vector2(40, 40)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.self_modulate = Palette.INK
+		band.add_child(icon)
+	box.add_child(band)
 	var title := Label.new()
 	title.text = "PoliSim"
-	title.theme_type_variation = "Title"
-	title.add_theme_font_size_override("font_size", 40)
+	title.add_theme_font_override("font", Palette.display(500))
+	title.add_theme_font_size_override("font_size", 64)
 	box.add_child(title)
-	box.add_child(_muted("You lead a government. Choose a country, and any mods to play it with."))
+	var rules := Control.new()
+	rules.custom_minimum_size = Vector2(0, 8)
+	rules.draw.connect(func() -> void:
+		rules.draw_line(Vector2(0, 1), Vector2(rules.size.x, 1), Palette.INK, 3.0)
+		rules.draw_line(Vector2(0, 7), Vector2(rules.size.x, 7), Palette.INK, 1.0))
+	box.add_child(rules)
+	var lead := Label.new()
+	lead.text = "You lead a government. Choose a country, and any mods to play it with."
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lead.add_theme_font_size_override("font_size", 18)
+	box.add_child(lead)
 	box.add_child(_muted("Country", true, true))
 	_choice = OptionButton.new()
 	_choice.name = "scenario_choice"
@@ -88,6 +109,7 @@ func _muted(text: String, small := false, heading := false) -> Label:
 	if small:
 		label.add_theme_font_size_override("font_size", Palette.SMALL)
 	if heading:
+		label.text = text.to_upper()
 		label.theme_type_variation = "Heading"
 	return label
 

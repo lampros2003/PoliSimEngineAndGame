@@ -1,8 +1,9 @@
 extends SceneTree
-## Stage S6.1: the icon web, through the interface. Opens the UK scenario, plays a month,
-## puts the basic rate of income tax at the centre of the web, and walks from it to the
-## government's poll rating by pressing tiles, along the shortest chain the model's own
-## connections allow; checks each tile pressed moves the web, and Back returns.
+## Stage S6.1, through the board (stage S13.2). Opens the UK scenario and plays a month;
+## finds the shortest chain of the model's own connections from the basic rate of income
+## tax to the government's poll rating (the board's reach search); then walks it back from
+## the poll rating's popup, following each cause in turn as the "why it moved" list lets a
+## player, and checks each step opens that value's popup and Back returns.
 
 var main: Control
 
@@ -13,32 +14,36 @@ func _initialize() -> void:
 	await _settle()
 	main.advance(1)
 	await _settle()
-	var web = main.web
-	web.show_value("basic_rate")
-	await process_frame
+	var web = main.board
 	if web.consumers_of("basic_rate").is_empty() or not web.inputs_of("basic_rate").is_empty():
 		return _fail("the basic rate should feed values and depend on none")
-	# The shortest chain of consumers from the lever to the poll rating.
 	var path := _path(web, "basic_rate", "government_support")
 	if path.is_empty():
 		return _fail("no chain from the basic rate to the poll rating")
-	for name in path.slice(1):
-		var tile: Button = web.find_child("tile_" + name, true, false)
-		if tile == null:
-			return _fail("no tile for %s around %s" % [name, web.center])
-		tile.pressed.emit()
+	main.open_indicator("government_support")
+	await _settle()
+	var back := path.slice(0, path.size() - 1)
+	back.reverse()
+	for name in back:
+		if not web.inputs_of(main.indicator_card().name_shown if main.indicator_card() != null else "").has(name) and name != "basic_rate":
+			return _fail("%s is not an input of %s" % [name, main.indicator_card().name_shown])
+		main.indicator_card().follow.emit(name)
 		await process_frame
-		if web.center != name:
-			return _fail("pressing %s left the web at %s" % [name, web.center])
-	web._back.pressed.emit()
+		var shown: String = main.indicator_card().name_shown if main.indicator_card() != null else main.policy_card().key
+		if name == "basic_rate":
+			if main.popup_kind() != "policy" or main.policy_card().key != "policy:income_tax":
+				return _fail("following the basic rate did not open Income tax")
+		elif shown != name:
+			return _fail("following %s opened %s" % [name, shown])
+	main.popup.back()
 	await process_frame
-	if web.center != path[path.size() - 2]:
-		return _fail("Back did not return to %s" % path[path.size() - 2])
-	print("web: from the basic rate to the poll rating in %d steps: %s" % [path.size() - 1, " > ".join(path)])
+	if main.indicator_card() == null or main.indicator_card().name_shown != path[1]:
+		return _fail("Back did not return to %s" % path[1])
+	print("web: from the basic rate to the poll rating in %d steps, walked back through the popups: %s" % [path.size() - 1, " > ".join(path)])
 	quit(0)
 
 
-## Breadth first over "what depends on it", visiting tiles in the order the web shows them.
+## Breadth first over "what depends on it".
 func _path(web, from: String, to: String) -> PackedStringArray:
 	var came := {from: ""}
 	var queue := [from]

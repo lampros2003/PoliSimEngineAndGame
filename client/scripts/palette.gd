@@ -1,70 +1,131 @@
 extends RefCounted
-## Colours, type, sizes and the theme. One place, so every screen agrees.
+## Colours, type, sizes, card stock and the theme. One place, so every screen agrees.
 ##
-## The look follows public-sector service and statistics design (GOV.UK and US Web Design
-## System patterns, ONS chart colours): a light grey page, white sections with hairline
-## rules and square corners, a navy masthead, serif headings and figures, tabular numbers,
-## text links for row actions, and a strong keyboard focus outline. No real government's
-## crown, logotype or typeface is used.
+## Stage S13.2: pictorial statistics, the mid-century public-information print tradition.
+## Warm paper with grain, a few flat inks (navy for text and line work, blue, brick, ochre,
+## sage), card stock a shade lighter than the paper with a firm ink edge and a hard offset
+## shadow, rules in ink. Ochre is the one accent: "you can act here, a change is waiting".
+## Good and bad are sage and brick, always with a sign or arrow beside the colour. Titles,
+## node labels and big numerals in Jost; text and figures in IBM Plex Sans with tabular
+## figures. Icons are white silhouettes from game-icons.net, tinted when drawn.
 
-const BG := Color("#f3f2f1")
-const PANEL := Color("#ffffff")
-const PANEL_RAISED := Color("#f8f8f7")
-const LINE := Color("#b1b4b6")
-const RULE := Color("#d9d9d9")  # hairlines between table rows
-const TEXT := Color("#0b0c0c")
-const MUTED := Color("#484949")
-const ACCENT := Color("#12436d")  # navy: the government's own rows, the masthead, focus
-const MASTHEAD := Color("#12273f")
-const LINK := Color("#1a65a6")
-const LINK_HOVER := Color("#0f385c")
-const FOCUS := Color("#ffdd00")
-const PENDING := Color("#a35200")  # a change waiting for next month (amber, dark enough to read)
-const GOOD := Color("#0f7a52")
-const BAD := Color("#ca3535")
-## ONS's categorical chart colours, in their order.
-const SERIES := [Color("#12436d"), Color("#28a197"), Color("#801650"), Color("#f46a25")]
+const PAPER := Color("#efe6d2")
+const PAPER_EDGE := Color("#d9ccae")  # the vignette's edge
+const CARD := Color("#f8f2e4")
+const CARD_DEEP := Color("#e8dcc1")  # a band of card stock a shade darker (the top bar)
+const INK := Color("#1c2733")
+const BLUE := Color("#1f4e79")
+const BRICK := Color("#b0412c")
+const OCHRE := Color("#d99a27")
+const SAGE := Color("#5f7f55")
+
+# The names the panels reused from S12 read.
+const BG := PAPER
+const PANEL := CARD
+const PANEL_RAISED := Color("#f1e9d6")
+const LINE := Color("#7d8590")  # an ink rule, thinned
+const RULE := Color("#cdbf9f")  # rules between rows: ink on paper, light
+const TEXT := INK
+const MUTED := Color("#55606c")
+const ACCENT := BLUE
+const PENDING := Color("#94600c")  # ochre dark enough to read as text
+const GOOD := Color("#4b6a42")
+const BAD := BRICK
+const SHADOW := Color("#1c2733")
+const SERIES := [BLUE, BRICK, Color("#b07a12"), SAGE]
 
 const FONT_SIZE := 15
-const SMALL := 13
-const TITLE := 22
-const FIGURE := 30
+const SMALL := 14
+const CAPS := 13  # tracked capitals for small labels
+const TITLE := 26
+const FIGURE := 34
 
-const SANS_FILE := preload("res://fonts/PublicSans.ttf")
-const SERIF_FILE := preload("res://fonts/SourceSerif4.ttf")
+const TEXT_FILE := preload("res://fonts/IBMPlexSans.ttf")
+const DISPLAY_FILE := preload("res://fonts/Jost.ttf")
+## Kept for the panels that name the old constants.
+const SANS_FILE := TEXT_FILE
+const SERIF_FILE := DISPLAY_FILE
+
+const PAPER_SHADER := """
+shader_type canvas_item;
+uniform vec4 paper : source_color;
+uniform vec4 edge : source_color;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+void fragment() {
+	vec2 px = floor(FRAGCOORD.xy);
+	float fine = hash(px) - 0.5;
+	float coarse = hash(floor(px / 3.0) + 17.0) - 0.5;
+	vec2 c = (UV - 0.5) * vec2(1.0, 1.25);
+	float vignette = smoothstep(0.32, 0.92, length(c));
+	vec3 tone = mix(paper.rgb, edge.rgb, vignette * 0.75);
+	COLOR = vec4(tone + fine * 0.022 + coarse * 0.016, 1.0);
+}
+"""
+
+static var _fonts := {}
 
 
 ## A font at a weight, with tabular figures so columns of numbers line up.
-static func font(file: FontFile, weight: int) -> FontVariation:
+static func font(file: FontFile, weight: int, spacing := 0) -> FontVariation:
+	var key := "%s/%d/%d" % [file.resource_path, weight, spacing]
+	if _fonts.has(key):
+		return _fonts[key]
 	var ts := TextServerManager.get_primary_interface()
 	var f := FontVariation.new()
 	f.base_font = file
 	f.variation_opentype = {ts.name_to_tag("wght"): weight}
 	f.opentype_features = {ts.name_to_tag("tnum"): 1}
+	if spacing != 0:
+		f.spacing_glyph = spacing
+	_fonts[key] = f
 	return f
 
 
-static func panel_style(color: Color = PANEL, radius: int = 0, margin: int = 16) -> StyleBoxFlat:
+static func text(weight := 400) -> FontVariation:
+	return font(TEXT_FILE, weight)
+
+
+static func display(weight := 500, spacing := 0) -> FontVariation:
+	return font(DISPLAY_FILE, weight, spacing)
+
+
+## Card stock: a shade lighter than the paper, a firm ink edge and a hard shadow down and
+## to the right, like a printed plate.
+static func card(margin := 20, shadow := 6, border := 2, colour := CARD) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = color
-	box.set_corner_radius_all(radius)
+	box.bg_color = colour
+	box.border_color = INK
+	box.set_border_width_all(border)
 	box.set_content_margin_all(margin)
-	if color == PANEL:
-		box.border_color = LINE
-		box.set_border_width_all(1)
+	if shadow > 0:
+		box.shadow_color = Color(SHADOW, 0.92)
+		box.shadow_size = 1
+		box.shadow_offset = Vector2(shadow, shadow)
+	box.anti_aliasing = false
 	return box
 
 
-static func _flat(bg: Color, border := Color.TRANSPARENT, bottom := 0, margin_h := 14, margin_v := 7) -> StyleBoxFlat:
+static func panel_style(color: Color = PANEL, _radius: int = 0, margin: int = 16) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.set_content_margin_all(margin)
+	return box
+
+
+static func _flat(bg: Color, border: Color, width := 2, margin_h := 14, margin_v := 6, shadow := 0) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = bg
 	box.border_color = border
-	box.border_width_bottom = bottom
+	box.set_border_width_all(width)
 	box.content_margin_left = margin_h
 	box.content_margin_right = margin_h
 	box.content_margin_top = margin_v
-	box.content_margin_bottom = margin_v + 2 - bottom  # keeps the text still when the shadow goes
+	box.content_margin_bottom = margin_v
 	box.anti_aliasing = false
+	if shadow > 0:
+		box.shadow_color = SHADOW
+		box.shadow_size = 1
+		box.shadow_offset = Vector2(shadow, shadow)
 	return box
 
 
@@ -78,303 +139,228 @@ static func _empty(margin_h := 4, margin_v := 4) -> StyleBoxEmpty:
 
 
 static func _button_states(theme: Theme, type: String, normal: StyleBox, hover: StyleBox, pressed: StyleBox,
-		disabled: StyleBox, text: Color, text_hover: Color, text_disabled: Color) -> void:
+		disabled: StyleBox, text_colour: Color, text_hover: Color, text_disabled: Color) -> void:
 	theme.set_stylebox("normal", type, normal)
 	theme.set_stylebox("hover", type, hover)
 	theme.set_stylebox("pressed", type, pressed)
 	theme.set_stylebox("hover_pressed", type, pressed)
 	theme.set_stylebox("disabled", type, disabled)
 	for key in ["font_color", "font_focus_color"]:
-		theme.set_color(key, type, text)
+		theme.set_color(key, type, text_colour)
 	for key in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		theme.set_color(key, type, text_hover)
 	theme.set_color("font_disabled_color", type, text_disabled)
+	for key in ["icon_normal_color", "icon_focus_color"]:
+		theme.set_color(key, type, text_colour)
+	for key in ["icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color"]:
+		theme.set_color(key, type, text_hover)
+	theme.set_color("icon_disabled_color", type, text_disabled)
 
 
-## The default theme's icons are drawn for a dark background: redrawn in the text colour.
-static func _recolour(icon: Texture2D, colour: Color) -> Texture2D:
-	var image: Image = icon.get_image() if icon != null else null
-	if image == null:  # an icon drawn from SVG at run time has no pixels to read here
-		return icon
-	image.convert(Image.FORMAT_RGBA8)
-	for y in image.get_height():
-		for x in image.get_width():
-			var p := image.get_pixel(x, y)
-			image.set_pixel(x, y, Color(colour, p.a * p.v))
-	return ImageTexture.create_from_image(image)
-
-
-## A square box for check boxes: an outline, and filled inside when ticked.
+## A small square drawn in ink: ticked, an ink block inside.
 static func _box_icon(ticked: bool, size := 18) -> Texture2D:
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
-	image.fill_rect(Rect2i(0, 0, size, size), TEXT)
-	image.fill_rect(Rect2i(2, 2, size - 4, size - 4), PANEL)
+	image.fill_rect(Rect2i(0, 0, size, size), INK)
+	image.fill_rect(Rect2i(2, 2, size - 4, size - 4), CARD)
 	if ticked:
-		image.fill_rect(Rect2i(5, 5, size - 10, size - 10), ACCENT)
+		image.fill_rect(Rect2i(5, 5, size - 10, size - 10), INK)
+	return ImageTexture.create_from_image(image)
+
+
+## A small solid triangle, pointing down (menus) or up/down (spin boxes).
+static func _triangle(size: int, up: bool, colour: Color) -> Texture2D:
+	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	for y in size:
+		var row := (size - 1 - y) if up else y
+		var half := int((size - 1 - row) * 0.5)
+		for x in range(size / 2 - half, size / 2 + half + 1):
+			if row < size * 0.7 and x >= 0 and x < size:
+				image.set_pixel(x, y if not up else y, colour)
 	return ImageTexture.create_from_image(image)
 
 
 static func make_theme() -> Theme:
 	var theme := Theme.new()
-	var sans := font(SANS_FILE, 400)
-	var sans_bold := font(SANS_FILE, 600)
-	var serif := font(SERIF_FILE, 600)
-	theme.default_font = sans
+	var body := text(400)
+	var strong := text(600)
+	theme.default_font = body
 	theme.default_font_size = FONT_SIZE
-	for type in ["Label", "RichTextLabel", "LineEdit", "TabContainer", "PopupMenu", "CheckBox", "TooltipLabel"]:
-		theme.set_color("font_color" if type != "RichTextLabel" else "default_color", type, TEXT)
-	theme.set_font("bold_font", "RichTextLabel", sans_bold)
-	theme.set_color("font_selected_color", "LineEdit", TEXT)
-	theme.set_color("selection_color", "LineEdit", FOCUS)
-	theme.set_color("caret_color", "LineEdit", TEXT)
+	for type in ["Label", "LineEdit", "PopupMenu", "CheckBox", "TooltipLabel", "OptionButton"]:
+		theme.set_color("font_color", type, INK)
+	theme.set_color("default_color", "RichTextLabel", INK)
+	theme.set_font("bold_font", "RichTextLabel", strong)
+	theme.set_font("normal_font", "RichTextLabel", body)
+	theme.set_color("selection_color", "RichTextLabel", Color(OCHRE, 0.45))
+	theme.set_color("font_selected_color", "LineEdit", INK)
+	theme.set_color("selection_color", "LineEdit", Color(OCHRE, 0.5))
+	theme.set_color("caret_color", "LineEdit", INK)
 
-	# Buttons: secondary by default (grey with a shadow underneath, as on public services).
+	# Buttons: card stock with an ink edge; pressed sinks into its shadow.
 	var focus := StyleBoxFlat.new()
 	focus.draw_center = false
-	focus.set_border_width_all(3)
-	focus.border_color = FOCUS
-	focus.set_expand_margin_all(2)
-	focus.shadow_color = TEXT
-	focus.shadow_size = 2
+	focus.set_border_width_all(2)
+	focus.border_color = OCHRE
+	focus.set_expand_margin_all(3)
 	theme.set_stylebox("focus", "Button", focus)
-	theme.set_font("font", "Button", font(SANS_FILE, 500))
-	_button_states(theme, "Button", _flat(Color("#e8e8e6"), Color("#929191"), 2), _flat(Color("#d6d6d4"), Color("#929191"), 2),
-		_flat(Color("#c9c9c7")), _flat(Color("#eeeeec")), TEXT, TEXT, Color("#9a9fa3"))
-
-	# Primary: the one main action on a screen.
+	theme.set_font("font", "Button", text(500))
+	_button_states(theme, "Button", _flat(CARD, INK, 2, 14, 6, 3), _flat(Color("#fbf3dc"), INK, 2, 14, 6, 3),
+		_flat(CARD_DEEP, INK, 2, 14, 6, 0), _flat(PAPER, LINE, 2, 14, 6, 0), INK, INK, LINE)
+	# Primary: the one main action (Next month); ochre, the colour of acting.
 	theme.set_type_variation("Primary", "Button")
-	_button_states(theme, "Primary", _flat(ACCENT, Color("#081c30"), 2), _flat(Color("#0d3354"), Color("#081c30"), 2),
-		_flat(Color("#081c30")), _flat(ACCENT.lerp(BG, 0.6)), Color.WHITE, Color.WHITE, Color("#e8ecf0"))
-
-	# Link: an action on a row ("Chart", "Why", "Undo", "Back"): text only.
+	_button_states(theme, "Primary", _flat(OCHRE, INK, 2, 18, 7, 4), _flat(Color("#e6ac43"), INK, 2, 18, 7, 4),
+		_flat(Color("#c4871b"), INK, 2, 18, 7, 0), _flat(Color(OCHRE, 0.35), Color(INK, 0.35), 2, 18, 7, 0), INK, INK, Color(INK, 0.45))
+	theme.set_font("font", "Primary", display(600, 1))
+	theme.set_font_size("font_size", "Primary", 16)
+	# Quiet: secondary actions on the top bar, text with an ink edge only on hover.
+	theme.set_type_variation("Quiet", "Button")
+	_button_states(theme, "Quiet", _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 6), _flat(Color(INK, 0.06), INK, 2, 8, 6),
+		_flat(Color(INK, 0.12), INK, 2, 8, 6), _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 6), INK, INK, LINE)
+	theme.set_font("font", "Quiet", display(500, 1))
+	theme.set_font_size("font_size", "Quiet", 15)
+	theme.set_constant("h_separation", "Quiet", 6)
+	theme.set_constant("icon_max_width", "Quiet", 20)
+	# Link: an action inside a card ("Undo", "Back"): blue text.
 	theme.set_type_variation("Link", "Button")
-	_button_states(theme, "Link", _empty(), _empty(), _empty(), _empty(), LINK, LINK_HOVER, Color("#9a9fa3"))
-	theme.set_font_size("font_size", "Link", SMALL + 1)
-
-	# On the masthead: white text, and the main action in white.
-	theme.set_type_variation("MastheadButton", "Button")
-	var on_navy := _flat(Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.55), 0)
-	on_navy.set_border_width_all(1)
-	var on_navy_hover := on_navy.duplicate()
-	on_navy_hover.bg_color = Color(1, 1, 1, 0.12)
-	var on_navy_down := on_navy.duplicate()
-	on_navy_down.bg_color = Color(1, 1, 1, 0.22)
-	var on_navy_off := on_navy.duplicate()
-	on_navy_off.border_color = Color(1, 1, 1, 0.2)
-	_button_states(theme, "MastheadButton", on_navy, on_navy_hover, on_navy_down, on_navy_off,
-		Color.WHITE, Color.WHITE, Color(1, 1, 1, 0.4))
-	theme.set_type_variation("MastheadPrimary", "Button")
-	_button_states(theme, "MastheadPrimary", _flat(Color.WHITE, Color("#8fa3b8"), 2), _flat(Color("#e3e9ef"), Color("#8fa3b8"), 2),
-		_flat(Color("#c8d3de")), _flat(Color(1, 1, 1, 0.25)), MASTHEAD, MASTHEAD, Color(1, 1, 1, 0.5))
-	theme.set_font("font", "MastheadPrimary", sans_bold)
-	theme.set_type_variation("MastheadLabel", "Label")
-	theme.set_color("font_color", "MastheadLabel", Color.WHITE)
-	theme.set_type_variation("MastheadTitle", "Label")
-	theme.set_color("font_color", "MastheadTitle", Color.WHITE)
-	theme.set_font("font", "MastheadTitle", serif)
-	theme.set_font_size("font_size", "MastheadTitle", 21)
-	theme.set_type_variation("Masthead", "PanelContainer")
-	var masthead := StyleBoxFlat.new()
-	masthead.bg_color = MASTHEAD
-	masthead.content_margin_left = 20
-	masthead.content_margin_right = 20
-	masthead.content_margin_top = 10
-	masthead.content_margin_bottom = 10
-	theme.set_stylebox("panel", "Masthead", masthead)
+	_button_states(theme, "Link", _empty(), _empty(), _empty(), _empty(), BLUE, Color("#0f2f4d"), LINE)
+	theme.set_font("font", "Link", text(600))
+	theme.set_font_size("font_size", "Link", SMALL)
+	# Chip: a figure on the top bar that opens its popup.
+	theme.set_type_variation("Chip", "Button")
+	_button_states(theme, "Chip", _empty(10, 2), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 10, 2),
+		_flat(Color(INK, 0.12), Color(INK, 0.0), 0, 10, 2), _empty(10, 2), INK, INK, INK)
 
 	# Text styles.
 	theme.set_type_variation("Title", "Label")
-	theme.set_font("font", "Title", serif)
+	theme.set_font("font", "Title", display(500))
 	theme.set_font_size("font_size", "Title", TITLE)
 	theme.set_type_variation("Figure", "Label")
-	theme.set_font("font", "Figure", serif)
+	theme.set_font("font", "Figure", display(500))
 	theme.set_font_size("font_size", "Figure", FIGURE)
-	theme.set_type_variation("Heading", "Label")  # column and section headings in tables
-	theme.set_font("font", "Heading", sans_bold)
-	theme.set_font_size("font_size", "Heading", SMALL)
+	theme.set_type_variation("Heading", "Label")  # small tracked capitals over a section
+	theme.set_font("font", "Heading", display(600, 1))
+	theme.set_font_size("font_size", "Heading", CAPS)
 	theme.set_color("font_color", "Heading", MUTED)
+	theme.set_type_variation("Muted", "Label")
+	theme.set_color("font_color", "Muted", MUTED)
+	theme.set_font_size("font_size", "Muted", SMALL)
 
-	# Sections: white with a hairline border; headline figures carry a navy rule on top.
-	theme.set_stylebox("panel", "PanelContainer", panel_style())
-	theme.set_type_variation("HeadlineCard", "PanelContainer")
-	var card := StyleBoxFlat.new()
-	card.bg_color = PANEL
-	card.border_color = ACCENT
-	card.border_width_top = 4
-	card.content_margin_left = 14
-	card.content_margin_right = 10
-	card.content_margin_top = 10
-	card.content_margin_bottom = 8
-	theme.set_stylebox("panel", "HeadlineCard", card)
+	theme.set_stylebox("panel", "PanelContainer", _empty(0, 0))
+	theme.set_type_variation("Card", "PanelContainer")
+	theme.set_stylebox("panel", "Card", card())
 
-	# Fields: white, a firm dark border.
-	var field := StyleBoxFlat.new()
-	field.bg_color = PANEL
-	field.border_color = TEXT
-	field.set_border_width_all(2)
-	field.set_content_margin_all(6)
-	var field_focus := focus.duplicate()
+	# Fields: card stock, an ink edge; ochre when focused.
+	var field := _flat(Color("#fffaf0"), INK, 2, 8, 4)
+	var field_focus := _flat(Color("#fffaf0"), OCHRE, 2, 8, 4)
 	theme.set_stylebox("normal", "LineEdit", field)
 	theme.set_stylebox("focus", "LineEdit", field_focus)
-	var field_off := field.duplicate()
-	field_off.border_color = LINE
-	field_off.bg_color = BG
-	theme.set_stylebox("read_only", "LineEdit", field_off)
+	theme.set_stylebox("read_only", "LineEdit", _flat(PAPER, LINE, 2, 8, 4))
+	theme.set_font("font", "LineEdit", text(500))
 
-	# Tabs: the open one white, joined to its panel, with a navy rule on top.
-	var tab_on := StyleBoxFlat.new()
-	tab_on.bg_color = PANEL
-	tab_on.border_color = ACCENT
-	tab_on.border_width_top = 3
-	tab_on.content_margin_left = 16
-	tab_on.content_margin_right = 16
-	tab_on.content_margin_top = 8
-	tab_on.content_margin_bottom = 8
-	var tab_off := tab_on.duplicate()
-	tab_off.bg_color = Color("#e3e3e1")
-	tab_off.border_color = Color("#e3e3e1")
-	var tab_hover := tab_off.duplicate()
-	tab_hover.bg_color = Color("#d6d6d4")
-	tab_hover.border_color = Color("#d6d6d4")
-	theme.set_stylebox("tab_selected", "TabContainer", tab_on)
-	theme.set_stylebox("tab_unselected", "TabContainer", tab_off)
-	theme.set_stylebox("tab_hovered", "TabContainer", tab_hover)
-	theme.set_stylebox("tab_focus", "TabContainer", focus)
-	var tab_panel := panel_style()
-	tab_panel.border_width_top = 0
-	theme.set_stylebox("panel", "TabContainer", tab_panel)
-	theme.set_color("font_selected_color", "TabContainer", TEXT)
-	theme.set_color("font_unselected_color", "TabContainer", MUTED)
-	theme.set_color("font_hovered_color", "TabContainer", TEXT)
-	theme.set_font("font", "TabContainer", font(SANS_FILE, 600))
+	# Sliders: an ink track, an ochre grabber.
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(INK, 0.25)
+	track.content_margin_top = 2
+	track.content_margin_bottom = 2
+	var filled := StyleBoxFlat.new()
+	filled.bg_color = INK
+	filled.content_margin_top = 2
+	filled.content_margin_bottom = 2
+	theme.set_stylebox("slider", "HSlider", track)
+	theme.set_stylebox("grabber_area", "HSlider", filled)
+	theme.set_stylebox("grabber_area_highlight", "HSlider", filled)
+	theme.set_icon("grabber", "HSlider", _grabber(false))
+	theme.set_icon("grabber_highlight", "HSlider", _grabber(true))
 
-	# Menus, tooltips, dialogs, rules, scroll bars.
-	var menu := panel_style(PANEL, 0, 6)
-	theme.set_stylebox("panel", "PopupMenu", menu)
-	theme.set_stylebox("hover", "PopupMenu", _flat(Color("#e8eef4"), Color.TRANSPARENT, 0, 8, 4))
-	theme.set_color("font_hover_color", "PopupMenu", TEXT)
+	# Menus, tooltips, option buttons.
+	theme.set_stylebox("panel", "PopupMenu", card(6, 4))
+	theme.set_stylebox("hover", "PopupMenu", _flat(Color(OCHRE, 0.35), Color(0, 0, 0, 0), 0, 8, 4))
+	theme.set_color("font_hover_color", "PopupMenu", INK)
 	theme.set_color("font_disabled_color", "PopupMenu", MUTED)
-	var tip := panel_style(TEXT, 0, 8)
-	theme.set_stylebox("panel", "TooltipPanel", tip)
-	theme.set_color("font_color", "TooltipLabel", Color.WHITE)
-	theme.set_stylebox("panel", "AcceptDialog", panel_style(PANEL, 0, 20))
-	var frame := StyleBoxFlat.new()
-	frame.bg_color = MASTHEAD
-	frame.expand_margin_left = 1
-	frame.expand_margin_right = 1
-	frame.expand_margin_bottom = 1
-	frame.expand_margin_top = 34
-	theme.set_stylebox("embedded_border", "Window", frame)
-	theme.set_stylebox("embedded_unfocused_border", "Window", frame)
-	theme.set_constant("title_height", "Window", 34)
-	theme.set_color("title_color", "Window", Color.WHITE)
-	theme.set_font("title_font", "Window", sans_bold)
-	theme.set_font_size("title_font_size", "Window", FONT_SIZE)
-	for type in ["HSeparator", "VSeparator"]:
-		var rule := StyleBoxLine.new()
-		rule.color = LINE
-		rule.vertical = type == "VSeparator"
-		theme.set_stylebox("separator", type, rule)
-	for type in ["VScrollBar", "HScrollBar"]:
-		var track := StyleBoxFlat.new()
-		track.bg_color = Color(0, 0, 0, 0)
-		track.set_content_margin_all(3)
-		var grab := StyleBoxFlat.new()
-		grab.bg_color = LINE
-		grab.set_content_margin_all(3)
-		var grab_on := grab.duplicate()
-		grab_on.bg_color = MUTED
-		theme.set_stylebox("scroll", type, track)
-		theme.set_stylebox("grabber", type, grab)
-		theme.set_stylebox("grabber_highlight", type, grab_on)
-		theme.set_stylebox("grabber_pressed", type, grab_on)
-
-	# Icons: the defaults redrawn dark; square check boxes.
-	var base := ThemeDB.get_default_theme()
-	for pair in [["arrow", "OptionButton"], ["updown", "SpinBox"], ["up", "SpinBox"], ["down", "SpinBox"],
-			["close", "Window"], ["submenu", "PopupMenu"], ["grabber", "HSplitContainer"], ["grabber", "VSplitContainer"]]:
-		if base.has_icon(pair[0], pair[1]):
-			theme.set_icon(pair[0], pair[1], _recolour(base.get_icon(pair[0], pair[1]), MUTED if pair[1] != "Window" else Color.WHITE))
+	theme.set_color("font_separator_color", "PopupMenu", MUTED)
+	theme.set_stylebox("panel", "TooltipPanel", _flat(INK, INK, 0, 10, 6))
+	theme.set_color("font_color", "TooltipLabel", CARD)
+	theme.set_font_size("font_size", "TooltipLabel", SMALL)
+	theme.set_icon("arrow", "OptionButton", _triangle(12, false, INK))
 	for type in ["CheckBox", "PopupMenu"]:
 		theme.set_icon("checked", type, _box_icon(true))
 		theme.set_icon("unchecked", type, _box_icon(false))
-	theme.set_stylebox("normal", "CheckBox", _empty(2, 4))
-	theme.set_stylebox("hover", "CheckBox", _empty(2, 4))
-	theme.set_stylebox("pressed", "CheckBox", _empty(2, 4))
-	theme.set_stylebox("hover_pressed", "CheckBox", _empty(2, 4))
+		theme.set_icon("radio_checked", type, _box_icon(true))
+		theme.set_icon("radio_unchecked", type, _box_icon(false))
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		theme.set_stylebox(state, "CheckBox", _empty(2, 4))
+	theme.set_constant("h_separation", "CheckBox", 10)
 
-	# Stage S12: tiles (policy areas) and the page navigation under the masthead.
-	theme.set_type_variation("Tile", "Button")
-	var tile := panel_style(PANEL, 0, 14)
-	tile.border_width_left = 4
-	tile.border_color = LINE
-	var tile_hover := tile.duplicate()
-	tile_hover.bg_color = Color("#f4f7fa")
-	tile_hover.border_color = ACCENT
-	var tile_down := tile_hover.duplicate()
-	tile_down.bg_color = Color("#e8eef4")
-	_button_states(theme, "Tile", tile, tile_hover, tile_down, tile, TEXT, TEXT, MUTED)
-	theme.set_constant("h_separation", "Tile", 14)
-	theme.set_constant("icon_max_width", "Tile", 32)
-	theme.set_color("icon_normal_color", "Tile", ACCENT)
-	theme.set_color("icon_hover_color", "Tile", ACCENT)
-	theme.set_color("icon_pressed_color", "Tile", ACCENT)
-	theme.set_type_variation("NavBar", "PanelContainer")
-	var bar := StyleBoxFlat.new()
-	bar.bg_color = PANEL
-	bar.border_color = LINE
-	bar.border_width_bottom = 1
-	bar.content_margin_left = 20
-	bar.content_margin_right = 20
-	theme.set_stylebox("panel", "NavBar", bar)
-	theme.set_type_variation("NavItem", "Button")
-	var item := _empty(14, 12)
-	var item_on := StyleBoxFlat.new()
-	item_on.bg_color = PANEL
-	item_on.border_color = ACCENT
-	item_on.border_width_bottom = 4
-	item_on.content_margin_left = 14
-	item_on.content_margin_right = 14
-	item_on.content_margin_top = 12
-	item_on.content_margin_bottom = 8
-	var item_hover := item_on.duplicate()
-	item_hover.border_color = LINE
-	_button_states(theme, "NavItem", item, item_hover, item_on, item, LINK, LINK_HOVER, MUTED)
-	theme.set_color("font_pressed_color", "NavItem", TEXT)
-	theme.set_color("font_hover_pressed_color", "NavItem", TEXT)
-	theme.set_font("font", "NavItem", sans_bold)
-	theme.set_constant("h_separation", "NavItem", 8)
-	theme.set_constant("icon_max_width", "NavItem", 18)
-	# The policy web's nodes: small white boxes with a hairline, navy when pointed at.
-	theme.set_type_variation("WebNode", "Button")
-	var node := panel_style(PANEL, 0, 8)
-	node.content_margin_top = 4
-	node.content_margin_bottom = 4
-	var node_hover := node.duplicate()
-	node_hover.border_color = ACCENT
-	node_hover.set_border_width_all(2)
-	_button_states(theme, "WebNode", node, node_hover, node_hover, node, TEXT, TEXT, MUTED)
-	theme.set_font_size("font_size", "WebNode", SMALL + 1)
-	theme.set_constant("icon_max_width", "WebNode", 18)
-	theme.set_constant("h_separation", "WebNode", 8)
-	for key in ["icon_normal_color", "icon_hover_color", "icon_pressed_color"]:
-		theme.set_color(key, "WebNode", ACCENT)
-	for key in ["icon_normal_color", "icon_hover_color"]:
-		theme.set_color(key, "NavItem", LINK)
-	for key in ["icon_pressed_color", "icon_hover_pressed_color"]:
-		theme.set_color(key, "NavItem", TEXT)
+	for type in ["HSeparator", "VSeparator"]:
+		var rule := StyleBoxLine.new()
+		rule.color = INK
+		rule.thickness = 2
+		rule.vertical = type == "VSeparator"
+		theme.set_stylebox("separator", type, rule)
+	for type in ["VScrollBar", "HScrollBar"]:
+		var lane := StyleBoxFlat.new()
+		lane.bg_color = Color(0, 0, 0, 0)
+		lane.set_content_margin_all(3)
+		var grab := StyleBoxFlat.new()
+		grab.bg_color = Color(INK, 0.35)
+		grab.set_content_margin_all(3)
+		var grab_on := grab.duplicate()
+		grab_on.bg_color = INK
+		theme.set_stylebox("scroll", type, lane)
+		theme.set_stylebox("grabber", type, grab)
+		theme.set_stylebox("grabber_highlight", type, grab_on)
+		theme.set_stylebox("grabber_pressed", type, grab_on)
+	# Spin boxes: the field only, with small ink arrows.
+	theme.set_icon("updown", "SpinBox", _updown())
 	return theme
 
 
-## Stage S12.2: an icon from client/icons by name (Lucide, drawn white so a theme colour
-## can tint it); a plain square for a name that has none.
+static func _grabber(hot: bool) -> Texture2D:
+	var size := 18
+	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	image.fill_rect(Rect2i(3, 0, size - 6, size), INK)
+	image.fill_rect(Rect2i(5, 2, size - 10, size - 4), Color("#e6ac43") if hot else OCHRE)
+	return ImageTexture.create_from_image(image)
+
+
+static func _updown() -> Texture2D:
+	var w := 12
+	var h := 20
+	var image := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	for row in 5:
+		for x in range(w / 2 - row, w / 2 + row):
+			image.set_pixel(x, 3 + row, INK)
+			image.set_pixel(x, h - 4 - row, INK)
+	return ImageTexture.create_from_image(image)
+
+
+## The paper the board and every screen sits on: a full-rect node with grain and vignette.
+static func paper() -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = PAPER
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = PAPER_SHADER
+	material.shader = shader
+	material.set_shader_parameter("paper", PAPER)
+	material.set_shader_parameter("edge", PAPER_EDGE)
+	rect.material = material
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return rect
+
+
+## An icon from client/icons by name (game-icons.net silhouettes, drawn white so a colour
+## can tint them); the generic cog for a name that has none.
 static func icon(name: String) -> Texture2D:
 	var path := "res://icons/%s.svg" % name
-	return load(path if name != "" and ResourceLoader.exists(path) else "res://icons/square.svg")
+	return load(path if name != "" and ResourceLoader.exists(path) else "res://icons/policy.svg")
 
 
-## Hairlines between the rows of a table laid out as a GridContainer.
+## Ink rules between the rows of a table laid out as a GridContainer.
 static func rule_rows(grid: GridContainer) -> void:
 	grid.sort_children.connect(grid.queue_redraw)
 	grid.draw.connect(func() -> void:
@@ -389,3 +375,11 @@ static func rule_rows(grid: GridContainer) -> void:
 			if bottom > 0.0 and start + grid.columns < count:
 				var y := floorf(bottom + gap / 2.0) + 0.5
 				grid.draw_line(Vector2(0, y), Vector2(grid.size.x, y), RULE, 1.0))
+
+
+## A tracked-capitals label for a small heading.
+static func caps(words: String) -> Label:
+	var label := Label.new()
+	label.text = words.to_upper()
+	label.theme_type_variation = "Heading"
+	return label

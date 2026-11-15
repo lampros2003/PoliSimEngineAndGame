@@ -30,17 +30,17 @@ func _initialize() -> void:
 	for month in range(60):
 		if CHANGES.has(month):
 			for change in CHANGES[month]:
-				main.levers.type_value(change[0], change[1])
+				main.type_lever(change[0], change[1])
 			await _settle()
 			if main.game.pending().size() != CHANGES[month].size():
 				_fail("month %d: the interface did not schedule the changes" % month)
 				return
 		if month == 20:
-			main._save.pressed.emit()
+			main._menu.get_popup().id_pressed.emit(0)
 			await _settle()
 			saved_hash = main.game.hashes()[19]
 		if month == 25:
-			main._reload.pressed.emit()
+			main._menu.get_popup().id_pressed.emit(2)
 			await _settle()
 		next_month.pressed.emit()
 		await _settle()
@@ -48,12 +48,13 @@ func _initialize() -> void:
 			_fail("month %d: expected %d months done, found %d" % [month, month + 1, main.game.steps_done()])
 			return
 	var hashes: PackedStringArray = main.game.hashes()
-	main.explain("gov_balance", true)
+	main.open_indicator("gov_balance")
 	await _settle()
-	if main.trace._summary.text.begins_with("Advance") or main.trace._rows.get_child_count() == 0:
+	var trace = main.current_trace()
+	if trace == null or trace._summary.text.begins_with("Advance") or trace._rows.get_child_count() == 0:
 		_fail("the why panel shows nothing for the budget balance")
 		return
-	main._load.pressed.emit()
+	main._menu.get_popup().id_pressed.emit(1)
 	await _settle()
 	if main.game.steps_done() != 20 or main.game.hashes()[19] != saved_hash:
 		_fail("loading the save did not restore month 20")

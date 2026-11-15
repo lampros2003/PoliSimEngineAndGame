@@ -16,7 +16,7 @@ func _initialize() -> void:
 	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await _settle()
-	if main.failed or not main.politics.visible:
+	if main.failed or main.politics.settings.is_empty():
 		return _fail("no politics panel")
 	main.advance(1 if expect == "office" else 2)
 	await _settle()
@@ -31,16 +31,20 @@ func _initialize() -> void:
 			return _fail("the next election reads: " + panel._election.text)
 		if not panel._summary.text.begins_with("Government: Centre-left, 411 of 650 seats"):
 			return _fail("the summary reads: " + panel._summary.text)
-		if main.lost or main._advance[0].disabled:
+		if main.lost or not main.can_advance():
 			return _fail("the game stopped")
 		# Stage S8.3: the issues, nothing changed yet since the stand-in election.
 		if not panel._issues.visible or not panel._issues.text.begins_with("What voters weigh, against the last election: Health +0.0%"):
 			return _fail("the issues read: " + panel._issues.text)
+		main.open_overlay("parliament")
+		await _settle()
+		if main.overlay_open() != "parliament" or not panel.is_visible_in_tree():
+			return _fail("Parliament did not open")
 		print("politics: the 2024 House, the government's poll rating, the July 2029 election and the issues shown")
 	else:
 		if main._dialog == null or not main._dialog.visible or not main._dialog.title.contains("lost office"):
 			return _fail("election night was not announced")
-		if not main.lost or not main._advance[0].disabled:
+		if not main.lost or main.can_advance():
 			return _fail("the game did not stop when the player lost office")
 		var steps: int = main.game.steps_done()
 		main.advance(1)

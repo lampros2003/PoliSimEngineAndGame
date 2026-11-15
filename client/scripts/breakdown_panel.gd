@@ -24,19 +24,15 @@ var _all_bar: Control
 var _source: Array = []  # [cells_of, latest, previous] from the last refresh
 
 
-func _ready() -> void:
-	add_theme_stylebox_override("panel", Palette.panel_style())
+## Built at once (stage S13.2), so a popup can fill it before it is on screen.
+func _init() -> void:
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
 	box.add_child(top)
-	var title := Label.new()
-	title.text = "Who gains, who loses"
-	title.theme_type_variation = "Title"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title)
 	_choice = OptionButton.new()
 	_choice.name = "breakdown_choice"
 	_choice.item_selected.connect(func(_i: int) -> void:
@@ -48,7 +44,7 @@ func _ready() -> void:
 	_note.add_theme_color_override("font_color", Palette.MUTED)
 	_note.add_theme_font_size_override("font_size", Palette.SMALL)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_note.custom_minimum_size = Vector2(600, 0)
+	_note.custom_minimum_size = Vector2(420, 0)
 	box.add_child(_note)
 	_grid = GridContainer.new()
 	_grid.columns = 5
@@ -72,7 +68,9 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 
 
 ## Shows the panel when the scenario names breakdowns the model has; hides it otherwise.
-func build(play: Dictionary, entries: Dictionary) -> void:
+## Stage S13.2: `only` limits the menu to the breakdowns of one indicator's popup; the menu
+## keeps the words it has with every breakdown in it.
+func build(play: Dictionary, entries: Dictionary, only: Array = []) -> void:
 	_entries = entries
 	var keep := selected()
 	_names.clear()
@@ -91,12 +89,22 @@ func build(play: Dictionary, entries: Dictionary) -> void:
 			continue
 		_names.append(str(name))
 		shorts.append(_short_label(entry))
+	var labels := []
 	for i in _names.size():
 		# Two breakdowns by the same dimension keep their full labels in the menu.
 		var label: String = shorts[i]
 		if shorts.count(label) > 1:
 			label = str(entries[_names[i]].get("label", _names[i]))
-		_choice.add_item(label)
+		labels.append(label)
+	if not only.is_empty():
+		var kept := []
+		for i in _names.size():
+			if only.has(_names[i]):
+				kept.append(i)
+		_names = kept.map(func(i): return _names[i])
+		labels = kept.map(func(i): return labels[i])
+	for i in _names.size():
+		_choice.add_item(labels[i])
 		if _names[i] == keep:
 			_choice.select(i)
 	var all: Dictionary = entries.get(str(play.get("breakdown_all", "")), {})

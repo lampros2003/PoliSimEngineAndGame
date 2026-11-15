@@ -1,10 +1,10 @@
 extends SceneTree
-## Opens the scenario given by --scenario, plays one month and writes the budget screen
+## Opens the scenario given by --scenario, plays one month and writes the Budget sheet
 ## as the player sees it, one "label,text" line per row, to --out=PATH. tools/check_client.py
 ## compares the UK's with the published public finances.
 ##
 ## Then raises the basic rate of income tax by one point, plays a second month and writes
-## every breakdown of the "who gains, who loses" panel, as shown, to --breakdowns=PATH:
+## every breakdown, as shown in the popups of the figures they break down, to --breakdowns=PATH:
 ## one tab-separated line per row (month, breakdown, group, this month, change, percent).
 
 var main: Control
@@ -25,14 +25,14 @@ func _initialize() -> void:
 		push_error("the game did not start")
 		quit(1)
 		return
-	# Inputs marked player = false (world demand, market rates) never reach the policy panel.
-	for name in main.levers._rows:
+	# Inputs marked player = false (world demand, market rates) never reach the board.
+	for name in main.board_levers():
 		if not main.entries[name].get("player", true):
 			push_error("the input %s is offered to the player" % name)
 			quit(1)
 			return
-	if main.levers._rows.has("export_demand") or not main.levers._rows.has("vat_rate"):
-		push_error("the policy panel does not hold the right levers")
+	if main.board_levers().has("export_demand") or not main.board_levers().has("vat_rate"):
+		push_error("the board does not hold the right levers")
 		quit(1)
 		return
 	main.advance(1)
@@ -41,9 +41,10 @@ func _initialize() -> void:
 	for line in main.budget._lines:
 		var entry: Dictionary = line["entry"]
 		lines.append("%s,%s" % [str(entry.get("label", line["name"])), line["cells"][0].text])
-	# The headline strip, as shown (stage S9.0: the NHS waiting list is one of its figures).
-	for key in main._cards:
-		lines.append("headline %s,\"%s\"" % [key, main._cards[key]["value"].text])
+	# Stage S13.2: the NHS waiting list, as its node on the board shows it.
+	main.hover("indicator:waiting_list")
+	lines.append("headline waiting_list,\"%s\"" % main.board.nodes["indicator:waiting_list"]["value"])
+	main.hover("")
 	for key in ["revenue", "spending", "balance"]:
 		var cells: Array = main.budget._totals.get(key, [])
 		if cells.size() == 3:
@@ -56,7 +57,7 @@ func _initialize() -> void:
 		quit(0)
 		return
 	var shown := PackedStringArray(["month\tbreakdown\tgroup\tnow\tchange\tpercent"])
-	_dump_breakdowns(shown, 1)
+	await _dump_breakdowns(shown, 1)
 	var refused: String = main.game.set_lever("basic_rate", 0.21)
 	if refused != "":
 		push_error(refused)
@@ -65,7 +66,7 @@ func _initialize() -> void:
 	await _settle()
 	main.advance(1)
 	await _settle()
-	_dump_breakdowns(shown, 2)
+	await _dump_breakdowns(shown, 2)
 	file = FileAccess.open(breakdown_path, FileAccess.WRITE)
 	file.store_string("\n".join(shown) + "\n")
 	file.close()
@@ -74,21 +75,30 @@ func _initialize() -> void:
 
 
 func _dump_breakdowns(shown: PackedStringArray, month: int) -> void:
-	var panel = main.breakdown
-	if not panel.visible:
-		push_error("the who gains, who loses panel is hidden")
-		return
-	var choice: OptionButton = panel._choice
-	for i in choice.item_count:
-		choice.select(i)
-		choice.item_selected.emit(i)
-		var rows: Array = panel._rows.duplicate()
-		if not panel._all_cells.is_empty():
-			rows.append({"cells": panel._all_cells})
-		for row in rows:
-			var cells: Array = row["cells"]
-			shown.append("\t".join([str(month), choice.get_item_text(i), cells[0].text, cells[1].text, cells[2].text, cells[3].text]))
-
+	var totals: Dictionary = main.play.get("breakdown_totals", {})
+	var opened := {}
+	for name in main.play.get("breakdowns", []):
+		var total := str(totals.get(str(name), main.play.get("breakdown_all", "")))
+		if opened.has(total):
+			continue
+		opened[total] = true
+		main.open_indicator(total)
+		await _settle()
+		var panel = main.indicator_card().breakdown if main.indicator_card() != null else null
+		if panel == null or not panel.visible:
+			push_error("the popup of %s shows no breakdowns" % total)
+			return
+		var choice: OptionButton = panel._choice
+		for i in choice.item_count:
+			choice.select(i)
+			choice.item_selected.emit(i)
+			var rows: Array = panel._rows.duplicate()
+			if not panel._all_cells.is_empty():
+				rows.append({"cells": panel._all_cells})
+			for row in rows:
+				var cells: Array = row["cells"]
+				shown.append("\t".join([str(month), choice.get_item_text(i), cells[0].text, cells[1].text, cells[2].text, cells[3].text]))
+		main.close_popup()
 
 func _settle() -> void:
 	for i in 4:

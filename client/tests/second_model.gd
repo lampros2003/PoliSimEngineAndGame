@@ -1,7 +1,7 @@
 extends SceneTree
 ## Opens a model the client was not written for (models/mini: other sector, lever and
 ## flow names) and checks the screen is built from its catalogue: two budget lines, two
-## levers, two headline figures, and a lever change that reaches the budget.
+## policies on an automatic board, two headline figures, and a lever change that reaches the budget.
 
 var main: Control
 
@@ -15,14 +15,14 @@ func _initialize() -> void:
 		problems.append("the model did not open")
 	if main.budget._lines.size() != 2:
 		problems.append("expected 2 budget lines, found %d" % main.budget._lines.size())
-	if main.levers._rows.size() != 2:
-		problems.append("expected 2 levers, found %d" % main.levers._rows.size())
-	if main._cards.size() != 2:
-		problems.append("expected 2 headline figures, found %d" % main._cards.size())
+	if main.board_levers().size() != 2 or main.board.authored:
+		problems.append("expected 2 levers on an automatic board, found %d" % main.board_levers().size())
+	if main._chip.size() != 2:
+		problems.append("expected 2 headline figures, found %d" % main._chip.size())
 	main.advance(1)
 	await _settle()
 	var before := int(main.game.latest("pensions.total"))
-	main.levers.type_value("pension", 1000.0)
+	main.type_lever("pension", 1000.0)
 	# The change goes to the simulation thread first; the month buttons wait for it.
 	await _settle()
 	main.advance(1)

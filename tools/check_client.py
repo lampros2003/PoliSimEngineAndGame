@@ -144,7 +144,7 @@ def main() -> int:
             print("res://tests/bill_vote.gd failed", file=sys.stderr)
             return 1
         print(bill.stdout.strip().splitlines()[-1])
-        # Stage S6.1: the icon web, walked from a lever to the poll rating.
+        # Stage S6.1: the model's chain from a lever to the poll rating, walked through the popups.
         walk = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/web_walk.gd",
              "--", "--scenario=models/uk/scenarios/2025.toml"],
@@ -165,8 +165,8 @@ def main() -> int:
                 print(f"res://tests/politics_check.gd ({expect}) failed", file=sys.stderr)
                 return 1
             print(run.stdout.strip().splitlines()[-1])
-        # Stage S12: the pages, the policy areas and the policy web; political capital.
-        for script in ("res://tests/policy_web_check.gd", "res://tests/capital_check.gd"):
+        # Stage S13.2: the board; political capital. Stage S13.3: looking ahead.
+        for script in ("res://tests/board_check.gd", "res://tests/capital_check.gd", "res://tests/forecast_check.gd"):
             run = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
                  "--", "--scenario=models/uk/scenarios/2025.toml"],
@@ -271,13 +271,13 @@ def compare_uk_budget(text: str) -> list[str]:
         return sum((-1 if c.startswith("-") else 1) * float(year[c.lstrip("-")]) for c in columns) * 1e6
 
     problems = []
-    # Stage S9.0: the headline shows the NHS waiting list, whole, as the runner has it.
+    # Stage S9.0: the NHS waiting list shows whole, as the runner has it (on the board since S13.2).
     out = subprocess.run([str(ROOT / "target" / "release" / EXE), "run", str(ROOT / "models" / "uk" / "scenarios" / "2025.toml"),
                           "--steps", "1", "--columns", "waiting_list"], capture_output=True, encoding="utf-8", timeout=600)
     want = int(out.stdout.splitlines()[1]) if out.returncode == 0 else None
     got = headline.get("waiting_list")
     if want is None or got is None or got.replace(",", "") != str(want):
-        problems.append(f"UK headline: the waiting list shows {got}, the runner has {want}")
+        problems.append(f"UK board: the waiting list shows {got}, the runner has {want}")
     checks = [(label, shown.get(label), published(columns)) for label, columns in UK_BUDGET.items()]
     interest = [shown.get(label) for label in UK_INTEREST]
     checks.append(("Debt interest", None if None in interest else sum(interest), published(["ps_interest"])))

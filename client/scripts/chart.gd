@@ -1,7 +1,7 @@
 extends Control
-## A time-series chart drawn by hand: several figures sharing one unit, policy changes
+## A time-series chart drawn by hand: one or two figures sharing one unit, policy changes
 ## marked on the time axis, values shown under the pointer. Click a legend entry to
-## remove that figure.
+## remove that figure. Stage S13.2: drawn straight onto the popup's card stock.
 
 const Palette := preload("res://scripts/palette.gd")
 
@@ -54,7 +54,7 @@ func _range() -> Vector2:
 	if lo == INF:
 		return Vector2(0, 1)
 	if lo == hi:
-		var pad := maxf(absf(lo) * 0.05, 1.0)
+		var pad := absf(lo) * 0.05 if lo != 0.0 else 1.0  # a flat line, a little room round it
 		return Vector2(lo - pad, hi + pad)
 	var span := hi - lo
 	return Vector2(lo - span * 0.08, hi + span * 0.08)
@@ -96,11 +96,10 @@ func _label(v: float) -> String:
 func _draw() -> void:
 	var font := get_theme_default_font()
 	var small := Palette.SMALL
-	draw_style_box(Palette.panel_style(Palette.PANEL, 6, 0), Rect2(Vector2.ZERO, size))
 	var rect := _plot_rect()
 	_legend_boxes.clear()
 	if series.is_empty():
-		draw_string(font, Vector2(PAD_LEFT, size.y * 0.5), "Choose a figure and press Chart to plot it here.",
+		draw_string(font, Vector2(PAD_LEFT, size.y * 0.5), "Its history appears after the first month.",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.FONT_SIZE, Palette.MUTED)
 		return
 	var r := _range()
@@ -141,7 +140,7 @@ func _draw() -> void:
 	# Legend.
 	var x := PAD_LEFT
 	for s in series:
-		var text: String = s["label"] + "  ×"
+		var text: String = s["label"] + ("  ×" if series.size() > 1 and s != series[0] else "")
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x
 		draw_rect(Rect2(x, 14, 12, 12), s["color"])
 		draw_string(font, Vector2(x + 18, 25), text, HORIZONTAL_ALIGNMENT_LEFT, -1, small, Palette.TEXT)
@@ -166,14 +165,14 @@ func _draw() -> void:
 		var box := Rect2(hx + 10, rect.position.y + 6, box_w + 16, 20 * lines.size() + 8)
 		if box.end.x > size.x - 4:
 			box.position.x = hx - box.size.x - 10
-		draw_style_box(Palette.panel_style(Palette.PANEL_RAISED, 4, 0), box)
+		draw_style_box(Palette.card(0, 3, 1), box)
 		for i in lines.size():
 			draw_string(font, box.position + Vector2(8, 20 + 20 * i), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, small, Palette.TEXT)
 
 
 func _polyline(points: PackedVector2Array, color: Color) -> void:
 	if points.size() >= 2:
-		draw_polyline(points, color, 2.0, true)
+		draw_polyline(points, color, 2.5, true)
 	elif points.size() == 1:
 		draw_circle(points[0], 2.5, color)
 

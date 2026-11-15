@@ -4,7 +4,7 @@ extends SceneTree
 ## coalition without a majority of its own), plays two months, raises the basic rate, plays
 ## a third, and checks that the House of Commons voted it down 324 to 326: the rate kept its
 ## value, the change is recorded as defeated with its vote, the player is told, and the
-## chart marks nothing.
+## chart marks nothing. Stage S13.2: through the basic rate's popup on the board.
 
 var main: Control
 
@@ -15,7 +15,8 @@ func _initialize() -> void:
 	await _settle()
 	if main.failed or not main.catalogue.get("legislature", false):
 		return _fail("the game did not start with a legislature")
-	if not main.levers.hint.text.begins_with("Changes are bills"):
+	main.open_node(main.board.policy_of("basic_rate"))
+	if main.policy_card() == null or not main.policy_card().hint.text.begins_with("Changes are bills"):
 		return _fail("the policy panel does not say changes are bills")
 	main.advance(2)
 	await _settle()
@@ -32,10 +33,11 @@ func _initialize() -> void:
 		return _fail("the change was not recorded as defeated 324 to 326: %s" % [changes])
 	if absf(float(main.game.latest("basic_rate")) - 0.2) > 1e-12:
 		return _fail("the basic rate changed although the bill was defeated")
-	if not main._message.visible or not main._message_text.text.contains("voted down"):
-		return _fail("the player was not told: %s" % main._message_text.text)
-	main._refresh_chart()
-	if not main.chart.markers.is_empty():
+	if not main.notice_visible() or not main.notice_text().contains("voted down"):
+		return _fail("the player was not told: %s" % main.notice_text())
+	main.open_node(main.board.policy_of("basic_rate"))
+	await _settle()
+	if not main.policy_card().chart.markers.is_empty():
 		return _fail("the chart marks a change that never took effect")
 	print("bill vote: the basic rate rise was voted down 324 to 326, the rate kept, the player told")
 	quit(0)

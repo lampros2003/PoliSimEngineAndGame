@@ -1,12 +1,12 @@
 extends PanelContainer
 ## The government's budget, generated from the model: every payment into the government
-## sector is revenue, every payment out is spending. This month, last month, the change,
-## and buttons to chart a line or ask why it moved.
+## sector is revenue, every payment out is spending. This month, last month and the change.
+## Stage S13.2: the ledger of the Budget sheet; every line opens its popup.
 
 const Palette := preload("res://scripts/palette.gd")
 
-signal chart_requested(row: String, label: String)
-signal explain_requested(name: String)
+## A line was pressed: its entry's name, and where on screen, for the popup to grow from.
+signal line_pressed(name: String, origin: Rect2)
 
 var fmt: RefCounted
 var _grid: GridContainer
@@ -14,19 +14,26 @@ var _title: Label
 var _lines: Array = []  # {name, row, entry, labels: [this, last, change], sign}
 var _totals := {}  # "revenue" / "spending" / "balance" -> [this, last, change]
 var _sector := ""
+var _summary: Control
+var _sums := [0.0, 0.0]  # revenue and spending this month, for the bars
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", Palette.panel_style())
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 	_title = Label.new()
 	_title.text = "Budget"
-	_title.theme_type_variation = "Title"
+	_title.theme_type_variation = "Muted"
 	box.add_child(_title)
+	# Stage S13.2: revenue against spending as two printed bars, the gap between them named.
+	_summary = Control.new()
+	_summary.custom_minimum_size = Vector2(0, 104)
+	_summary.draw.connect(_draw_summary)
+	box.add_child(_summary)
 	_grid = GridContainer.new()
-	_grid.columns = 6
+	_grid.columns = 4
 	_grid.add_theme_constant_override("h_separation", 14)
 	_grid.add_theme_constant_override("v_separation", 9)
 	Palette.rule_rows(_grid)
@@ -48,42 +55,34 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 
 func _section(title: String) -> void:
 	_grid.add_child(_cell(title, Palette.MUTED, false, Palette.SMALL))
-	for i in 5:
+	for i in 3:
 		_grid.add_child(Control.new())
 
 
 func _line(name: String, entry: Dictionary, sign: int) -> void:
-	var label := _cell(str(entry.get("label", name)), Palette.TEXT, false)
+	var label := Button.new()
+	label.name = "line_" + name
+	label.text = str(entry.get("label", name))
 	label.tooltip_text = str(entry.get("doc", ""))
-	label.mouse_filter = Control.MOUSE_FILTER_PASS
-	label.custom_minimum_size = Vector2(200, 0)
+	label.theme_type_variation = "Link"
+	label.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
+	label.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.custom_minimum_size = Vector2(260, 0)
+	label.pressed.connect(func() -> void: line_pressed.emit(name, label.get_global_rect()))
 	_grid.add_child(label)
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
 	for c in cells:
 		_grid.add_child(c)
 	var row: String = entry.get("row", name)
-	var plot := Button.new()
-	plot.text = "Chart"
-	plot.theme_type_variation = "Link"
-	plot.name = "chart_" + name
-	plot.pressed.connect(func() -> void: chart_requested.emit(row, str(entry.get("label", name))))
-	_grid.add_child(plot)
-	var why := Button.new()
-	why.text = "Why"
-	why.theme_type_variation = "Link"
-	why.name = "why_" + name
-	why.pressed.connect(func() -> void: explain_requested.emit(name))
-	_grid.add_child(why)
-	_lines.append({"name": name, "row": row, "entry": entry, "cells": cells, "sign": sign})
-
+	_lines.append({"name": name, "row": row, "entry": entry, "cells": cells, "sign": sign, "button": label})
 
 func _total(key: String, title: String) -> void:
-	_grid.add_child(_cell(title, Palette.TEXT, false, Palette.FONT_SIZE))
+	var total := _cell(title, Palette.TEXT, false, Palette.FONT_SIZE)
+	total.add_theme_font_override("font", Palette.text(600))
+	_grid.add_child(total)
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
 	for c in cells:
 		_grid.add_child(c)
-	_grid.add_child(Control.new())
-	_grid.add_child(Control.new())
 	_totals[key] = cells
 
 
@@ -101,7 +100,7 @@ func build(catalogue: Dictionary, entries: Dictionary, sector: String) -> void:
 		_title.text = "Budget (no sector named %s in this model)" % sector
 		return
 	_title.text = "Budget of the %s, this month%s" % [str(found["label"]).to_lower(), " at an annual rate" if fmt.per_year else ""]
-	for heading in ["", "This month", "Last month", "Change", "", ""]:
+	for heading in ["", "This month", "Last month", "Change"]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	# Only payments count: not purchases or sales of assets (marked financial in the
 	# model), and nothing in an instrument other than the one payments use.
@@ -146,6 +145,8 @@ func refresh(latest: Callable, previous: Callable) -> void:
 	var money := {"money": true, "shown_unit": "%s/%s" % [fmt.currency, fmt.step_unit], "type": "int"}
 	for key in ["revenue", "spending"]:
 		_show_total(key, sums[key], known[key], money, 1 if key == "revenue" else -1)
+	_sums = [float(sums["revenue"][0]), float(sums["spending"][0])] if known["revenue"][0] and known["spending"][0] else [0.0, 0.0]
+	_summary.queue_redraw()
 	var balance := [sums["revenue"][0] - sums["spending"][0], sums["revenue"][1] - sums["spending"][1]]
 	var balance_known := [known["revenue"][0] and known["spending"][0], known["revenue"][1] and known["spending"][1]]
 	_show_total("balance", balance, balance_known, money, 1)
@@ -165,6 +166,31 @@ func _show_total(key: String, values: Array, known: Array, entry: Dictionary, si
 		cells[2].add_theme_color_override("font_color", _colour(values[0], values[1], sign))
 	else:
 		cells[2].text = "–"
+
+
+func _draw_summary() -> void:
+	var top: float = maxf(_sums[0], _sums[1])
+	if top <= 0.0:
+		return
+	var money := {"money": true, "shown_unit": "%s/%s" % [fmt.currency, fmt.step_unit], "type": "int"}
+	var caps := Palette.display(600, 1)
+	var figure := Palette.display(500)
+	var width := _summary.size.x - 300.0
+	for i in 2:
+		var y := 8.0 + i * 46.0
+		var w: float = width * _sums[i] / top
+		var colour: Color = Palette.BLUE if i == 0 else Palette.BRICK
+		_summary.draw_string(caps, Vector2(0, y + 24.0), ["REVENUE", "SPENDING"][i], HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.MUTED)
+		_summary.draw_rect(Rect2(100.0 + 4.0, y + 4.0, w, 30.0), Palette.SHADOW)
+		_summary.draw_rect(Rect2(100.0, y, w, 30.0), colour)
+		_summary.draw_string(figure, Vector2(112.0 + w, y + 24.0), fmt.value(money, int(_sums[i]), true, false), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Palette.INK)
+	var gap: float = _sums[0] - _sums[1]
+	var x: float = 100.0 + width * minf(_sums[0], _sums[1]) / top
+	var x2: float = 100.0 + width * maxf(_sums[0], _sums[1]) / top
+	_summary.draw_line(Vector2(x, 2.0), Vector2(x, 92.0), Palette.INK, 1.5)
+	_summary.draw_line(Vector2(x2, 2.0), Vector2(x2, 92.0), Palette.INK, 1.5)
+	var words: String = ("SURPLUS " if gap >= 0.0 else "DEFICIT ") + fmt.value(money, int(absf(gap)), true, false)
+	_summary.draw_string(caps, Vector2(x2 + 12.0, 98.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.GOOD if gap >= 0.0 else Palette.BAD)
 
 
 ## Green when the budget improves (more revenue, less spending), red when it worsens.
