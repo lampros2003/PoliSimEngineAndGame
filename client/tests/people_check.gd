@@ -33,7 +33,7 @@ func _initialize() -> void:
 	if card.approval_text != main.fmt.value(main.rows["approval_young"], approval, true, false) or not card.approval_text.ends_with("%"):
 		return _fail("the young's popup shows %s, the model %s" % [card.approval_text, approval])
 	var drivers: Array = main._group_drivers()
-	if card.drivers_shown.size() != 5 or drivers.size() != 5:
+	if card.drivers_shown.size() != 6 or drivers.size() != 6:  # stage S13.8: the public finances is the sixth
 		return _fail("drivers shown: %s" % [card.drivers_shown])
 	var moving := false
 	for i in 5:
@@ -112,7 +112,7 @@ func _initialize() -> void:
 	await _settle()
 	if not board.keys_of("group").is_empty() or not board.overlaps().is_empty() or main.failed:
 		return _fail("valmora's board: %d groups, %s" % [board.keys_of("group").size(), board.overlaps()])
-	print("people: the young back the government at %s, as the model has it, its five drivers the model's; Northern Ireland shows a dash; eight of the young's households, all young, one's account adding up (%s); a 21%% basic rate costs high incomes %.2f pts and low incomes %.2f; Income tax links the budget balance and unemployment up, and %d groups; valmora's board has no groups" % [
+	print("people: the young back the government at %s, as the model has it, its six drivers the model's; Northern Ireland shows a dash; eight of the young's households, all young, one's account adding up (%s); a 21%% basic rate costs high incomes %.2f pts and low incomes %.2f; Income tax links the budget balance and unemployment up, and %d groups; valmora's board has no groups" % [
 		young_text, net_text, groups["High incomes"] * 100.0, groups.get("Low incomes", 0.0) * 100.0, group_links.size()])
 	quit(0)
 

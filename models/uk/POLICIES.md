@@ -43,6 +43,13 @@ spending does; duties stated as multiples of 2024's rates grow with it too; fuel
 prescription charge, the fee cap, the bus fare cap, the grant and the visa threshold are
 nominal amounts, as they are set in law.
 
+Stage S13.8: whatever a policy does to receipts and spending also moves public borrowing,
+which lenders and voters now weigh (`finances.toml`, `politics/README.md`, "The public
+finances"). So an unfunded spending policy costs a little more over a term than its own
+reactions say, through a higher gilt yield and voters' view of the deficit, and a duty that
+raises money earns a little back. The "Measured" figures below were taken before stage
+S13.8 and leave that out.
+
 Each effect moves with inertia: a state follows its target over a stated number of months,
 so a policy's effect builds over months and years. Bills cost political capital as any lever
 does (`capital_weight` below scales the cost of moving across the whole range); a level policy

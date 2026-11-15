@@ -479,7 +479,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
-               "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml")
+               "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml",
+               "finances.toml")
               if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
@@ -540,6 +541,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
              "policy_charges": " + policy_charges", "dwellings_factor": " * homes_policy_level",
              "policy_labour": " + policy_labour_force_growth"}
     fills.update({k: (v if people else "") for k, v in hooks.items()})
+    # Stage S13.8: the yield on new gilts carries the lenders' premium (finances.toml).
+    fills["new_gilt_yield"] = "gilt_yield_now" if people else "gilt_yield + gilt_yield_shift"
     if people:
         fills["benefits_expr"] += " + policy_benefits"
     for name in ("model.toml", "economy.toml",

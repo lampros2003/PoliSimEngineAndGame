@@ -243,7 +243,7 @@ type = "real"
 unit = "1"
 phase = "accounts"
 initial = {{opening.effective_rate}}
-next = "effective_rate + (gilt_yield + gilt_yield_shift - effective_rate) / maturity_months"
+next = "effective_rate + ({{new_gilt_yield}} - effective_rate) / maturity_months"
 
 [state.private_employment]
 label = "Private sector employment"

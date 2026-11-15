@@ -21,7 +21,7 @@ currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "alignment", "income", "spending", "finance", "accounts", "politics"]
-files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml", "finances.toml"]
 
 [sector.households]
 label = "Households"
@@ -243,7 +243,7 @@ type = "real"
 unit = "1"
 phase = "accounts"
 initial = 0.043770771197
-next = "effective_rate + (gilt_yield + gilt_yield_shift - effective_rate) / maturity_months"
+next = "effective_rate + (gilt_yield_now - effective_rate) / maturity_months"
 
 [state.private_employment]
 label = "Private sector employment"

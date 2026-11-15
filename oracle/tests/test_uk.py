@@ -590,7 +590,9 @@ class Dilemmas(unittest.TestCase):
             "pay_claim", "nhs_winter", "bank_rescue", "steelworks", "investor", "energy_shock", "water_company",
             "defence_summit", "prisons_full", "universities", "floods", "net_zero_warning",
             # Stage S13.7: two chance questions from 2028.
-            "fuel_protest", "small_boats"])
+            "fuel_protest", "small_boats",
+            # Stage S13.8: lenders refuse the gilts.
+            "gilt_crisis"])
         for d in model().dilemmas:
             self.assertTrue(2 <= len(d["options"]) <= 3, d["name"])
             self.assertTrue(d["doc"] and all(o["doc"] for o in d["options"]), d["name"])

@@ -25,7 +25,7 @@ PARTITIONS = {"age": ["young", "midlife", "pensioners"],
               "income": ["low_income", "middle_income", "high_income"],
               "place": ["scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"],
               "tenure": ["home_owners", "renters"]}
-DRIVERS = ["income", "jobs", "prices_and_time", "services", "standing"]
+DRIVERS = ["income", "jobs", "prices_and_time", "services", "standing", "finances"]  # finances: stage S13.8
 OPTIONS = 10  # nine blocs and not voting, the last
 YEAR = 13  # the base month and a year after a change made in the second
 

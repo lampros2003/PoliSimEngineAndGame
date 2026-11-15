@@ -1,0 +1,110 @@
+# The public finances and the lenders (stage S13.8, docs/S13-PLAN.md). GENERATED: copied
+# from tools/uk/template/finances.toml by tools/uk/calibrate.py. Edit the template.
+#
+# Lenders ask more for new gilts when borrowing, as a share of output and smoothed over about
+# a year, runs above its level at the start of the game, and less when it runs below, within
+# bounds. The premium is added to the yield on new gilts, which the average rate on the debt
+# follows (model.toml, effective_rate), so it reaches debt interest. The model has no other
+# path from interest rates to households or firms: firms pay no interest on their loans,
+# households have no mortgages and investment does not read a rate (models/uk/README.md,
+# Known weaknesses), so the premium stops at debt interest, and through the gilt interest
+# banks pass on, at households' incomes.
+#
+# Everything here is nil in the base month (the smoothed borrowing is its level at the start
+# until a month has passed), and the premium is nil whatever borrowing does unless a
+# scenario sets `lender_premium_effect` (the 2025 scenario's [params]).
+
+[param.lender_premium_effect]
+doc = "Points of yield on new gilts for each point of output that smoothed borrowing runs above its level at the start of the game (nil in the model; a scenario's judgement)"
+type = "real"
+unit = "1"
+value = 0.0
+
+[param.lender_premium_most]
+doc = "The largest premium lenders ask, in yield (a judgement: about the rise in gilt yields in the autumn of 2022)"
+type = "real"
+unit = "1"
+value = 0.02
+
+[param.lender_discount_most]
+doc = "The largest discount lenders give for borrowing below its level at the start, in yield (a judgement)"
+type = "real"
+unit = "1"
+value = 0.005
+
+[param.borrowing_smooth_months]
+doc = "Months over which borrowing is averaged, exponentially, before lenders and voters weigh it"
+type = "real"
+unit = "1"
+value = 12.0
+
+[state.borrowing_smoothed]
+label = "Borrowing as a share of GDP, smoothed"
+doc = "Public sector net borrowing over output, averaged over about a year, so one month's bills or answers do not swing it; -1 until the first month"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(borrowing_smoothed < -0.5, borrowing_to_gdp, borrowing_smoothed + (borrowing_to_gdp - borrowing_smoothed) / borrowing_smooth_months)"
+
+[state.borrowing_at_start]
+doc = "Borrowing as a share of GDP in the first month of the game, which lenders take as normal; -1 until it is known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(borrowing_at_start < -0.5, borrowing_to_gdp, borrowing_at_start)"
+
+[state.debt_at_start]
+doc = "Net debt as a share of GDP in the first month of the game; -1 until it is known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(debt_at_start < -0.5, debt_to_gdp, debt_at_start)"
+
+[var.borrowing_gap]
+label = "Borrowing against its level at the start"
+doc = "Smoothed borrowing less borrowing in the first month, as shares of GDP: positive when the government borrows more than it did"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(borrowing_at_start < -0.5 or borrowing_smoothed < -0.5, 0.0, borrowing_smoothed - borrowing_at_start)"
+
+[var.gilt_premium]
+label = "Lenders' premium on new gilts"
+doc = "What lenders add to the yield on new gilts for borrowing above its level at the start, or take off for borrowing below it, within bounds"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "clamp(lender_premium_effect * borrowing_gap, 0.0 - lender_discount_most, lender_premium_most)"
+
+[var.gilt_yield_now]
+label = "Gilt yield"
+doc = "The annual rate on newly issued gilts: the assumption, where the market has it, and the lenders' premium. The average rate on the debt follows it over the gilts' lives"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "gilt_yield + gilt_yield_shift + gilt_premium"
+
+[param.gilt_crisis_gap]
+doc = "How far smoothed borrowing must run above its level at the start, as a share of GDP, before lenders refuse the gilts (dilemmas.toml, gilt_crisis; a judgement)"
+type = "real"
+unit = "1"
+value = 0.012
+
+# ---- voters' reward when borrowing falls well below its starting level
+
+[param.lenders_confidence_standing]
+doc = "What the government's standing gains with every voter while lenders' confidence holds (situations.toml; a judgement)"
+type = "real"
+unit = "1"
+value = 0.01
+
+[var.finances_standing]
+label = "Lenders' confidence, on the government's standing"
+doc = "A small gain while borrowing is well below its level at the start (the situation lenders_confidence); nil otherwise"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "select(lenders_confidence, lenders_confidence_standing, 0.0)"

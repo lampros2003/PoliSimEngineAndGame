@@ -59,15 +59,22 @@ const EXPECT: &[Answer] = &[
     ("small_boats", "patrols", &[("procurement", '+'), ("government_standing", '+')]),
     ("small_boats", "offshore", &[("procurement", '+'), ("government_standing", '~')]),
     ("small_boats", "routes", &[("policy_migration_factor", '+'), ("government_standing", '~')]),
+    // Stage S13.8: lenders refuse the gilts.
+    ("gilt_crisis", "budget", &[("procurement", '-'), ("public_investment", '-'), ("government_standing", '-')]),
+    ("gilt_crisis", "hold", &[("gilt_premium", '+'), ("inflation", '+'), ("government_standing", '-')]),
+    ("gilt_crisis", "bank", &[("gilt_premium", '-'), ("inflation", '+'), ("government_standing", '-')]),
 ];
 
-/// The seed of a run in which the dilemma opens, and whether that run needs a slump.
-fn recipe(dilemma: &str) -> (u64, bool) {
+/// The seed of a run in which the dilemma opens, and the spending levers' factor from the
+/// second month (1 for none).
+fn recipe(dilemma: &str) -> (u64, i64) {
     match dilemma {
-        "universities" | "water_company" => (8, false),
+        "universities" | "water_company" => (8, 1),
         // A recession with unemployment above 5.5%: every public service cut by a third.
-        "bank_rescue" => (2025, true),
-        _ => (2025, false),
+        "bank_rescue" => (2025, -3),
+        // Stage S13.8: sustained heavy borrowing: every public service up by a third.
+        "gilt_crisis" => (2025, 3),
+        _ => (2025, 1),
     }
 }
 
@@ -90,18 +97,20 @@ fn cells(sim: &Simulation, name: &str) -> Vec<f64> {
 
 /// The run to the month the dilemma opens, saved there.
 fn opened(model: &Arc<Model>, base: &RunConfig, dilemma: &str) -> Vec<u8> {
-    let (seed, slump) = recipe(dilemma);
+    let (seed, change) = recipe(dilemma);
     let mut config = base.clone();
     config.seed = seed;
-    if slump {
+    if change != 1 {
         config.commands = model
             .symbols
             .iter()
             .filter(|d| d.kind == Kind::Lever && d.name.starts_with("spending_"))
             .map(|d| {
+                // A third off (-3) or on (3).
+                let (num, den) = if change < 0 { (2, 3) } else { (4, 3) };
                 let cut = match &d.spec["default"] {
-                    Value::Integer(v) => Value::Integer(v * 2 / 3),
-                    other => Value::Float(other.as_float().unwrap() * 2.0 / 3.0),
+                    Value::Integer(v) => Value::Integer(v * num / den),
+                    other => Value::Float(other.as_float().unwrap() * num as f64 / den as f64),
                 };
                 (1, d.name.clone(), cut)
             })

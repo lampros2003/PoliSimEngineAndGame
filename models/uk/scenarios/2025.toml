@@ -11,6 +11,11 @@ preset = "central"
 # than safely above it. Nil in the base month (politics/README.md, "Wear of office").
 [params]
 vote_wear_effect = -0.025
+# Stage S13.8 (docs/S13-BALANCE.md, "After S13.8"): lenders and voters mind the public
+# finances (models/uk/finances.toml; politics/README.md, "The public finances"). Both are nil
+# in the base month.
+lender_premium_effect = 0.75
+vote_finances_effect = 1.0
 
 [play]
 # Stage S7.1: listed on the start screen.
@@ -132,12 +137,12 @@ groups = [
   { key = "drinkers", label = "Drinkers", icon = "group-drinkers", row = "approval_drinkers", share = "share_drinkers", family = "Ways of life", estimate = "the Health Survey for England's share who drank in the last week, by age" },
   { key = "smokers", label = "Smokers", icon = "group-smokers", row = "approval_smokers", share = "share_smokers", family = "Ways of life", estimate = "the ONS's adult smoking habits, by age and kind of work" },
 ]
-group_drivers = { income = "group_driver_income", jobs = "group_driver_jobs", prices_and_time = "group_driver_prices_and_time", services = "group_driver_services", standing = "group_driver_standing" }
+group_drivers = { income = "group_driver_income", jobs = "group_driver_jobs", prices_and_time = "group_driver_prices_and_time", services = "group_driver_services", standing = "group_driver_standing", finances = "group_driver_finances" }
 # Stage S13.4: a household as the group popup shows it: its flags and figures by name, the
 # data columns read in words through a dimension's labels ("column:dimension"), and its
 # account for the year (a "-" in front is taken away).
 household = { entity = "household", support = "household_support", net_income = "net_income", change = "income_change", adults = "adults", children = "children", region = "region_code:region", type = "type:household_type", account = ["household_earnings", "household_pensions", "-income_tax_year", "-employee_ni_year", "household_benefits"] }
-group_driver_labels = { income = "Their incomes", jobs = "Jobs where they live", prices_and_time = "Prices and time in office", services = "Public services and the climate", standing = "The government's decisions" }
+group_driver_labels = { income = "Their incomes", jobs = "Jobs where they live", prices_and_time = "Prices and time in office", services = "Public services and the climate", standing = "The government's decisions", finances = "The public finances" }
 
 [[play.web.areas]]
 name = "Economy"
@@ -152,6 +157,8 @@ indicators = [
   { row = "unemployment_rate", icon = "unemployment", size = 3, better = "low" },
   { row = "consumer_inflation_annual", icon = "prices", size = 3, better = "low" },
   { row = "output_growth", icon = "growth", size = 2, better = "high" },
+  # Stage S13.8: the yield on new gilts, with the lenders' premium.
+  { row = "gilt_yield_now", icon = "debt", size = 2, better = "low" },
   { row = "pay_per_employee_job", icon = "pay", size = 2, better = "high" },
   { row = "workforce_jobs", icon = "jobs", size = 1, better = "high" },
   { row = "business_investment", icon = "investment", size = 1, better = "high" },

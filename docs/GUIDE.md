@@ -147,8 +147,9 @@ every situation flag.
 
 Click a group to meet it. Its popup shows its approval and the month's change, its history
 against the country's, its share of the electorate as a hundred figures, **What is moving
-them** (five drivers of its vote: their incomes, jobs where they live, prices and time in
-office, public services and the climate, and the government's decisions) and **Policies
+them** (six drivers of its vote: their incomes, jobs where they live, prices and time in
+office, public services and the climate, the government's decisions, and the public
+finances) and **Policies
 that matter most to them**. Under **Households** stand eight households drawn from the
 group, as figures for adults and children; click one for its account for the year:
 earnings, pensions, income tax, National Insurance, benefits and net income, before housing
@@ -177,7 +178,18 @@ centre-right, liberal, populist right, green, the Scottish and Welsh nationalist
 Northern Ireland's parties and others). In the first month each region votes as it did in
 2024. After that each kind of voter (by region, age, income and work) weighs the change in
 its real household income, unemployment in its region and inflation since the last
-election, how long the government has been in office, and its reaction to each policy.
+election, how long the government has been in office, and its reaction to each policy. It
+also weighs the public finances: borrowing, averaged over about a year, against the last
+election. Half a point of output more barely registers; past a point it costs a great deal,
+most among pensioners, home owners and high incomes, and borrowing well below where it
+started earns a little ("Lenders' confidence").
+
+Lenders mind too. The **Gilt yield** indicator in Economy is what new government borrowing
+costs: it rises when borrowing runs above its level at the start of the game and falls when
+it runs below, and the interest on the debt follows it over the years. If borrowing stays
+more than about 1.2 points of output above where it started, lenders refuse the gilts and
+you must choose between an emergency budget, a much higher yield, or asking the Bank of
+England to print the money.
 
 ## Advancing time and the month's report
 
@@ -196,12 +208,13 @@ Sometimes the government must decide: a strike, a crisis. A dialog puts the ques
 two or more answers, each saying what it does. No month runs until you answer; you can
 close the dialog to look at the board first, and the flag **Decide** in the corner (or the
 month buttons) asks again. Your answer takes effect the next month, for good or for the
-months it says, and shows as a flag while it lasts. The UK has twelve: the public sector
+months it says, and shows as a flag while it lasts. The UK has fifteen: the public sector
 pay round in July 2025, an NHS winter crisis once the waiting list breaks its record, the
 allies' defence summit, full prisons, a climate warning, and chances (a steelworks closing,
 a chip maker choosing a site, an energy price shock, floods, a failing water company or
-universities) whose months the game's random seed decides; a bank in trouble comes only
-with a slump. In this build every new game of a scenario has the same seed, so the chances
+universities, and from 2028 fuel protests and small boats) whose months the game's random
+seed decides; a bank in trouble comes only with a slump, and lenders refusing the gilts only
+with heavy borrowing. In this build every new game of a scenario has the same seed, so the chances
 come in the same months each time.
 
 ## Keys

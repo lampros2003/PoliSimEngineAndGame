@@ -104,13 +104,17 @@ func _draw() -> void:
 		return
 	var r := _range()
 	# Grid and value labels.
-	for t in _nice_ticks(r.x, r.y):
+	var ticks := _nice_ticks(r.x, r.y)
+	# A rate whose gridlines are closer than a tenth of a point is marked to two places, so
+	# they do not all read the same (a gilt yield moving by hundredths).
+	var fine: bool = fmt != null and fmt.is_rate(entry) and ticks.size() > 1 and (ticks[1] - ticks[0]) * 100.0 < 0.099
+	for t in ticks:
 		# Stage S13.5: a whole-number value (an age, a year, a level) is marked at whole numbers only.
 		if ((entry.get("type", "") == "int" and not entry.get("money", false)) or entry.has("levels")) and not is_equal_approx(t, roundf(t)):
 			continue
 		var y := _y(t, rect, r)
 		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Palette.RULE, 1.0)
-		draw_string(font, Vector2(4, y + 5), _label(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12, small, Palette.MUTED)
+		draw_string(font, Vector2(4, y + 5), fmt.percent(t, 2) if fine else _label(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12, small, Palette.MUTED)
 	if r.x < 0.0 and r.y > 0.0:
 		var zero := _y(0.0, rect, r)
 		draw_line(Vector2(rect.position.x, zero), Vector2(rect.end.x, zero), Palette.MUTED, 1.0)

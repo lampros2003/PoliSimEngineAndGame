@@ -140,6 +140,8 @@ DRIVERS = [
     ("prices_and_time", "prices and time in office", None),
     ("services", "services and the climate", "voter_services"),
     ("standing", "reactions to the government's decisions", "government_standing"),
+    # Stage S13.8: borrowing against the last election.
+    ("finances", "the public finances", "voter_finances"),
 ]
 
 ASSUMPTIONS = {
@@ -860,7 +862,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 * type_age + policy_standing"
+expr = "0.0 * type_age + policy_standing + finances_standing"
 
 [var.voter_jobs]
 doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
@@ -878,13 +880,59 @@ phase = "politics"
 dims = ["voter_type"]
 expr = "issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
 
-[var.voter_fundamentals]
-doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, the issues it weighs, and answers to dilemmas"
+# ---- stage S13.8: the public finances. Voters weigh borrowing, as a share of output and
+# smoothed over about a year (finances.toml), against its level at the last election, as they
+# weigh prices and jobs; a rise counts more and more the further it goes, a fall less (a
+# judgement). Pensioners, home owners and high incomes weigh it most. Nil unless a scenario
+# sets vote_finances_effect (the 2025 scenario's [params]).
+
+[state.borrowing_at_election]
+doc = "Smoothed borrowing as a share of GDP at the last election; the base month's stands in for July 2024's (-1 until it is known)"
+type = "real"
+unit = "1"
+phase = "politics"
+initial = -1.0
+next = "select(borrowing_at_election < -0.5, borrowing_to_gdp, select(election_now, borrowing_smoothed, borrowing_at_election))"
+
+[param.vote_finances_effect]
+doc = "How much the public finances count at all on the governing blocs' utility: 1 is the curve finances_reaction as it stands (nil in the model; a scenario's judgement)"
+type = "real"
+unit = "1"
+value = 0.0
+
+# Utility for the government against the rise in smoothed borrowing since the last election,
+# in shares of output: half a point costs little, a point 0.08, and it steepens past it to
+# 0.16 at 1.2 points, where lenders refuse the gilts (gilt_crisis_gap, finances.toml); a fall
+# of three points earns about a quarter of what a rise of three costs.
+[table.finances_reaction]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{{ x = -0.04, y = 0.12 }}, {{ x = -0.02, y = 0.07 }}, {{ x = 0.0, y = 0.0 }}, {{ x = 0.005, y = -0.01 }}, {{ x = 0.009, y = -0.04 }}, {{ x = 0.012, y = -0.16 }}, {{ x = 0.015, y = -0.22 }}, {{ x = 0.02, y = -0.3 }}, {{ x = 0.04, y = -0.55 }}]
+
+[var.finances_weight]
+doc = "How much each voter type weighs the public finances: a half, and a half more each for pensioners, home owners and the richest fifth (a judgement)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + voter_jobs + voter_services"
+expr = "0.5 + 0.5 * select(type_age == 4, 1.0, 0.0) + 0.5 * group_member[group: home_owners] + 0.5 * select(type_quintile == 4, 1.0, 0.0)"
+
+[var.voter_finances]
+doc = "Borrowing against the last election, on the government's utility (stage S13.8: a driver of approval)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "select(borrowing_at_election < -0.5 or borrowing_smoothed < -0.5, 0.0, vote_finances_effect * finances_weight * curve(borrowing_smoothed - borrowing_at_election, finances_reaction))"
+
+[var.voter_fundamentals]
+doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, the issues it weighs, the public finances, and answers to dilemmas"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "government_standing + fundamentals + voter_jobs + voter_services + voter_finances"
 
 [var.utility]
 type = "real"

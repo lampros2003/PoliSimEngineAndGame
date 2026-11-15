@@ -170,8 +170,9 @@ is split into five drivers, each the group's mean over its adults (weights as ab
 | `group_driver_prices_and_time` | `fundamentals`, inflation against the last election and time in office, less the base month's time in office (six months), the same for every group |
 | `group_driver_services` | `voter_services`: health, education and policing service levels and the climate, against the last election |
 | `group_driver_standing` | `government_standing`: reactions to the government's answers to dilemmas |
+| `group_driver_finances` | `voter_finances`: borrowing against the last election (stage S13.8, below) |
 
-The five add up to the group's mean performance utility less the base month's time in
+The six add up to the group's mean performance utility less the base month's time in
 office, which the intercepts were fitted with; so all five are zero in the base month.
 They are utilities (log-odds), not points of approval: a driver of -0.1 makes the
 government's odds about a tenth lower among the group, all else equal.
@@ -268,3 +269,34 @@ the government polls 28.7% in June 2029 and keeps 330 seats in July, against 363
 with the second answers 323, short of a majority. A government that governs well keeps its
 majority; one that coasts is near the line or in a hung parliament. The other UK scenarios
 keep the model's nil.
+
+## The public finances (stage S13.8)
+
+After stage S13.7 borrowing was free: the crowd-pleaser ran the largest deficit and won the
+most seats (`docs/S13-BALANCE.md`). Now voters weigh the public finances like prices and
+jobs. `voter_finances`, for the blocs in government, is
+
+```
+vote_finances_effect * finances_weight * curve(borrowing_smoothed - borrowing_at_election, finances_reaction)
+```
+
+where `borrowing_smoothed` is public sector net borrowing over output, averaged over about a
+year (`../finances.toml`), and `borrowing_at_election` its level at the last election (the
+base month's standing in for July 2024's, as for the other fundamentals). The curve is a
+judgement: half a point of output more costs 0.01 of utility, a point 0.08, 1.2 points 0.16,
+two points 0.3; a fall of two points earns 0.07 and of four 0.12, so cutting borrowing is
+rewarded less than raising it is punished. The steep part sits where lenders start to refuse
+the gilts (1.2 points, `gilt_crisis_gap`): a deficit that worries the markets is news.
+`finances_weight` is a half, and a half more each for pensioners (65 and over), home owners
+(their estimated share of the type) and the richest fifth: about 1.07 on average, up to 2.
+`vote_finances_effect` is nil in the model and 1 in the 2025 scenario's `[params]`.
+
+`government_standing` also gains `finances_standing`, 0.01 with every voter while the
+situation "Lenders' confidence" holds (borrowing, smoothed, more than a point of output below
+its level at the start).
+
+Everything is nil in the base month (no memory yet) and in the fitted intercepts, and the
+hindcast, which has no politics, does not see it. In the 2025 scenario, with the lenders'
+premium of `../finances.toml`: doing nothing keeps 325 seats (330 after S13.7), the
+crowd-pleaser leads in the polls for two years and ends with 312, austerity 314 (274), and
+"tax early, please late", which pays for what it spends, 364, the most.

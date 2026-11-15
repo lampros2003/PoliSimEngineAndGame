@@ -60,7 +60,9 @@ class UnitedKingdom(unittest.TestCase):
                                  "emissions_on_track", "waiting_list_record", "waiting_list_falling",
                                  # Stage S13.7: the indicators of stage S13.5.
                                  "crime_wave", "healthy_life_falling", "housing_shortage", "building_boom",
-                                 "migration_high", "migration_falling"])
+                                 "migration_high", "migration_falling",
+                                 # Stage S13.8: the public finances.
+                                 "lenders_confidence"])
         scenario.commands = {1: {d.name: d.spec["default"] * 3 // 4 for d in scenario.model.symbols.values()
                                  if d.kind == "lever" and d.name.startswith("spending_")}}
         sim = from_scenario(scenario)

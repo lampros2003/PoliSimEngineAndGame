@@ -47,14 +47,14 @@ func _initialize() -> void:
 		var text := _texts(main.popup)
 		if not text.contains("awaiting") and key != "policy:income_tax":
 			return _fail("%s's popup at step 0 does not say its figures are awaited: %s" % [key, text.left(300)])
-		if text.contains("nan") or text.contains("inf "):
+		if _has_nan(text):
 			return _fail("%s's popup at step 0 shows nan" % key)
 		main.close_popup()
 	for which in ["budget", "parliament"]:
 		main.open_overlay(which)
 		await _settle()
 		var text := _texts(main._sheets)
-		if text.contains("nan") or text.contains("inf "):
+		if _has_nan(text):
 			return _fail("%s at step 0 shows nan" % which)
 		main.close_overlay()
 	# Figures too small to show never read as a negative nought or a signed nought.
@@ -203,6 +203,12 @@ func _texts(node: Node) -> String:
 		elif child is RichTextLabel:
 			out.append(child.get_parsed_text())
 	return " | ".join(out).to_lower()
+
+
+## "nan" or "inf" as a word of its own: stage S13.8's "The public finances" holds "nan".
+func _has_nan(text: String) -> bool:
+	var word := RegEx.create_from_string("\\b(nan|inf)\\b")
+	return word.search(text) != null
 
 
 func _fail(message: String) -> void:

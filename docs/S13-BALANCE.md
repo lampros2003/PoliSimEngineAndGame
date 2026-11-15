@@ -1,7 +1,8 @@
 # PoliSim S13: balance report, the UK 2025 term
 
 Played on 2026-11-15 against the model as it stands (no model file changed). Stage S13.7 changed the
-model on these findings and played the strategies again: "After S13.7", below.
+model on these findings and played the strategies again: "After S13.7", below; stage S13.8
+made the public finances matter and played them a third time: "After S13.8".
 
 ## Method
 
@@ -376,6 +377,98 @@ strategies.
    `polisim play` now does what the game does (`crates/cli/src/play.rs`, with a test).
 8. Values pinned at a limit: political capital at 100 for the passive strategies, now sooner
    (January 2026 under (a)).
+
+## After S13.8
+
+Played a third time on 2026-11-15 with the decisions of `docs/S13-PLAN.md`, "S13.8: the
+public finances matter", in the model:
+
+- **Lenders.** New gilts cost 0.75 points more for each point of GDP that borrowing, averaged
+  over a year, runs above January 2025's 5.1%, and as much less below it. The premium is capped
+  at two points and the discount at half a point (`models/uk/finances.toml`). It reaches debt
+  interest through the average rate on the debt. The model has no other interest-rate path to
+  households or firms, so it stops there.
+- **Voters.** Voters weigh that borrowing against the last election, on a curve that is mild
+  to a point of GDP and steep beyond it. Pensioners, home owners and high incomes weigh it
+  most. It shows as the group popups' sixth driver, "The public finances".
+- **The crisis.** "Lenders refuse the gilts" opens once smoothed borrowing is 1.2 points
+  above the start, from the thirteenth month. Its three answers are an emergency budget,
+  holding course at two points more, or asking the Bank to buy.
+- **Situations.** "Lenders' confidence" comes on more than a point below the start.
+  "Debt above a year's output" becomes "Debt rising fast": seven points of GDP above the
+  start rather than above 100%.
+- **The board.** The gilt yield is an indicator in Economy.
+
+Lenders and voters are switched on by the 2025 scenario's `[params]`
+(`lender_premium_effect` 0.75, `vote_finances_effect` 1) and are nil in the base month.
+`vote_wear_effect` is unchanged at -0.025. The method is as in "After S13.7": the same
+scratch runner, since deleted, with every question given its first answer (so the
+crowd-pleaser answers the crisis with the emergency budget).
+
+### Strategies at a glance, after S13.8 (election in July 2029; the majority is 326)
+
+The approval columns are Jan 2026 / Jan 2027 / Jun 2029. Figures in brackets are after
+S13.7.
+
+| Strategy | Approval | CL seats (after S13.7) | Government after | Balance Jun 2029 £bn/yr | Debt % GDP | Gilt yield Jun 2029 | Unemployment | Bills passed | Capital earned / spent / wasted | Lenders refuse |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (a) Nothing, first answers | 32.7 / 31.4 / 28.5% | 325 (330) | CL+SNP | -192 | 105.5 | 4.58% | 4.8% | 0 | 245 / 0 / 185 | no |
+| (b) Nothing, second answers | 32.7 / 31.4 / 28.1% | 315 (323) | CL+SNP | -192 | 105.5 | 4.54% | 4.8% | 0 | 241 / 0 / 181 | no |
+| (c) Crowd-pleaser | 34.1 / 32.2 / 28.3% | 312 (382) | CL+SNP | -225 | 107.4 | 5.06% | 4.9% | 17 | 249 / 230 / 0 | Aug 2027 |
+| (d) Austerity | 30.6 / 29.7 / 28.1% | 314 (274) | CL+SNP | -89 | 101.7 | 3.70% | 5.4% | 29 | 229 / 193 / 0 | no |
+| (e) Reformer | 32.5 / 31.4 / 29.2% | 336 (337) | Centre-left | -183 | 103.6 | 4.37% | 4.7% | 8 | 248 / 163 / 25 | no |
+| (f1) Basic rate 30% in Feb 2025 | 30.1 / 29.5 / 27.6% | 309 (304) | CL+SNP+PC | -157 | 104.9 | 3.97% | 4.8% | 1 | 223 / 17 / 146 | no |
+| (f2) Health cut by a quarter in Feb 2025 | 27.9 / 27.1 / 25.4% | 249 (247) | CL+Lib+Grn+SNP+PC | -160 | 106.4 | 4.07% | 4.8% | 1 | 195 / 28 / 108 | no |
+| (g) Wrecker | 26.8 / 25.2 / 18.3% | 101 (62) | CR+PopR | +38 | 100.5 | 3.70% | 7.5% | 5 | 152 / 175 / 0 | no |
+| (h) Tax early, please late | 31.2 / 31.7 / 31.0% | 364 (361) | Centre-left | -165 | 100.8 | 3.86% | 3.9% | 13 | 248 / 207 / 34 | no |
+
+The gilt yield in January 2025 is 4.20% under every strategy.
+
+The crowd-pleaser's other answers to the crisis do worse:
+- **Hold course:** 276 seats. The yield goes past 7%, and inflation is 4.2% in January 2028.
+- **The Bank buys:** 247 seats. Inflation is 5.3% in January 2028, and the slump that follows
+  brings a bank rescue in July 2028.
+
+### The conclusions, a third time
+
+**Borrowing is no longer free.**
+- The crowd-pleaser leads doing nothing in the polls by 1.4 points after one year and 0.8
+  after two.
+- Smoothed borrowing passes 1.2 points above the start in August 2027, and lenders refuse
+  the gilts.
+- The emergency budget is resented for two years, and by the election it polls 28.3% against
+  doing nothing's 28.5%: 312 seats against 325.
+- Austerity, which halves the deficit, gains from lenders' confidence (from January 2028)
+  and from voters' view of the finances. It ends near the line at 314 seats, not 274.
+- The paid-for programme wins: "tax early, please late" (364) and the reformer (336) are the
+  only strategies with a majority of their own. The wrecker still loses office.
+- The earlier finding stands that a tax rise early in the term now costs something at the
+  election: f1 holds 309.
+
+**Doing nothing.**
+- 325 seats with the first answers and 315 with the second. Both are a hung parliament in
+  which the centre-left governs with the SNP.
+- Doing nothing also borrows about half a point more by 2029, which costs a little. The wear
+  of office was left as it was because the result is within 320 to 335.
+
+**What is still wrong.**
+- The curve is steep past a point of GDP, and most of the crowd-pleaser's loss comes from
+  there and from the emergency budget's two years. A strategy that borrows slightly less
+  (under the 1.2-point line) would escape both. Judgement, not evidence, sets where the line
+  is.
+- Austerity wins no more seats than doing nothing, though its deficit is half as large:
+  voters reward a fall in borrowing at about a quarter of the rate they punish a rise, and its
+  cuts still cost through services and jobs.
+- The lenders' premium moves debt interest slowly. The average rate follows new gilts over
+  fourteen years, so a crowd-pleaser's extra 0.86 points on new gilts adds only about 0.1
+  points to the average rate by 2029. Nothing else feels it: the model has no Bank Rate and
+  no mortgages, and investment reads no rate.
+- The approval range is still narrow (25.4% to 31.0% for every strategy but the wrecker),
+  and a month's change is still almost always under half a point.
+
+**Pacing.** Under (a) there are still 2, 4, 3, 2 and 2 questions a year, and the crisis comes
+only to heavy borrowers. "Debt rising fast" now comes on in late 2028 under doing nothing
+rather than staying on from 2027. The longest stretch with nothing new is 6 months, from 8.
 
 ## Month by month, by strategy
 

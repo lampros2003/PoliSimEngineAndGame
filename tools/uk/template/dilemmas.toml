@@ -377,3 +377,33 @@ label = "Open safe and legal routes"
 doc = "Fewer risk the crossing, but net migration is about 30,000 a year higher for two years; voters of 50 and over are angry, the young approve"
 months = 24
 effect = { policy_migration_factor = "{base} + 30.0 * visa_migration_scale / (year * per_step(sum(net_migration, region)))", government_standing = "{base} - select(type_age >= 3, 0.03, 0.0) + select(type_age <= 1, 0.01, 0.0)" }
+
+# ---------------------------------------------------------------- stage S13.8: lenders refuse
+# Opens when borrowing, averaged over a year, has run well above its level at the start of the
+# game (finances.toml). Not a chance: a government that borrows this much meets it.
+
+[dilemma.gilt_crisis]
+label = "Lenders refuse the gilts"
+doc = "With borrowing far above where it started and still rising, a gilt auction fails: lenders will only take the government's debt at a much higher price, and the pound falls"
+start = "months_elapsed >= 12 and borrowing_gap > gilt_crisis_gap"
+again_after = 36
+
+[[dilemma.gilt_crisis.option]]
+name = "budget"
+label = "An emergency budget"
+doc = "Cuts to plans for two years: procurement 4% and public investment 10% lower, about £20bn a year; lenders calm down, and voters resent the cuts while they last"
+months = 24
+effect = { procurement = "round({base} * 0.96)", public_investment = "round({base} * 0.9)", government_standing = "{base} - 0.03" }
+
+[[dilemma.gilt_crisis.option]]
+name = "hold"
+label = "Hold course"
+doc = "Pay what lenders ask: new gilts cost two points more for two years, the weaker pound adds about two and a half points a year to inflation for a year, and voters blame the government"
+effect = { gilt_premium = "{base} + select(gilt_crisis_age < 24, 0.02, 0.0)", inflation = "{base} + select(gilt_crisis_age < 12, 0.002, 0.0)", government_standing = "{base} - select(gilt_crisis_age < 12, 0.05, 0.0)" }
+
+[[dilemma.gilt_crisis.option]]
+name = "bank"
+label = "Ask the Bank of England to buy"
+doc = "The Bank buys gilts with new money: lenders' premium is gone for a year, but inflation runs about three and a half points a year higher for that year, and voters notice"
+months = 12
+effect = { gilt_premium = "0.0 * {base}", inflation = "{base} + 0.003", government_standing = "{base} - 0.02" }

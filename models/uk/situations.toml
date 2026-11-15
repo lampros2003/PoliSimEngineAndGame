@@ -47,11 +47,13 @@ doc = "Consumer prices are rising by more than 5% a year"
 start = "consumer_inflation_annual > 0.05"
 end = "consumer_inflation_annual < 0.04"
 
+# Stage S13.8: debt against its level at the start of the game (finances.toml), not against
+# 100% of GDP, which it passed in the 18th month with policy unchanged and then never left.
 [situation.debt_above_output]
-label = "Debt above a year's output"
-doc = "Public sector net debt is more than 100% of GDP"
-start = "debt_to_gdp > 1.0"
-end = "debt_to_gdp < 0.98"
+label = "Debt rising fast"
+doc = "Public sector net debt is more than 7 points of GDP above its level at the start of the game (97% in January 2025)"
+start = "debt_at_start > 0.0 and debt_to_gdp > debt_at_start + 0.07"
+end = "debt_to_gdp < debt_at_start + 0.05"
 
 [situation.budget_surplus]
 label = "Budget surplus"
@@ -165,3 +167,13 @@ label = "Net migration falling"
 doc = "Net migration is more than 12% below its level of the year to mid-2024, under about 650,000 a year"
 start = "policy_migration_factor < 0.88"
 end = "policy_migration_factor > 0.92"
+
+# ---- Stage S13.8: the public finances (finances.toml). Lenders' confidence also adds a little
+# to the government's standing with every voter while it lasts (finances_standing).
+
+[situation.lenders_confidence]
+label = "Lenders' confidence"
+doc = "Borrowing, averaged over a year, is more than a point of GDP below its level at the start of the game: lenders ask less for gilts and voters notice"
+good = true
+start = "borrowing_at_start > 0.0 and borrowing_gap < -0.01"
+end = "borrowing_gap > -0.005"
