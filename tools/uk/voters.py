@@ -39,6 +39,59 @@ AGES = [("age_18_24", "18 to 24", 18, 24), ("age_25_34", "25 to 34", 25, 34), ("
         ("age_50_64", "50 to 64", 50, 64), ("age_65_plus", "65 and over", 65, 90)]
 ADULTS = 4
 
+# Stage S13.4: the interest groups, in order: key, label, the name in a sentence, and who is
+# in the group. A formula over the voter type's attributes is exact (1 or 0); the rest come
+# from the households: the share of the type's adults aged 18 and over who are in the group.
+GROUPS = [
+    ("young", "The young", "the young", "type_age <= 1"),
+    ("midlife", "Mid-life", "people in mid-life", "type_age == 2 or type_age == 3"),
+    ("pensioners", "Pensioners", "pensioners", "type_age == 4"),
+    ("low_income", "Low incomes", "low incomes", "type_quintile == 0"),
+    ("middle_income", "Middle incomes", "middle incomes", "type_quintile >= 1 and type_quintile <= 3"),
+    ("high_income", "High incomes", "high incomes", "type_quintile == 4"),
+    ("in_work", "In work", "people in work", "type_in_work == 1"),
+    ("out_of_work", "Out of work", "people out of work", "type_in_work == 0 and type_age <= 3"),
+    ("parents", "Parents", "parents", None),
+    ("lone_parents", "Lone parents", "lone parents", None),
+    ("self_employed", "The self-employed", "the self-employed", None),
+    ("scotland", "Scotland", "Scotland", "type_region == 10"),
+    ("wales", "Wales", "Wales", "type_region == 9"),
+    ("northern_ireland", "Northern Ireland", "Northern Ireland", "type_region == 11"),
+    ("london", "London", "London", "type_region == 6"),
+    ("north", "The North", "the North", "type_region <= 2"),
+    ("midlands", "The Midlands", "the Midlands", "type_region == 3 or type_region == 4"),
+    ("south", "The South", "the South", "type_region == 5 or type_region == 7 or type_region == 8"),
+]
+# The group dimension's member where the key is already an element's name (households.toml).
+MEMBER = {"pensioners": "pensioner"}
+# Each household group: the adult slots counted, and the condition on the household and slot.
+HOUSEHOLD_GROUPS = {
+    "parents": (range(1, ADULTS + 1), "children >= 1"),
+    "lone_parents": (range(1, 2), "type == 7 and children >= 1"),  # adult 1 of a lone-parent family
+    "self_employed": (range(1, ADULTS + 1), "self_employed{i}"),
+}
+# The same groups for one household: true when any of its adults is in the group ({i} is each
+# adult in turn), or for the household as a whole. Every household has an adult; every adult is
+# 18 or over; an absent adult has age -1, no earnings and is not self-employed.
+HOUSEHOLD_FLAGS = {
+    "young": "age{i} >= 18 and age{i} <= 34", "midlife": "age{i} >= 35 and age{i} <= 64", "pensioners": "age{i} >= 65",
+    "low_income": "income_decile <= 2", "middle_income": "income_decile >= 3 and income_decile <= 8",
+    "high_income": "income_decile >= 9",
+    "in_work": "earnings{i} > 0", "out_of_work": "age{i} >= 18 and age{i} <= 64 and not (earnings{i} > 0)",
+    "parents": "children >= 1", "lone_parents": "type == 7 and children >= 1", "self_employed": "self_employed{i}",
+    "scotland": "region_code == 10", "wales": "region_code == 9", "northern_ireland": "region_code == 11",
+    "london": "region_code == 6", "north": "region_code <= 2", "midlands": "region_code == 3 or region_code == 4",
+    "south": "region_code == 5 or region_code == 7 or region_code == 8",
+}
+# The drivers of a group's approval: each a term of the governing blocs' utility, by voter type.
+DRIVERS = [
+    ("income", "income", "vote_income_effect * voter_income_change"),
+    ("jobs", "jobs: unemployment in the region since the election", "voter_jobs"),
+    ("prices_and_time", "prices and time in office", None),
+    ("services", "services and the climate", "voter_services"),
+    ("standing", "reactions to the government's decisions", "government_standing"),
+]
+
 ASSUMPTIONS = {
     # Age effects on utility (35 to 49 is the reference), by option. The 2024 election's
     # widely reported pattern: turnout rises with age; the young lean to the centre-left and
@@ -244,8 +297,139 @@ def constituencies() -> list[dict]:
     return out
 
 
+def groups() -> str:
+    """Stage S13.4: the interest groups, their share of the electorate, their approval of the
+    government and its drivers, and the same groups and support for each household."""
+    out = f'''
+# ---- stage S13.4: interest groups (models/uk/politics/README.md, Groups)
+
+[dim.group]
+members = [{", ".join(f'"{MEMBER.get(g[0], g[0])}"' for g in GROUPS)}]
+labels = [{", ".join(f'"{g[1]}"' for g in GROUPS)}]
+'''
+    for key, (slots, cond) in HOUSEHOLD_GROUPS.items():
+        terms = " + ".join(f"wsum_by(household, select({cond.format(i=i)}, adult_voter{i}, 0), voter_type, voter_type_of{i})"
+                           for i in slots)
+        out += f'''
+[var.voters_{key}]
+doc = "Adults aged 18 and over in the group '{key}', by voter type, from the households"
+type = "int"
+unit = "person"
+phase = "politics"
+dims = ["voter_type"]
+expr = "{terms}"
+'''
+    member = "0.0"
+    for k in reversed(range(len(GROUPS))):
+        key, _, _, cond = GROUPS[k]
+        here = f"safe_div(1.0 * voters_{key}, 1.0 * voters, 0.0)" if cond is None else f"select({cond}, 1.0, 0.0)"
+        member = here if k == len(GROUPS) - 1 else f"select(coord(group) == {k}, {here}, {member})"
+    out += f'''
+[var.group_member]
+doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type", "group"]
+expr = "{member}"
+
+[var.governing_choice]
+doc = "Share of each voter type choosing a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "sum(select(governing, choice[option: coord(bloc)], 0.0), bloc)"
+
+[var.group_voters]
+type = "real"
+unit = "person"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member, voter_type)"
+
+[var.group_share]
+label = "Share of the electorate, by group"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "group_voters / sum(voters, voter_type)"
+
+[var.group_approval]
+label = "Approval of the government, by group"
+doc = "The share of the group's likely voters (those who would vote) who would vote for a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * governing_choice, voter_type) / sum(voters * group_member * (1.0 - choice[option: abstain]), voter_type)"
+'''
+    tenure = f"vote_tenure_effect * {ASSUMPTIONS['months_in_office']} / 12.0"
+    for key, words, term in DRIVERS:
+        if term is None:
+            expr = f"fundamentals - {tenure}"
+            doc = ("Inflation since the last election and time in office, the same for every group; less the base "
+                   "month's time in office, which the intercepts were fitted with")
+        else:
+            expr = f"sum(voters * group_member * {term}, voter_type) / group_voters"
+            doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+        out += f'''
+[var.group_driver_{key}]
+label = "Approval drivers: {words}"
+doc = "{doc}"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "{expr}"
+'''
+    for k, (key, _, words, _) in enumerate(GROUPS):
+        out += f'''
+[var.approval_{key}]
+label = "Approval: {words}"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: {k}]"
+
+[var.share_{key}]
+label = "Share of the electorate: {words}"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: {k}]"
+'''
+    # Each household: which groups its adults are in, and their support (every adult is 18 or over).
+    voter = "age{i} >= 18"
+    out += f'''
+[var.household_support]
+label = "Support for the government in the household"
+doc = "The mean, over the household's adults aged 18 and over, of their voter type's share choosing a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "safe_div({" + ".join(f"select({voter.format(i=i)}, governing_choice[voter_type: voter_type_of{i}], 0.0)" for i in range(1, ADULTS + 1))}, 1.0 * adults, 0.0)"
+'''
+    for key, label, _, _ in GROUPS:
+        flag = HOUSEHOLD_FLAGS[key]
+        expr = " or ".join(f"({flag.format(i=i)})" for i in range(1, ADULTS + 1)) if "{i}" in flag else flag
+        out += f'''
+[var.household_in_{key}]
+label = "In the group: {label}"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "{expr}"
+'''
+    return out
+
+
 def rules(seats: list[dict]) -> str:
     a = ASSUMPTIONS
+    groups_section = groups()
 
     def slots(term: str) -> str:
         return " + ".join(f"wsum_by(household, {term.format(i=i)}, voter_type, voter_type_of{i})"
@@ -444,6 +628,7 @@ initial = 0.0
 next = "select(income_memory > 0.0, income_memory + (real_net_income - income_memory) / 12.0, real_net_income)"
 
 [var.income_change]
+label = "Change in real net income on about a year before"
 doc = "Real net income against its average over about a year"
 type = "real"
 unit = "1"
@@ -561,13 +746,29 @@ phase = "politics"
 dims = ["voter_type"]
 expr = "0.0 * type_age"
 
+[var.voter_jobs]
+doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region]))"
+
+[var.voter_services]
+doc = "The issues the voter type weighs, services and the climate, against the last election, on the government's utility (stage S13.4: a driver of approval)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
+
 [var.voter_fundamentals]
 doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, the issues it weighs, and answers to dilemmas"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
+expr = "government_standing + fundamentals + voter_jobs + voter_services"
 
 [var.utility]
 type = "real"
@@ -635,7 +836,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "sum(select(governing, vote_intention, 0.0), bloc)"
-
+{groups_section}
 # ------------------------------------------------------------------ seats (stage S5.3)
 # Each seat's 2024 shares, scaled by its region's swing (proportional), first past the post.
 

@@ -163,6 +163,7 @@ initial = 0.0
 next = "select(income_memory > 0.0, income_memory + (real_net_income - income_memory) / 12.0, real_net_income)"
 
 [var.income_change]
+label = "Change in real net income on about a year before"
 doc = "Real net income against its average over about a year"
 type = "real"
 unit = "1"
@@ -343,13 +344,29 @@ phase = "politics"
 dims = ["voter_type"]
 expr = "0.0 * type_age"
 
+[var.voter_jobs]
+doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region]))"
+
+[var.voter_services]
+doc = "The issues the voter type weighs, services and the climate, against the last election, on the government's utility (stage S13.4: a driver of approval)"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
+
 [var.voter_fundamentals]
 doc = "The fundamentals for each voter type: inflation, time in office, its own region's unemployment, the issues it weighs, and answers to dilemmas"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + select(regional_unemployment_at_election[region: type_region] < 0.0, 0.0, vote_unemployment_effect * (regional_unemployment[region: type_region] - regional_unemployment_at_election[region: type_region])) + issue_weight_scale * sum(select(issue_at_election < 0.0, 0.0, issue_weight[voter_age: type_age] * curve(issue_measure - issue_at_election, issue_reaction)), issue)"
+expr = "government_standing + fundamentals + voter_jobs + voter_services"
 
 [var.utility]
 type = "real"
@@ -417,6 +434,526 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "sum(select(governing, vote_intention, 0.0), bloc)"
+
+# ---- stage S13.4: interest groups (models/uk/politics/README.md, Groups)
+
+[dim.group]
+members = ["young", "midlife", "pensioner", "low_income", "middle_income", "high_income", "in_work", "out_of_work", "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"]
+labels = ["The young", "Mid-life", "Pensioners", "Low incomes", "Middle incomes", "High incomes", "In work", "Out of work", "Parents", "Lone parents", "The self-employed", "Scotland", "Wales", "Northern Ireland", "London", "The North", "The Midlands", "The South"]
+
+[var.voters_parents]
+doc = "Adults aged 18 and over in the group 'parents', by voter type, from the households"
+type = "int"
+unit = "person"
+phase = "politics"
+dims = ["voter_type"]
+expr = "wsum_by(household, select(children >= 1, adult_voter1, 0), voter_type, voter_type_of1) + wsum_by(household, select(children >= 1, adult_voter2, 0), voter_type, voter_type_of2) + wsum_by(household, select(children >= 1, adult_voter3, 0), voter_type, voter_type_of3) + wsum_by(household, select(children >= 1, adult_voter4, 0), voter_type, voter_type_of4)"
+
+[var.voters_lone_parents]
+doc = "Adults aged 18 and over in the group 'lone_parents', by voter type, from the households"
+type = "int"
+unit = "person"
+phase = "politics"
+dims = ["voter_type"]
+expr = "wsum_by(household, select(type == 7 and children >= 1, adult_voter1, 0), voter_type, voter_type_of1)"
+
+[var.voters_self_employed]
+doc = "Adults aged 18 and over in the group 'self_employed', by voter type, from the households"
+type = "int"
+unit = "person"
+phase = "politics"
+dims = ["voter_type"]
+expr = "wsum_by(household, select(self_employed1, adult_voter1, 0), voter_type, voter_type_of1) + wsum_by(household, select(self_employed2, adult_voter2, 0), voter_type, voter_type_of2) + wsum_by(household, select(self_employed3, adult_voter3, 0), voter_type, voter_type_of3) + wsum_by(household, select(self_employed4, adult_voter4, 0), voter_type, voter_type_of4)"
+
+[var.group_member]
+doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type", "group"]
+expr = "select(coord(group) == 0, select(type_age <= 1, 1.0, 0.0), select(coord(group) == 1, select(type_age == 2 or type_age == 3, 1.0, 0.0), select(coord(group) == 2, select(type_age == 4, 1.0, 0.0), select(coord(group) == 3, select(type_quintile == 0, 1.0, 0.0), select(coord(group) == 4, select(type_quintile >= 1 and type_quintile <= 3, 1.0, 0.0), select(coord(group) == 5, select(type_quintile == 4, 1.0, 0.0), select(coord(group) == 6, select(type_in_work == 1, 1.0, 0.0), select(coord(group) == 7, select(type_in_work == 0 and type_age <= 3, 1.0, 0.0), select(coord(group) == 8, safe_div(1.0 * voters_parents, 1.0 * voters, 0.0), select(coord(group) == 9, safe_div(1.0 * voters_lone_parents, 1.0 * voters, 0.0), select(coord(group) == 10, safe_div(1.0 * voters_self_employed, 1.0 * voters, 0.0), select(coord(group) == 11, select(type_region == 10, 1.0, 0.0), select(coord(group) == 12, select(type_region == 9, 1.0, 0.0), select(coord(group) == 13, select(type_region == 11, 1.0, 0.0), select(coord(group) == 14, select(type_region == 6, 1.0, 0.0), select(coord(group) == 15, select(type_region <= 2, 1.0, 0.0), select(coord(group) == 16, select(type_region == 3 or type_region == 4, 1.0, 0.0), select(type_region == 5 or type_region == 7 or type_region == 8, 1.0, 0.0))))))))))))))))))"
+
+[var.governing_choice]
+doc = "Share of each voter type choosing a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["voter_type"]
+expr = "sum(select(governing, choice[option: coord(bloc)], 0.0), bloc)"
+
+[var.group_voters]
+type = "real"
+unit = "person"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member, voter_type)"
+
+[var.group_share]
+label = "Share of the electorate, by group"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "group_voters / sum(voters, voter_type)"
+
+[var.group_approval]
+label = "Approval of the government, by group"
+doc = "The share of the group's likely voters (those who would vote) who would vote for a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * governing_choice, voter_type) / sum(voters * group_member * (1.0 - choice[option: abstain]), voter_type)"
+
+[var.group_driver_income]
+label = "Approval drivers: income"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * vote_income_effect * voter_income_change, voter_type) / group_voters"
+
+[var.group_driver_jobs]
+label = "Approval drivers: jobs: unemployment in the region since the election"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * voter_jobs, voter_type) / group_voters"
+
+[var.group_driver_prices_and_time]
+label = "Approval drivers: prices and time in office"
+doc = "Inflation since the last election and time in office, the same for every group; less the base month's time in office, which the intercepts were fitted with"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "fundamentals - vote_tenure_effect * 6 / 12.0"
+
+[var.group_driver_services]
+label = "Approval drivers: services and the climate"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * voter_services, voter_type) / group_voters"
+
+[var.group_driver_standing]
+label = "Approval drivers: reactions to the government's decisions"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * government_standing, voter_type) / group_voters"
+
+[var.approval_young]
+label = "Approval: the young"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 0]"
+
+[var.share_young]
+label = "Share of the electorate: the young"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 0]"
+
+[var.approval_midlife]
+label = "Approval: people in mid-life"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 1]"
+
+[var.share_midlife]
+label = "Share of the electorate: people in mid-life"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 1]"
+
+[var.approval_pensioners]
+label = "Approval: pensioners"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 2]"
+
+[var.share_pensioners]
+label = "Share of the electorate: pensioners"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 2]"
+
+[var.approval_low_income]
+label = "Approval: low incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 3]"
+
+[var.share_low_income]
+label = "Share of the electorate: low incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 3]"
+
+[var.approval_middle_income]
+label = "Approval: middle incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 4]"
+
+[var.share_middle_income]
+label = "Share of the electorate: middle incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 4]"
+
+[var.approval_high_income]
+label = "Approval: high incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 5]"
+
+[var.share_high_income]
+label = "Share of the electorate: high incomes"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 5]"
+
+[var.approval_in_work]
+label = "Approval: people in work"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 6]"
+
+[var.share_in_work]
+label = "Share of the electorate: people in work"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 6]"
+
+[var.approval_out_of_work]
+label = "Approval: people out of work"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 7]"
+
+[var.share_out_of_work]
+label = "Share of the electorate: people out of work"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 7]"
+
+[var.approval_parents]
+label = "Approval: parents"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 8]"
+
+[var.share_parents]
+label = "Share of the electorate: parents"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 8]"
+
+[var.approval_lone_parents]
+label = "Approval: lone parents"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 9]"
+
+[var.share_lone_parents]
+label = "Share of the electorate: lone parents"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 9]"
+
+[var.approval_self_employed]
+label = "Approval: the self-employed"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 10]"
+
+[var.share_self_employed]
+label = "Share of the electorate: the self-employed"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 10]"
+
+[var.approval_scotland]
+label = "Approval: Scotland"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 11]"
+
+[var.share_scotland]
+label = "Share of the electorate: Scotland"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 11]"
+
+[var.approval_wales]
+label = "Approval: Wales"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 12]"
+
+[var.share_wales]
+label = "Share of the electorate: Wales"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 12]"
+
+[var.approval_northern_ireland]
+label = "Approval: Northern Ireland"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 13]"
+
+[var.share_northern_ireland]
+label = "Share of the electorate: Northern Ireland"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 13]"
+
+[var.approval_london]
+label = "Approval: London"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 14]"
+
+[var.share_london]
+label = "Share of the electorate: London"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 14]"
+
+[var.approval_north]
+label = "Approval: the North"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 15]"
+
+[var.share_north]
+label = "Share of the electorate: the North"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 15]"
+
+[var.approval_midlands]
+label = "Approval: the Midlands"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 16]"
+
+[var.share_midlands]
+label = "Share of the electorate: the Midlands"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 16]"
+
+[var.approval_south]
+label = "Approval: the South"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 17]"
+
+[var.share_south]
+label = "Share of the electorate: the South"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 17]"
+
+[var.household_support]
+label = "Support for the government in the household"
+doc = "The mean, over the household's adults aged 18 and over, of their voter type's share choosing a governing bloc"
+type = "real"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "safe_div(select(age1 >= 18, governing_choice[voter_type: voter_type_of1], 0.0) + select(age2 >= 18, governing_choice[voter_type: voter_type_of2], 0.0) + select(age3 >= 18, governing_choice[voter_type: voter_type_of3], 0.0) + select(age4 >= 18, governing_choice[voter_type: voter_type_of4], 0.0), 1.0 * adults, 0.0)"
+
+[var.household_in_young]
+label = "In the group: The young"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(age1 >= 18 and age1 <= 34) or (age2 >= 18 and age2 <= 34) or (age3 >= 18 and age3 <= 34) or (age4 >= 18 and age4 <= 34)"
+
+[var.household_in_midlife]
+label = "In the group: Mid-life"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(age1 >= 35 and age1 <= 64) or (age2 >= 35 and age2 <= 64) or (age3 >= 35 and age3 <= 64) or (age4 >= 35 and age4 <= 64)"
+
+[var.household_in_pensioners]
+label = "In the group: Pensioners"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(age1 >= 65) or (age2 >= 65) or (age3 >= 65) or (age4 >= 65)"
+
+[var.household_in_low_income]
+label = "In the group: Low incomes"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "income_decile <= 2"
+
+[var.household_in_middle_income]
+label = "In the group: Middle incomes"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "income_decile >= 3 and income_decile <= 8"
+
+[var.household_in_high_income]
+label = "In the group: High incomes"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "income_decile >= 9"
+
+[var.household_in_in_work]
+label = "In the group: In work"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(earnings1 > 0) or (earnings2 > 0) or (earnings3 > 0) or (earnings4 > 0)"
+
+[var.household_in_out_of_work]
+label = "In the group: Out of work"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(age1 >= 18 and age1 <= 64 and not (earnings1 > 0)) or (age2 >= 18 and age2 <= 64 and not (earnings2 > 0)) or (age3 >= 18 and age3 <= 64 and not (earnings3 > 0)) or (age4 >= 18 and age4 <= 64 and not (earnings4 > 0))"
+
+[var.household_in_parents]
+label = "In the group: Parents"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "children >= 1"
+
+[var.household_in_lone_parents]
+label = "In the group: Lone parents"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "type == 7 and children >= 1"
+
+[var.household_in_self_employed]
+label = "In the group: The self-employed"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "(self_employed1) or (self_employed2) or (self_employed3) or (self_employed4)"
+
+[var.household_in_scotland]
+label = "In the group: Scotland"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 10"
+
+[var.household_in_wales]
+label = "In the group: Wales"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 9"
+
+[var.household_in_northern_ireland]
+label = "In the group: Northern Ireland"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 11"
+
+[var.household_in_london]
+label = "In the group: London"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 6"
+
+[var.household_in_north]
+label = "In the group: The North"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code <= 2"
+
+[var.household_in_midlands]
+label = "In the group: The Midlands"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 3 or region_code == 4"
+
+[var.household_in_south]
+label = "In the group: The South"
+type = "bool"
+unit = "1"
+phase = "politics"
+entity = "household"
+expr = "region_code == 5 or region_code == 7 or region_code == 8"
 
 # ------------------------------------------------------------------ seats (stage S5.3)
 # Each seat's 2024 shares, scaled by its region's swing (proportional), first past the post.

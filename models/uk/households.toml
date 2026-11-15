@@ -238,6 +238,7 @@ default = 0.19
 leaning = "left"
 doc = "Scottish income tax starter rate"
 range = [0, 1]
+player = false
 
 [lever.scottish_basic_rate]
 label = "Basic rate"
@@ -248,6 +249,7 @@ default = 0.2
 leaning = "left"
 doc = "Scottish income tax scottish basic rate"
 range = [0, 1]
+player = false
 
 [lever.scottish_basic_threshold]
 label = "Basic rate from"
@@ -258,6 +260,7 @@ default = 2306
 leaning = "right"
 doc = "Taxable income at which the Scottish scottish basic rate starts"
 range = [0, 10000000]
+player = false
 
 [lever.intermediate_rate]
 label = "Intermediate rate"
@@ -268,6 +271,7 @@ default = 0.21
 leaning = "left"
 doc = "Scottish income tax intermediate rate"
 range = [0, 1]
+player = false
 
 [lever.intermediate_threshold]
 label = "Intermediate rate from"
@@ -278,6 +282,7 @@ default = 13991
 leaning = "right"
 doc = "Taxable income at which the Scottish intermediate rate starts"
 range = [0, 10000000]
+player = false
 
 [lever.scottish_higher_rate]
 label = "Higher rate"
@@ -288,6 +293,7 @@ default = 0.42
 leaning = "left"
 doc = "Scottish income tax scottish higher rate"
 range = [0, 1]
+player = false
 
 [lever.scottish_higher_threshold]
 label = "Higher rate from"
@@ -298,6 +304,7 @@ default = 31092
 leaning = "right"
 doc = "Taxable income at which the Scottish scottish higher rate starts"
 range = [0, 10000000]
+player = false
 
 [lever.advanced_rate]
 label = "Advanced rate"
@@ -308,6 +315,7 @@ default = 0.45
 leaning = "left"
 doc = "Scottish income tax advanced rate"
 range = [0, 1]
+player = false
 
 [lever.advanced_threshold]
 label = "Advanced rate from"
@@ -318,6 +326,7 @@ default = 62430
 leaning = "right"
 doc = "Taxable income at which the Scottish advanced rate starts"
 range = [0, 10000000]
+player = false
 
 [lever.top_rate]
 label = "Top rate"
@@ -328,6 +337,7 @@ default = 0.48
 leaning = "left"
 doc = "Scottish income tax top rate"
 range = [0, 1]
+player = false
 
 [lever.top_threshold]
 label = "Top rate from"
@@ -338,6 +348,7 @@ default = 125140
 leaning = "right"
 doc = "Taxable income at which the Scottish top rate starts"
 range = [0, 10000000]
+player = false
 
 [lever.ni_primary_threshold]
 label = "Employees pay from"
@@ -877,6 +888,7 @@ entity = "household"
 expr = "marginal(pay4, employer_ni)"
 
 [var.income_tax_year]
+label = "Income tax"
 type = "money"
 unit = "GBP/year/household"
 phase = "income"
@@ -885,11 +897,13 @@ expr = "income_tax1 + income_tax2 + income_tax3 + income_tax4"
 doc = "Income tax of every adult, a year"
 
 [var.employee_ni_year]
+label = "National Insurance"
 type = "money"
 unit = "GBP/year/household"
 phase = "income"
 entity = "household"
 expr = "employee_ni1 + employee_ni2 + employee_ni3 + employee_ni4"
+doc = "Employee and self-employed National Insurance of every adult, a year"
 
 [var.employer_ni_year]
 type = "money"
@@ -971,12 +985,40 @@ expr = "select(age1 < state_pension_age, max(uc_standard + uc_children - round(u
 doc = "Universal Credit, a month (no housing element)"
 
 [var.net_income]
+label = "Net income"
 type = "money"
 unit = "GBP/month/household"
 phase = "income"
 entity = "household"
 expr = "round((earn1 + pens1 - income_tax1 - employee_ni1 + earn2 + pens2 - income_tax2 - employee_ni2 + earn3 + pens3 - income_tax3 - employee_ni3 + earn4 + pens4 - income_tax4 - employee_ni4 + child_benefit_year - hicbc_year) / year) + universal_credit"
 doc = "Income after income tax and National Insurance, with Child Benefit and Universal Credit, a month"
+
+[var.household_earnings]
+label = "Earnings"
+type = "money"
+unit = "GBP/year/household"
+phase = "income"
+entity = "household"
+expr = "earn1 + earn2 + earn3 + earn4"
+doc = "Pay and self-employment profit of every adult before tax, a year"
+
+[var.household_pensions]
+label = "Pensions"
+type = "money"
+unit = "GBP/year/household"
+phase = "income"
+entity = "household"
+expr = "pens1 + pens2 + pens3 + pens4"
+doc = "State and private pensions of every adult before tax, a year"
+
+[var.household_benefits]
+label = "Benefits"
+type = "money"
+unit = "GBP/year/household"
+phase = "income"
+entity = "household"
+expr = "child_benefit_year - hicbc_year + round(universal_credit * year)"
+doc = "Child Benefit net of the High Income Child Benefit Charge, and Universal Credit, a year"
 
 [var.income_tax_total]
 label = "Income tax"

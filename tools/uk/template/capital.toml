@@ -1,0 +1,65 @@
+# Political capital (stage S12.4, docs/S12-PLAN.md). GENERATED: copied from
+# tools/uk/template/capital.toml by tools/uk/calibrate.py. Edit the template.
+#
+# Every bill costs capital (docs/spec/06-model-format-1.md, "Political capital"): 5 for any
+# bill, and 60 more for moving a lever across its whole range, in proportion to how far it
+# moves. A bill that costs more than is left is refused, unvoted. The government earns
+# capital each month: 1, up to 5 more the better its poll rating (none at 25% or below, all
+# of it at 45% or above), and 2 more in the first year of a parliament; it holds at most
+# 100, and starts with 40. These are first judgements, to be tuned in play.
+
+[state.political_capital]
+label = "Political capital"
+doc = "What the government can spend on bills: each costs 5, and up to 60 more the further it moves a policy. It is earned each month, more when the government is popular and in the first year of a parliament, up to 100"
+type = "real"
+unit = "1"
+phase = "politics"
+initial = 40.0
+next = "clamp(political_capital - capital_spent + capital_earned, 0.0, capital_most)"
+
+[var.capital_earned]
+label = "Political capital earned this month"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "capital_monthly + capital_from_support * clamp((government_support - 0.25) / 0.2, 0.0, 1.0) + select(months_since_election <= 12, capital_new_parliament, 0.0)"
+
+[lever.capital_spent]
+label = "Political capital spent on bills this month"
+doc = "Set by the engine: what the bills passed this month cost"
+type = "real"
+unit = "1"
+default = 0.0
+player = false
+
+[param.capital_bill]
+label = "Political capital any bill costs"
+type = "real"
+unit = "1"
+value = 5.0
+
+[param.capital_swing]
+label = "Political capital a bill costs for moving a policy across its whole range"
+type = "real"
+unit = "1"
+value = 60.0
+
+[param.capital_monthly]
+type = "real"
+unit = "1"
+value = 1.0
+
+[param.capital_from_support]
+type = "real"
+unit = "1"
+value = 5.0
+
+[param.capital_new_parliament]
+type = "real"
+unit = "1"
+value = 2.0
+
+[param.capital_most]
+type = "real"
+unit = "1"
+value = 100.0

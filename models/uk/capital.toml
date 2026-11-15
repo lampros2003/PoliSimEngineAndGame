@@ -1,4 +1,5 @@
-# Political capital (stage S12.4, docs/S12-PLAN.md). Written by hand, not generated.
+# Political capital (stage S12.4, docs/S12-PLAN.md). GENERATED: copied from
+# tools/uk/template/capital.toml by tools/uk/calibrate.py. Edit the template.
 #
 # Every bill costs capital (docs/spec/06-model-format-1.md, "Political capital"): 5 for any
 # bill, and 60 more for moving a lever across its whole range, in proportion to how far it

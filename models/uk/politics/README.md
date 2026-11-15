@@ -126,6 +126,65 @@ and Yorkshire for two years, and so on (`models/uk/README.md`, Dilemmas). The vo
 quintile and work (`type_quintile`, `type_in_work`) are there for these effects. The base
 month and the 2024 shares are unchanged.
 
+## Groups (stage S13.4)
+
+Eighteen interest groups, the dimension `group`, in this order: the young (18 to 34),
+mid-life (35 to 64), pensioners (65 and over; the member is `pensioner`, since
+`pensioners` is a household value), low incomes (the poorest household income quintile),
+middle incomes (the middle three), high incomes (the richest), in work, out of work (under
+65 and not in work), parents (adults in households with children), lone parents (the adult
+of a lone-parent family with children), the self-employed, and seven places: Scotland,
+Wales, Northern Ireland, London, the North (North East, North West, Yorkshire), the
+Midlands (East and West) and the South (East, South East, South West).
+
+**Membership** (`group_member`, by voter type and group) is exact for the groups the voter
+types are made of: 1 or 0 by region, age band, quintile and work. Parents, lone parents and
+the self-employed cut across the types, so for them it is the share of the type's adults in
+the group, summed from the households with their current weights (`voters_parents`,
+`voters_lone_parents`, `voters_self_employed`), so it follows the population as the
+households are reweighted. Quintiles are of households, so the poorest quintile holds
+about 15% of adults and the richest 23%.
+
+**Approval** (`group_approval`, and a row each, `approval_<group>`) is the share of the
+group's likely voters, the adults who would vote, who would vote for a governing bloc:
+the model's own choice shares, summed over the voter types with each type's adults in the
+group as weights. So it moves with everything the vote moves with. Weighted by likely
+voters, the approvals of a partition (the age bands, the income groups, the places) give
+the government's poll rating exactly, up to rounding. The government's bloc does not
+stand in Northern Ireland, so approval there is nil. `group_share` (and `share_<group>`)
+is the group's share of all adults.
+
+**Drivers.** For the governing blocs a voter type's utility is identity (the region's
+intercept and the age band's effect, fitted to 2024) plus performance. The performance part
+is split into five drivers, each the group's mean over its adults (weights as above):
+
+| Driver | The term |
+|---|---|
+| `group_driver_income` | `vote_income_effect * voter_income_change`: real household income against a year before |
+| `group_driver_jobs` | `voter_jobs`: unemployment in the type's region against the last election |
+| `group_driver_prices_and_time` | `fundamentals`, inflation against the last election and time in office, less the base month's time in office (six months), the same for every group |
+| `group_driver_services` | `voter_services`: health, education and policing service levels and the climate, against the last election |
+| `group_driver_standing` | `government_standing`: reactions to the government's answers to dilemmas |
+
+The five add up to the group's mean performance utility less the base month's time in
+office, which the intercepts were fitted with; so all five are zero in the base month.
+They are utilities (log-odds), not points of approval: a driver of -0.1 makes the
+government's odds about a tenth lower among the group, all else equal.
+
+**Households.** For each household: `household_in_<group>`, true when any of its adults is
+in the group (low, middle and high incomes, parents and the places are the household's);
+`household_support`, the mean over its adults of their voter type's share for a governing
+bloc. The rest of a household's statement is in `../households.toml`: `household_earnings`,
+`household_pensions` (state and private), `income_tax_year`, `employee_ni_year` and
+`household_benefits` (Child Benefit net of the charge, and Universal Credit), each a year;
+`net_income`, a month; and here `income_change`, real net income against its average over
+about a year.
+
+What is estimated: the household groups come from the synthetic households, whose children
+and self-employment follow the published tables they were built from
+(`../households/README.md`); and approval is what the model's vote gives, with the age
+effects and fundamentals above, not a poll of the group.
+
 ## Against past elections (stage S9.4)
 
 `tools/uk/history.py` fits the government's reactions to income and unemployment to the

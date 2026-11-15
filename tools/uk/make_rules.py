@@ -190,6 +190,8 @@ doc = "{doc}"
 '''
     if rng:
         out += f"range = [{rng[0]}, {rng[1]}]\n"
+    if group_of(name) == "Scottish income tax":
+        out += "player = false\n"  # stage S13.4: devolved, set by the Scottish Parliament
     return out
 
 
@@ -519,10 +521,8 @@ unit = "{y}"
 bands = [{{ from = "{up("class4_lower")}", rate = "class4_main_rate" }}, {{ from = "{up("class4_upper")}", rate = "class4_upper_rate" }}]
 '''
 
-    def var(name, expr, unit=y, kind="money", phase=rp, doc=""):
-        out = f'''
-[var.{name}]
-type = "{kind}"
+    def var(name, expr, unit=y, kind="money", phase=rp, doc="", label=""):
+        out = f"\n[var.{name}]\n" + (f'label = "{label}"\n' if label else "") + f'''type = "{kind}"
 unit = "{unit}"
 phase = "{phase}"
 entity = "household"
@@ -545,8 +545,9 @@ expr = "{expr}"
         rules += var(f"employee_ni{i}", f"marginal(pay{i}, employee_ni) + marginal(profit{i}, class4_ni)")
         rules += var(f"employer_ni{i}", f"marginal(pay{i}, employer_ni)")
     tax_terms = " + ".join(f"income_tax{i}" for i in range(1, ADULTS + 1))
-    rules += var("income_tax_year", tax_terms, doc="Income tax of every adult, a year")
-    rules += var("employee_ni_year", " + ".join(f"employee_ni{i}" for i in range(1, ADULTS + 1)))
+    rules += var("income_tax_year", tax_terms, doc="Income tax of every adult, a year", label="Income tax")
+    rules += var("employee_ni_year", " + ".join(f"employee_ni{i}" for i in range(1, ADULTS + 1)),
+                 label="National Insurance", doc="Employee and self-employed National Insurance of every adult, a year")
     rules += var("employer_ni_year", " + ".join(f"employer_ni{i}" for i in range(1, ADULTS + 1)))
     rules += var("top_income", "max(max(income1, income2), max(income3, income4))")
     rules += var("child_benefit_year", f"select(children >= 1, {up('child_benefit_eldest')} + max(children - 1, 0) * {up('child_benefit_other')}, 0)")
@@ -574,7 +575,15 @@ expr = "{expr}"
 '''
     adults_net = " + ".join(f"earn{i} + pens{i} - income_tax{i} - employee_ni{i}" for i in range(1, ADULTS + 1))
     rules += var("net_income", f"round(({adults_net} + child_benefit_year - hicbc_year) / year) + universal_credit",
-                 unit=m_unit, doc="Income after income tax and National Insurance, with Child Benefit and Universal Credit, a month")
+                 unit=m_unit, doc="Income after income tax and National Insurance, with Child Benefit and Universal Credit, a month",
+                 label="Net income")
+    # Stage S13.4: the rest of a household's income statement, for the client's household views.
+    rules += var("household_earnings", " + ".join(f"earn{i}" for i in range(1, ADULTS + 1)),
+                 label="Earnings", doc="Pay and self-employment profit of every adult before tax, a year")
+    rules += var("household_pensions", " + ".join(f"pens{i}" for i in range(1, ADULTS + 1)),
+                 label="Pensions", doc="State and private pensions of every adult before tax, a year")
+    rules += var("household_benefits", "child_benefit_year - hicbc_year + round(universal_credit * year)",
+                 label="Benefits", doc="Child Benefit net of the High Income Child Benefit Charge, and Universal Credit, a year")
     rules += total("income_tax_total", "round(wsum(household, income_tax_year) / year / household_unit)", "Income tax")
     rules += total("employee_ni_total", "round(wsum(household, employee_ni_year) / year / household_unit)", "National Insurance, employees and self-employed")
     rules += total("employer_ni_total", "round(wsum(household, employer_ni_year) / year / household_unit)", "National Insurance, employers")
