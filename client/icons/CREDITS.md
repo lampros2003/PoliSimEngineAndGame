@@ -2,7 +2,7 @@
 
 Silhouette pictograms from game-icons.net, licensed under CC BY 3.0
 (https://creativecommons.org/licenses/by/3.0/). The black background square of each
-file was removed so the client can tint the white artwork. Stage S13.2.
+file was removed so the client can tint the white artwork. Stage S13.2; the groups' pictograms, stage S13.4.
 
 | File | Icon | Author |
 |---|---|---|
@@ -10,8 +10,8 @@ file was removed so the client can tint the white artwork. Stage S13.2.
 | `balance.svg` | weight-scale | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `capital.svg` | crown-coin | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `carbon-price.svg` | poison-cloud | sbed, available on https://game-icons.net, CC BY 3.0 |
-| `child.svg` | baby-face | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `child-benefit.svg` | baby-bottle | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `child.svg` | baby-face | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `corporation-tax.svg` | briefcase | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `council-tax.svg` | house-keys | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `culture.svg` | theater | delapouite, available on https://game-icons.net, CC BY 3.0 |
@@ -24,6 +24,23 @@ file was removed so the client can tint the white artwork. Stage S13.2.
 | `exports.svg` | cargo-ship | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `gdp.svg` | growth | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `government.svg` | capitol | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-high-income.svg` | gold-stack | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-in-work.svg` | toolbox | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-london.svg` | tower-bridge | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-lone-parents.svg` | tree-swing | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-low-income.svg` | two-coins | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-middle-income.svg` | coins | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-midlands.svg` | anvil-impact | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-midlife.svg` | spectacles | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-north.svg` | mining | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-northern-ireland.svg` | shamrock | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-out-of-work.svg` | newspaper | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-parents.svg` | matryoshka-dolls | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-scotland.svg` | bagpipes | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-self-employed.svg` | shop | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `group-south.svg` | wheat | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-wales.svg` | dragon-head | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `group-young.svg` | skateboard | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `group.svg` | shield | badges, available on https://game-icons.net, CC BY 3.0 |
 | `growth.svg` | histogram | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `health.svg` | hospital-cross | lorc, available on https://game-icons.net, CC BY 3.0 |
@@ -31,8 +48,8 @@ file was removed so the client can tint the white artwork. Stage S13.2.
 | `hospital.svg` | hospital | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `housing.svg` | house | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `imports.svg` | warehouse | delapouite, available on https://game-icons.net, CC BY 3.0 |
-| `income.svg` | wallet | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `income-tax.svg` | take-my-money | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `income.svg` | wallet | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `indicator.svg` | target-arrows | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `investment.svg` | gears | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `jobs.svg` | anvil | lorc, available on https://game-icons.net, CC BY 3.0 |
@@ -57,8 +74,8 @@ file was removed so the client can tint the white artwork. Stage S13.2.
 | `social-care.svg` | healing-shield | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `subsidies.svg` | coins | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `tax.svg` | pay-money | delapouite, available on https://game-icons.net, CC BY 3.0 |
-| `trade.svg` | globe | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `trade-barriers.svg` | barbed-wire | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `trade.svg` | globe | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `train.svg` | subway-train | caro-asercion, available on https://game-icons.net, CC BY 3.0 |
 | `transport.svg` | bus | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `treatments.svg` | stethoscope | delapouite, available on https://game-icons.net, CC BY 3.0 |

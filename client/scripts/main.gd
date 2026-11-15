@@ -19,6 +19,7 @@ const PopupCard := preload("res://scripts/popup.gd")
 const Sheet := preload("res://scripts/sheet.gd")
 const LeverPanel := preload("res://scripts/lever_panel.gd")
 const IndicatorCard := preload("res://scripts/indicator_card.gd")
+const GroupCard := preload("res://scripts/group_card.gd")
 const BudgetPanel := preload("res://scripts/budget_panel.gd")
 const PoliticsPanel := preload("res://scripts/politics_panel.gd")
 const StartScreen := preload("res://scripts/start_screen.gd")
@@ -266,6 +267,7 @@ func _build_layout() -> void:
 	_budget_sheet.body.add_child(budget)
 	politics = PoliticsPanel.new()
 	politics.fmt = fmt
+	politics.group_pressed.connect(open_node)
 	_parliament_sheet = _new_sheet("Parliament", 900.0)
 	_parliament_sheet.body.add_child(politics)
 	popup = PopupCard.new()
@@ -514,6 +516,7 @@ func _model_changed() -> void:
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	politics.build(play)
 	board.build(entries, play, lever_entries, _key_label)
+	politics.build_groups(board)
 	_build_headline()
 	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
 	# opened, loaded or reloaded).
@@ -722,11 +725,11 @@ func _set_controls(enabled: bool) -> void:
 
 ## Opens the popup of a board node: "policy:<key>", "indicator:<row>", "group:<key>",
 ## "flag:<key>" or "centre" (Parliament).
-func open_node(key: String) -> void:
+func open_node(key: String, from := Rect2()) -> void:
 	if not board.nodes.has(key):
 		return
 	var node: Dictionary = board.nodes[key]
-	var origin := _node_rect(key)
+	var origin := _node_rect(key) if from == Rect2() else from
 	match str(node["kind"]):
 		"centre":
 			open_overlay("parliament")
@@ -758,7 +761,7 @@ func open_indicator(name: String, row_key := "", origin := Rect2()) -> void:
 	else:
 		if origin == Rect2():
 			origin = Rect2(get_viewport_rect().size / 2.0, Vector2.ONE)
-		popup.open(func() -> Control: return _entry_content(name, row_key, {}), origin)
+		popup.open(func() -> Control: return _entry_content(name, row_key), origin)
 	_after_open()
 
 
@@ -783,6 +786,7 @@ func _node_content(key: String) -> Control:
 		var card := LeverPanel.new()
 		card.fmt = fmt
 		card.name = "policy_card"
+		card.wide = get_viewport_rect().size.x >= LeverPanel.WIDE_FROM
 		var lever_entries := []
 		for lever in node["levers"]:
 			lever_entries.append(entries[lever])
@@ -793,13 +797,12 @@ func _node_content(key: String) -> Control:
 			_refresh())
 		card.follow.connect(func(name: String) -> void: _follow(name))
 		return card
-	var extras := {}
 	if node["kind"] == "group":
-		extras = _group_extras(node)
-	return _entry_content(str(node["name"]), str(node["row"]), extras, key)
+		return _group_content(key)
+	return _entry_content(str(node["name"]), str(node["row"]), key)
 
 
-func _entry_content(name: String, row_key: String, extras: Dictionary, key := "") -> Control:
+func _entry_content(name: String, row_key: String, key := "") -> Control:
 	var entry: Dictionary = entries.get(name, {})
 	var node: Dictionary = board.nodes.get(key, {})
 	var card := IndicatorCard.new()
@@ -817,7 +820,7 @@ func _entry_content(name: String, row_key: String, extras: Dictionary, key := ""
 	for m in found:
 		movers.append([m[0], board.nodes[m[0]]["label"], m[1], m[2]])
 	var icon: Texture2D = node.get("icon", Palette.icon("indicator"))
-	card.build(name, row_key, entry, label, str(node.get("area", "")), icon, entries, play, _breakdowns_of(name), compare, movers, extras)
+	card.build(name, row_key, entry, label, str(node.get("area", "")), icon, entries, play, _breakdowns_of(name), compare, movers)
 	card.follow.connect(func(target: String) -> void: _follow(target))
 	card.trace.trail = PackedStringArray([name])
 	card.trace.show_waiting(name)
@@ -838,26 +841,75 @@ func _breakdowns_of(name: String) -> Array:
 	return out
 
 
-## An interest group's size and drivers (stage S13.4 gives the model groups).
-func _group_extras(node: Dictionary) -> Dictionary:
-	var extras := {"drivers": []}
+## Stage S13.4: an interest group's popup, and a request for eight of its households.
+func _group_content(key: String) -> Control:
+	var node: Dictionary = board.nodes[key]
+	var card := GroupCard.new()
+	card.fmt = fmt
+	card.name = "group_card"
+	card.wide = get_viewport_rect().size.x >= LeverPanel.WIDE_FROM
+	card.index = _group_index(node)
+	var movers := []
+	for m in board.movers(key):
+		movers.append([m[0], board.nodes[m[0]]["label"], m[1], m[2]])
+	card.build(node, entries.get(node["name"], {}), _group_drivers(), movers)
+	card.follow.connect(func(target: String) -> void: _follow(target))
+	card.household_opened.connect(func(record: Dictionary) -> void:
+		popup.push(func() -> Control: return _household_content(record)))
+	var house: Dictionary = play.get("web", {}).get("household", {})
+	var flag := str(node.get("households", ""))
+	if flag != "" and not house.is_empty() and game.has_method("request_records"):
+		var columns := PackedStringArray([flag])
+		for field in ["support", "net_income", "change", "adults", "children", "region", "type"]:
+			if str(house.get(field, "")) != "":
+				columns.append(str(house[field]).get_slice(":", 0))
+		for spec in house.get("account", []):
+			columns.append(str(spec).trim_prefix("-"))
+		game.call("request_records", str(house.get("entity", "household")), flag, 8, columns, key)
+	return card
+
+
+## The group's place in its dimension: the member whose share of the electorate is the
+## group's own (the [play.web] row), so no member names are needed.
+func _group_index(node: Dictionary) -> int:
 	var share: Variant = game.latest(str(node.get("share", "")))
-	if share != null:
-		extras["share_text"] = "%s of the electorate." % fmt.percent(float(share))
-	var drivers: Dictionary = play.get("web", {}).get("group_drivers", {})
-	var group_key := str(node["key"]).trim_prefix("group:")
-	var index := -1
-	var i := 0
-	for g in board.groups:
-		if str(g.get("key", g.get("row", ""))) == group_key:
-			index = i
-		i += 1
-	for label in drivers:
-		var cells: Dictionary = game.cells(str(drivers[label]))
-		var values: PackedFloat64Array = cells.get("values", PackedFloat64Array())
-		if index >= 0 and index < values.size():
-			extras["drivers"].append([str(label), fmt.value(entries.get(str(drivers[label]), {}), values[index], true, false)])
-	return extras
+	var cells: Dictionary = game.cells(str(play.get("web", {}).get("group_share", "group_share")))
+	var values: PackedFloat64Array = cells.get("values", PackedFloat64Array())
+	var best := -1
+	for i in values.size():
+		if share != null and (best < 0 or absf(values[i] - float(share)) < absf(values[best] - float(share))):
+			best = i
+	return best
+
+
+## The drivers of a group's vote: [[plain name, value name]], from [play.web].
+func _group_drivers() -> Array:
+	var web: Dictionary = play.get("web", {})
+	var drivers: Dictionary = web.get("group_drivers", {})
+	var labels: Dictionary = web.get("group_driver_labels", {})
+	var out := []
+	for k in drivers:
+		out.append([str(labels.get(k, entries.get(str(drivers[k]), {}).get("label", k))), str(drivers[k])])
+	return out
+
+
+## The words for a household's data columns: column -> the labels of its dimension.
+func _household_words() -> Dictionary:
+	var house: Dictionary = play.get("web", {}).get("household", {})
+	var words := {}
+	for field in ["region", "type"]:
+		var spec := str(house.get(field, ""))
+		for d in catalogue.get("dims", []):
+			if str(d["name"]) == spec.get_slice(":", 1):
+				words[spec.get_slice(":", 0)] = d["labels"]
+	return words
+
+
+func _household_content(record: Dictionary) -> Control:
+	var account := GroupCard.HouseholdAccount.new()
+	account.name = "household_card"
+	account.build(record, play.get("web", {}).get("household", {}), entries, fmt, _household_words())
+	return account
 
 
 ## Following a cause inside the popup: an entry's name or a board key.
@@ -866,6 +918,9 @@ func _follow(target: String) -> void:
 		if board.nodes.has(target):
 			board.select(target)
 			popup.push(func() -> Control: return _node_content(target))
+			_refresh_popup(game.pending(), _show_capital())
+			_request_forecast()
+			return
 	else:
 		var entry: Dictionary = entries.get(target, {})
 		if entry.is_empty():
@@ -877,7 +932,7 @@ func _follow(target: String) -> void:
 			var key := board.policy_of(target)
 			popup.push(func() -> Control: return _node_content(key))
 		else:
-			popup.push(func() -> Control: return _entry_content(target, row_key, {}))
+			popup.push(func() -> Control: return _entry_content(target, row_key))
 	_refresh_popup(game.pending(), _show_capital())
 	_request_forecast()
 
@@ -899,6 +954,13 @@ func _refresh_popup(pending: Dictionary, capital: float) -> void:
 				if pending.has(lever):
 					var typed: Variant = float(pending[lever]) / fmt.minor if entries.get(lever, {}).get("money", false) else pending[lever]
 					card.show_vote(lever, game.call("vote_preview", lever, typed), capital - _waiting_except(lever))
+	var group := group_card()
+	if group != null:
+		group.refresh(func(r: String) -> Variant: return game.latest(r), func(r: String) -> Variant: return game.previous(r),
+			func(name: String) -> Dictionary: return game.cells(name), _group_drivers())
+		var support := str(play.get("politics", {}).get("support", ""))
+		group.show_history(game.history_steps(), func(r: String) -> PackedFloat64Array: return game.series(r),
+			[support, "The country"] if support != "" else [])
 	var ind := indicator_card()
 	if ind != null:
 		var node: Dictionary = board.nodes.get("indicator:" + ind.row, {})
@@ -929,13 +991,21 @@ func close_popup() -> void:
 		popup.close()
 
 
-## "policy", "indicator" or "" for the popup open now.
+## "policy", "indicator", "group", "household" or "" for the popup open now.
 func popup_kind() -> String:
 	if popup == null or not popup.is_open():
 		return ""
 	if popup.content is LeverPanel:
 		return "policy"
+	if popup.content is GroupCard:
+		return "group"
+	if popup.content is GroupCard.HouseholdAccount:
+		return "household"
 	return "indicator"
+
+
+func group_card() -> GroupCard:
+	return popup.content as GroupCard if popup != null and popup.is_open() else null
 
 
 func policy_card() -> LeverPanel:
@@ -1115,7 +1185,7 @@ func _year_rows() -> Array:
 		var node: Dictionary = board.nodes[key]
 		if not seen.has(node["row"]):
 			seen[node["row"]] = true
-			out.append([node["row"], node["label"], entries.get(node["name"], {}), node["kind"], node["tier"]])
+			out.append([node["row"], node["label"], entries.get(node["name"], {}), node["kind"], node["tier"], node["better"], key])
 	for line in budget._lines:
 		if not seen.has(line["row"]):
 			seen[line["row"]] = true
@@ -1495,6 +1565,11 @@ func _process(_delta: float) -> void:
 					popup.relayout()
 			"effects":
 				_take_effects(event)
+			"records":
+				var group := group_card()
+				if group != null and str(event.get("tag", "")) == group.key:
+					group.show_households(event.get("records", []), play.get("web", {}).get("household", {}), _household_words())
+					popup.relayout()
 			"effects_done":
 				effects_running = false
 			"saved":

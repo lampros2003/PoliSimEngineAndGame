@@ -183,7 +183,8 @@ func _draw_summary() -> void:
 		_summary.draw_string(caps, Vector2(0, y + 24.0), ["REVENUE", "SPENDING"][i], HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.MUTED)
 		_summary.draw_rect(Rect2(100.0 + 4.0, y + 4.0, w, 30.0), Palette.SHADOW)
 		_summary.draw_rect(Rect2(100.0, y, w, 30.0), colour)
-		_summary.draw_string(figure, Vector2(112.0 + w, y + 24.0), fmt.value(money, int(_sums[i]), true, false), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Palette.INK)
+		# Stage S13.4: each total in a column past both bars, so neither bar's end line crosses it.
+		_summary.draw_string(figure, Vector2(116.0 + width, y + 24.0), fmt.value(money, int(_sums[i]), true, false), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Palette.INK)
 	var gap: float = _sums[0] - _sums[1]
 	var x: float = 100.0 + width * minf(_sums[0], _sums[1]) / top
 	var x2: float = 100.0 + width * maxf(_sums[0], _sums[1]) / top

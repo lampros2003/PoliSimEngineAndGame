@@ -1,6 +1,6 @@
 extends VBoxContainer
-## Stage S13.2: an indicator's popup (and a budget line's, a top-bar figure's, a situation's
-## and, for a later stage, an interest group's). The figure large with last month's change;
+## Stage S13.2: an indicator's popup (and a budget line's, a top-bar figure's and a
+## situation's; stage S13.4 gives interest groups a popup of their own, group_card.gd). The figure large with last month's change;
 ## its history, with one more series to compare; why it moved (the S6 trace, whose inputs
 ## open their own popups); its breakdowns where the scenario gives them; and the policies
 ## that move it most.
@@ -31,9 +31,9 @@ var _movers: VBoxContainer
 ## `node` is the board node shown, or {} for an entry off the board; `label` its label;
 ## `breakdowns` the breakdown names that belong to it; `compare` [row key, label] of the
 ## board's indicators in the same unit; `movers` [[policy key, label, signed strength,
-## measured]]; `group` the extras of an interest group ({} otherwise).
+## measured]].
 func build(name: String, row_key: String, the_entry: Dictionary, label: String, area: String, icon: Texture2D, entries: Dictionary,
-		play: Dictionary, breakdowns: Array, compare: Array, movers: Array, group := {}) -> void:
+		play: Dictionary, breakdowns: Array, compare: Array, movers: Array) -> void:
 	name_shown = name
 	row = row_key
 	_entries = entries
@@ -72,8 +72,6 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	figures.add_child(_change)
 	if str(entry.get("doc", "")) != "":
 		add_child(_muted(LeverPanel._sentence(str(entry["doc"]))))
-	if not group.is_empty():
-		_group_extras(group)
 	if row != "":
 		var chart_head := HBoxContainer.new()
 		chart_head.add_child(Palette.caps("History"))
@@ -160,19 +158,6 @@ func _muted(words: String) -> Label:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size = Vector2(420, 0)
 	return label
-
-
-## Size, approval's drivers and households, for an interest group (stage S13.4 fills it).
-func _group_extras(group: Dictionary) -> void:
-	if str(group.get("share_text", "")) != "":
-		add_child(_muted(str(group["share_text"])))
-	var drivers: Array = group.get("drivers", [])
-	if not drivers.is_empty():
-		add_child(Palette.caps("What drives it"))
-		for d in drivers:
-			var line := Label.new()
-			line.text = "%s: %s" % [d[0], d[1]]
-			add_child(line)
 
 
 ## Last month's value and change; `value_of` and `before_of` read result rows.

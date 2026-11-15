@@ -4,7 +4,9 @@ extends PanelContainer
 ## intention, seats and the projection by bloc, which blocs govern, the government's poll
 ## rating, turnout, the election flag and the months to the next election; and (stage S8.3)
 ## the issues voters weigh, each against where it stood at the last election. Stage S13.2:
-## the Parliament sheet, with the House drawn as rows of seats, one dot each.
+## the Parliament sheet, with the House drawn as rows of seats, one dot each. Stage S13.4:
+## the country by group, each group's share, approval and month's change; a row opens the
+## group's popup.
 
 const Palette := preload("res://scripts/palette.gd")
 
@@ -13,6 +15,9 @@ const BLOC_COLOURS := [Color("#b0412c"), Color("#1f4e79"), Color("#d99a27"), Col
 	Color("#c2b03a"), Color("#2e5e44"), Color("#76609a"), Color("#8a8f96"), Color("#a3586f")]
 ## Seats per column of the House.
 const SEAT_ROWS := 10
+
+## A group's row was pressed: its board key, and where on screen.
+signal group_pressed(key: String, origin: Rect2)
 
 var fmt: RefCounted
 var settings := {}
@@ -24,6 +29,9 @@ var _grid: GridContainer
 var _rows: Array = []  # per bloc: {cells: [name, polls, change, seats, projected]}
 var _seats := PackedFloat64Array()
 var _governing := PackedFloat64Array()
+var _groups_title: Label
+var _groups: GridContainer
+var _group_rows: Array = []  # {key, row, share, note, cells: [share, bar, approval, change]}
 
 
 func _ready() -> void:
@@ -58,6 +66,16 @@ func _ready() -> void:
 	_grid.add_theme_constant_override("v_separation", 9)
 	Palette.rule_rows(_grid)
 	box.add_child(_grid)
+	_groups_title = Palette.caps("The country by group")
+	_groups_title.visible = false
+	box.add_child(_groups_title)
+	_groups = GridContainer.new()
+	_groups.name = "groups"
+	_groups.columns = 5
+	_groups.add_theme_constant_override("h_separation", 14)
+	_groups.add_theme_constant_override("v_separation", 7)
+	Palette.rule_rows(_groups)
+	box.add_child(_groups)
 
 
 func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.FONT_SIZE) -> Label:
@@ -81,6 +99,75 @@ func build(play: Dictionary) -> void:
 		_grid.remove_child(child)
 		child.queue_free()
 	_rows.clear()
+
+
+## Stage S13.4: a row per interest group on the board.
+func build_groups(board: Control) -> void:
+	for child in _groups.get_children():
+		_groups.remove_child(child)
+		child.queue_free()
+	_group_rows.clear()
+	var keys: PackedStringArray = board.keys_of("group")
+	_groups_title.visible = not keys.is_empty()
+	if keys.is_empty():
+		return
+	for heading in ["", "Share of adults", "Backing the government", "", "Last month"]:
+		_groups.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
+	for key in keys:
+		var node: Dictionary = board.nodes[key]
+		var name := Button.new()
+		name.name = "group_" + key.trim_prefix("group:")
+		name.text = str(node["label"])
+		name.theme_type_variation = "Link"
+		name.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		name.custom_minimum_size = Vector2(190, 0)
+		name.pressed.connect(func() -> void: group_pressed.emit(key, name.get_global_rect()))
+		_groups.add_child(name)
+		var bar := Control.new()
+		bar.custom_minimum_size = Vector2(200, 18)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.draw.connect(func() -> void: _draw_approval(bar))
+		var cells := [_cell("–"), bar, _cell("–"), _cell("–", Palette.MUTED)]
+		for c in cells:
+			_groups.add_child(c)
+		_group_rows.append({"key": key, "row": str(node["row"]), "share": str(node.get("share", "")), "note": str(node.get("note", "")),
+			"button": name, "cells": cells})
+
+
+## A group's approval as a bar from nought to a half, with a tick at the national rating.
+func _draw_approval(bar: Control) -> void:
+	var v := float(bar.get_meta("approval", 0.0))
+	var national := float(bar.get_meta("national", -1.0))
+	var w := bar.size.x
+	bar.draw_rect(Rect2(0, 3, w, bar.size.y - 6), Color(Palette.RULE, 0.5))
+	bar.draw_rect(Rect2(0, 3, w * clampf(v / 0.5, 0.0, 1.0), bar.size.y - 6), Palette.BLUE)
+	if national >= 0.0:
+		var x := w * clampf(national / 0.5, 0.0, 1.0)
+		bar.draw_line(Vector2(x, 0), Vector2(x, bar.size.y), Palette.INK, 2.0)
+
+
+func _show_groups(latest: Callable, previous: Callable) -> void:
+	var national: Variant = latest.call(str(settings.get("support", "")))
+	for g in _group_rows:
+		var cells: Array = g["cells"]
+		var share: Variant = latest.call(g["share"]) if g["share"] != "" else null
+		var now: Variant = latest.call(g["row"])
+		var was: Variant = previous.call(g["row"])
+		cells[0].text = fmt.percent(float(share)) if share != null else "–"
+		var silent: bool = now != null and absf(float(now)) < 0.0005 and g["note"] != ""
+		cells[1].set_meta("approval", 0.0 if now == null or silent else float(now))
+		cells[1].set_meta("national", float(national) if national != null else -1.0)
+		cells[1].tooltip_text = g["note"] if silent else ""
+		cells[1].queue_redraw()
+		cells[2].text = "–" if now == null or silent else fmt.percent(float(now))
+		cells[2].tooltip_text = g["note"] if silent else ""
+		cells[3].text = "–"
+		cells[3].add_theme_color_override("font_color", Palette.MUTED)
+		if now != null and was != null and not silent:
+			var d := (float(now) - float(was)) * 100.0
+			cells[3].text = "0.0" if absf(d) < 0.05 else ("▲ +%.1f" % d if d > 0.0 else "▼ −%.1f" % absf(d))
+			if absf(d) >= 0.05:
+				cells[3].add_theme_color_override("font_color", Palette.GOOD if d > 0.0 else Palette.BAD)
 
 
 func _ensure_rows(labels: PackedStringArray) -> void:
@@ -172,6 +259,7 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable, months_do
 		text += " Turnout if an election were held now: %s." % fmt.percent(float(turnout))
 	_summary.text = text
 	_show_issues(cells_of)
+	_show_groups(latest, previous)
 	_bar.set_meta("majority", majority)
 	_bar.queue_redraw()
 

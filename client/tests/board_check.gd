@@ -5,7 +5,10 @@ extends SceneTree
 ## rest, nor four situation flags, overlap at 1366x768, 1920x1080 or 2560x1440; every node opens the right popup (the
 ## centre, Parliament); a basic rate typed in Income tax's popup waits with its cost in
 ## political capital; pointing at a policy shows its links; the Budget's lines open their
-## popups. Then models/mini, which has no [play.web], gets an automatic board.
+## popups. Then models/mini, which has no [play.web], gets an automatic board. Stage S13.4:
+## the 18 interest groups round the centre in their five families, each family together;
+## a label at rest for most nodes, none touching another node, label or flag at the three
+## sizes; a group opens a group popup; models/mini's board has an empty middle.
 
 var main: Control
 
@@ -25,6 +28,13 @@ func _initialize() -> void:
 	var indicators: int = board.keys_of("indicator").size()
 	if policies != 24 or indicators != 24:
 		return _fail("the board has %d policies and %d indicators" % [policies, indicators])
+	var families := []
+	for key in board.keys_of("group"):
+		var family := str(board.nodes[key]["family"])
+		if families.is_empty() or families[-1] != family:
+			families.append(family)
+	if board.keys_of("group").size() != 18 or families != ["Ages", "Incomes", "Work", "Families", "Places"]:
+		return _fail("the groups: %d in families %s" % [board.keys_of("group").size(), families])
 	var on_board: PackedStringArray = main.board_levers()
 	for name in main.entries:
 		var entry: Dictionary = main.entries[name]
@@ -34,6 +44,7 @@ func _initialize() -> void:
 		if on_board.has(name) == scottish:
 			return _fail("%s is %s the board" % [name, "on" if scottish else "missing from"])
 	var own_size: Vector2 = board.size
+	var rested := []
 	for view in [Vector2(1366, 768), Vector2(1920, 1080), Vector2(2560, 1440)]:
 		board.size = view - Vector2(0, main.BAR_HEIGHT)
 		board.layout()
@@ -43,6 +54,15 @@ func _initialize() -> void:
 		var found: PackedStringArray = board.overlaps()
 		if not found.is_empty():
 			return _fail("at %dx%d: %s" % [view.x, view.y, ", ".join(found)])
+		var labelled := 0
+		var labels := 0
+		for key in board.order:
+			if not board.nodes[key]["kind"] in ["centre", "flag"]:
+				labels += 1
+				labelled += 1 if board.nodes[key]["rest"] else 0
+		if labelled < labels * 0.85:
+			return _fail("at %dx%d only %d of %d nodes are labelled at rest" % [view.x, view.y, labelled, labels])
+		rested.append("%d of %d at %dx%d" % [labelled, labels, view.x, view.y])
 	board.size = own_size
 	board.set_flags([])
 	board.layout()
@@ -52,7 +72,7 @@ func _initialize() -> void:
 			continue
 		main.open_node(key)
 		await process_frame
-		var want: String = {"policy": "policy", "indicator": "indicator", "group": "indicator", "centre": ""}[kind]
+		var want: String = {"policy": "policy", "indicator": "indicator", "group": "group", "centre": ""}[kind]
 		if main.popup_kind() != want or (kind == "centre" and main.overlay_open() != "parliament"):
 			return _fail("%s opened %s" % [key, main.popup_kind() if main.popup_kind() != "" else main.overlay_open()])
 		main.close_popup()
@@ -83,9 +103,9 @@ func _initialize() -> void:
 	board.size = Vector2(1440, 900 - main.BAR_HEIGHT)  # a window's board (none without a display)
 	main.start(main.find_file("models/mini/scenarios/island.toml"))
 	await _settle()
-	if board.authored or board.keys_of("policy").size() != 2 or board.keys_of("indicator").is_empty() or not board.overlaps().is_empty():
+	if board.authored or board.keys_of("policy").size() != 2 or board.keys_of("indicator").is_empty() or not board.overlaps().is_empty() 			or not board.keys_of("group").is_empty():
 		return _fail("mini's automatic board: %d policies, %d indicators, %s" % [board.keys_of("policy").size(), board.keys_of("indicator").size(), board.overlaps()])
-	print("board: ten areas, 24 policies and 24 indicators, nothing overlapping at three sizes; every node opens its popup; a change waits with its cost; links shown; budget lines open; an automatic board for mini")
+	print("board: ten areas, 24 policies, 24 indicators and 18 groups in five families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown; budget lines open; an automatic board for mini, its middle empty" % ", ".join(rested))
 	quit(0)
 
 

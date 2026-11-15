@@ -109,7 +109,7 @@ func _show(build: Callable, origin: Rect2, grow: bool) -> void:
 		content.queue_free()
 		content = null
 	content = build.call()
-	content.custom_minimum_size.x = WIDTH - 56.0
+	content.custom_minimum_size.x = _width() - 56.0
 	_holder.add_child(content)
 	stack.append([build, origin])
 	_origin = origin
@@ -118,7 +118,9 @@ func _show(build: Callable, origin: Rect2, grow: bool) -> void:
 	visible = true
 	_place.call_deferred(grow)
 	# Wrapped text settles its height a frame later: place the card again then.
-	get_tree().process_frame.connect(func() -> void: get_tree().process_frame.connect(_place.bind(false), CONNECT_ONE_SHOT), CONNECT_ONE_SHOT)
+	get_tree().process_frame.connect(func() -> void:
+		if not get_tree().process_frame.is_connected(_place.bind(false)):
+			get_tree().process_frame.connect(_place.bind(false), CONNECT_ONE_SHOT), CONNECT_ONE_SHOT)
 
 
 ## Beside what was clicked, on the side with more room, inside the window.
@@ -128,7 +130,7 @@ func _place(grow: bool) -> void:
 	var view := get_viewport_rect().size
 	var tall := content.get_combined_minimum_size().y + 4.0
 	var room := view.y - top_margin - 2.0 * MARGIN - 50.0
-	_scroll.custom_minimum_size = Vector2(WIDTH, minf(tall, room))
+	_scroll.custom_minimum_size = Vector2(_width(), minf(tall, room))
 	card.reset_size()
 	var box := card.get_combined_minimum_size()
 	var x := 0.0
@@ -155,6 +157,13 @@ func _place(grow: bool) -> void:
 	_tween.tween_property(card, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(card, "modulate:a", 1.0, 0.09)
 	_tween.tween_property(_veil, "modulate:a", 1.0, 0.18)
+
+
+## Stage S13.4: the card's width: the content's own (a policy's two columns), or WIDTH.
+func _width() -> float:
+	if content != null and content.has_method("popup_width"):
+		return minf(content.popup_width(), get_viewport_rect().size.x - 2.0 * MARGIN)
+	return WIDTH
 
 
 func close() -> void:

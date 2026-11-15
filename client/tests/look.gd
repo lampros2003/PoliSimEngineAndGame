@@ -6,7 +6,8 @@ extends SceneTree
 ## "indicator:gdp", "centre"), --entry=NAME any value's popup, --overlay=budget|parliament
 ## a sheet, --hover=KEY points at a node, --type=lever:value types a change into a policy
 ## popup first (and --then=N plays N more months), --dilemma=1 leaves the question on screen, --effects=1 waits for the measured
-## effects table first (for hover links). For a person to look at; needs a
+## effects table first (for hover links). Stage S13.4: --node=group:KEY opens a group's
+## popup, and --household=N then opens its Nth household's account. For a person to look at; needs a
 ## display. Godot's --resolution WxH before --path sets the window size.
 
 var main: Control
@@ -51,10 +52,20 @@ func _initialize() -> void:
 		if args.has("then"):
 			main.advance(int(args["then"]))
 			await _settle()
+	# The pointer of whoever runs this must not point at the board for the picture.
+	main.board.input_enabled = false
+	main.board.set_hover("")
 	if args.has("overlay"):
 		main.open_overlay(str(args["overlay"]))
 	if args.has("node"):
 		main.open_node(str(args["node"]))
+	if args.has("household"):
+		for i in 1200:
+			if main.group_card() != null and not main.group_card().records.is_empty():
+				break
+			await process_frame
+		await _settle()
+		main.group_card().household_opened.emit(main.group_card().records[int(args["household"])])
 	if args.has("entry"):
 		main.open_indicator(str(args["entry"]))
 	if args.has("hover"):
