@@ -48,13 +48,23 @@ so a policy's effect builds over months and years. Bills cost political capital 
 does (`capital_weight` below scales the cost of moving across the whole range); a level policy
 moved one step at a time is affordable, a jump across the whole range usually is not.
 
+Stage S13.7 retuned the policies the playtest (`docs/S13-BALANCE.md`) found out of line: fuel
+duty's reaction is a quarter of what it was; the soft drinks levy, the prescription charge,
+the bus fare cap, the Winter Fuel Payment, cannabis law and a lower drinking age react more,
+and the levy and the charge move healthy life visibly; liberal planning no longer loses
+approval; cannabis law and rent controls weigh 0.6 in capital, not 1. Every policy is still
+neutral at its default. Its "Measured (S13.7)" figures are the playtest's measure: the policy
+set at that end of its range in July 2025 (`scenarios/2025.toml`, every question given its
+first answer), against doing nothing, the largest gap in any month to the July 2029
+election.
+
 ## The policies
 
 | Policy | Lever (unit) | 2024 setting | Range | Leaning | Capital weight | Area |
 |---|---|---|---|---|---|---|
 | Legal age to buy alcohol | `drinking_age` (years) | 18 | 16 to 21 | right | 0.5 | Law and order |
 | Sentencing | `sentencing` (level) | 2, as now | 0 lenient to 4 tough | right | 0.8 | Law and order |
-| Cannabis law | `cannabis_law` (level) | 0, illegal | 0 illegal, 1 decriminalised, 2 legal and taxed | left | 1.0 | Law and order |
+| Cannabis law | `cannabis_law` (level) | 0, illegal | 0 illegal, 1 decriminalised, 2 legal and taxed | left | 0.6 (1.0 before S13.7) | Law and order |
 | Alcohol duty | `alcohol_duty` (multiple of 2024 rates) | 1 | 0.5 to 2 | left | 0.6 | Health |
 | Tobacco duty | `tobacco_duty` (multiple) | 1 | 0.5 to 2 | left | 0.4 | Health |
 | Soft drinks levy | `sugar_levy` (multiple) | 1 | 0 to 3 | left | 0.2 | Health |
@@ -68,7 +78,7 @@ moved one step at a time is affordable, a jump across the whole range usually is
 | Free school meals | `free_school_meals` (level) | 0, means-tested | 0, 1 all on Universal Credit, 2 all pupils | left | 0.5 | Education |
 | Planning rules | `planning_rules` (level) | 2, as now | 0 very restrictive to 4 very liberal | right | 1.0 | Housing |
 | Social housing programme | `social_housing` (£ a month, 2024 prices) | £0 beyond 2024's | up to £6bn a year | left | 0.6 | Housing |
-| Rent controls | `rent_controls` (level) | 0, none | 0 none, 1 capped rises, 2 strict | left | 1.0 | Housing |
+| Rent controls | `rent_controls` (level) | 0, none | 0 none, 1 capped rises, 2 strict | left | 0.6 (1.0 before S13.7) | Housing |
 | Winter Fuel Payment | `winter_fuel_payment` (level) | 1, means-tested | 0 none, 1 means-tested, 2 universal | left | 1.0 | Welfare |
 | Skilled worker visa salary threshold | `visa_threshold` (£ a year) | £38,700 | £20,000 to £60,000 | right | 0.8 | Foreign and trade |
 
@@ -84,9 +94,12 @@ under 21 drink about a twentieth of it and a higher age cuts theirs by about a q
 judgement), crime by 0.5% (a judgement from the American studies of the drinking age of 21,
 Carpenter and Dobkin, Wagenaar and Toomey, cited only), and through alcohol drunk, alcohol
 harm and some more crime (below). Reactions: the young -0.02 for each year above 18 and
-+0.005 below; drinkers -0.01 above; pensioners +0.005 above and -0.01 below. Measured: at 21,
++0.01 below; drinkers -0.01 above; pensioners +0.005 above and -0.04 below (stage S13.7: below
+18 was +0.005 and -0.01, too little to notice). Measured: at 21,
 crime 1.0% lower after a year and 1.6% after five, alcohol deaths 171 fewer a year after five,
-the young's approval 1.8 points lower and the government's rating 0.5 points.
+the young's approval 1.8 points lower and the government's rating 0.5 points. Measured
+(S13.7): at 16, the rating 0.33 points lower (0.11 before), pensioners' approval 1.3 lower and
+the young's 0.5 higher, crime 1.0% higher.
 
 ### Sentencing
 
@@ -109,9 +122,11 @@ Illegal in 2024. Money: legal sale raises £1bn a year in 2024 prices (a judgeme
 range of published estimates, *estimate*), as a tax on production. Effects: crime 0.5% lower
 when decriminalised and 1.5% when legal (a judgement: less trade for criminal markets; the
 Crime Survey does not count possession itself), healthy life 0.03 years shorter when legal (a
-judgement), over three years. Reactions for each step: the young +0.015, pensioners -0.02,
-parents -0.005. Measured with legal sale from the start: £1.0bn a year, crime 1.5% lower after
-five years, the young's approval 0.7 points higher and pensioners' 0.6 lower.
+judgement), over three years. Reactions for each step: the young +0.045, pensioners -0.06,
+parents -0.015 (stage S13.7: three times the first judgement, +0.015, -0.02 and -0.005).
+Measured with legal sale from the start: £1.0bn a year, crime 1.5% lower after five years.
+Measured (S13.7): legal and taxed, the young's approval 2.1 points higher, pensioners' 1.9
+lower and the rating 0.3 lower (0.12 before); a bill for the whole step costs 41, not 65.
 
 ### Alcohol duty
 
@@ -152,9 +167,13 @@ smoking 9.6% after five years, healthy life 0.15 years longer, referrals 0.4% fe
 2024's rates, £338m in 2023-24 (HMRC, Soft Drinks Industry Levy statistics, *secondary*).
 Levied volume falls by half the levy's proportional rise over a year, as makers cut sugar
 below its thresholds (a judgement; OHID, Sugar reduction in drinks 2015 to 2024, found sugar
-per 100ml down 47% under the levy). Healthy life 0.02 years for each multiple (a judgement).
-Reactions: low incomes and parents -0.005 each for each multiple above 1. Measured at 2: £135m
-more in the first year and almost nothing after five, as drinks are reformulated.
+per 100ml down 47% under the levy). Healthy life 0.06 years for each multiple (a judgement;
+0.02 before stage S13.7, which no figure on the board could show). Reactions: low incomes and
+parents -0.02 each for each multiple above 1, +0.02 below (0.005 before S13.7). Measured at 2:
+£135m more in the first year and almost nothing after five, as drinks are reformulated.
+Measured (S13.7): at 3, the rating 0.41 points lower (0.12 before), low incomes' approval 1.2
+lower, healthy life 0.09 years longer; at 0, the rating 0.21 higher, healthy life 0.04
+shorter.
 
 ### Prescription charge
 
@@ -162,10 +181,12 @@ more in the first year and almost nothing after five, as drinks are reformulated
 https://www.gov.uk/government/news/nhs-prescription-charges-from-1-may-2024), raising about
 £600m a year (the Department's figure, *secondary*), so about 61m items paid for a year. Items
 paid for fall a tenth for each doubling of the charge (a judgement: most who pay hold a
-prepayment certificate). Money in other public receipts. Healthy life 0.03 years shorter for a
-doubling (a judgement: some go without). Reactions: mid-life and low incomes -0.02 each for a
-doubling (most pensioners and children are exempt). Measured at £15: £0.26bn a year more, the
-rating 0.15 points lower.
+prepayment certificate). Money in other public receipts. Healthy life 0.12 years shorter for a
+doubling (a judgement: some go without; 0.03 before stage S13.7). Reactions: mid-life and low
+incomes -0.035 each for a doubling, +0.035 for no charge (most pensioners and children are
+exempt; 0.02 before S13.7). Measured at £15: £0.26bn a year more. Measured (S13.7): free, the
+rating 0.53 points higher (0.30 before), low incomes' approval 1.2 higher, healthy life 0.09
+years longer; at £20, the same the other way.
 
 ### Fuel duty
 
@@ -178,19 +199,25 @@ Dargay and Hanly 2004, cited only). Receipts are the rate on the fuel now bought
 cars from any policy reduce them. Driving is 45% of households' own emissions (a judgement),
 so they fall with fuel bought and with the policies' electric cars on the road. The duty
 passes in full to shop prices (the tax wedge). The electric share of new cars rises half a
-point for 10p (a judgement). Reactions: motorists -0.004 for each penny above 52.95 and
-+0.002 for each penny below (a rise is resented more than a cut is thanked); the young
-+0.0005 a penny. Measured at 62.95: £4.0bn a year more after a year, £3.6bn after five;
+point for 10p (a judgement). Reactions: motorists -0.001 for each penny above 52.95 and
++0.0005 for each penny below (a rise is resented more than a cut is thanked); the young
++0.000125 a penny. Stage S13.7 cut these to a quarter of the first judgement (-0.004, +0.002,
++0.0005), which made fuel duty three to four times as strong as any other policy: abolishing it
+was worth 2.7 points for the whole term, more than a ten-point rise in the basic rate cost at
+the election. Measured at 62.95: £4.0bn a year more after a year, £3.6bn after five;
 households' emissions 1.2% lower after a year and 1.7% after five; consumer inflation 0.06
-points higher for a year; the rating 0.8 points lower.
+points higher for a year. Measured (S13.7): at 0p the rating 1.5 points higher (2.7 before), at
+100p 1.6 lower (3.8 before), the North and Wales most; what is left is mostly what the duty
+does to prices and real incomes, which voters now remember to the election
+(`politics/README.md`).
 
 Stage S13.6: with motorists by region (Groups, below), a 10p rise (52.95 to 62.95 from the
 second month, measured after a year) takes 0.76 points off the government's approval among
 motorists, 0.70 among the rest, 0.75 nationally and 0.67 in London, the least of any place
 in Great Britain (Scotland 0.78, the South 0.70, the Midlands 0.81, the North 0.84, Wales
 0.85). Before, with motorists by income alone, London lost the most of any place (0.87) and
-motorists 0.77 against the rest's 0.71. The reaction is left at -0.004 a penny (a
-judgement): it already carries nearly all of the effect (a standing of -0.031 among
+motorists 0.77 against the rest's 0.71. The reaction was left at -0.004 a penny (a
+judgement, cut to a quarter in stage S13.7, above): it then carried nearly all of the effect (a standing of -0.031 among
 motorists, -0.022 in London), and raising it would widen the gap between motorists and the
 rest only in proportion, since voter types mix motorists with the rest (most types are 70%
 to 95% motorists), while pushing a 10p rise past a point off the national rating.
@@ -217,7 +244,10 @@ first ten months found about 5% more journeys (https://assets.publishing.service
 £2.80 (a judgement), and the cap, on 375m journeys a year, sized so that the £2 cap costs
 about £0.3bn a year (an *estimate*: its cost was not found published), as subsidies. No
 effect on emissions is modelled: the switch from cars is small. Reactions: low incomes and
-the young -0.01 each for each pound above £2. Measured at £1: £0.38bn a year more.
+the young -0.045 each for each 50p above £2, up to the £2.80 the cap replaced (a cap above it
+caps nothing), +0.045 for each 50p below (stage S13.7: 0.01 a pound, with no limit, before).
+Measured at £1: £0.38bn a year more. Measured (S13.7): at £1, the rating 0.38 points higher
+(0.08 before), the young's and low incomes' approval 1.2 to 1.3 higher; at £5, 0.30 lower.
 
 ### Home insulation programme
 
@@ -279,8 +309,12 @@ https://obr.uk/box/alternative-scenarios-for-housebuilding/, *secondary*). House
 investment in homes follows the same factor, so construction and output rise: at very liberal
 (4), homes built 30,000 a year higher and output 0.56% higher after five years, more than the
 OBR's 0.2% because the model has no crowding out of other investment. Reactions: for each
-step toward liberal, home owners -0.01, renters +0.008 and the young +0.005; toward
-restrictive, home owners +0.005, renters -0.008, the young -0.005.
+step toward liberal, home owners -0.005, renters +0.01 and the young +0.005; toward
+restrictive, home owners +0.005, renters -0.008, the young -0.005. Stage S13.7 halved the
+owners' penalty for liberalising (it was -0.01, with renters +0.008), so that the policy with
+the biggest economic effect of its area is no longer a net loss of approval. Measured (S13.7):
+very liberal, the rating 0.14 points higher (0.11 lower before), the young's approval 0.6
+higher; very restrictive, 0.11 lower.
 
 ### Social housing programme
 
@@ -306,9 +340,12 @@ benefits, cutting recipients from about 11.4 million to about 1.5 million and sa
 £1.4bn (as reported, *secondary*; the DWP's own figures were not found). Level 2 pays every
 pensioner, £1.4bn a year more; level 0 pays none, about £0.4bn a year less (an *estimate*),
 as benefits. Pensioners' real incomes on the household records are not changed: the
-records hold no Winter Fuel Payment. Reaction: pensioners +0.04 for paying every pensioner and
--0.04 for paying none (the 2024 means test was much resented). Measured universal: £1.4bn a
-year, pensioners' approval 0.7 points higher.
+records hold no Winter Fuel Payment. Reaction: pensioners +0.09 for paying every pensioner and
+-0.09 for paying none (the 2024 means test was much resented; 0.04 before stage S13.7).
+Measured universal: £1.4bn a year. Measured (S13.7): universal, pensioners' approval 1.5
+points higher and the rating 0.45 higher (0.20 before); none, 1.4 and 0.42 lower. No indicator
+moves: the household records hold no Winter Fuel Payment, so pensioners' incomes and poverty
+do not change (a known limit).
 
 ### Skilled worker visa salary threshold
 

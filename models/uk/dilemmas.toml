@@ -31,6 +31,10 @@
 
 [stream.water_chance]
 
+[stream.fuel_protest_chance]
+
+[stream.small_boats_chance]
+
 # ---------------------------------------------------------------- the pay round
 
 [dilemma.pay_claim]
@@ -63,7 +67,9 @@ effect = { treatments = "{base} * 0.9", service_target = "select(coord(function)
 label = "NHS winter crisis"
 doc = "The waiting list is the longest there has ever been, ambulances queue outside hospitals and the NHS asks for emergency help"
 start = "waiting_list > record_waiting_list and months_elapsed >= 9"
-again_after = 12
+# Stage S13.7: two years before it comes again (it was one), so a record list is not the
+# same question every winter.
+again_after = 24
 
 [[dilemma.nhs_winter.option]]
 name = "fund"
@@ -222,7 +228,8 @@ effect = { government_standing = "{base} - select(type_age == 4, 0.02, 0.0)" }
 label = "Prisons are full"
 doc = "Prisons have run out of places; courts are told to delay sentences"
 start = "service_level[function: public_order] < 0.99 and months_elapsed >= 6"
-again_after = 18
+# Stage S13.7: two years before it comes again (it was eighteen months).
+again_after = 24
 
 [[dilemma.prisons_full.option]]
 name = "release"
@@ -315,3 +322,58 @@ label = "Drop the 2050 target"
 doc = "Voters under 35 turn against the government for two years; some of 65 and over approve"
 months = 24
 effect = { government_standing = "{base} - select(type_age <= 1, 0.05, 0.0) + select(type_age == 4, 0.01, 0.0)" }
+
+# ---------------------------------------------------------------- stage S13.7: two more chances
+# Questions that can come from 2028, the year the playtest found emptiest
+# (docs/S13-BALANCE.md), each tied to a policy and an indicator of stage S13.5.
+
+[dilemma.fuel_protest]
+label = "Fuel protests"
+doc = "With pump prices high, hauliers and farmers blockade refineries and slow-drive on the motorways; filling stations start to run dry"
+start = "months_elapsed >= 36 and rand(fuel_protest_chance) < select(fuel_duty > fuel_duty_2024, 0.2, 0.1)"
+
+[[dilemma.fuel_protest.option]]
+name = "cut"
+label = "Cut fuel duty by 5p for a year"
+doc = "Fuel duty receipts fall about £2.3bn over the year and pump prices with them; motorists are grateful while it lasts"
+months = 12
+effect = { fuel_duty_change = "{base} - round(fuel_litres * 5.0 * fuel_duty_penny * fuel_volume)", government_standing = "{base} + 0.02 * group_member[group: motorists]" }
+
+[[dilemma.fuel_protest.option]]
+name = "rebate"
+label = "A rebate for rural drivers"
+doc = "Subsidies 2% higher for a year, about £0.8bn; motorists think a little better of the government"
+months = 12
+effect = { subsidies = "round({base} * 1.02)", government_standing = "{base} + 0.01 * group_member[group: motorists]" }
+
+[[dilemma.fuel_protest.option]]
+name = "hold"
+label = "Hold firm"
+doc = "The blockades last a month: households spend 1% less while they do, and motorists hold it against the government for six months"
+months = 6
+effect = { consumption = "round({base} * select(fuel_protest_age < 1, 0.99, 1.0))", government_standing = "{base} - 0.02 * group_member[group: motorists]" }
+
+[dilemma.small_boats]
+label = "Small boats"
+doc = "A summer of calm weather brings record numbers across the Channel in small boats; the asylum hotels are full and the papers ask what the government will do"
+start = "months_elapsed >= 36 and rand(small_boats_chance) < 0.1"
+
+[[dilemma.small_boats.option]]
+name = "patrols"
+label = "More patrols and faster decisions"
+doc = "Procurement 0.2% higher, about £0.7bn a year, for two years; voters of 50 and over approve for a year"
+effect = { procurement = "round({base} * select(small_boats_age < 24, 1.002, 1.0))", government_standing = "{base} + select(small_boats_age < 12 and type_age >= 3, 0.01, 0.0)" }
+
+[[dilemma.small_boats.option]]
+name = "offshore"
+label = "Process claims abroad"
+doc = "A deal with another country: procurement 0.3% higher, about £1bn a year, for two years; voters of 65 and over approve, voters under 35 do not"
+months = 24
+effect = { procurement = "round({base} * 1.003)", government_standing = "{base} + select(type_age == 4, 0.02, 0.0) - select(type_age <= 1, 0.02, 0.0)" }
+
+[[dilemma.small_boats.option]]
+name = "routes"
+label = "Open safe and legal routes"
+doc = "Fewer risk the crossing, but net migration is about 30,000 a year higher for two years; voters of 50 and over are angry, the young approve"
+months = 24
+effect = { policy_migration_factor = "{base} + 30.0 * visa_migration_scale / (year * per_step(sum(net_migration, region)))", government_standing = "{base} - select(type_age >= 3, 0.03, 0.0) + select(type_age <= 1, 0.01, 0.0)" }

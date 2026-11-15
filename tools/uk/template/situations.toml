@@ -123,3 +123,45 @@ doc = "The NHS waiting list is more than 5% shorter than at the end of 2024"
 good = true
 start = "waiting_list < round(0.95 * waiting_list_2024)"
 end = "waiting_list > round(0.97 * waiting_list_2024)"
+
+# ---- Stage S13.7: the indicators of stage S13.5 (policies.toml), with thresholds away from
+# their 2024 levels, so that none is on at the start and each comes and goes with policy:
+# with policy unchanged crime rises about 1.3% and healthy life falls about 0.16 years by the
+# 2029 election, short of both.
+
+[situation.crime_wave]
+label = "Crime wave"
+doc = "Crime is more than 2% above its 2024 level (9.2 million incidents a year)"
+start = "crime_incidents > 1.02 * crime_2024"
+end = "crime_incidents < 1.015 * crime_2024"
+
+[situation.healthy_life_falling]
+label = "Healthy life expectancy falling"
+doc = "Healthy life expectancy is more than 0.2 years below its 2022-24 level of 60.8 years"
+start = "healthy_life_expectancy < hle_2024 - 0.2 * hle_year"
+end = "healthy_life_expectancy > hle_2024 - 0.1 * hle_year"
+
+[situation.housing_shortage]
+label = "Housing shortage"
+doc = "Fewer than about 203,000 homes a year are being built in England, 8% fewer than in 2023-24 (221,070)"
+start = "homes_built < 0.92 * homes_built_2024"
+end = "homes_built > 0.96 * homes_built_2024"
+
+[situation.building_boom]
+label = "House-building boom"
+doc = "More than about 236,500 homes a year are being built in England, 7% more than in 2023-24 (221,070)"
+good = true
+start = "homes_built > 1.07 * homes_built_2024"
+end = "homes_built < 1.04 * homes_built_2024"
+
+[situation.migration_high]
+label = "Net migration high"
+doc = "Net migration is more than 8% above its level of the year to mid-2024 (739,000), about 800,000 a year"
+start = "policy_migration_factor > 1.08"
+end = "policy_migration_factor < 1.04"
+
+[situation.migration_falling]
+label = "Net migration falling"
+doc = "Net migration is more than 12% below its level of the year to mid-2024, under about 650,000 a year"
+start = "policy_migration_factor < 0.88"
+end = "policy_migration_factor > 0.92"

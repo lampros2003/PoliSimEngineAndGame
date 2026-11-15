@@ -59,6 +59,14 @@ fn parse_value(text: &str) -> Option<RawValue> {
     }
 }
 
+/// Stage S13.7: schedules a lever change for `step` as the game's `Session::set_lever` does: a
+/// lever changed again in the same step moves to the end, so a step's bills are voted and
+/// charged in the order they were last made, as in the game.
+fn schedule(commands: &mut Vec<(u64, String, RawValue)>, step: u64, lever: &str, raw: RawValue) {
+    commands.retain(|(at, name, _)| !(*at == step && name == lever));
+    commands.push((step, lever.to_string(), raw));
+}
+
 struct Session {
     sim: Simulation,
     scenario: Scenario,
@@ -192,7 +200,7 @@ impl Session {
             Ok(value) => {
                 let d = self.sim.model().sym(lever).expect("checked");
                 println!("{lever} will be {} from the next step", display(&value, d.money, self.sim.model().minor));
-                self.commands.push((self.sim.steps_done(), lever.to_string(), raw));
+                schedule(&mut self.commands, self.sim.steps_done(), lever, raw);
                 self.sim.set_commands(self.commands.clone());
             }
             Err(error) => println!("not changed: {error}"),
@@ -266,5 +274,53 @@ pub fn play(scenario: Scenario, seed: Option<u64>, resume: Option<Vec<u8>>) -> R
             ["quit" | "exit" | "q"] => return Ok(()),
             _ => println!("not understood; type `help`"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use polisim_core::{RawValue, Simulation, load_scenario};
+
+    use super::schedule;
+
+    /// Stage S13.7: the runner charges a month's bills in the order the game does. Changing
+    /// the electric car grant, then sentencing, then the grant again leaves capital for only
+    /// one of the two bills: the game takes sentencing first (the grant was last made), and so
+    /// must the runner.
+    #[test]
+    fn bills_are_charged_in_the_order_the_game_charges_them() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/uk/scenarios/2025.toml");
+        let made = [
+            ("ev_grant", RawValue::Integer(2500)),
+            ("sentencing", RawValue::Integer(4)),
+            ("ev_grant", RawValue::Integer(2000)),
+        ];
+
+        let mut game = polisim_core::Session::open(&path).unwrap();
+        for (lever, raw) in &made {
+            game.set_lever(lever, raw.clone()).unwrap();
+        }
+        game.step().unwrap();
+        let passed = |lever: &str, changes: &[(String, bool)]| changes.iter().any(|(l, p)| l == lever && *p);
+        let mut game_changes: Vec<(String, bool)> =
+            game.changes().iter().map(|c| (c.lever.clone(), c.passed)).collect();
+        game_changes.sort();
+
+        let scenario = load_scenario(&path).unwrap();
+        let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
+        let mut commands = scenario.commands.clone();
+        for (lever, raw) in &made {
+            schedule(&mut commands, 0, lever, raw.clone());
+        }
+        sim.set_commands(commands);
+        sim.step().unwrap();
+        let mut runner_changes: Vec<(String, bool)> = sim.votes().iter().map(|v| (v.lever.clone(), v.passed)).collect();
+        runner_changes.sort();
+
+        assert!(passed("sentencing", &game_changes) && !passed("ev_grant", &game_changes), "{game_changes:?}");
+        assert_eq!(runner_changes, game_changes);
     }
 }

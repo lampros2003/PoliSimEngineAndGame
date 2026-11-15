@@ -34,7 +34,7 @@ ellipse that reads from the outside in, from what you control to the people it r
 | Outer rim | **Policies**, as discs, in arcs by area: Economy, Tax, Welfare, Health, Education, Law and order, Transport, Environment and energy, Housing, Foreign and trade. The area's name is set along the rim |
 | Middle | **Indicators**, as rings: the figures your policies move, in the sector of their area (in two rows where the sector is crowded). They run from GDP and unemployment to crime, school results and electric car sales |
 | Inner band | **Groups** of voters, as shields: the young, pensioners, low incomes, parents, Scotland, motorists and so on, 23 in six families (ages, incomes, work, families, places, ways of life). A group is drawn larger the bigger its share of the electorate |
-| Centre | The government: its approval (the poll rating), the months to the election and your political capital. Click it to open Parliament |
+| Centre | The government: its approval (your party's poll rating), the months to the election and your political capital. Click it to open Parliament |
 | Corners | **Flags** for the situations in force (a recession, a record waiting list), each with the month it began, and for questions put to you and your answers while they last (beside the centre, on a board without groups) |
 
 Size says importance: nodes come in three sizes, and the biggest are the ones that matter
@@ -85,9 +85,13 @@ you ever govern without a majority of your own, a bill can fail. The popup tells
 vote before you commit: "The Commons would pass this", with the count of votes for and against.
 
 Every bill also costs **political capital**: 5 for any bill, and up to 60 more the further
-it moves a policy across its range, scaled by a weight each policy has (a point on
-the basic rate costs 5.6). You start with 40 and earn some back each month, more while your
-poll rating is high and in the first year of a parliament, up to 100. Your capital is shown
+it moves a policy across its range, scaled by a weight each policy has: the big spending
+lines (the NHS, schools, social care, police, pensions and benefits, public investment) weigh
+3 and the main tax rates (the basic rate, VAT, National Insurance, corporation tax) 2, so a
+point on the basic rate costs 6.2 and a quarter off the NHS 27.5. You start with 40 and earn
+1.5 a month, up to 5 more the higher your own party's poll rating (nothing extra at 20% or
+below, all of it at 40%; in a coalition only your party's rating counts) and 2 more in the
+first year of a parliament, up to 100: about 4 a month at 30%. Your capital is shown
 at the centre of the board and, on a wide window, in the top bar. The popup says what the
 bill costs and what the bills already waiting will cost; a bill that costs more than is
 left when its turn comes is not put to the Commons, and the game tells you.
@@ -228,8 +232,8 @@ Both are kept between games.
 1. **Raise fuel duty by 10p** (Transport, Fuel duty: type 62.95). The bill costs about 12
    political capital. In a year public receipts are up by about £4bn a year, less than the
    rise alone would give, because drivers buy less fuel; household emissions fall by about 1%; consumer inflation is a
-   little higher for the year and the government's rating about 0.8 points lower. Motorists
-   are the group that turns against you most. Point at Fuel duty to see its links.
+   little higher for the year and the government's rating about 0.3 points lower. Motorists
+   turn against you a little more than the country does, London least. Point at Fuel duty to see its links.
 2. **Introduce an electric car grant** (Transport, **New policy**, Electric car grant:
    set £3,000 a car). It costs about £1.8bn in the first year, and in a year the
    electric share of new cars about 2.6 points higher. Put it to the Commons, play a month,

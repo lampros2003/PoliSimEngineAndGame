@@ -67,7 +67,9 @@ def change(name: str, column: str) -> float:
 
 class Neutral(unittest.TestCase):
     def test_every_policy_at_its_default_gives_the_recorded_hashes(self):
-        sim = Simulation(model(), seed=SEED, levers={k: spec["default"] for k, spec in LEVERS.items()})
+        # Stage S13.7: with the scenario's own parameters (its wear of office), as recorded.
+        params = tomllib.loads((UK / "scenarios" / "2025.toml").read_text(encoding="utf-8"))["params"]
+        sim = Simulation(model(), seed=SEED, params=params, levers={k: spec["default"] for k, spec in LEVERS.items()})
         with open(UK / "golden" / "2025.hashes.csv", newline="", encoding="utf-8") as handle:
             golden = [row["hash"] for row in csv.DictReader(handle)][:3]
         self.assertEqual([row["hash"] for row in sim.run(3)], golden)

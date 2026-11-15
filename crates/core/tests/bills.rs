@@ -133,11 +133,12 @@ fn a_game_refuses_a_bill_it_cannot_pay_for_and_keeps_it_through_a_save() {
     let mut session = Session::open(&path).unwrap();
     session.step().unwrap();
     let Some(Val::F(capital)) = session.latest("political_capital") else { panic!("no political capital") };
-    session.set_lever("basic_rate", Value::Float(0.8)).unwrap();
-    session.set_lever("vat_rate", Value::Float(0.5)).unwrap();
+    session.set_lever("basic_rate", Value::Float(0.5)).unwrap();
+    session.set_lever("vat_rate", Value::Float(0.35)).unwrap();
     session.step().unwrap();
     let changes = session.changes();
-    // 5 + 60 * 0.6 / 1 and 5 + 60 * 0.3 / 0.5: 41 each, against about 45 to spend.
+    // Stage S13.7: both rates weigh 2. 5 + 60 * 2 * 0.3 / 1 and 5 + 60 * 2 * 0.15 / 0.5: 41
+    // each, against about 47 to spend.
     let find = |lever: &str| changes.iter().find(|c| c.lever == lever).unwrap();
     let (first, second) = (find("basic_rate"), find("vat_rate"));
     assert!((first.lever.as_str(), first.passed, first.refused) == ("basic_rate", true, false), "{first:?}");

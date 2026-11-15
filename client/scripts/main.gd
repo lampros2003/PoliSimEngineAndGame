@@ -702,7 +702,18 @@ func _headline_keys() -> Array:
 	var keys: Array = play.get("headline", [])
 	if keys.is_empty():
 		keys = play.get("watch", [])
-	return keys.slice(0, 6)
+	# Stage S13.7: the top bar's approval is the player's own bloc's rating when there is one.
+	var support := str(play.get("politics", {}).get("support", ""))
+	var approval := _approval_key()
+	return keys.slice(0, 6).map(func(k: Variant) -> Variant: return approval if support != "" and str(k) == support else k)
+
+
+## Stage S13.7: the approval the centre and the top bar show: the player's own bloc's rating
+## when the scenario names one ([play.politics] `own`), else the governing blocs' (`support`).
+func _approval_key() -> String:
+	var settings: Dictionary = play.get("politics", {})
+	var own := str(settings.get("own", ""))
+	return own if own != "" and not _key_entry(own).is_empty() else str(settings.get("support", ""))
 
 
 ## A headline key is a row name, optionally with "-" in front to show it negated.
@@ -714,6 +725,9 @@ func _key_label(key: String) -> String:
 	var labels: Dictionary = play.get("labels", {})
 	if labels.has(key):
 		return str(labels[key])
+	var support := str(play.get("politics", {}).get("support", ""))
+	if key == _approval_key() and labels.has(support):
+		return str(labels[support])  # stage S13.7: the own bloc's rating keeps the name "Approval"
 	return str(_key_entry(key).get("label", key))
 
 
@@ -847,12 +861,12 @@ func _show_capital() -> float:
 	return float(now)
 
 
-## The centre of the board: the government's approval (the poll rating named in
+## The centre of the board: the government's approval (the own bloc's or the poll rating named in
 ## [play.politics]; for a model without politics, the first headline figure), the months to
 ## the election and the political capital.
 func _show_centre(capital: float) -> void:
 	var settings: Dictionary = play.get("politics", {})
-	var key := str(settings.get("support", ""))
+	var key := _approval_key()
 	var title := "APPROVAL"
 	if key == "" or _key_entry(key).is_empty():
 		var keys := _headline_keys()

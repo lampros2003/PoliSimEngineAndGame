@@ -312,17 +312,26 @@ end, each with a start and an end so it does not flicker:
 | On track for net zero (good, S8.2) | more than 2% below the path | above it |
 | Record NHS waiting list (S9.0) | longer than the record, 7.77 million in September 2023 | 1% below it |
 | NHS waiting list falling (good, S9.0) | more than 5% shorter than at the end of 2024 | less than 3% shorter |
+| Crime wave (S13.7) | crime more than 2% above 2024's 9.2 million incidents a year | less than 1.5% above |
+| Healthy life expectancy falling (S13.7) | more than 0.2 years below 2022-24's 60.8 | less than 0.1 below |
+| Housing shortage (S13.7) | fewer than about 203,000 homes built a year, 8% below 2023-24's 221,070 | more than about 212,000 |
+| House-building boom (good, S13.7) | more than about 236,500, 7% above | fewer than about 230,000 |
+| Net migration high (S13.7) | more than 8% above the year to mid-2024's 739,000 | less than 4% above |
+| Net migration falling (S13.7) | more than 12% below it | less than 8% below |
 
 With policy unchanged, debt passes 100% of GDP in the 18th month, emissions move above
 their path in the 16th, the waiting list passes its record in the 30th and the health
-service falls below 95% in the 55th. Cutting purchases of goods and services by a quarter brings a recession at
+service falls below 95% in the 55th. Stage S13.7's six (the indicators of `policies.toml`) are
+off with policy unchanged, which by the 2029 election raises crime 1.3% and takes 0.16 years
+off healthy life; a tenth off the police, very restrictive planning, a £20,000 or £60,000 visa
+threshold, or very liberal planning with a social housing programme each turn one on. Cutting purchases of goods and services by a quarter brings a recession at
 once and high unemployment from the sixth month, both over within two years. (That was
 written when purchases were one lever; with spending by function, cutting health spending by
 a third does the same, with unemployment above 6% at once.)
 
 ## Dilemmas (stage S9.2)
 
-`dilemmas.toml` puts twelve questions to the government (model format 1's dilemmas: each
+`dilemmas.toml` puts fourteen questions to the government (model format 1's dilemmas: each
 opens when its start holds, waits for an answer, and each answer changes formulas the model
 already has). Every size is a judgement. Costs are shares of an existing payment: 1% of
 procurement is about £3.3bn a year, of public investment £1.4bn, of subsidies £0.4bn, of
@@ -334,24 +343,28 @@ more in office.
 | Dilemma | Opens | Answers |
 |---|---|---|
 | Public sector pay claim | July 2025's pay round (the end of the sixth month) | Meet it: pay 4% higher for good. Offer half: 2% for good, 5% fewer treatments for three months. Hold to the plans: a tenth fewer treatments and schools 5% worse for six months, standing -0.01 |
-| NHS winter crisis | the waiting list above its record, from the tenth month; again a year after an answer | Emergency funding: 1% more procurement and 5% more treatments for six months. Private hospitals: 0.5% and 3% for a year. Ride it out: standing -0.04 over 65, -0.02 50 to 64, for six months |
+| NHS winter crisis | the waiting list above its record, from the tenth month; again two years after an answer (a year before stage S13.7) | Emergency funding: 1% more procurement and 5% more treatments for six months. Private hospitals: 0.5% and 3% for a year. Ride it out: standing -0.04 over 65, -0.02 50 to 64, for six months |
 | A bank in trouble | a recession with unemployment above 5.5% | Rescue: subsidies doubled for six months, standing -0.02 for two years. Protect savers only: business investment 7% lower for six months. Let it fail: business investment 15% and consumption 2% lower, standing -0.02 among those in work, for nine months |
 | Steelworks to close | a 3% chance a month from the eleventh, 15% while growth is below 1% | Subsidise: 5% more subsidies for two years, standing +0.02 in Wales and Yorkshire. Nationalise: 3% more public investment for a year, +0.04 there and -0.01 for the richest fifth, for two years. Let it close: exports 0.3% lower for good, -0.05 in Wales and Yorkshire for two years |
 | A chip maker looks for a site | 2% a month from the fourth | A grant: 2% more subsidies for two years, business investment 1% and exports 0.2% higher for good. Nothing special: nothing |
 | Energy prices jump | 1.5% a month from the seventh; again three years after an answer | Cap bills: subsidies up half and inflation 0.5 points a year higher for six months. Help poorer households: benefits 2% higher, inflation 3 points, standing +0.01 for the poorest two fifths. Let prices rise: inflation 3 points, standing -0.02 |
 | A water company fails | 1% a month from the thirteenth | Special administration: public investment 1% higher for a year. Customers pay: inflation 0.1 points higher and standing -0.01 for a year |
 | Allies ask for more on defence | the alliance summit, June 2026 | Pledge: 1% more procurement for good, standing +0.01 over 50 for a year. Current plans: -0.02 over 65 for a year |
-| Prisons are full | police, courts and prisons below 99% of their first month's service, from the seventh; again 18 months after | Early release: -0.03 over 50 for a year. Emergency places: public investment 0.5% higher and the service 3% better for a year. Community sentences: the service 2% better, -0.01 over 65 |
+| Prisons are full | police, courts and prisons below 99% of their first month's service, from the seventh; again two years after (18 months before stage S13.7) | Early release: -0.03 over 50 for a year. Emergency places: public investment 0.5% higher and the service 3% better for a year. Community sentences: the service 2% better, -0.01 over 65 |
 | Universities near bankruptcy | 3% a month from the tenth | Emergency money: 0.2% more procurement for two years. Higher fees: -0.03 under 35 for two years. Mergers and closures: exports 0.2% lower for good, -0.02 under 25 for a year |
 | Floods in the north | 1% a month from the third; again two years after | Repairs and defences: public investment 2% higher, +0.02 in the north of England, for a year. Leave it to councils: -0.04 there for a year |
 | Off track for net zero | emissions above their path, from the nineteenth month | The committee's plan: 0.2% more procurement and emissions per pound falling 1.2% a year faster, for good, +0.02 under 35 for a year. Later: -0.02 under 35 for a year. Drop the target: -0.05 under 35, +0.01 over 65, for two years |
+| Fuel protests (S13.7) | 10% a month from January 2028, 20% while fuel duty is above 2024's | Cut fuel duty 5p for a year: about £2.3bn, +0.02 among motorists for the year. A rebate for rural drivers: 2% more subsidies for a year, +0.01 among motorists. Hold firm: households spend 1% less for a month, -0.02 among motorists for six months |
+| Small boats (S13.7) | 10% a month from January 2028 | More patrols and faster decisions: 0.2% more procurement for two years, +0.01 over 50 for a year. Process claims abroad: 0.3% more procurement, +0.02 over 65 and -0.02 under 35, for two years. Safe and legal routes: net migration 30,000 a year higher, -0.03 over 50 and +0.01 under 35, for two years |
 
 The chances draw from random streams of their own, so a game's seed decides when they come:
 with the 2025 scenario's seed and policy unchanged, nine open in five years (the pay claim
 in the sixth month, the steelworks in the eleventh, the summit, prisons and net zero in the
 seventeenth and eighteenth, the chip maker in the nineteenth, energy prices in the twenty-
 sixth, the NHS winter crisis in the thirtieth and floods in the thirty-second); the bank
-needs a slump. `crates/core/tests/uk_dilemmas.rs` gives every answer and checks that each
+needs a slump. Since stage S13.7, answering each with its first answer, thirteen come by
+the July 2029 election: those nine, prisons again in June 2028, fuel protests in January
+2028, small boats in March 2029 and the NHS winter crisis again in July 2029. `crates/core/tests/uk_dilemmas.rs` gives every answer and checks that each
 element it names moves the way its text says.
 
 ## Known weaknesses

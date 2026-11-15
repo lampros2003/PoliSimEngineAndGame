@@ -58,7 +58,7 @@ unit = "1"
 default = 0
 range = [0, 2]
 leaning = "left"
-capital_weight = 1.0
+capital_weight = 0.6
 doc = "Cannabis is illegal (0, as in 2024), decriminalised for personal use (1), or legal, sold under licence and taxed (2). Legal sale raises about £1bn a year and takes some trade from criminal markets; older voters dislike it."
 
 [param.prison_population_2024]
@@ -440,12 +440,12 @@ value = 1.0
 
 [state.hle_other]
 label = "Healthy life: other policies"
-doc = "Years of healthy life from the soft drinks levy, prescription charges and cannabis law, following them over about three years (judgements: 0.02 years for each multiple of the levy; 0.03 lost when the charge doubles; 0.03 lost with legal cannabis)"
+doc = "Years of healthy life from the soft drinks levy, prescription charges and cannabis law, following them over about three years (judgements: 0.06 years for each multiple of the levy; 0.12 lost when the charge doubles; 0.03 lost with legal cannabis; stage S13.7: the levy's was 0.02 and the charge's 0.03, too small to show)"
 type = "real"
 unit = "year"
 phase = "accounts"
 initial = 0.0
-next = "hle_other + ((0.02 * (sugar_levy - 1.0) - 0.03 * (prescription_charge / prescription_charge_2024 - 1.0) - select(cannabis_law == 2, 0.03, 0.0)) * hle_year - hle_other) / 36.0"
+next = "hle_other + ((0.06 * (sugar_levy - 1.0) - 0.12 * (prescription_charge / prescription_charge_2024 - 1.0) - select(cannabis_law == 2, 0.03, 0.0)) * hle_year - hle_other) / 36.0"
 
 [var.healthy_life_expectancy]
 label = "Healthy life expectancy"
@@ -928,7 +928,7 @@ unit = "1"
 default = 0
 range = [0, 2]
 leaning = "left"
-capital_weight = 1.0
+capital_weight = 0.6
 doc = "Limits on private rents: none (0, England in 2024), rises capped each year (1), or strict limits (2). Renters welcome them; landlords build and let fewer homes."
 
 [param.homes_built_2024]
@@ -1152,12 +1152,12 @@ value = 83333333.33
 # unemployment in its region.
 
 [var.standing_drinking_age]
-doc = "The young: -0.02 for each year above 18, +0.005 below; drinkers -0.01 above; pensioners +0.005 above, -0.01 below"
+doc = "The young: -0.02 for each year above 18, +0.01 below; drinkers -0.01 above; pensioners +0.005 above, -0.04 below (stage S13.7: below 18 was +0.005 and -0.01)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "group_member[group: young] * (0.005 * max(18 - drinking_age, 0) - 0.02 * max(drinking_age - 18, 0)) - group_member[group: drinkers] * 0.01 * max(drinking_age - 18, 0) + group_member[group: pensioner] * (0.005 * max(drinking_age - 18, 0) - 0.01 * max(18 - drinking_age, 0))"
+expr = "group_member[group: young] * (0.01 * max(18 - drinking_age, 0) - 0.02 * max(drinking_age - 18, 0)) - group_member[group: drinkers] * 0.01 * max(drinking_age - 18, 0) + group_member[group: pensioner] * (0.005 * max(drinking_age - 18, 0) - 0.04 * max(18 - drinking_age, 0))"
 
 [var.standing_sentencing]
 doc = "Pensioners +0.01 for each step tougher, the young -0.01"
@@ -1168,12 +1168,12 @@ dims = ["voter_type"]
 expr = "(group_member[group: pensioner] - group_member[group: young]) * 0.01 * (sentencing - 2)"
 
 [var.standing_cannabis]
-doc = "For each step toward legal sale: the young +0.015, pensioners -0.02, parents -0.005"
+doc = "For each step toward legal sale: the young +0.045, pensioners -0.06, parents -0.015 (stage S13.7: three times the first judgement)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "(0.015 * group_member[group: young] - 0.02 * group_member[group: pensioner] - 0.005 * group_member[group: parents]) * cannabis_law"
+expr = "(0.045 * group_member[group: young] - 0.06 * group_member[group: pensioner] - 0.015 * group_member[group: parents]) * cannabis_law"
 
 [var.standing_alcohol_duty]
 doc = "Drinkers -0.04 for each multiple of the 2024 duty above it, +0.04 below"
@@ -1192,28 +1192,28 @@ dims = ["voter_type"]
 expr = "0.0 - 0.06 * group_member[group: smokers] * (tobacco_duty - 1.0)"
 
 [var.standing_sugar_levy]
-doc = "Low incomes and parents -0.005 each for each multiple of the 2024 levy above it"
+doc = "Low incomes and parents -0.02 each for each multiple of the 2024 levy above it, +0.02 below (stage S13.7: was 0.005)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 - 0.005 * (group_member[group: low_income] + group_member[group: parents]) * (sugar_levy - 1.0)"
+expr = "0.0 - 0.02 * (group_member[group: low_income] + group_member[group: parents]) * (sugar_levy - 1.0)"
 
 [var.standing_prescription_charge]
-doc = "Mid-life and low incomes -0.02 each for a doubling of the charge (most pensioners and children are exempt)"
+doc = "Mid-life and low incomes -0.035 each for a doubling of the charge, +0.035 for none (most pensioners and children are exempt; stage S13.7: was 0.02)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 - 0.02 * (group_member[group: midlife] + group_member[group: low_income]) * (prescription_charge / prescription_charge_2024 - 1.0)"
+expr = "0.0 - 0.035 * (group_member[group: midlife] + group_member[group: low_income]) * (prescription_charge / prescription_charge_2024 - 1.0)"
 
 [var.standing_fuel_duty]
-doc = "Motorists -0.004 for each penny above 52.95, +0.002 for each penny below (a rise is resented more than a cut is thanked); the young +0.0005 a penny"
+doc = "Motorists -0.001 for each penny above 52.95, +0.0005 for each penny below (a rise is resented more than a cut is thanked); the young +0.000125 a penny (stage S13.7: a quarter of the first judgement, which made fuel duty three to four times as strong as any other policy)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "group_member[group: motorists] * (0.002 * max(fuel_duty_2024 - fuel_duty, 0.0) - 0.004 * max(fuel_duty - fuel_duty_2024, 0.0)) / fuel_duty_penny + group_member[group: young] * 0.0005 * (fuel_duty - fuel_duty_2024) / fuel_duty_penny"
+expr = "group_member[group: motorists] * (0.0005 * max(fuel_duty_2024 - fuel_duty, 0.0) - 0.001 * max(fuel_duty - fuel_duty_2024, 0.0)) / fuel_duty_penny + group_member[group: young] * 0.000125 * (fuel_duty - fuel_duty_2024) / fuel_duty_penny"
 
 [var.standing_ev_grant]
 doc = "For each £1,000 a car: the young +0.005, motorists +0.002"
@@ -1224,12 +1224,12 @@ dims = ["voter_type"]
 expr = "(0.005 * group_member[group: young] + 0.002 * group_member[group: motorists]) * 3.0 * (ev_grant / ev_grant_reference)"
 
 [var.standing_bus_fare_cap]
-doc = "Low incomes and the young -0.01 each for each pound above £2, +0.01 below"
+doc = "Low incomes and the young -0.045 each for each 50p above £2, up to the £2.80 the cap replaced (a cap above it caps nothing), +0.045 for each 50p below (stage S13.7: was 0.01, with no limit)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 - 0.01 * (group_member[group: low_income] + group_member[group: young]) * (bus_fare_cap / bus_fare_cap_2024 - 1.0) * 2.0"
+expr = "0.0 - 0.045 * (group_member[group: low_income] + group_member[group: young]) * (min(bus_fare_cap, bus_fare_uncapped) / bus_fare_cap_2024 - 1.0) * 2.0"
 
 [var.standing_insulation]
 doc = "For each £1bn a year: low incomes +0.008, the young +0.005"
@@ -1264,12 +1264,12 @@ dims = ["voter_type"]
 expr = "(0.01 * group_member[group: parents] + 0.02 * group_member[group: lone_parents] - 0.003 * group_member[group: high_income]) * free_school_meals"
 
 [var.standing_planning]
-doc = "For each step toward liberal: home owners -0.01, renters +0.008, the young +0.005; toward restrictive: home owners +0.005, renters -0.008, the young -0.005"
+doc = "For each step toward liberal: home owners -0.005, renters +0.01, the young +0.005; toward restrictive: home owners +0.005, renters -0.008, the young -0.005 (stage S13.7: liberal was owners -0.01 and renters +0.008, a net loss of approval)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "group_member[group: home_owners] * (0.005 * max(2 - planning_rules, 0) - 0.01 * max(planning_rules - 2, 0)) + (0.008 * group_member[group: renters] + 0.005 * group_member[group: young]) * (planning_rules - 2)"
+expr = "group_member[group: home_owners] * (0.005 * max(2 - planning_rules, 0) - 0.005 * max(planning_rules - 2, 0)) + group_member[group: renters] * (0.01 * max(planning_rules - 2, 0) - 0.008 * max(2 - planning_rules, 0)) + 0.005 * group_member[group: young] * (planning_rules - 2)"
 
 [var.standing_social_housing]
 doc = "For each £1bn a year: renters +0.01, low incomes +0.005"
@@ -1288,12 +1288,12 @@ dims = ["voter_type"]
 expr = "(0.03 * group_member[group: renters] - 0.01 * group_member[group: home_owners] - 0.005 * group_member[group: self_employed]) * rent_controls"
 
 [var.standing_winter_fuel]
-doc = "Pensioners +0.04 for paying every pensioner, -0.04 for paying none, against the means test"
+doc = "Pensioners +0.09 for paying every pensioner, -0.09 for paying none, against the means test (stage S13.7: was 0.04)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.04 * group_member[group: pensioner] * (winter_fuel_payment - 1)"
+expr = "0.09 * group_member[group: pensioner] * (winter_fuel_payment - 1)"
 
 [var.standing_visa_threshold]
 doc = "For each £10,000 above £38,700: pensioners +0.01, the young -0.01, the self-employed -0.005"

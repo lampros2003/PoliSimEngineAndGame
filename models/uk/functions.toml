@@ -41,6 +41,7 @@ default = 21654938439
 range = [0, 43309876878]
 leaning = "left"
 doc = "The NHS and other health services: their staff and what they buy, in 2024 prices; its pay and purchases keep their 2024 split (HM Treasury, PESA 2025)"
+capital_weight = 3
 
 [lever.spending_education]
 label = "Education"
@@ -51,6 +52,7 @@ default = 10895455885
 range = [0, 21790911770]
 leaning = "left"
 doc = "Schools, colleges, universities and the rest of education, in 2024 prices; its pay and purchases keep their 2024 split (HM Treasury, PESA 2025)"
+capital_weight = 3
 
 [lever.spending_defence]
 label = "Defence"
@@ -71,6 +73,7 @@ default = 4533814685
 range = [0, 9067629370]
 leaning = "left"
 doc = "Public order and safety: the police, fire services, courts and prisons, in 2024 prices; its pay and purchases keep their 2024 split (HM Treasury, PESA 2025)"
+capital_weight = 3
 
 [lever.spending_transport]
 label = "Transport"
@@ -91,6 +94,7 @@ default = 4549904660
 range = [0, 9099809320]
 leaning = "left"
 doc = "Adult and children's social care and the other services of social protection (not benefits, which are separate), in 2024 prices; its pay and purchases keep their 2024 split (HM Treasury, PESA 2025)"
+capital_weight = 3
 
 [lever.spending_environment_housing]
 label = "Environment and housing"

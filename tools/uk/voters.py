@@ -670,6 +670,17 @@ low = {a["tenure_effect"]["low"]!r}
 central = {a["tenure_effect"]["central"]!r}
 high = {a["tenure_effect"]["high"]!r}
 
+# Stage S13.7: a scenario's own judgement of how fast its government wears, on top of the
+# time in office above: per year in office beyond the six months the government had held
+# office in the base month (and, after a change of government, beyond its first six), so the
+# base month and the fitted intercepts do not move. Nothing in the model itself; the 2025
+# scenario sets it (models/uk/scenarios/2025.toml, [params]).
+[param.vote_wear_effect]
+doc = "More on the governing blocs' utility per year in office beyond the first six months, set by a scenario (stage S13.7)"
+type = "real"
+unit = "1"
+value = 0.0
+
 [state.governing]
 label = "In government"
 type = "bool"
@@ -713,14 +724,33 @@ entity = "household"
 initial = 0.0
 next = "select(income_memory > 0.0, income_memory + (real_net_income - income_memory) / 12.0, real_net_income)"
 
+# Stage S13.7: voters remember their incomes at the last election as well as over the past
+# year, as they do jobs, prices and services, so a tax rise early in a term still counts a
+# little on polling day and a late giveaway is not all that matters (docs/S13-BALANCE.md).
+
+[state.income_at_election]
+doc = "Real net income at the last general election; the base month's stands in for July 2024's (0 until it is known)"
+type = "real"
+unit = "GBP/month/household"
+phase = "politics"
+entity = "household"
+initial = 0.0
+next = "select(income_at_election <= 0.0 or election_now, real_net_income, income_at_election)"
+
+[param.income_election_share]
+doc = "The share of the income term that compares real net income with the last election rather than with the past year (a judgement, stage S13.7)"
+type = "real"
+unit = "1"
+value = 0.5
+
 [var.income_change]
-label = "Change in real net income on about a year before"
-doc = "Real net income against its average over about a year"
+label = "Change in real net income, on the past year and the last election"
+doc = "Real net income against its average over about a year and, half and half, against its level at the last election"
 type = "real"
 unit = "1"
 phase = "politics"
 entity = "household"
-expr = "select(income_memory > 0.0 and real_net_income > 0.0, real_net_income / income_memory - 1.0, 0.0)"
+expr = "(1.0 - income_election_share) * select(income_memory > 0.0 and real_net_income > 0.0, real_net_income / income_memory - 1.0, 0.0) + income_election_share * select(income_at_election > 0.0 and real_net_income > 0.0, real_net_income / income_at_election - 1.0, 0.0)"
 
 # ---- voter types
 
@@ -745,7 +775,7 @@ label = "Inflation and time in office, on the government's utility"
 type = "real"
 unit = "1"
 phase = "politics"
-expr = "select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (consumer_inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0"
+expr = "select(inflation_at_election < -0.5, 0.0, vote_inflation_effect * (consumer_inflation_annual - inflation_at_election)) + vote_tenure_effect * months_in_office / 12.0 + vote_wear_effect * max(months_in_office - {a["months_in_office"]}, 0) / 12.0"
 
 # ---- unemployment by region (stage S6.2): the national rate times the region's relative
 # rate in the Annual Population Survey of 2024; voters weigh their own region's.
@@ -1093,6 +1123,14 @@ type = "bool"
 unit = "1"
 phase = "politics"
 expr = "select(election_now, would_govern[bloc: centre_left], governing[bloc: centre_left])"
+
+[var.own_support]
+label = "Your party's poll rating"
+doc = "The player's bloc's share of voting intention, in government or not (stage S13.7): political capital is earned on it, so a coalition does not inflate it"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "vote_intention[bloc: centre_left]"
 '''
 
 

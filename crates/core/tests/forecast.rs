@@ -161,12 +161,13 @@ fn a_vote_preview_agrees_with_a_defeated_bill() {
 #[test]
 fn a_vote_preview_counts_the_bills_waiting_and_agrees_with_a_refusal() {
     let mut session = open("models/uk/scenarios/2025.toml", 1);
-    session.set_lever("basic_rate", Value::Float(0.8)).unwrap();
-    let alone = session.vote_preview("basic_rate", &Value::Float(0.8)).unwrap();
+    // Stage S13.7: both rates weigh 2 in capital, so 41 each (bills.rs), against about 47.
+    session.set_lever("basic_rate", Value::Float(0.5)).unwrap();
+    let alone = session.vote_preview("basic_rate", &Value::Float(0.5)).unwrap();
     assert!(alone.affordable, "the waiting change it replaces is not counted: {alone:?}");
-    let preview = session.vote_preview("vat_rate", &Value::Float(0.5)).unwrap();
+    let preview = session.vote_preview("vat_rate", &Value::Float(0.35)).unwrap();
     assert!(preview.bill && !preview.affordable, "{preview:?}");
-    session.set_lever("vat_rate", Value::Float(0.5)).unwrap();
+    session.set_lever("vat_rate", Value::Float(0.35)).unwrap();
     session.step().unwrap();
     let change = session.changes().iter().find(|c| c.lever == "vat_rate").unwrap();
     assert!(change.refused && !change.passed);

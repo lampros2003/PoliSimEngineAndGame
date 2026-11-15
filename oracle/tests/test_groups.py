@@ -154,16 +154,29 @@ class Policies(unittest.TestCase):
 
     def test_a_fuel_duty_rise_costs_most_among_motorists_and_least_in_london(self):
         # Stage S13.6: after a 10p fuel duty rise, motorists' approval falls by more than the
-        # nation's and London's, and London's by less than any other place's in Great Britain
-        # (Northern Ireland has no governing bloc to lose). London has the fewest motorists.
+        # nation's and London's. London has the fewest motorists, so its voters' reaction to
+        # the duty itself is the mildest of any place in Great Britain (Northern Ireland has no
+        # governing bloc to lose). Stage S13.7 cut that reaction to a quarter, so most of what a
+        # rise costs is now through prices and real incomes, which fall on every place, and
+        # London's approval no longer falls least of all: the places are compared on the
+        # reaction, the part that depends on who drives.
         rise = {"fuel_duty": 62.95}
         motorists, london = self.change("motorists", **rise), self.change("london", **rise)
         nation = after_a_year(**rise)[1]["government_support"] - after_a_year()[1]["government_support"]
         self.assertLess(motorists, nation)
         self.assertLess(nation, london)
         self.assertLess(london, 0.0)
+        sim = after_a_year(**rise)[0]
+        voters, member, standing = sim.column("voters"), sim.column("group_member"), sim.column("standing_fuel_duty")
+
+        def reaction(key: str) -> float:
+            g = GROUPS.index(key)
+            weights = [voters[t] * member[t * len(GROUPS) + g] for t in range(len(voters))]
+            return sum(w * x for w, x in zip(weights, standing)) / sum(weights)
+
+        self.assertLess(reaction("london"), 0.0)
         for place in ("scotland", "wales", "north", "midlands", "south"):
-            self.assertLess(self.change(place, **rise), london, place)
+            self.assertLess(reaction(place), reaction("london"), place)
 
 
 if __name__ == "__main__":

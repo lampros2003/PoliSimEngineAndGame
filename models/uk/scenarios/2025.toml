@@ -6,6 +6,12 @@ seed = 2025
 steps = 60
 preset = "central"
 
+# Stage S13.7 (docs/S13-BALANCE.md): this government wears faster than the model's fitted
+# time in office alone, so that a term of doing nothing ends near the majority line rather
+# than safely above it. Nil in the base month (politics/README.md, "Wear of office").
+[params]
+vote_wear_effect = -0.025
+
 [play]
 # Stage S7.1: listed on the start screen.
 title = "The United Kingdom, 2025"
@@ -37,6 +43,10 @@ seats = "seats"
 projected = "projected_seats"
 governing = "governing"
 support = "government_support"
+# Stage S13.7: the player's own bloc's rating: the centre of the board and the top bar's
+# "Approval" show it, so a coalition does not make approval jump; political capital is
+# earned on it.
+own = "own_support"
 turnout = "turnout"
 election = "election_now"
 months_to_election = "months_to_election"

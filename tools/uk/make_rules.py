@@ -177,6 +177,14 @@ def leaning_of(name: str) -> str:
     return "right" if name in RIGHTWARD or name.endswith("_threshold") else "left"
 
 
+# Stage S13.7: what a bill on these rates weighs in political capital (capital.toml): the
+# rates of which a point raises £3bn a year or more (HMRC's ready reckoner: the basic rate
+# about £7bn, the main employee rate about £5bn, the employer rate about £8bn), so a big tax
+# decision costs more than a small one. The higher and additional rates (about £2bn and less)
+# weigh 1.
+CAPITAL_WEIGHT = {"basic_rate": 2, "ni_main_rate": 2, "ni_employer_rate": 2}
+
+
 def lever(name, value, unit, doc, kind="money", rng=None):
     out = f'''
 [lever.{name}]
@@ -188,6 +196,8 @@ default = {value}
 leaning = "{leaning_of(name)}"
 doc = "{doc}"
 '''
+    if name in CAPITAL_WEIGHT:
+        out += f"capital_weight = {CAPITAL_WEIGHT[name]}\n"
     if rng:
         out += f"range = [{rng[0]}, {rng[1]}]\n"
     if group_of(name) == "Scottish income tax":

@@ -26,7 +26,9 @@ share   = exp(utility) / sum over options of exp(utility)
 ```
 
 A household's change in real income is its real net income against an exponential
-average over about a year (`income_change`); a type's is the average over its adults.
+average over about a year (`income_change`); a type's is the average over its adults. Since
+stage S13.7 half of it is the change against the household's real net income at the last
+election instead (below, "Memory of income").
 
 ## Where the numbers come from
 
@@ -42,7 +44,10 @@ table without survey microdata gives their effect on the vote.
 ## What it gives
 
 - `vote_intention` (by bloc), `government_support`, `turnout`: the polls, each month;
-- `regional_intention` (by region and bloc), which S5.3 turns into seats.
+- `regional_intention` (by region and bloc), which S5.3 turns into seats;
+- `own_support` (stage S13.7): the player's bloc's (the centre-left's) voting intention, in
+  government or not. Political capital is earned on it (`../capital.toml`) and the centre of
+  the board shows it, so governing in a coalition does not raise either.
 
 In the base month the government (the centre-left bloc) has 33.9% (its 2024 share was
 33.7%; the households weight regions by adults, not by registered electors) and turnout
@@ -160,7 +165,7 @@ is split into five drivers, each the group's mean over its adults (weights as ab
 
 | Driver | The term |
 |---|---|
-| `group_driver_income` | `vote_income_effect * voter_income_change`: real household income against a year before |
+| `group_driver_income` | `vote_income_effect * voter_income_change`: real household income against a year before and against the last election, half and half (stage S13.7) |
 | `group_driver_jobs` | `voter_jobs`: unemployment in the type's region against the last election |
 | `group_driver_prices_and_time` | `fundamentals`, inflation against the last election and time in office, less the base month's time in office (six months), the same for every group |
 | `group_driver_services` | `voter_services`: health, education and policing service levels and the climate, against the last election |
@@ -178,7 +183,7 @@ bloc. The rest of a household's statement is in `../households.toml`: `household
 `household_pensions` (state and private), `income_tax_year`, `employee_ni_year` and
 `household_benefits` (Child Benefit net of the charge, and Universal Credit), each a year;
 `net_income`, a month; and here `income_change`, real net income against its average over
-about a year.
+about a year and its level at the last election.
 
 What is estimated: the household groups come from the synthetic households, whose children
 and self-employment follow the published tables they were built from
@@ -224,3 +229,42 @@ and 3.90), unemployment -2.96 (-0.74 and -5.21). Time in office and inflation, w
 the four term effects could show, are left as they were. With unchanged policy the
 government polls 30.5% at the 2029 election, against 30.2% with the earlier judgements,
 and wins 359 seats rather than 352.
+
+## Memory of income (stage S13.7)
+
+The playtest of `docs/S13-BALANCE.md` found that voters forgot a tax rise within one to two
+years: real income was judged only against its average over about a year, while jobs, prices
+and services are judged against the last election. So the dominant strategy was to raise
+taxes at once and spend late. Now half of a household's `income_change` compares real net
+income with that average, as before, and half with its level at the last election
+(`income_at_election`, a household state set at each election and, standing in for July
+2024's, in the base month, as `inflation_at_election` and
+`regional_unemployment_at_election` are; `income_election_share`, 0.5, a judgement).
+
+The fitted coefficient `vote_income_effect` (2.76, stage S9.4) is kept as it is. It was fitted
+to the change in real income growth in the year before each election, which is nearer the
+old one-year measure; applying it to a term-long change, half weighted, treats a lasting fall
+in real income as worth about as much per point as a recent one. That is a judgement, made
+because the historical fit cannot tell the two memories apart (four terms, eleven regions)
+and because the rest of the voters' fundamentals already reach back to the election. The
+term is nil in the base month (no memory yet) and the same as before in the second (the
+year's memory and the election's level are both the first month's income), so the base month
+and the fitted intercepts do not move.
+
+What it changes: with policy unchanged, real incomes grow over the term, so the government
+does a little better than before (363 seats in July 2029 against 344, without the 2025
+scenario's wear of office below); in the 2025 scenario a 30% basic rate from February 2025 now
+costs 26 seats at the election (330 to 304), where it cost none.
+
+## Wear of office (stage S13.7)
+
+`vote_wear_effect`, nil in the model, is added to the governing blocs' utility for each year
+in office beyond six months (the six the government had held office in the base month, and
+after a change of government its first six), so a scenario can say its government wears
+faster without moving the base month or the intercepts, which are fitted to the six months
+of the base month. `scenarios/2025.toml` sets it to -0.025 (its `[params]`), as much again as
+the fitted `vote_tenure_effect`: with policy unchanged and the first answer to every question
+the government polls 28.7% in June 2029 and keeps 330 seats in July, against 363 without it;
+with the second answers 323, short of a majority. A government that governs well keeps its
+majority; one that coasts is near the line or in a hung parliament. The other UK scenarios
+keep the model's nil.

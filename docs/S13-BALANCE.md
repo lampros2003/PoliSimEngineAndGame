@@ -1,6 +1,7 @@
 # PoliSim S13: balance report, the UK 2025 term
 
-Played on 2026-11-15 against the model as it stands (no model file changed).
+Played on 2026-11-15 against the model as it stands (no model file changed). Stage S13.7 changed the
+model on these findings and played the strategies again: "After S13.7", below.
 
 ## Method
 
@@ -231,6 +232,150 @@ question comes a month earlier or later. Pensioner poverty is left out (the clif
 | winter_fuel_payment=2 | 35.0 | +0.21 pts | pensioners +0.66, wales +0.27 | child_poverty_rate +0.1 pts; output_growth +0.1 pts; dwellings +0.1%; budget balance -0.6% |
 | visa_threshold=20000 | 33.0 | -0.09 pts | young +0.49, pensioners -0.35 | net_migration_annual +13.3%; poverty_rate -1.3 pts; output_growth +0.4 pts; budget balance -2.4% |
 | visa_threshold=60000 | 37.0 | +0.39 pts | pensioners +0.85, young -0.55 | net_migration_annual -14.7%; median_income +0.5%; net_income_average +0.5%; budget balance +0.8% |
+
+## After S13.7
+
+Played again on 2026-11-15 with the decisions of `docs/S13-PLAN.md`, "S13.7: what the playtest
+changes", in the model: voters remember half of their income change from the last election;
+the big spending lines weigh 3 in capital and the main tax rates 2 (cannabis law and rent
+controls 0.6); capital is earned at 1.5 a month and up to 5 more on the player's own party's
+rating, centred on 20% to 40%; fuel duty's reaction is a quarter of what it was and seven
+weak policies react more; the NHS winter crisis and full prisons wait two years before they
+come again; two chance questions from 2028 (fuel protests, small boats) and six situations for
+the new indicators; and the 2025 scenario's own wear of office, `vote_wear_effect` -0.025 a
+year beyond the first six months (nil in the base month).
+
+Method as before, with one difference: the strategies were replayed through the game's own
+`Session` (a scratch runner against `polisim-core`, since deleted), each bill made in the
+month listed above and, if the capital or the Commons would not take it, again each month
+until it passed. Under the old model this runner reproduces the first table to the seat for
+every strategy except austerity (323 seats rather than 326) and the wrecker (151 rather than
+156), whose bills it passed in slightly different months, and it counts bills passed to July
+2029 only. Capital earned, spent and wasted
+at the cap are from January 2025 to June 2029, beside the same runner's figures for the old
+model.
+
+### Strategies at a glance, after S13.7 (election in July 2029; the majority is 326)
+
+| Strategy | Approval Jun 2029 (before) | Centre-left seats (before) | Government after | Balance Jun 2029 £bn/yr | Debt % GDP | Unemployment | Bills passed | Capital earned / spent / wasted (before) |
+|---|---|---|---|---|---|---|---|---|
+| (a) Nothing, first answers | 28.7% (29.8%) | 330 (344) | Centre-left | -190 | 105.4 | 4.8% | 0 | 248 / 0 / 188 (163 / 0 / 103) |
+| (b) Nothing, second answers | 28.3% (29.8%) | 323 (344) | CL+SNP | -191 | 105.4 | 4.8% | 0 | 242 / 0 / 182 (159 / 0 / 99) |
+| (c) Crowd-pleaser | 32.3% (32.1%) | 382 (377) | Centre-left | -235 | 106.9 | 4.7% | 17 | 277 / 230 / 0 (185 / 221 / 0) |
+| (d) Austerity | 26.4% (28.4%) | 274 (323) | CL+Lib+Grn+SNP+PC | -92 | 101.8 | 5.4% | 29 | 220 / 193 / 0 (141 / 169 / 0) |
+| (e) Reformer | 29.3% (29.8%) | 337 (344) | Centre-left | -182 | 103.6 | 4.7% | 8 | 249 / 163 / 26 (157 / 163 / 0) |
+| (f1) Basic rate 30% in Feb 2025 | 27.4% (29.8%) | 304 (344) | CL+Grn+SNP+PC | -158 | 105.0 | 4.8% | 1 | 222 / 17 / 145 (151 / 11 / 80) |
+| (f2) Health cut by a quarter in Feb 2025 | 25.2% (26.7%) | 247 (284) | CL+Lib+Grn+SNP+PC | -160 | 106.4 | 4.8% | 1 | 195 / 28 / 108 (114 / 13 / 41) |
+| (g) Wrecker | 16.3% (21.2%) | 62 (151) | Centre-right | +33 | 102.4 | 10.6% | 5 | 150 / 175 / 0 (71 / 82 / 0) |
+| (h) Tax early, please late | 30.7% (32.2%) | 361 (383) | Centre-left | -167 | 101.0 | 3.9% | 13 | 243 / 207 / 32 (163 / 194 / 2) |
+
+### The real-life policies that changed
+
+Measured as before (each at an end of its range from July 2025, the largest gap to doing
+nothing in any month to the July 2029 election; the figure before S13.7 in brackets). The bill
+cost is what the game charges, 5 + 60 x weight x the share of the range moved; the first table's
+costs for the drinking age, fuel duty and the visa threshold do not follow that formula and
+are not repeated here.
+
+| Policy at | Bill cost | Approval | Groups moved most | Largest indicator moves |
+|---|---|---|---|---|
+| drinking_age=16 | 17.0 | -0.33 pts (-0.11) | pensioners -1.29, young +0.49 | crime_incidents +1.0% |
+| cannabis_law=2 | 41.0 (65.0) | -0.29 pts (-0.12) | young +2.05, pensioners -1.88 | crime_incidents -1.5% |
+| sugar_levy=0 | 9.0 | +0.21 pts (+0.07) | low_income +0.59, lone_parents +0.44 | healthy life -0.04 years |
+| sugar_levy=3 | 13.0 | -0.41 pts (-0.12) | low_income -1.15, lone_parents -0.87 | healthy life +0.09 years (+0.03) |
+| prescription_charge=0 | 13.9 | +0.53 pts (+0.30) | low_income +1.15, out_of_work +0.95 | healthy life +0.09 years (+0.02) |
+| prescription_charge=20 | 14.1 | -0.53 pts (-0.31) | low_income -1.15, out_of_work -0.95 | healthy life -0.09 years (-0.02) |
+| fuel_duty=0 | 43.1 | +1.46 pts (+2.69) | north +1.65, wales +1.59 | household_emissions +9.5%; ev_share -2.6 pts |
+| fuel_duty=100 | 38.9 | -1.58 pts (-3.76) | north -1.79, wales -1.74 | household_emissions -7.6%; ev_share +2.4 pts |
+| bus_fare_cap=1 | 9.5 | +0.38 pts (+0.09) | young +1.26, low_income +1.17 | none |
+| bus_fare_cap=5 | 18.5 | -0.30 pts (-0.25) | young -1.00, low_income -0.92 | none |
+| planning_rules=0 | 35.0 | -0.11 pts (-0.10) | young -0.51, london -0.26 | homes_built -13.1% |
+| planning_rules=4 | 35.0 | +0.14 pts (-0.12) | young +0.57, london +0.31 | homes_built +13.1% |
+| rent_controls=2 | 41.0 (65.0) | +0.15 pts (+0.15) | young +0.75, low_income +0.54 | homes_built -5.2% |
+| winter_fuel_payment=0 | 35.0 | -0.42 pts (-0.20) | pensioners -1.42, wales -0.56 | none |
+| winter_fuel_payment=2 | 35.0 | +0.45 pts (+0.21) | pensioners +1.49, wales +0.59 | none |
+
+Every other row moved by 0.03 points or less.
+
+### The conclusions, again
+
+**Is the election winnable and losable?** Changed. Doing nothing now keeps 330 seats with the
+first answers and 323 with the second, a hung parliament in which the centre-left governs with
+the SNP: the majority is in doubt, not safe. The reasons are the 2025 scenario's own wear of
+office (without it doing nothing gives 363 seats, more than before, because real incomes grow
+over the term and voters now remember that too) and the memory of income. Losing office still
+takes trying: austerity (274 seats), a 30% basic rate (304) and a quarter off health (247) all
+lose the majority but keep the centre-left in office through a coalition; only the wrecker
+loses it (62 seats). The range of sensible play is wider, 25.2% to 32.3% at the election
+against 26.7% to 32.2%, and 247 to 382 seats against 284 to 383.
+
+**One strategy dominates?** Changed, but not as hoped. "Tax early, please late" no longer wins:
+361 seats against the crowd-pleaser's 382, because a tax rise early in the term now costs
+something on polling day (f1's 30% basic rate costs 26 seats at the election, against none
+before). What wins now is plain spending: the crowd-pleaser runs the largest deficit (£235bn a
+year) and wins the most seats, while austerity, which halves the deficit, loses the majority.
+Sound finances are still punished and borrowing is not: voters in the model do not weigh the
+deficit or debt at all. That is still wrong, and it needs a voter term for the public
+finances or a market reaction to debt, which no decision of this stage covers.
+
+**Political capital.** Changed. Earned about 4 to 5 a month (220 to 277 from January 2025 to
+June 2029 for every strategy but the health cut and the wrecker, against 141 to 185), so the
+reformer and "tax early" end
+the term with capital to spare and the crowd-pleaser holds 87 in June 2029. Big decisions now
+cost more than small ones: a quarter off the NHS 27.5 (12.5 before), a point on the basic rate
+6.2, ten points 17; the dearest introductions 41 (65 before). The coalition jump is gone where
+it mattered: after f2's election the governing blocs' share is 56.2% but the centre of the
+board and capital follow the centre-left's own 34.2% (its time in office restarts with the new
+coalition, so it recovers). Still true: a passive player wastes most of what is earned (188
+under (a), more than before), and answers to questions remain free.
+
+**Do the real-life policies matter?** Mostly resolved. Fuel duty's direct reaction is a quarter
+of what it was, yet it remains the strongest policy (+1.46 points abolished, -1.58 at 100p),
+because most of what is left is what the duty does to prices and real incomes, which voters now
+remember to the election; it is about twice as strong as alcohol duty at the top of the
+range and three times at the bottom, against four to six times before.
+The soft drinks levy, the prescription charge, the bus fare cap, the Winter Fuel Payment,
+cannabis law and a drinking age of 16 now move national approval by 0.2 to 0.5 points and
+their most affected group by 0.6 to 2.1 points; the levy and the charge move healthy life by
+0.09 years. Still invisible on the board: the Winter Fuel Payment and the bus fare cap move no
+indicator (the households hold no Winter Fuel Payment and the model no bus journeys).
+Liberal planning is now a small gain (+0.14) rather than a loss.
+
+**Do the groups differ enough?** Little changed. Pensioners are still lowest and the young
+highest under every strategy, and the economy still moves every group together. Single
+policies separate them more than before (cannabis law: the young +2.1, pensioners -1.9).
+
+**Pacing.** Partly resolved. Under (a) thirteen questions by the election (2, 4, 3, 2 and 2 a
+year, against 1 in 2028 before); the NHS winter crisis comes twice and full prisons twice,
+not three times each; the longest stretch with no question and no situation change is 8 months
+(9 before). The new situations come with the policies that
+cause them (a tenth off the police brings a crime wave that ends a year after the money is
+restored; very restrictive planning a housing shortage; a £20,000 visa threshold high net
+migration, a £60,000 one falling net migration; a health cut falling healthy life; liberal
+planning a building boom), but none comes under doing nothing. Unchanged: "debt above a
+year's output" and "emissions above the path" stay on for most of the term under most
+strategies.
+
+**Broken, absurd or exploitable.**
+
+1. The coalition jump: resolved for the centre and for capital (above). The Parliament sheet
+   still shows the governing blocs' share, as it should.
+2. Tax rises free in the long run: resolved in part (f1 costs 26 seats), but see "One strategy
+   dominates": deficits are free instead.
+3. The pensioner poverty cliff: not changed (left for later in the plan: it needs the
+   households rebuilt).
+4. The economy heals too fast: not changed. The wrecker's unemployment is 10.6% in June 2029
+   only because its health cut, now dearer (50 rather than 20), could not be paid for until
+   October 2028, so its slump falls just before the election.
+5. A 10-point tax rise first worsens the deficit: not changed.
+6. Approval barely moves: a little better. The range of play is about 7 points rather than 5,
+   but a month's change is still almost always under half a point.
+7. The runner and the game: fixed. The report's two-bill example gives the same result in both
+   (sentencing passes, the grant is refused); the real difference was a lever changed twice in
+   one month, which `polisim play` kept in its first place while the game moves it to the end.
+   `polisim play` now does what the game does (`crates/cli/src/play.rs`, with a test).
+8. Values pinned at a limit: political capital at 100 for the passive strategies, now sooner
+   (January 2026 under (a)).
 
 ## Month by month, by strategy
 

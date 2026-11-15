@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import functools
 import sys
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -297,7 +298,10 @@ class Reproducibility(unittest.TestCase):
         with open(UK / "golden" / "2025.hashes.csv", newline="", encoding="utf-8") as handle:
             golden = [row["hash"] for row in csv.DictReader(handle)]
         self.assertEqual(len(golden), STEPS)
-        self.assertEqual([row["hash"] for row in run()], golden)
+        # Stage S13.7: with the scenario's own parameters (its wear of office), as recorded.
+        params = tomllib.loads((UK / "scenarios" / "2025.toml").read_text(encoding="utf-8"))["params"]
+        rows = Simulation(model(), seed=SEED, params=params).run(STEPS)
+        self.assertEqual([row["hash"] for row in rows], golden)
 
 
 if __name__ == "__main__":
@@ -584,7 +588,9 @@ class Dilemmas(unittest.TestCase):
     def test_the_dilemmas_and_the_pay_round(self):
         self.assertEqual([d["name"] for d in model().dilemmas], [
             "pay_claim", "nhs_winter", "bank_rescue", "steelworks", "investor", "energy_shock", "water_company",
-            "defence_summit", "prisons_full", "universities", "floods", "net_zero_warning"])
+            "defence_summit", "prisons_full", "universities", "floods", "net_zero_warning",
+            # Stage S13.7: two chance questions from 2028.
+            "fuel_protest", "small_boats"])
         for d in model().dilemmas:
             self.assertTrue(2 <= len(d["options"]) <= 3, d["name"])
             self.assertTrue(d["doc"] and all(o["doc"] for o in d["options"]), d["name"])

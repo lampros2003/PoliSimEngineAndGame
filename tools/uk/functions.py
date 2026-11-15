@@ -206,6 +206,13 @@ def write(out_dir: Path, pay_monthly: int, procurement_monthly: int, government_
     return rules(pay, spend)
 
 
+# Stage S13.7: what a bill on these lines weighs in political capital (capital.toml): the
+# functions of at least 5% of the spending the player sets (with the benefits bill and public
+# investment, calibrate.py), so a quarter off the NHS costs more than a penny on a duty.
+# Defence (about 4%) and the smaller lines weigh 1.
+BIG_LINES = {"health": 3, "education": 3, "public_order": 3, "social_care": 3}
+
+
 def rules(pay: list[int], spend: list[int]) -> str:
     names = ", ".join(f'"{f[0]}"' for f in FUNCTIONS)
     labels = ", ".join(f'"{f[1]}"' for f in FUNCTIONS)
@@ -222,6 +229,8 @@ range = [0, {2 * s}]
 leaning = "left"
 doc = "{doc}, in 2024 prices; its pay and purchases keep their 2024 split (HM Treasury, PESA 2025)"
 '''
+        if name in BIG_LINES:
+            levers += f"capital_weight = {BIG_LINES[name]}\n"
     pay_terms = " + ".join(f"muldiv(spending_{f[0]}, function_pay[function: {k}], function_spending[function: {k}])"
                            for k, f in enumerate(FUNCTIONS))
     total_terms = " + ".join(f"spending_{f[0]}" for f in FUNCTIONS)

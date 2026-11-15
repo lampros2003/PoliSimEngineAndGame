@@ -333,7 +333,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
             out.append(f'doc = "{doc}"')
         out.append("")
 
-    def lever(name, label, default, unit, rng, doc, kind="money"):
+    def lever(name, label, default, unit, rng, doc, kind="money", weight=None):
         # Amounts are set in base-year prices and uprated by the trend index, so the budget
         # line they feed is larger than the setting; the label says so.
         if kind == "money":
@@ -346,6 +346,8 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         out.append(f"default = {default}")
         if people:  # S5.4: with a parliament, raising spending or a tax rate is a move to the left
             out.append('leaning = "left"')
+            if weight is not None:  # stage S13.7: what a bill weighs in political capital
+                out.append(f"capital_weight = {weight}")
         out.append(f"range = [{rng[0]}, {rng[1]}]")
         out.append(f'doc = "{doc}"')
         out.append("")
@@ -353,7 +355,11 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     def bn(x):
         return float(x) / 1000
 
-    # Levers: monthly amounts in base-year prices, and tax rates.
+    # Levers: monthly amounts in base-year prices, and tax rates. Stage S13.7: the benefits bill
+    # and public investment (about 24% and 13% of the spending the player sets) weigh 3 in
+    # political capital, as the big functions do (functions.py); VAT (about £8bn a year a point)
+    # and corporation tax (about £3.5bn) weigh 2, as the main income tax and National Insurance
+    # rates do (make_rules.py).
     # Stage S8.0: with the 2024 base the public pay bill and purchases are the sums of the
     # spending by function (functions.toml), each function a lever of its own.
     if not people:
@@ -366,7 +372,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     other_benefits = monthly(v.benefits_other) - (round(base["benefits"] / 100) if people else 0)
     lever("benefits_bill", "Pensions and other benefits", other_benefits, "GBP/month", (0, other_benefits * 2),
           f"Social benefits that do not depend on unemployment, mostly the state pension, in {year} prices"
-          + (" (Child Benefit and Universal Credit come from the households)." if people else "."))
+          + (" (Child Benefit and Universal Credit come from the households)." if people else "."), weight=3)
     bpu = pounds_and_pence(v.benefit_per_unemployed)
     lever("benefit_per_unemployed", "Benefit per unemployed person", bpu, "GBP/month/person",
           (0, pounds_and_pence(v.benefit_per_unemployed * 2000 / 450)),
@@ -374,7 +380,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     lever("public_investment_bill", "Public investment", monthly(v.public_investment), "GBP/month",
           (0, monthly(v.public_investment) * 3),
           f"Gross public investment: roads, buildings, equipment, in {year} prices. {year}: £%.1fbn a year."
-          % bn(v.public_investment))
+          % bn(v.public_investment), weight=3)
     lever("subsidies_bill", "Subsidies", monthly(v.subsidies), "GBP/month", (0, monthly(v.subsidies) * 3),
           f"Subsidies to producers, in {year} prices.")
     lever("transfers_abroad_bill", "Aid and other transfers", monthly(v.other_current), "GBP/month",
@@ -388,9 +394,9 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
               f"Employee and employer National Insurance as a share of pay. {year}: %.1f%%." % (v.nics_rate * 100),
               kind="real")
     lever("vat_rate", "VAT standard rate", r12(v.vat_rate), "1", (0, 0.5),
-          "The standard rate. About %.0f%% of household spending is taxed at it." % (v.vat_base_share * 100), kind="real")
+          "The standard rate. About %.0f%% of household spending is taxed at it." % (v.vat_base_share * 100), kind="real", weight=2)
     lever("corporation_tax_rate", "Corporation tax main rate", r12(v.ct_rate), "1", (0, 0.5),
-          "Main rate of corporation tax on company profits.", kind="real")
+          "Main rate of corporation tax on company profits.", kind="real", weight=2)
     lever("council_tax_bill", "Council tax", monthly(v.council), "GBP/month", (0, monthly(v.council) * 3),
           f"Total council tax, in {year} prices. {year}: £%.1fbn a year." % bn(v.council))
 

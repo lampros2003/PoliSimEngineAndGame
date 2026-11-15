@@ -52,6 +52,13 @@ const EXPECT: &[Answer] = &[
     ("net_zero_warning", "plan", &[("procurement", '+'), ("emission_intensity", '-'), ("government_standing", '+')]),
     ("net_zero_warning", "later", &[("government_standing", '-')]),
     ("net_zero_warning", "drop", &[("government_standing", '~')]),
+    // Stage S13.7: two chance questions from 2028.
+    ("fuel_protest", "cut", &[("fuel_duty_change", '-'), ("government_standing", '+')]),
+    ("fuel_protest", "rebate", &[("subsidies", '+'), ("government_standing", '+')]),
+    ("fuel_protest", "hold", &[("consumption", '-'), ("government_standing", '-')]),
+    ("small_boats", "patrols", &[("procurement", '+'), ("government_standing", '+')]),
+    ("small_boats", "offshore", &[("procurement", '+'), ("government_standing", '~')]),
+    ("small_boats", "routes", &[("policy_migration_factor", '+'), ("government_standing", '~')]),
 ];
 
 /// The seed of a run in which the dilemma opens, and whether that run needs a slump.
