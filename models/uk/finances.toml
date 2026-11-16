@@ -81,17 +81,29 @@ expr = "clamp(lender_premium_effect * borrowing_gap, 0.0 - lender_discount_most,
 
 [var.gilt_yield_now]
 label = "Gilt yield"
-doc = "The annual rate on newly issued gilts: the assumption, where the market has it, and the lenders' premium. The average rate on the debt follows it over the gilts' lives"
+doc = "The annual rate on newly issued gilts: the assumption, where the market has it, the lenders' premium and (stage S14.5) half of Bank Rate's move. The average rate on the debt follows it over the gilts' lives"
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "gilt_yield + gilt_yield_shift + gilt_premium"
+expr = "gilt_yield + gilt_yield_shift + gilt_premium + gilt_bank_rate_effect * (bank_rate - bank_rate_2024)"
 
-[param.gilt_crisis_gap]
-doc = "How far smoothed borrowing must run above its level at the start, as a share of GDP, before lenders refuse the gilts (dilemmas.toml, gilt_crisis; a judgement)"
+# Stage S14.5: the chance each month that lenders refuse the gilts (dilemmas.toml, gilt_crisis),
+# against smoothed borrowing above its level at the start, in shares of output: nil at or
+# below the start, 2% a month at a point above (about one chance in five a year), 10% at two
+# and 22% at three (95% within a year), rising smoothly between (a judgement; it
+# replaces S13.8's line at 1.2 points, which a government just under it never met).
+[table.gilt_crisis_odds]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.0, y = 0.0 }, { x = 0.005, y = 0.004 }, { x = 0.01, y = 0.02 }, { x = 0.015, y = 0.05 }, { x = 0.02, y = 0.1 }, { x = 0.025, y = 0.16 }, { x = 0.03, y = 0.22 }, { x = 0.04, y = 0.35 }]
+
+[var.gilt_crisis_chance_now]
+label = "Chance lenders refuse the gilts this month"
 type = "real"
 unit = "1"
-value = 0.012
+phase = "accounts"
+expr = "curve(borrowing_gap, gilt_crisis_odds)"
 
 # ---- voters' reward when borrowing falls well below its starting level
 
@@ -108,3 +120,236 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "select(lenders_confidence, lenders_confidence_standing, 0.0)"
+
+# ================================================================= interest rates (stage S14.5)
+#
+# A Bank Rate set each month by a rule, a gilt yield that moves with it, a mortgage rate that
+# follows both with the lag of fixed-rate deals, and what households, firms and the Treasury
+# pay as they move (docs/S14-PLAN.md, "The economy"; models/uk/README.md, "Interest rates").
+# Every term here is a change from the base month's rates, which are 2024's, so at those rates
+# the 2024 accounts are reproduced exactly: the interest already in them is untouched. The
+# hindcast model has no finances.toml, so none of this is in the 2005-2024 replay.
+
+[param.bank_rate_2024]
+doc = "Bank Rate in the base month: 4.75%, in force from 7 November 2024 to 6 February 2025 (Bank of England, Bank Rate history)"
+type = "real"
+unit = "1"
+value = 0.0475
+
+[param.inflation_goal]
+doc = "The Bank of England's target: consumer price inflation of 2% a year"
+type = "real"
+unit = "1"
+value = 0.02
+
+[param.bank_rate_inflation_weight]
+doc = "Points of Bank Rate for each point of consumer inflation above the target (Taylor's rule: 1.5)"
+type = "real"
+unit = "1"
+value = 1.5
+
+[param.bank_rate_slack_weight]
+doc = "Points of Bank Rate for each point unemployment is below its natural rate (Taylor's half a point per point of output gap, at Okun's two points of output per point of unemployment)"
+type = "real"
+unit = "1"
+value = 1.0
+
+[param.bank_rate_smooth_months]
+doc = "Months over which Bank Rate closes the gap to its rule, exponentially: the Bank moves in steps of a quarter or half a point at its eight meetings a year (a judgement)"
+type = "real"
+unit = "1"
+value = 6.0
+
+[param.bank_rate_floor]
+doc = "The lowest Bank Rate: 0.1%, as from March 2020 to December 2021"
+type = "real"
+unit = "1"
+value = 0.001
+
+[param.bank_rate_ceiling]
+doc = "The highest Bank Rate the rule may set: 15%, as in October 1989 and briefly in September 1992"
+type = "real"
+unit = "1"
+value = 0.15
+
+[state.bank_rate_neutral]
+doc = "The rule's neutral rate: what makes the rule give 2024's Bank Rate at the base month's inflation and unemployment; -1 until it is known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(bank_rate_neutral < -0.5, bank_rate_2024 - bank_rate_inflation_weight * (consumer_inflation_annual - inflation_goal) - bank_rate_slack_weight * (natural_unemployment_now - unemployment_rate), bank_rate_neutral)"
+
+[var.bank_rate_rule]
+label = "Bank Rate the rule asks for"
+doc = "The neutral rate, plus 1.5 points for each point consumer inflation runs above 2% and a point for each point unemployment is below its natural rate, within 0.1% and 15%"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(bank_rate_neutral < -0.5, bank_rate, clamp(bank_rate_neutral + bank_rate_inflation_weight * (consumer_inflation_annual - inflation_goal) + bank_rate_slack_weight * (natural_unemployment_now - unemployment_rate), bank_rate_floor, bank_rate_ceiling))"
+
+[state.bank_rate]
+label = "Bank Rate"
+doc = "The Bank of England's policy rate: it moves each month a sixth of the way to what its rule asks, starting from 2024's 4.75%"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.0475
+next = "clamp(bank_rate + (bank_rate_rule - bank_rate) / bank_rate_smooth_months, bank_rate_floor, bank_rate_ceiling)"
+
+[param.gilt_bank_rate_effect]
+doc = "Points of yield on new gilts for each point Bank Rate is above 2024's: long yields price the Bank Rate expected over a gilt's life, and a rule's move is expected to unwind; from 2021 to 2023 Bank Rate rose 5.15 points and ten-year yields about 3.5 (a judgement: a half)"
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.reserves_share]
+doc = "The share of the public debt in effect financed at Bank Rate: the Bank of England's gilts bought with reserves, about £560bn of £2.8 trillion at the end of 2024 (Asset Purchase Facility quarterly reports; ONS public sector finances)"
+type = "real"
+unit = "1"
+value = 0.2
+
+[param.mortgage_rate_2024]
+doc = "The average rate on outstanding mortgages in the base month: about 3.8% (Bank of England, effective interest rates, secured lending to individuals, December 2024)"
+type = "real"
+unit = "1"
+value = 0.038
+
+[param.mortgage_stock_2024]
+doc = "Mortgages outstanding, the base month: about £1.65 trillion (Bank of England, lending secured on dwellings, December 2024); grown with the economy's trend"
+type = "money"
+unit = "GBP"
+value = 1650000000000
+
+[param.mortgage_bank_rate_share]
+doc = "How much of a new mortgage's rate follows Bank Rate rather than the gilt yield: two-year fixes and trackers price off Bank Rate, five-year fixes off longer yields (a judgement: a half)"
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.mortgage_fix_months]
+doc = "Months over which the rate on all mortgages follows the rate on new ones: about 85% are fixed, mostly for two or five years (UK Finance; FCA mortgage lending statistics), so the stock turns over in about two and a half years"
+type = "real"
+unit = "1"
+value = 30.0
+
+[var.mortgage_rate_new]
+label = "Rate on new mortgages"
+doc = "2024's average rate, moved by Bank Rate and the gilt yield (with any lenders' premium) since the base month"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "mortgage_rate_2024 + mortgage_bank_rate_share * (bank_rate - bank_rate_2024) + (1.0 - mortgage_bank_rate_share) * (gilt_yield_now - gilt_yield)"
+
+[state.mortgage_rate]
+label = "Mortgage rate"
+doc = "The average rate households pay on their mortgages: it follows the rate on new mortgages as fixed deals end, over about two and a half years"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.038
+next = "mortgage_rate + (mortgage_rate_new - mortgage_rate) / mortgage_fix_months"
+
+# ---- who pays: households, firms, the Treasury. Each is the change from the base month's
+# rates, paid one way when rates are higher and the other when they are lower.
+
+[flow.mortgage_interest_rise]
+label = "Mortgage interest above the base month's"
+from = "households"
+to = "banks"
+phase = "income"
+expr = "round(max(mortgage_rate - mortgage_rate_2024, 0.0) * mortgage_stock_2024 * trend_index / interest_months)"
+
+[flow.mortgage_interest_fall]
+label = "Mortgage interest below the base month's"
+from = "banks"
+to = "households"
+phase = "income"
+expr = "round(max(mortgage_rate_2024 - mortgage_rate, 0.0) * mortgage_stock_2024 * trend_index / interest_months)"
+
+[flow.firm_interest_rise]
+label = "Interest on firms' loans above the base month's"
+doc = "Most bank lending to firms is at floating rates over Bank Rate"
+from = "firms"
+to = "banks"
+phase = "income"
+expr = "round(max(bank_rate - bank_rate_2024, 0.0) * bank_loans / interest_months)"
+
+[flow.firm_interest_fall]
+label = "Interest on firms' loans below the base month's"
+from = "banks"
+to = "firms"
+phase = "income"
+expr = "round(max(bank_rate_2024 - bank_rate, 0.0) * bank_loans / interest_months)"
+
+[var.reserves_interest]
+label = "Interest on the Bank's reserves, against the base month"
+doc = "The debt bought with reserves pays Bank Rate, so Bank Rate reaches debt interest at once (part of debt interest to UK holders)"
+type = "money"
+unit = "GBP/month"
+phase = "income"
+expr = "round(reserves_share * (bank_gilts + foreign_gilts) * (bank_rate - bank_rate_2024) / interest_months)"
+
+[var.mortgage_share]
+label = "Chance the household has a mortgage"
+doc = "By the age of its first adult: about 29% of households have a mortgage, from a few under 25 and over 65 to half of those aged 35 to 49 (English Housing Survey 2023-24, households by tenure and age of the household reference person; shares rounded)"
+type = "real"
+unit = "1"
+phase = "income"
+entity = "household"
+expr = "select(age1 < 25, 0.08, select(age1 < 35, 0.38, select(age1 < 50, 0.52, select(age1 < 65, 0.36, 0.05))))"
+
+[param.mortgage_per_income]
+doc = "A mortgage's balance per pound of its household's income in the base year, set so the households' mortgages add up to the stock outstanding (tools/uk/calibrate.py)"
+type = "real"
+unit = "1"
+value = 3.177073081097
+
+[var.mortgage_cost_change]
+label = "Mortgage payments against the base month"
+doc = "A household's expected mortgage, by the age of its first adult and its income, times the change in the mortgage rate, a month: what voters feel of interest rates"
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+entity = "household"
+expr = "mortgage_share * mortgage_per_income * (earnings1 + earnings2 + earnings3 + earnings4 + pension1 + pension2 + pension3 + pension4) * trend_index * (mortgage_rate - mortgage_rate_2024) / year"
+
+# ---- business investment reads the real cost of borrowing
+
+[param.investment_rate_effect]
+doc = "Business investment falls this share for each point the real cost of borrowing, averaged over a year, runs above the base month's: a user-cost elasticity of about a half with a cost of capital of about 12% (a judgement in the range of the Bank of England's and the OBR's investment equations)"
+type = "real"
+unit = "1"
+value = 4.0
+
+[var.borrowing_cost_real]
+label = "Real cost of borrowing for firms"
+doc = "Half Bank Rate (bank loans) and half the gilt yield (bonds), less consumer inflation"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "0.5 * bank_rate + 0.5 * gilt_yield_now - consumer_inflation_annual"
+
+[state.borrowing_cost_at_start]
+doc = "The real cost of borrowing in the base month; -1 until it is known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(borrowing_cost_at_start < -0.5, borrowing_cost_real, borrowing_cost_at_start)"
+
+[state.borrowing_cost_smoothed]
+doc = "The real cost of borrowing, averaged over about a year: firms plan investment ahead; -1 until the first month"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(borrowing_cost_smoothed < -0.5, borrowing_cost_real, borrowing_cost_smoothed + (borrowing_cost_real - borrowing_cost_smoothed) / 12.0)"
+
+[var.investment_rate_factor]
+label = "Business investment, for the cost of borrowing"
+doc = "1 at the base month's cost of borrowing; 4% lower for each point it has run higher, within a half and one and a half"
+type = "real"
+unit = "1"
+phase = "spending"
+expr = "select(borrowing_cost_at_start < -0.5 or borrowing_cost_smoothed < -0.5, 1.0, clamp(1.0 - investment_rate_effect * (borrowing_cost_smoothed - borrowing_cost_at_start), 0.5, 1.5))"

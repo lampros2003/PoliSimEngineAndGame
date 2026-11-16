@@ -35,6 +35,8 @@
 
 [stream.small_boats_chance]
 
+[stream.gilt_crisis_chance]
+
 # ---------------------------------------------------------------- the pay round
 
 [dilemma.pay_claim]
@@ -379,13 +381,15 @@ months = 24
 effect = { policy_migration_factor = "{base} + 30.0 * visa_migration_scale / (year * per_step(sum(net_migration, region)))", government_standing = "{base} - select(type_age >= 3, 0.03, 0.0) + select(type_age <= 1, 0.01, 0.0)" }
 
 # ---------------------------------------------------------------- stage S13.8: lenders refuse
-# Opens when borrowing, averaged over a year, has run well above its level at the start of the
-# game (finances.toml). Not a chance: a government that borrows this much meets it.
+# Stage S14.5: a chance each month that rises with borrowing, averaged over a year, above its
+# level at the start of the game (finances.toml, gilt_crisis_odds): small a point above, near
+# certain within a year at three. (S13.8 opened it at a line, 1.2 points, which a government
+# just under it never met.)
 
 [dilemma.gilt_crisis]
 label = "Lenders refuse the gilts"
 doc = "With borrowing far above where it started and still rising, a gilt auction fails: lenders will only take the government's debt at a much higher price, and the pound falls"
-start = "months_elapsed >= 12 and borrowing_gap > gilt_crisis_gap"
+start = "months_elapsed >= 12 and rand(gilt_crisis_chance) < gilt_crisis_chance_now"
 again_after = 36
 
 [[dilemma.gilt_crisis.option]]

@@ -139,9 +139,10 @@ func show_explanation(e: Dictionary) -> void:
 			symbol = lagged[0]
 		name_button.theme_type_variation = "ReportLine"  # stage S13.6: tinted under the pointer
 		name_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		name_button.custom_minimum_size = Vector2(190, 0)
+		# Stage S14.5: a long name wraps onto a second line, never cut.
+		name_button.custom_minimum_size = Vector2(230, 0)
 		name_button.size_flags_horizontal = Control.SIZE_FILL
-		name_button.clip_text = true
+		name_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var input_entry: Dictionary = entries.get(symbol, {})
 		var followable := symbol != "" and str(input_entry.get("kind", "")) in ["var", "flow", "state", "account"]
 		name_button.disabled = not followable
@@ -151,7 +152,8 @@ func show_explanation(e: Dictionary) -> void:
 			name_button.pressed.connect(func() -> void: follow.emit(symbol))
 		row.add_child(name_button)
 		var bar := Bar.new()
-		bar.custom_minimum_size = Vector2(120, 18)
+		bar.custom_minimum_size = Vector2(100, 18)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.fraction = 0.0 if effect == null or biggest == 0.0 else float(effect) / biggest
 		row.add_child(bar)

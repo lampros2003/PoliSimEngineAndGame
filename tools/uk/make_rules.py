@@ -427,7 +427,7 @@ doc = "0 for female, 1 for male, -1 for no such adult"
 type = "int"
 unit = "1"
 '''
-        model += money_column(f"earnings{i}") + money_column(f"pension{i}")
+        model += money_column(f"earnings{i}") + money_column(f"pension{i}") + money_column(f"state_pension{i}")
         model += f'''
 [entity.household.columns.self_employed{i}]
 type = "bool"
@@ -449,6 +449,14 @@ type = "real"
 unit = "1"
 phase = "{rp}"
 expr = "private_pay_per_worker / pay_base"
+
+[var.state_pension_level]
+label = "State Pension relative to 2024"
+doc = "Stage S14.5: the benefits bill (mostly the State Pension) against its 2024 setting; the households' State Pensions move with it"
+type = "real"
+unit = "1"
+phase = "{rp}"
+expr = "benefits_bill / state_pension_base"
 '''
     rules += '''
 [param.year]
@@ -543,7 +551,9 @@ expr = "{expr}"
     for i in range(1, ADULTS + 1):
         if integrated:
             rules += var(f"earn{i}", f"round(earnings{i} * pay_uprating)", doc="Pay or profit now, a year")
-            rules += var(f"pens{i}", f"round(pension{i} * trend_index)", doc="Pensions now, a year")
+            # Stage S14.5: the State Pension part follows the benefits bill, of which it is most.
+            rules += var(f"pens{i}", f"round(pension{i} * trend_index + state_pension{i} * (state_pension_level - 1.0) * trend_index)",
+                         doc="Pensions now, a year: the State Pension part moves with the benefits bill")
         else:
             rules += var(f"earn{i}", f"earnings{i}", doc="Pay or profit, a year")
             rules += var(f"pens{i}", f"pension{i}", doc="Pensions, a year")

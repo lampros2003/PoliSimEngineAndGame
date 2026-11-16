@@ -12,6 +12,10 @@ python -m unittest discover -s tests
 The suite takes one to two minutes (179 tests; 42 s to 112 s on one Windows PC). Each model is loaded
 once per test module and every simulation is a run inside its process.
 
+Stage S14.5 added `test_economy.py` (22 tests): the tax rise and the State Pension spread,
+interest rates, slumps that last, the borrowing chance, homelessness and productivity. The
+eight strategies of `docs/S13-BALANCE.md` are played by `python tools/uk/strategies.py`.
+
 ## Where the reference implementation's tests went
 
 Until stage S14.2 these tests ran on the Python reference implementation (`oracle/`), 196

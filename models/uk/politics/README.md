@@ -283,10 +283,12 @@ vote_finances_effect * finances_weight * curve(borrowing_smoothed - borrowing_at
 where `borrowing_smoothed` is public sector net borrowing over output, averaged over about a
 year (`../finances.toml`), and `borrowing_at_election` its level at the last election (the
 base month's standing in for July 2024's, as for the other fundamentals). The curve is a
-judgement: half a point of output more costs 0.01 of utility, a point 0.08, 1.2 points 0.16,
-two points 0.3; a fall of two points earns 0.07 and of four 0.12, so cutting borrowing is
-rewarded less than raising it is punished. The steep part sits where lenders start to refuse
-the gilts (1.2 points, `gilt_crisis_gap`): a deficit that worries the markets is news.
+judgement: since stage S14.5 a smooth convex curve, 0.1 of utility times the square of the
+rise in points, so half a point of output more costs 0.025, a point 0.1, one and a half 0.225
+and two 0.4 (S13.8's curve had a kink between 0.9 and 1.2 points, where lenders then refused
+the gilts; lenders now refuse by a chance that rises as smoothly, `../finances.toml`); a fall
+of two points earns 0.07 and of four 0.12, so cutting borrowing is rewarded less than raising
+it is punished.
 `finances_weight` is a half, and a half more each for pensioners (65 and over), home owners
 (their estimated share of the type) and the richest fifth: about 1.07 on average, up to 2.
 `vote_finances_effect` is nil in the model and 1 in the 2025 scenario's `[params]`.
@@ -296,7 +298,15 @@ situation "Lenders' confidence" holds (borrowing, smoothed, more than a point of
 its level at the start).
 
 Everything is nil in the base month (no memory yet) and in the fitted intercepts, and the
-hindcast, which has no politics, does not see it. In the 2025 scenario, with the lenders'
-premium of `../finances.toml`: doing nothing keeps 325 seats (330 after S13.7), the
-crowd-pleaser leads in the polls for two years and ends with 312, austerity 314 (274), and
-"tax early, please late", which pays for what it spends, 364, the most.
+hindcast, which has no politics, does not see it. In the 2025 scenario, after stage S14.5
+(interest rates, slumps that last, the smooth curve; `docs/S13-BALANCE.md`, "After S14.5"):
+doing nothing keeps 324 seats, the crowd-pleaser leads in the polls for a year and ends with
+305, austerity 324, and "tax early, please late", which pays for what it spends, 373, the
+most.
+
+**Mortgages (stage S14.5).** A household's real net income, on which its pocketbook vote
+rests, is its net income less the change in its mortgage payments since the base month
+(`mortgage_cost_change`, `../finances.toml`): its expected mortgage, by the age of its first
+adult and its income, times the change in the mortgage rate. Nil at 2024's rates; a point on
+the mortgage rate costs a household of 35 to 49 with £50,000 a year about £70 a month, and
+pensioners almost nothing.

@@ -1,7 +1,8 @@
 extends SceneTree
 ## Stage S13.3: looking ahead through the real bridge (models/uk/scenarios/2025.toml).
 ## After a month: a basic rate of 21% typed in Income tax's popup shows, under "In a year",
-## income tax receipts up and household income down; the Commons vote line says the bill
+## income tax receipts up and the budget balance up (stage S14.5; household income down
+## before); the Commons vote line says the bill
 ## would pass; once the effects table has arrived, Income tax's links on the board are
 ## measured and point the way the table has the basic rate move them; and a VAT rise typed after an expensive
 ## income tax bill says there is not enough political capital for it.
@@ -27,7 +28,10 @@ func _initialize() -> void:
 	var year := {}
 	for row in card.year_shown:
 		year[row[0]] = row[1]
-	if not year.get("Income tax", 0.0) > 0.0 or not year.get("Household income", 0.0) < 0.0:
+	# Stage S14.5: the budget balance up, where household income down was checked before: with
+	# Bank Rate and debt interest on the model, household income's move no longer ranks among
+	# the rows shown.
+	if not year.get("Income tax", 0.0) > 0.0 or not year.get("Budget balance", 0.0) > 0.0:
 		return _fail("in a year: %s" % [card.year_shown])
 	var vote: String = card._rows["basic_rate"]["vote"].text
 	if not vote.begins_with("The Commons would pass this "):
@@ -57,8 +61,8 @@ func _initialize() -> void:
 		await process_frame
 	if not refused.contains("Not enough political capital: needs "):
 		return _fail("the unaffordable bill reads: " + refused)
-	print("forecast: a basic rate rise shows income tax up (%s) and household income down (%s) in a year; %s; %d measured links; \"%s\"" % [
-		year["Income tax"], year["Household income"], vote, links.size(), refused])
+	print("forecast: a basic rate rise shows income tax up (%s) and the budget balance up (%s) in a year; %s; %d measured links; \"%s\"" % [
+		year["Income tax"], year["Budget balance"], vote, links.size(), refused])
 	quit(0)
 
 

@@ -180,16 +180,19 @@ Northern Ireland's parties and others). In the first month each region votes as 
 its real household income, unemployment in its region and inflation since the last
 election, how long the government has been in office, and its reaction to each policy. It
 also weighs the public finances: borrowing, averaged over about a year, against the last
-election. Half a point of output more barely registers; past a point it costs a great deal,
-most among pensioners, home owners and high incomes, and borrowing well below where it
+election. Half a point of output more barely registers; each point more costs more than the
+last, most among pensioners, home owners and high incomes, and borrowing well below where it
 started earns a little ("Lenders' confidence").
 
 Lenders mind too. The **Gilt yield** indicator in Economy is what new government borrowing
 costs: it rises when borrowing runs above its level at the start of the game and falls when
-it runs below, and the interest on the debt follows it over the years. If borrowing stays
-more than about 1.2 points of output above where it started, lenders refuse the gilts and
-you must choose between an emergency budget, a much higher yield, or asking the Bank of
-England to print the money.
+it runs below, and the interest on the debt follows it over the years. The longer and the
+further borrowing runs above where it started, the likelier lenders are to refuse the gilts:
+a small chance each month a point of output above, near certain within a year at three.
+Then you must choose between an emergency budget, a much higher yield, or asking the Bank of
+England to print the money. Since stage S14.5 the Bank of England also sets **Bank Rate**
+each month against inflation and unemployment, and the **Mortgage rate** follows it and the
+gilt yield as fixed deals end: dearer mortgages cost home owners, and voters feel it.
 
 ## Advancing time and the month's report
 

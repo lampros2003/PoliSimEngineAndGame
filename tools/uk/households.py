@@ -36,8 +36,6 @@ import sys
 import zipfile
 from pathlib import Path
 
-import openpyxl
-
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / ".cache" / "uk"
 DATA = ROOT / "models" / "uk" / "data"
@@ -66,6 +64,13 @@ ASSUMPTIONS = {
     "state_pension_age": 66,
     "state_pension_full": 221.20 * 52,  # new State Pension, 2024-25, £ a year
     "state_pension_average_share": 0.85,  # of the full rate, across pensioners
+    # Stage S14.5: each pensioner's State Pension is the average times a spread with mean one
+    # (log-normal, this standard deviation of the log), so that pensioners do not all sit on
+    # one amount and cross the poverty line together. DWP's caseload by weekly amount runs
+    # from under £100 (reduced old basic pensions) to over £300 (large additional pensions),
+    # most between about £150 and £250 a week: a spread of about a quarter either way. The
+    # total is kept: the factors are scaled so their weighted mean over pensioners is one.
+    "state_pension_spread": 0.25,
     "private_pension_share": 0.6,  # pensioners with an occupational or personal pension
     "private_pension_median": 6_000,  # £ a year
     "pay_tails": (0.4, 2.0),  # pay at the 1st and 99th percentiles, as multiples of the 10th and 90th
@@ -106,6 +111,7 @@ def load_targets():
     pop = {}
     for r in csv.DictReader((DATA / "population.csv").read_text(encoding="utf-8").splitlines()):
         pop[(r["region"], r["sex"], int(r["age"]))] = int(r["people"])
+    import openpyxl  # only for a full build from the ONS tables
     wb = openpyxl.load_workbook(CACHE / "households2025.xlsx", read_only=True, data_only=True)
     rows = list(wb["7"].iter_rows(values_only=True))
     header = next(r for r in rows if r and r[0] and str(r[0]).startswith("Number of households"))
@@ -139,6 +145,7 @@ def load_pay():
     """ASHE 2024 annual gross pay percentiles: by (sex, region) and medians by (sex, age group)."""
     def sheet_rows(zip_name: str, member: str, sheet: str):
         data = zipfile.ZipFile(CACHE / zip_name).read(member)
+        import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         return list(wb[sheet].iter_rows(values_only=True))
 
@@ -242,19 +249,42 @@ def build(rng: random.Random, pop, counts, pay_region, pay_age):
             earnings = pay(sex, region, age) if work else 0.0
             if self_employed:
                 earnings *= ASSUMPTIONS["self_employed_pay_factor"]
-            pension = 0.0
+            pension = state = 0.0
             if age >= ASSUMPTIONS["state_pension_age"]:
-                pension = ASSUMPTIONS["state_pension_full"] * ASSUMPTIONS["state_pension_average_share"]
+                state = AVERAGE_STATE_PENSION * pension_spread(hid, len(people))
+                pension = state
                 if rng.random() < ASSUMPTIONS["private_pension_share"]:
                     pension += ASSUMPTIONS["private_pension_median"] * math.exp(rng.gauss(0.0, 0.8))
             people.append({"age": age, "sex": sex, "employee": work and not self_employed,
-                           "self_employed": self_employed, "earnings": earnings, "pension": pension})
+                           "self_employed": self_employed, "earnings": earnings, "pension": pension,
+                           "state_pension": state})
         for age in children:
             people.append({"age": age, "sex": rng.choice(["female", "male"]), "employee": False,
-                           "self_employed": False, "earnings": 0.0, "pension": 0.0})
+                           "self_employed": False, "earnings": 0.0, "pension": 0.0, "state_pension": 0.0})
         records.append({"id": hid, "type": key, "region": region, "adults": len(adults),
                         "children": len(children), "people": people})
     return records
+
+
+AVERAGE_STATE_PENSION = ASSUMPTIONS["state_pension_full"] * ASSUMPTIONS["state_pension_average_share"]
+
+
+def pension_spread(hid: int, slot: int) -> float:
+    """A pensioner's State Pension against the average, before scaling: drawn from a stream
+    of its own (the record and the adult), so the other draws of the build do not move."""
+    return math.exp(random.Random(f"{SEED}-pension-{hid}-{slot}").gauss(0.0, ASSUMPTIONS["state_pension_spread"]))
+
+
+def keep_state_pension_total(records, weights) -> None:
+    """Scales every State Pension so that the weighted average over pensioners is the
+    assumed average: the spread moves pensions between pensioners, not their total."""
+    total = sum(w * p["state_pension"] for r, w in zip(records, weights) for p in r["people"])
+    count = sum(w for r, w in zip(records, weights) for p in r["people"] if p["state_pension"] > 0)
+    scale = AVERAGE_STATE_PENSION * count / total
+    for r in records:
+        for p in r["people"]:
+            p["pension"] += p["state_pension"] * (scale - 1)
+            p["state_pension"] *= scale
 
 
 def income_deciles(records, weights) -> dict[int, int]:
@@ -339,14 +369,59 @@ def solve(a, b):
     return out
 
 
+def spread_existing(path: Path) -> int:
+    """Stage S14.5 on records built before it: each pensioner held the average State Pension
+    plus any private pension; the average is replaced by the spread one, as build() draws it,
+    the total kept, and the deciles, which count pensions, worked out again."""
+    rows = list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    if "state_pension1" in rows[0]:
+        raise SystemExit(f"{path}: the State Pensions are already spread")
+    records, weights = [], []
+    for row in rows:
+        people = []
+        for i in range(int(row["adults"])):
+            pension = float(row[f"pension{i + 1}"])
+            state = AVERAGE_STATE_PENSION * pension_spread(int(row["id"]), i) if int(row[f"age{i + 1}"]) >= ASSUMPTIONS["state_pension_age"] else 0.0
+            private = pension - AVERAGE_STATE_PENSION if state else pension
+            people.append({"earnings": float(row[f"earnings{i + 1}"]), "pension": private + state, "state_pension": state})
+        records.append({"id": int(row["id"]), "adults": int(row["adults"]), "children": int(row["children"]), "people": people})
+        weights.append(int(row["weight"]))
+    keep_state_pension_total(records, weights)
+    deciles = income_deciles(records, weights)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, list(rows[0]) + [f"state_pension{i}" for i in range(1, 5)], lineterminator="\n")
+    writer.writeheader()
+    for row, r in zip(rows, records):
+        for i in range(4):
+            p = r["people"][i] if i < len(r["people"]) else None
+            row[f"pension{i + 1}"] = "{:.2f}".format(p["pension"]) if p else "0.00"
+            row[f"state_pension{i + 1}"] = "{:.2f}".format(p["state_pension"]) if p else "0.00"
+        row["income_decile"] = deciles[r["id"]]
+        writer.writerow(row)
+    path.write_text(buffer.getvalue(), encoding="utf-8", newline="\n")
+    report = path.parent / "HOUSEHOLDS.md"
+    text = report.read_text(encoding="utf-8")
+    head, rest = text.split("## Assumptions", 1)
+    tail = rest[rest.index("## Targets"):]
+    report.write_text(head + "## Assumptions\n\n" + "\n".join(f"- `{k}`: {v}" for k, v in ASSUMPTIONS.items())
+                      + "\n\n" + tail, encoding="utf-8", newline="\n")
+    print(f"{path}: State Pensions spread for {sum(1 for r in records for p in r['people'] if p['state_pension'])} pensioners")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
     global RECORDS, OUT
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--records", type=int, default=RECORDS)
     parser.add_argument("--out", type=Path, default=OUT)
+    parser.add_argument("--pensions-only", action="store_true",
+                        help="spread the State Pensions of the existing households.csv (built before stage S14.5, "
+                             "every pensioner on the average) without the ONS tables; the same result as a full build")
     args = parser.parse_args(argv)
     RECORDS, OUT = args.records, args.out
+    if args.pensions_only:
+        return spread_existing(OUT / "households.csv")
     pop, counts, people_in_households = load_targets()
     pay_region, pay_age = load_pay()
     rng = random.Random(SEED)
@@ -400,6 +475,7 @@ def main(argv: list[str] | None = None) -> int:
         r["x_solve"] = {j - 1: v for j, v in r["x"].items()}
     weights, iterations = calibrate(records, targets[1:], targets[0][0])
     whole = [max(1, round(w)) for w in weights]
+    keep_state_pension_total(records, whole)
 
     # ---- write
     OUT.mkdir(parents=True, exist_ok=True)
@@ -409,6 +485,7 @@ def main(argv: list[str] | None = None) -> int:
     columns += [f"{f}{i}" for i in range(1, 5) for f in ("age", "sex")]
     columns += [f"{f}{i}" for f in ("earnings", "self_employed", "pension") for i in range(1, 5)]
     columns += ["income_decile", "girls", "boys", "older_girls", "older_boys"]
+    columns += [f"state_pension{i}" for i in range(1, 5)]
     deciles = income_deciles(records, whole)
     writer.writerow(columns)
     for r, w in zip(records, whole):
@@ -434,6 +511,7 @@ def main(argv: list[str] | None = None) -> int:
         children = r["people"][r["adults"]:]
         for lo, hi, sex in ((0, 15, "female"), (0, 15, "male"), (16, 17, "female"), (16, 17, "male")):
             cells.append(sum(1 for p in children if lo <= p["age"] <= hi and p["sex"] == sex))
+        cells += ["{:.2f}".format(adults[i]["state_pension"]) if i < len(adults) else "0.00" for i in range(4)]
         writer.writerow(cells)
     (OUT / "households.csv").write_text(buffer.getvalue(), encoding="utf-8", newline="\n")
 

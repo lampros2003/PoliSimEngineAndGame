@@ -18,6 +18,7 @@ Largest error: 0.028%.
 - `state_pension_age`: 66
 - `state_pension_full`: 11502.4
 - `state_pension_average_share`: 0.85
+- `state_pension_spread`: 0.25
 - `private_pension_share`: 0.6
 - `private_pension_median`: 6000
 - `pay_tails`: (0.4, 2.0)

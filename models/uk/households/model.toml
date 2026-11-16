@@ -82,6 +82,10 @@ unit = "GBP/year/household"
 type = "money"
 unit = "GBP/year/household"
 
+[entity.household.columns.state_pension1]
+type = "money"
+unit = "GBP/year/household"
+
 [entity.household.columns.self_employed1]
 type = "bool"
 unit = "1"
@@ -100,6 +104,10 @@ type = "money"
 unit = "GBP/year/household"
 
 [entity.household.columns.pension2]
+type = "money"
+unit = "GBP/year/household"
+
+[entity.household.columns.state_pension2]
 type = "money"
 unit = "GBP/year/household"
 
@@ -124,6 +132,10 @@ unit = "GBP/year/household"
 type = "money"
 unit = "GBP/year/household"
 
+[entity.household.columns.state_pension3]
+type = "money"
+unit = "GBP/year/household"
+
 [entity.household.columns.self_employed3]
 type = "bool"
 unit = "1"
@@ -142,6 +154,10 @@ type = "money"
 unit = "GBP/year/household"
 
 [entity.household.columns.pension4]
+type = "money"
+unit = "GBP/year/household"
+
+[entity.household.columns.state_pension4]
 type = "money"
 unit = "GBP/year/household"
 

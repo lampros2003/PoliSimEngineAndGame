@@ -17,6 +17,14 @@ the mid-2024 population. Each record has a region, a household type, up to four 
 (age, sex, pay or self-employment profit, pension) and its children. Weights come from
 exponential calibration to 179 published totals, all met within 0.03%.
 
+Since stage S14.5 each pensioner's State Pension is the average (85% of the full new State
+Pension) times a log-normal spread of about a quarter either way, scaled so the total is
+unchanged, and held in its own columns (`state_pension1` to `4`, also in `pension1` to `4`)
+so that inside the UK model it follows the benefits bill. Before, every pensioner held the
+same amount, and a block of them crossed the poverty line together.
+(`python tools/uk/households.py --pensions-only` spread the existing records without the ONS
+tables; a full build draws the same spread.)
+
 Pay above the 99th percentile follows a Pareto tail (index 2, the 99th percentile at twice
 the 90th), chosen so that National Insurance, the one check that depends on pay alone,
 comes within 2% of the published total.

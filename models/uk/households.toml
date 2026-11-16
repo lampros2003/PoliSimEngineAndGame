@@ -67,6 +67,10 @@ unit = "GBP/year/household"
 type = "money"
 unit = "GBP/year/household"
 
+[entity.household.columns.state_pension1]
+type = "money"
+unit = "GBP/year/household"
+
 [entity.household.columns.self_employed1]
 type = "bool"
 unit = "1"
@@ -85,6 +89,10 @@ type = "money"
 unit = "GBP/year/household"
 
 [entity.household.columns.pension2]
+type = "money"
+unit = "GBP/year/household"
+
+[entity.household.columns.state_pension2]
 type = "money"
 unit = "GBP/year/household"
 
@@ -109,6 +117,10 @@ unit = "GBP/year/household"
 type = "money"
 unit = "GBP/year/household"
 
+[entity.household.columns.state_pension3]
+type = "money"
+unit = "GBP/year/household"
+
 [entity.household.columns.self_employed3]
 type = "bool"
 unit = "1"
@@ -130,6 +142,10 @@ unit = "GBP/year/household"
 type = "money"
 unit = "GBP/year/household"
 
+[entity.household.columns.state_pension4]
+type = "money"
+unit = "GBP/year/household"
+
 [entity.household.columns.self_employed4]
 type = "bool"
 unit = "1"
@@ -146,6 +162,14 @@ type = "real"
 unit = "1"
 phase = "income"
 expr = "private_pay_per_worker / pay_base"
+
+[var.state_pension_level]
+label = "State Pension relative to 2024"
+doc = "Stage S14.5: the benefits bill (mostly the State Pension) against its 2024 setting; the households' State Pensions move with it"
+type = "real"
+unit = "1"
+phase = "income"
+expr = "benefits_bill / state_pension_base"
 
 [param.year]
 doc = "Months in a year: annual amounts divided by it are monthly"
@@ -631,8 +655,8 @@ type = "money"
 unit = "GBP/year/household"
 phase = "income"
 entity = "household"
-expr = "round(pension1 * trend_index)"
-doc = "Pensions now, a year"
+expr = "round(pension1 * trend_index + state_pension1 * (state_pension_level - 1.0) * trend_index)"
+doc = "Pensions now, a year: the State Pension part moves with the benefits bill"
 
 [var.pay1]
 type = "money"
@@ -699,8 +723,8 @@ type = "money"
 unit = "GBP/year/household"
 phase = "income"
 entity = "household"
-expr = "round(pension2 * trend_index)"
-doc = "Pensions now, a year"
+expr = "round(pension2 * trend_index + state_pension2 * (state_pension_level - 1.0) * trend_index)"
+doc = "Pensions now, a year: the State Pension part moves with the benefits bill"
 
 [var.pay2]
 type = "money"
@@ -767,8 +791,8 @@ type = "money"
 unit = "GBP/year/household"
 phase = "income"
 entity = "household"
-expr = "round(pension3 * trend_index)"
-doc = "Pensions now, a year"
+expr = "round(pension3 * trend_index + state_pension3 * (state_pension_level - 1.0) * trend_index)"
+doc = "Pensions now, a year: the State Pension part moves with the benefits bill"
 
 [var.pay3]
 type = "money"
@@ -835,8 +859,8 @@ type = "money"
 unit = "GBP/year/household"
 phase = "income"
 entity = "household"
-expr = "round(pension4 * trend_index)"
-doc = "Pensions now, a year"
+expr = "round(pension4 * trend_index + state_pension4 * (state_pension_level - 1.0) * trend_index)"
+doc = "Pensions now, a year: the State Pension part moves with the benefits bill"
 
 [var.pay4]
 type = "money"

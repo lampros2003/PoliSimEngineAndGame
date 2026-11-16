@@ -470,6 +470,114 @@ The crowd-pleaser's other answers to the crisis do worse:
 only to heavy borrowers. "Debt rising fast" now comes on in late 2028 under doing nothing
 rather than staying on from 2027. The longest stretch with nothing new is 6 months, from 8.
 
+## After S14.5
+
+Played a fourth time on 2026-11-16 with stage S14.5 of `docs/S14-PLAN.md`, "The economy", in
+the model (`models/uk/README.md`, "Interest rates", "Slumps that last", "Homelessness and
+productivity"):
+
+- **Interest rates.** Bank Rate is set each month by a rule (1.5 points for each point of
+  inflation above 2%, a point for each point of unemployment below the natural rate, smoothed
+  over six months, from 4.75%). The gilt yield moves half as much, a fifth of the debt pays
+  Bank Rate, and the mortgage rate follows Bank Rate and the gilt yield over two and a half
+  years. Households pay the change on their mortgages, by age and income, and their voters
+  feel it. Firms pay it on their loans, and business investment reads the real cost of
+  borrowing.
+- **Slumps that last.** Firms and the state shed staff at 8% of the gap a month rather than a
+  quarter. Long unemployment raises the natural rate and slows hiring for a time, and pay
+  falls a quarter as fast as it rises.
+- **The borrowing cliff.** Lenders refuse the gilts by a chance a month that rises with
+  borrowing above the start (2% at a point, 10% at two, 22% at three), not at 1.2 points.
+  The voters' curve is a smooth square: 0.1 of utility at a point, 0.4 at two.
+- **Two bugs.** The 10-point tax rise never worsened the deficit by itself: the slump it
+  causes opens "a bank in trouble", and the first answer (a rescue that doubles subsidies for
+  six months) did. Without an answer the rise improves the balance every month (a test now
+  says so). Pensioners' State Pensions are spread (log-normal, a quarter either way), so the
+  basic rate at 30% moves pensioner poverty 3.7 points in its month, not 9. Since the State
+  Pension now follows the benefits bill, a tenth off it moves pensioner poverty 4.7 points at
+  once. That is a real effect, not bunching: each 1% moves it under a point.
+- **The board.** Bank Rate, the mortgage rate and productivity are in Economy, homeless
+  households in Housing.
+
+`[params]` unchanged: `lender_premium_effect` 0.75, `vote_finances_effect` 1,
+`vote_wear_effect` -0.025. The premium now also reaches mortgages: the crowd-pleaser's
+mortgage rate is 4.10% in January 2027 against doing nothing's 3.72%. That is not too strong,
+so the premium was left; the voters' curve was made a little steeper past a point instead (0.1
+times the square, rather than 0.08, which matched S13.8's curve at one point). The method is
+now a script, `python tools/uk/strategies.py` (the eight strategies, each bill made in its
+month and again each month until it passes, every question its first answer, (b) its second;
+`--months` gives each strategy every six months). On the S13.8 model it reproduced the S13.8
+table to the seat, every figure, but two. The crowd-pleaser's crisis came a month earlier
+(the script counts the month the question opens, not the month it is put). The wrecker's
+capital earned was 151 rather than 152 (rounding of a sum).
+
+### Strategies at a glance, after S14.5 (election in July 2029; the majority is 326)
+
+The approval columns are Jan 2026 / Jan 2027 / Jun 2029. Seats in brackets are after S13.8.
+
+| Strategy | Approval | CL seats (S13.8) | Government after | Balance Jun 2029 £bn/yr | Debt % GDP | Gilt yield | Unemployment | Bills passed | Capital earned / spent / wasted | Lenders refuse |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (a) Nothing, first answers | 32.7 / 31.4 / 28.4% | 324 (325) | CL+SNP | -185 | 105.2 | 4.06% | 5.0% | 0 | 244 / 0 / 184 | no |
+| (b) Nothing, second answers | 32.7 / 31.5 / 28.1% | 316 (315) | CL+SNP | -179 | 105.2 | 3.46% | 5.9% | 0 | 241 / 0 / 181 | no |
+| (c) Crowd-pleaser | 33.7 / 30.8 / 27.7% | 305 (312) | CL+SNP+PC | -222 | 108.9 | 4.32% | 5.7% | 17 | 235 / 230 / 0 | Mar 2028 |
+| (d) Austerity | 31.4 / 30.6 / 28.3% | 324 (314) | CL+SNP | -54 | 97.8 | 2.76% | 6.6% | 29 | 236 / 193 / 0 | no |
+| (e) Reformer | 32.5 / 31.4 / 29.2% | 336 (336) | Centre-left | -180 | 103.7 | 4.04% | 4.8% | 8 | 247 / 163 / 24 | no |
+| (f1) Basic rate 30% in Feb 2025 | 31.4 / 30.5 / 28.7% | 331 (309) | Centre-left | -126 | 101.0 | 3.21% | 5.3% | 1 | 235 / 17 / 158 | no |
+| (f2) Health cut by a quarter in Feb 2025 | 28.6 / 27.5 / 26.6% | 279 (249) | CL+Lib+Grn+SNP+PC | -119 | 101.6 | 2.95% | 6.0% | 1 | 206 / 28 / 118 | no |
+| (g) Wrecker | 26.2 / 25.8 / 16.8% | 68 (101) | Centre-right | +88 | 93.9 | 1.38% | 15.6% | 5 | 147 / 175 / 0 | no |
+| (h) Tax early, please late | 31.3 / 31.9 / 31.4% | 373 (364) | Centre-left | -153 | 99.3 | 3.61% | 4.4% | 13 | 250 / 207 / 35 | no |
+
+The largest move in one month, for any strategy, is 3.5 points of approval (the wrecker's
+first bills) and 0.6 points of unemployment (the wrecker's education cut). It was 4.1 points of
+unemployment before, when a cut to a service put its staff out of work in one month.
+
+| Strategy, June 2029 | Bank Rate | Mortgage rate | Homeless households | Productivity |
+|---|---|---|---|---|
+| (a) Nothing, first answers | 3.88% | 3.68% | 132,000 | 99.98 |
+| (c) Crowd-pleaser | 3.01% | 3.97% | 130,000 | 100.0 |
+| (d) Austerity | 2.85% | 2.67% | 137,000 | 99.78 |
+| (g) Wrecker | 0.11% | 1.55% | 186,000 | 99.32 |
+| (h) Tax early, please late | 4.65% | 3.34% | 126,000 | 100.1 |
+
+### The conclusions, a fourth time
+
+**Against the targets of stage S14.5.**
+- **Doing nothing** keeps 324 seats (316 with the second answers), inside 315 to 335.
+- **Borrow and spend** (c) leads doing nothing by a point in January 2026. Then mortgages
+  reprice upward (Bank Rate is 5.3% by January 2027), and by then it is behind. The
+  crisis comes in March 2028 and it ends with 305 seats, 19 behind.
+- **Austerity** (d) ties doing nothing at 324 seats. It borrows £131bn a year less, debt is
+  7.4 points of output lower, and Bank Rate and mortgages are a point lower. It pays with a
+  real slump: unemployment 6.2% in January 2027 and 6.6% at the election.
+- **A paid-for programme** wins most: "tax early, please late" holds 373, the reformer 336.
+- **The wrecker** loses office (68 seats; the centre-right governs alone).
+- **No month jumps implausibly** (above).
+
+**What changed and why.**
+- Austerity gains 10 seats on S13.8 and the 30% basic rate 22. The Bank now cuts rates when
+  policy tightens, and lower mortgage payments reach voters.
+- Borrowing loses: the Bank raises rates against a borrowed boom, and the lenders' premium
+  reaches mortgages.
+- f2's quarter off health costs fewer seats (279 against 249). Its staff now go over a year,
+  and Bank Rate falls to 1.5% in 2027.
+
+**What is still wrong.**
+- The wrecker's slump never heals: unemployment 15.6% and prices falling at the election, with
+  Bank Rate at its floor. Halving health and cutting education by two fifths takes about 1.4
+  million public jobs, and long unemployment then slows hiring to a quarter of its speed. The
+  caps (three points of long unemployment at most) stop a spiral, but not a long slump. The
+  wrecker is a test of losing office, so this was left. A milder policy slump (f2, austerity)
+  heals in two to three years.
+- A demand shock that ends overshoots after it: lower Bank Rate reaches mortgages over two and
+  a half years, after the shock has gone. A year of business investment a quarter down leaves
+  unemployment above its start two years on, but below doing nothing's from the 22nd month.
+- Doing nothing ends with unemployment at 5.0% (4.8% after S13.8). Long unemployment builds
+  from the 2025 drift above the natural rate.
+- Productivity barely moves in a term (within 0.7 of 100 for every strategy). That is as the
+  sources have it, so it is a slow statistic on the board.
+- Austerity ties doing nothing rather than winning, as the target allows. Voters reward a fall
+  in borrowing at about a seventh of the rate they punish a rise.
+
 ## Month by month, by strategy
 
 Groups: the lowest and highest group approval in that month. Capital: held at the end of the month; earned, spent and wasted at the cap over the 12 months to that month. Growth is the annual rate of output growth that month.

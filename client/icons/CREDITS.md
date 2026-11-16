@@ -118,3 +118,13 @@ file was removed so the client can tint the white artwork. Stage S13.2; the grou
 | `waiting-list.svg` | empty-hourglass | lorc, available on https://game-icons.net, CC BY 3.0 |
 | `welfare.svg` | meeple-group | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `winter-fuel.svg` | fireplace | delapouite, available on https://game-icons.net, CC BY 3.0 |
+
+Stage S14.5: four pictograms drawn for this project (original art, in the style of the set
+above: white silhouettes on a 512 square), not from game-icons.net.
+
+| File | Icon | Author |
+|---|---|---|
+| `bank-rate.svg` | a bank front with a percent badge | original to PoliSim |
+| `mortgage-rate.svg` | a house with a percent badge | original to PoliSim |
+| `productivity.svg` | a cog with a rising arrow | original to PoliSim |
+| `homelessness.svg` | a figure under a bare roof line | original to PoliSim |

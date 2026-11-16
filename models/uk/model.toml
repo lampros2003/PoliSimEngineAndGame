@@ -21,7 +21,7 @@ currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "alignment", "income", "spending", "finance", "accounts", "politics"]
-files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml", "finances.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml", "finances.toml", "labour.toml", "statistics.toml"]
 
 [sector.households]
 label = "Households"
@@ -210,7 +210,7 @@ type = "real"
 unit = "GBP/month/person"
 phase = "accounts"
 initial = 350975.915680092
-next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock + wage_catchup * price_wedge_growth)"
+next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * curve(natural_unemployment_now - unemployment_rate, wage_shape) + pay_shock + wage_catchup * price_wedge_growth + productivity_change)"
 
 [state.trend_index]
 label = "Trend size of the economy (2024 = 1)"
@@ -251,7 +251,7 @@ type = "real"
 unit = "person"
 phase = "accounts"
 initial = 26718096.35473867
-next = "private_employment + hiring_speed * ((labour_force - public_employment) * curve(wage_share * labour_share * private_demand / private_pay_per_worker / (labour_force - public_employment), labour_capacity) - private_employment)"
+next = "private_employment + select(private_employment_wanted < private_employment, firing_speed, hiring_speed / (1.0 + rehiring_drag * min(long_unemployment, long_unemployment_most))) * (private_employment_wanted - private_employment)"
 
 # Stage S11.3: how much of firms' demand for workers the labour market can fill, a judgement
 # (docs/S11-PLAN.md). Demand and filled jobs are shares of the workers not employed by the

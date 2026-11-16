@@ -30,7 +30,7 @@ government = "government"
 # Amounts paid each month are shown at an annual rate, as the public finances are published.
 amounts = "year"
 # Stage S13.2: short names for the top bar and the board.
-labels = { government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Housing stock", crime_incidents = "Crime", prison_population = "Prisoners", healthy_life_expectancy = "Healthy life", smoking_prevalence = "Smoking", alcohol_deaths = "Alcohol deaths", ev_share = "Electric cars", school_attainment = "School results", homes_built = "Homes built", net_migration_annual = "Net migration" }
+labels = { homelessness = "Homelessness", government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Housing stock", crime_incidents = "Crime", prison_population = "Prisoners", healthy_life_expectancy = "Healthy life", smoking_prevalence = "Smoking", alcohol_deaths = "Alcohol deaths", ev_share = "Electric cars", school_attainment = "School results", homes_built = "Homes built", net_migration_annual = "Net migration" }
 headline = ["government_support", "gdp", "unemployment_rate", "consumer_inflation_annual", "budget_balance", "debt_to_gdp"]
 watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_inflation_annual", "waiting_list"]
 # "Who gains, who loses": net income per household by group, from the households; jobs and
@@ -169,6 +169,9 @@ indicators = [
   { row = "output_growth", icon = "growth", size = 2, better = "high" },
   # Stage S13.8: the yield on new gilts, with the lenders' premium.
   { row = "gilt_yield_now", icon = "debt", size = 2, better = "low" },
+  # Stage S14.5: Bank Rate (neither good nor bad) and productivity; the mortgage rate is in Housing.
+  { row = "bank_rate", icon = "bank-rate", size = 2 },
+  { row = "productivity", icon = "productivity", size = 2, better = "high" },
   { row = "pay_per_employee_job", icon = "pay", size = 2, better = "high" },
   { row = "workforce_jobs", icon = "jobs", size = 1, better = "high" },
   { row = "business_investment", icon = "investment", size = 1, better = "high" },
@@ -295,6 +298,10 @@ policies = [
 indicators = [
   { row = "homes_built", icon = "homes-built", size = 2, better = "high", unit = "count" },
   { row = "dwellings", icon = "housing", size = 1, better = "high" },
+  # Stage S14.5: households in temporary accommodation; and the mortgage rate, what home
+  # owners pay (neither good nor bad).
+  { row = "homelessness", icon = "homelessness", size = 2, better = "low", unit = "count" },
+  { row = "mortgage_rate", icon = "mortgage-rate", size = 1 },
 ]
 
 [[play.web.areas]]

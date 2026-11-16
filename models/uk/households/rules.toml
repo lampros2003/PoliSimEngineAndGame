@@ -40,6 +40,7 @@ unit = "1"
 default = 0.2
 leaning = "left"
 doc = "Income tax basic rate, rest of the UK"
+capital_weight = 2
 range = [0, 1]
 
 [lever.higher_rate]
@@ -231,6 +232,7 @@ unit = "1"
 default = 0.08
 leaning = "left"
 doc = "Employee National Insurance main rate"
+capital_weight = 2
 range = [0, 1]
 
 [lever.ni_upper_rate]
@@ -261,6 +263,7 @@ unit = "1"
 default = 0.138
 leaning = "left"
 doc = "Employer National Insurance rate"
+capital_weight = 2
 range = [0, 1]
 
 [lever.class4_lower]

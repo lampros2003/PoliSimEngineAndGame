@@ -286,6 +286,20 @@ def household_base() -> dict[str, float]:
             "benefits": row["child_benefit_total"] + row["universal_credit_total"]}
 
 
+def mortgage_per_income(source: Path) -> float:
+    """Stage S14.5: a mortgage's balance per pound of its household's gross income (pay and
+    pensions, a year), so that the households' expected mortgages (finances.toml,
+    `mortgage_share` by the first adult's age) add up to the stock outstanding."""
+    total = 0.0
+    with open(source, newline="", encoding="utf-8") as handle:
+        for r in csv.DictReader(handle):
+            age = int(r["age1"])
+            share = 0.08 if age < 25 else 0.38 if age < 35 else 0.52 if age < 50 else 0.36 if age < 65 else 0.05
+            gross = sum(float(r[f"{f}{i}"]) for f in ("earnings", "pension") for i in range(1, 5))
+            total += int(r["weight"]) * share * gross
+    return 1.65e12 / total  # finances.toml, mortgage_stock_2024
+
+
 PRESETS = ("low", "central", "high")
 
 
@@ -373,6 +387,9 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     lever("benefits_bill", "Pensions and other benefits", other_benefits, "GBP/month", (0, other_benefits * 2),
           f"Social benefits that do not depend on unemployment, mostly the state pension, in {year} prices"
           + (" (Child Benefit and Universal Credit come from the households)." if people else "."), weight=3)
+    if people:  # stage S14.5: the households' State Pensions move with the bill (households.toml)
+        param("state_pension_base", other_benefits, "GBP/month", "money",
+              "The benefits bill's 2024 setting, against which the households' State Pensions move")
     bpu = pounds_and_pence(v.benefit_per_unemployed)
     lever("benefit_per_unemployed", "Benefit per unemployed person", bpu, "GBP/month/person",
           (0, pounds_and_pence(v.benefit_per_unemployed * 2000 / 450)),
@@ -480,7 +497,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
                "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml",
-               "finances.toml")
+               "finances.toml", "labour.toml", "statistics.toml")
               if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
@@ -526,7 +543,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     fills["benefits_expr"] = ("round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index) + child_benefit_total + universal_credit_total"
                               if people else "round((benefits_bill + benefit_per_unemployed * unemployed) * trend_index)")
     # Stage S6.3: with the 2024 base, trade is by partner (trade.toml).
-    fills["exports_expr"] = ("round(sum(exports_by_partner, partner))" if people
+    fills["exports_expr"] = ("round(sum(exports_by_partner, partner) * productivity / 100.0)" if people
                              else "round(exports_base * world_index * export_demand)")
     fills["imports_expr"] = ("round(sum(imports_by_partner, partner))" if people
                              else "round(import_share * import_propensity * private_demand)")
@@ -543,6 +560,35 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     fills.update({k: (v if people else "") for k, v in hooks.items()})
     # Stage S13.8: the yield on new gilts carries the lenders' premium (finances.toml).
     fills["new_gilt_yield"] = "gilt_yield_now" if people else "gilt_yield + gilt_yield_shift"
+    # Stage S14.5: interest rates reach the Treasury, households and firms (finances.toml);
+    # each term is nil at the base month's rates, and none is in the hindcast model.
+    rates = {"reserves_interest": " + reserves_interest", "mortgage_income": " - mortgage_interest_rise + mortgage_interest_fall",
+             "investment_rates": " * investment_rate_factor", "firm_interest": " + firm_interest_rise - firm_interest_fall"}
+    fills.update({k: (val if people else "") for k, val in rates.items()})
+    # Stage S14.5: firms hoard labour and long unemployment raises the natural rate for a time
+    # (labour.toml); the hindcast model keeps the plain hiring speed and natural rate.
+    target = "(labour_force - public_employment) * curve(wage_share * labour_share * private_demand / private_pay_per_worker / (labour_force - public_employment), labour_capacity)"
+    fills["private_employment_next"] = (
+        "private_employment + select(private_employment_wanted < private_employment, firing_speed,"
+        " hiring_speed / (1.0 + rehiring_drag * min(long_unemployment, long_unemployment_most)))"
+        " * (private_employment_wanted - private_employment)" if people
+        else f"private_employment + hiring_speed * ({target} - private_employment)")
+    # Stage S14.5: the state hires and lets staff go over months too (labour.toml), so a cut
+    # to a service does not put its staff out of work in a single month.
+    fills["public_employment_expr"] = (
+        "public_employment_held + select(public_pay_bill / public_pay_per_worker < public_employment_held, firing_speed,"
+        " hiring_speed) * (public_pay_bill / public_pay_per_worker - public_employment_held)" if people
+        else "public_pay_bill / public_pay_per_worker")
+    fills["public_employment_2024"] = repr(monthly(v.public_pay) / money(v.pay_per_worker / MONTHS))
+    fills["natural_rate"] = "natural_unemployment_now" if people else "natural_unemployment"
+    # Stage S14.5: productivity (statistics.toml) feeds pay and exports.
+    fills["productivity_pay"] = " + productivity_change" if people else ""
+    fills["business_investment_2024"] = monthly(v.business_investment)
+    fills["public_investment_2024"] = monthly(v.public_investment)
+    fills["wage_gap"] = ("curve(natural_unemployment_now - unemployment_rate, wage_shape)" if people
+                         else "(natural_unemployment - unemployment_rate)")
+    if people:
+        fills["mortgage_per_income"] = r12(mortgage_per_income(source))
     if people:
         fills["benefits_expr"] += " + policy_benefits"
     for name in ("model.toml", "economy.toml",

@@ -7,11 +7,17 @@ label = "Pensions and other benefits (2024 prices)"
 group = "Spending"
 type = "money"
 unit = "GBP/month"
-default = 21687591639
+default = 21686960921
 leaning = "left"
 capital_weight = 3
-range = [0, 43375183278]
+range = [0, 43373921842]
 doc = "Social benefits that do not depend on unemployment, mostly the state pension, in 2024 prices (Child Benefit and Universal Credit come from the households)."
+
+[param.state_pension_base]
+type = "money"
+unit = "GBP/month"
+value = 21686960921
+doc = "The benefits bill's 2024 setting, against which the households' State Pensions move"
 
 [lever.benefit_per_unemployed]
 label = "Benefit per unemployed person (2024 prices)"
@@ -89,7 +95,7 @@ doc = "Total council tax, in 2024 prices. 2024: £46.7bn a year."
 [param.other_income_tax_rate]
 type = "real"
 unit = "1"
-value = 0.100852529957
+value = 0.100040043937
 doc = "Income tax on other income, as a share of it"
 
 [param.ni_scale]

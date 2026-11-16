@@ -39,6 +39,8 @@ const MAX_LINKS := 7
 const LINK_FLOOR := 0.0005
 ## Stage S13.4: a policy's links to groups, besides its links to indicators.
 const MAX_GROUP_LINKS := 3
+## Stage S14.5: where the first area may begin, in half turns before the top, in order of trial.
+const START_TURNS := [0.22, 0.16, 0.28, 0.10, 0.34]
 ## Stage S14.1: the group ring, in pixels at a unit scale of 1: the band's thickness, the gap
 ## between two families and between two groups of a family, and the approval arc's offset
 ## from the band and thickness.
@@ -571,6 +573,24 @@ class Ring:
 func layout() -> void:
 	if demo or nodes.is_empty() or size.x < 10.0 or size.y < 10.0:
 		return
+	# Stage S14.5: where round the rim the first area begins decides which areas sit at the
+	# crowded top and bottom; a few beginnings are tried and the first that labels every node
+	# kept (else the one that labels most).
+	var best := -1.0
+	var fewest := 1 << 30
+	for turn in START_TURNS:
+		_layout_from(turn)
+		var missing := Array(order).filter(func(k): return not nodes[k]["kind"] in ["centre", "group"] and not nodes[k]["rest"]).size()
+		if missing == 0:
+			return
+		if missing < fewest:
+			fewest = missing
+			best = turn
+	_layout_from(best)
+
+
+## The layout with the first area beginning `turn` of a half turn before the top.
+func _layout_from(turn: float) -> void:
 	_widths.clear()
 	_unit = clampf(minf(size.x / 1.55, size.y) / 800.0, 0.72, 2.2)
 	var u := _unit
@@ -603,7 +623,7 @@ func layout() -> void:
 		p_need.append(maxf(p, name_w * 1.15 + area_gap))
 		i_need.append(m)
 		a["rows"] = 1
-	var start := outer.fraction(TAU - PI * 0.16) if areas.size() > 2 else 0.0
+	var start := outer.fraction(TAU - PI * turn) if areas.size() > 2 else 0.0
 	var shares := _allocate(p_need, i_need, start, outer, middle)
 	var total_share := 0.0
 	for s in shares:
@@ -953,10 +973,25 @@ func _place_labels() -> void:
 			if nodes[key]["kind"] != "group":
 				failed.append(key)
 	# Stage S14.1: a node left without a label takes its place first among its neighbours,
-	# which then find theirs again; kept only if every one of them still finds one.
+	# which then find theirs again; kept only if every one of them still finds one. Stage
+	# S14.5: a few rounds, the radius of "neighbour" growing, while any is left without.
+	for round in 3:
+		failed = keys.filter(func(k): return not by_key.has(k))
+		if failed.is_empty():
+			break
+		by_key = _repair_labels(failed, by_key, font, (230.0 + 120.0 * round) * _unit)
+	for key in by_key:
+		nodes[key]["label_rect"] = by_key[key]
+		nodes[key]["rest"] = true
+	_place_group_labels(by_key.values(), font)
+
+
+## One round of label repair: each node in `failed`, its label placed first among the
+## labels within `radius` of it, which then are placed again; kept only if all still fit.
+func _repair_labels(failed: Array, by_key: Dictionary, font: Font, radius: float) -> Dictionary:
 	for key in failed:
 		var p: Vector2 = nodes[key]["pos"]
-		var near: Array = by_key.keys().filter(func(k): return nodes[k]["kind"] != "group" and (by_key[k] as Rect2).get_center().distance_to(p) < 230.0 * _unit)
+		var near: Array = by_key.keys().filter(func(k): return nodes[k]["kind"] != "group" and (by_key[k] as Rect2).get_center().distance_to(p) < radius)
 		near.sort_custom(func(x, y): return _label_rank(x) > _label_rank(y))
 		var trial := {}
 		for k in by_key:
@@ -977,9 +1012,11 @@ func _place_labels() -> void:
 		else:
 			for k in lines_before:
 				nodes[k]["lines"] = lines_before[k]
-	for key in by_key:
-		nodes[key]["label_rect"] = by_key[key]
-		nodes[key]["rest"] = true
+	return by_key
+
+
+## Stage S14.4: the groups' names, all at rest when every one fits outside its arc, else none.
+func _place_group_labels(placed: Array, font: Font) -> void:
 	var rects := {}
 	var all_fit := true
 	for key in keys_of("group"):
@@ -1059,7 +1096,7 @@ func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, ro
 			candidates = turns.map(func(t): return Vector2.from_angle(t) * (r + 2.0) + Vector2(cos(t) * w, sin(t) * h) / 2.0)
 			# and, failing those, a little further off (stage S14.1: never nearer another node
 			# than its own, so it cannot be read as another's).
-			for far in [10.0, 18.0]:
+			for far in [10.0, 18.0, 26.0]:
 				candidates += turns.map(func(t): return Vector2.from_angle(t) * (r + far * _unit) + Vector2(cos(t) * w, sin(t) * h) / 2.0)
 		var near_count := 16 if round_about else candidates.size()
 		for i in candidates.size():
@@ -1596,38 +1633,61 @@ func _tessellate() -> void:
 	for link in _links:
 		var a: Dictionary = nodes[link["from"]]
 		var b: Dictionary = nodes[link["to"]]
-		var pa: Vector2 = a["pos"]
-		var pb: Vector2 = b["pos"]
+		var pa: Vector2 = _link_end(a)
+		var pb: Vector2 = _link_end(b)
 		var mid := (pa + pb) / 2.0
 		var normal := (pb - pa).orthogonal().normalized()
 		# Bend towards the centre, so links sweep round the inside of the board.
 		if normal.dot(_c - mid) < 0.0:
 			normal = -normal
 		# Stage S13.6: never under the centre medallion: the gentlest bend, either way, whose
-		# curve clears it; failing that, the widest tried.
+		# curve clears it; failing that, the widest tried. Stage S14.5: a link into a group
+		# arrives at its arc's outer edge, at its middle, coming straight in from outside the
+		# ring (see _curve), so it never runs along the neighbouring arcs to get there.
 		var keep_out: float = nodes["centre"]["r"] + 10.0 * _unit if nodes.has("centre") else 0.0
-		var points := PackedVector2Array()
+		var best := PackedVector2Array()
+		var best_bad := 1 << 30
 		for bend in [0.22, -0.22, 0.4, -0.4, 0.6, -0.6, 0.85, -0.85]:
-			points = _curve(a, b, mid + normal * pa.distance_to(pb) * bend)
-			var clear := true
-			for p in points:
-				if p.distance_to(_c) < keep_out:
-					clear = false
-					break
-			if clear:
+			var points := _curve(a, b, mid + normal * pa.distance_to(pb) * bend)
+			var bad := 0
+			for i in points.size():
+				var d := points[i].distance_to(_c)
+				if d < keep_out:
+					bad += 1
+			if bad < best_bad:
+				best = points
+				best_bad = bad
+			if bad == 0:
 				break
-		link["points"] = points
+		link["points"] = best
+
+
+## Where a link meets a node: a group at the outer edge of its arc's middle; others at their centre.
+func _link_end(n: Dictionary) -> Vector2:
+	if n["kind"] == "group" and _group_ring != null and n.has("f0"):
+		return _group_ring.offset_at((float(n["f0"]) + float(n["f1"])) / 2.0, ring_reach() + 2.0 * _unit)
+	return n["pos"]
 
 
 func _curve(a: Dictionary, b: Dictionary, control: Vector2) -> PackedVector2Array:
-	var pa: Vector2 = a["pos"]
-	var pb: Vector2 = b["pos"]
-	var start: Vector2 = pa + (control - pa).normalized() * (a["r"] + 3.0 * _unit)
-	var end: Vector2 = pb + (control - pb).normalized() * (b["r"] + 7.0 * _unit)
+	var pa: Vector2 = _link_end(a)
+	var pb: Vector2 = _link_end(b)
+	var start: Vector2 = pa if a["kind"] == "group" else pa + (control - pa).normalized() * (a["r"] + 3.0 * _unit)
+	var end: Vector2 = pb if b["kind"] == "group" else pb + (control - pb).normalized() * (b["r"] + 7.0 * _unit)
+	# Stage S14.5: at a group's end the curve's handle points straight out of the ring, so the
+	# link comes in square to the arc.
+	var c1 := control
+	var c2 := control
+	var reach := clampf(start.distance_to(end) * 0.35, 30.0 * _unit, 160.0 * _unit)
+	if a["kind"] == "group":
+		c1 = start + (start - _c).normalized() * reach
+	if b["kind"] == "group":
+		c2 = end + (end - _c).normalized() * reach
 	var points := PackedVector2Array()
 	for i in 25:
 		var t := i / 24.0
-		points.append(start.lerp(control, t).lerp(control.lerp(end, t), t))
+		var u := 1.0 - t
+		points.append(start * u * u * u + c1 * 3.0 * u * u * t + c2 * 3.0 * u * t * t + end * t * t * t)
 	return points
 
 

@@ -177,3 +177,10 @@ doc = "Borrowing, averaged over a year, is more than a point of GDP below its le
 good = true
 start = "borrowing_at_start > 0.0 and borrowing_gap < -0.01"
 end = "borrowing_gap > -0.005"
+
+# Stage S14.5: homelessness (statistics.toml).
+[situation.homelessness_rising]
+label = "Homelessness rising"
+doc = "More than 5% more households in temporary accommodation than on 30 September 2024 (126,040 in England); stage S14.5"
+start = "homelessness > 1.05 * temporary_accommodation_2024"
+end = "homelessness < 1.03 * temporary_accommodation_2024"

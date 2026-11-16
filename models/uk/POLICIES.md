@@ -421,6 +421,55 @@ population model keeps its mid-2024 rate (a known weakness in `README.md`).
 **The electric share of new cars** follows the path to the ban described above, plus the
 grant's and fuel duty's effect.
 
+### Homelessness and productivity (stage S14.5)
+
+Two more indicators, asked for by the owner (`statistics.toml`; `docs/S14-PLAN.md`, "The
+economy"). Both are at their 2024 levels in the base month.
+
+| Indicator | Row | Base month | Source of the 2024 level | Moves with |
+|---|---|---|---|---|
+| Homeless households | `homelessness` | 126,040 households | MHCLG, Statutory homelessness in England: July to September 2024 (https://www.gov.uk/government/statistics/statutory-homelessness-in-england-july-to-september-2024): households in temporary accommodation on 30 September 2024, England | Rent controls, planning rules, the social housing programme, working-age poverty (benefits), unemployment, the mortgage rate |
+| Productivity | `productivity` | 100 (2024) | An index: output per job beyond its trend, 2024 = 100 | Business and public investment against their trend, school attainment, healthy life expectancy |
+
+**Homeless households** head for 126,040 times one, less 5% for each step of rent controls
+(fewer tenancies end in an unaffordable rise or a no-fault eviction, the largest single cause
+of homelessness), less half the change in private homes built against 2024's (planning rules
+and rent controls: 10% more homes, 5% fewer households), plus 4% for each point working-age
+poverty (which benefits move) and each point unemployment run above the base month's, plus 3%
+for each point the mortgage rate is above 2024's (arrears and repossessions); less a third of
+the social homes the programme has built (about a third of new general needs lettings go to
+homeless households: MHCLG, Social housing lettings in England, April 2023 to March 2024). It
+follows that over about a year. Every size is a judgement. With policy unchanged unemployment
+drifts up and homelessness with it, to about 132,000 by the 2029 election; strict rent controls
+take about 8,000 off it within a year (9,000 by 2029), a £300m-a-month social housing programme
+about 14,000 by 2029, and very liberal planning about 8,500. "Homelessness rising" (`situations.toml`) comes on
+5% above 2024's level.
+
+**Productivity** heads for 100 times one plus 0.05 times business investment against 2024's
+(grown with the economy's trend), 0.025 times public investment against 2024's, 0.1 times
+school attainment (a share) and 0.01 a year of healthy life, each against the base month,
+over about five years. The sizes are judgements: a fifth more business investment raises the
+capital stock about 2.5% in five years, about 1% more output per job at a capital share of
+0.3; the OBR (2024) puts a sustained point of output more public investment at about 0.4% more
+potential output in five years; ten points of school attainment, 1% in time (after Hanushek
+and Woessmann, as only a few cohorts join the workforce in a term); a year of healthy life,
+1%. Private pay grows by productivity's growth on top of its own trend (`productivity_change`,
+`model.toml`) and exports scale with it (`trade.toml`'s exports times the index over 100), so
+it feeds incomes and output over time; both are small in a term. Half as much public
+investment again lifts it about 0.7 by 2029; a quarter off health spending takes 0.3 off it.
+
+### Mortgages (stage S14.5)
+
+Households' mortgage payments, which reach voters' real incomes since stage S14.5
+(`finances.toml`, `mortgage_share`), use the English Housing Survey 2023-24's households
+buying with a mortgage by age of the household reference person (Annex tables, tenure by
+age; https://www.gov.uk/government/collections/english-housing-survey), rounded: 8% under 25,
+38% at 25 to 34, 52% at 35 to 49, 36% at 50 to 64 and 5% over 65, about 29% of all households.
+Within an age band a household's expected mortgage is in proportion to its income, scaled so
+that all of them add to the £1.65 trillion of mortgages outstanding (Bank of England,
+Bankstats, lending secured on dwellings, December 2024). The estimated group `home_owners`
+(above) is unchanged: owners outright and with a mortgage together.
+
 ## Groups
 
 Five groups are estimated from published shares by income fifth or age band and added to

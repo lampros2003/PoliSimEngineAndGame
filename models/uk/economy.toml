@@ -14,7 +14,7 @@ label = "Public sector employment"
 type = "real"
 unit = "person"
 phase = "labour"
-expr = "public_pay_bill / public_pay_per_worker"
+expr = "public_employment_held + select(public_pay_bill / public_pay_per_worker < public_employment_held, firing_speed, hiring_speed) * (public_pay_bill / public_pay_per_worker - public_employment_held)"
 
 [var.unemployed]
 label = "Unemployed people"
@@ -84,7 +84,7 @@ label = "Debt interest to UK holders"
 from = "government"
 to = "banks"
 phase = "income"
-expr = "round(effective_rate * bank_gilts / interest_months)"
+expr = "round(effective_rate * bank_gilts / interest_months) + reserves_interest"
 
 [flow.gilt_interest_abroad]
 label = "Debt interest to holders abroad"
@@ -126,7 +126,7 @@ label = "Household disposable income"
 type = "money"
 unit = "GBP/month"
 phase = "income"
-expr = "wages + public_pay + benefits + other_income + bank_payout - income_tax - national_insurance - council_tax"
+expr = "wages + public_pay + benefits + other_income + bank_payout - income_tax - national_insurance - council_tax - mortgage_interest_rise + mortgage_interest_fall"
 
 # ================================================================= phase: spending
 
@@ -177,14 +177,14 @@ label = "Exports"
 from = "rest_of_world"
 to = "firms"
 phase = "spending"
-expr = "round(sum(exports_by_partner, partner))"
+expr = "round(sum(exports_by_partner, partner) * productivity / 100.0)"
 
 [var.business_investment]
 label = "Business investment"
 type = "money"
 unit = "GBP/month"
 phase = "spending"
-expr = "round(investment_share * investment_demand * prev(private_demand))"
+expr = "round(investment_share * investment_demand * prev(private_demand) * investment_rate_factor)"
 
 [var.private_demand]
 label = "Sales by firms"
@@ -346,7 +346,7 @@ type = "money"
 unit = "GBP/month"
 phase = "finance"
 doc = "Positive when firms hold less cash than their usual months of sales, after this month's payments"
-expr = "per_step(round(cash_target_months * private_demand) - firm_money) + wages + other_income + pension_transfers + imports + vat + production_taxes + corporation_tax + other_receipts - consumption - dwellings - procurement - public_investment - subsidies - exports"
+expr = "per_step(round(cash_target_months * private_demand) - firm_money) + wages + other_income + pension_transfers + imports + vat + production_taxes + corporation_tax + other_receipts - consumption - dwellings - procurement - public_investment - subsidies - exports + firm_interest_rise - firm_interest_fall"
 
 [flow.new_loans]
 label = "New bank loans to firms"
@@ -417,7 +417,7 @@ label = "Inflation this month"
 type = "real"
 unit = "1"
 phase = "accounts"
-expr = "inflation_target + phillips_slope * curve(natural_unemployment - unemployment_rate, phillips_shape) + inflation_shock"
+expr = "inflation_target + phillips_slope * curve(natural_unemployment_now - unemployment_rate, phillips_shape) + inflation_shock"
 
 # Stage S11.3: the Phillips curve's shape, a judgement (docs/S11-PLAN.md). Within a point of
 # the natural rate it is the straight line it was (phillips_slope times the gap); with the

@@ -158,11 +158,12 @@ next = "select(inflation_at_election < -0.5 or election_now, consumer_inflation_
 # ---- each household's change in real income, the pocketbook
 
 [var.real_net_income]
+doc = "Net income less the change in mortgage payments since the base month (stage S14.5, finances.toml), at consumer prices"
 type = "real"
 unit = "GBP/month/household"
 phase = "politics"
 entity = "household"
-expr = "net_income / consumer_price_index"
+expr = "(net_income - mortgage_cost_change) / consumer_price_index"
 
 [state.income_memory]
 doc = "Real net income, averaged over about a year (exponentially); 0 until the first month"
@@ -411,14 +412,15 @@ unit = "1"
 value = 0.0
 
 # Utility for the government against the rise in smoothed borrowing since the last election,
-# in shares of output: half a point costs little, a point 0.08, and it steepens past it to
-# 0.16 at 1.2 points, where lenders refuse the gilts (gilt_crisis_gap, finances.toml); a fall
-# of three points earns about a quarter of what a rise of three costs.
+# in shares of output: 0.1 times the square of the rise in points, so half a point costs
+# 0.025, a point 0.1, one and a half 0.225 (as before), two 0.4 and three 0.9, steepening
+# smoothly (stage S14.5: S13.8's curve had a kink between 0.9 and 1.2 points, where lenders then
+# refused the gilts); a fall of three points earns about a seventh of what a rise of three costs.
 [table.finances_reaction]
 kind = "curve"
 x_unit = "1"
 unit = "1"
-points = [{ x = -0.04, y = 0.12 }, { x = -0.02, y = 0.07 }, { x = 0.0, y = 0.0 }, { x = 0.005, y = -0.01 }, { x = 0.009, y = -0.04 }, { x = 0.012, y = -0.16 }, { x = 0.015, y = -0.22 }, { x = 0.02, y = -0.3 }, { x = 0.04, y = -0.55 }]
+points = [{ x = -0.04, y = 0.12 }, { x = -0.02, y = 0.07 }, { x = 0.0, y = 0.0 }, { x = 0.0025, y = -0.00625 }, { x = 0.005, y = -0.025 }, { x = 0.0075, y = -0.05625 }, { x = 0.01, y = -0.1 }, { x = 0.0125, y = -0.15625 }, { x = 0.015, y = -0.225 }, { x = 0.0175, y = -0.30625 }, { x = 0.02, y = -0.4 }, { x = 0.025, y = -0.625 }, { x = 0.03, y = -0.9 }, { x = 0.04, y = -1.6 }]
 
 [var.finances_weight]
 doc = "How much each voter type weighs the public finances: a half, and a half more each for pensioners, home owners and the richest fifth (a judgement)"

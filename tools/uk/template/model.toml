@@ -210,7 +210,7 @@ type = "real"
 unit = "GBP/month/person"
 phase = "accounts"
 initial = {{opening.private_pay_per_worker}}
-next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * (natural_unemployment - unemployment_rate) + pay_shock{{pay_catchup}})"
+next = "private_pay_per_worker * (1.0 + inflation + productivity_growth + wage_curve * {{wage_gap}} + pay_shock{{pay_catchup}}{{productivity_pay}})"
 
 [state.trend_index]
 label = "Trend size of the economy ({{base_year}} = 1)"
@@ -251,7 +251,7 @@ type = "real"
 unit = "person"
 phase = "accounts"
 initial = {{opening.private_employment}}
-next = "private_employment + hiring_speed * ((labour_force - public_employment) * curve(wage_share * labour_share * private_demand / private_pay_per_worker / (labour_force - public_employment), labour_capacity) - private_employment)"
+next = "{{private_employment_next}}"
 
 # Stage S11.3: how much of firms' demand for workers the labour market can fill, a judgement
 # (docs/S11-PLAN.md). Demand and filled jobs are shares of the workers not employed by the

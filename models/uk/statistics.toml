@@ -1,0 +1,184 @@
+# Two statistics the owner asked for (stage S14.5, docs/S14-PLAN.md, "The economy"):
+# homelessness and productivity. GENERATED: copied from tools/uk/template/statistics.toml by
+# tools/uk/calibrate.py. Edit the template. Sources and judgements: models/uk/POLICIES.md,
+# "Homelessness and productivity". Both are at their 2024 levels in the base month and stay
+# there with every policy as in 2024 and the economy as in the base month.
+
+# ================================================================= homelessness
+
+[param.temporary_accommodation_2024]
+doc = "Households in temporary accommodation in England on 30 September 2024: 126,040 (Ministry of Housing, Communities and Local Government, Statutory homelessness in England, July to September 2024)"
+type = "real"
+unit = "1"
+value = 126040.0
+
+[param.homeless_rent_controls]
+doc = "Temporary accommodation for each step of rent controls: 5% fewer households when rises are capped, 10% when strict, as fewer private tenancies end in an unaffordable rise or a no-fault eviction, the largest single cause of homelessness (a judgement)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[param.homeless_homes_effect]
+doc = "Temporary accommodation per unit of private homes built against 2024's (planning rules and rent controls, homes_policy_level): 10% more homes a year, 5% fewer households in temporary accommodation as rents ease (a judgement)"
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.homeless_social_share]
+doc = "The share of the programme's new social homes let to households in temporary accommodation: about a third of new general needs lettings go to homeless households (MHCLG, Social housing lettings in England, 2023-24; a judgement)"
+type = "real"
+unit = "1"
+value = 0.33
+
+[param.homeless_poverty_effect]
+doc = "Temporary accommodation for each point of working-age poverty above the start: 4% more (benefits that fall behind rents; a judgement)"
+type = "real"
+unit = "1"
+value = 4.0
+
+[param.homeless_unemployment_effect]
+doc = "Temporary accommodation for each point of unemployment above the start: 4% more (a judgement)"
+type = "real"
+unit = "1"
+value = 4.0
+
+[param.homeless_mortgage_effect]
+doc = "Temporary accommodation for each point the mortgage rate is above 2024's: 3% more, through arrears and repossessions, a small cause of homelessness (a judgement)"
+type = "real"
+unit = "1"
+value = 3.0
+
+[param.homeless_adjust_months]
+doc = "Months over which temporary accommodation follows its drivers, exponentially (a judgement)"
+type = "real"
+unit = "1"
+value = 12.0
+
+[state.social_homes_total]
+label = "Social homes the programme has built"
+type = "real"
+unit = "home"
+phase = "accounts"
+initial = 0.0
+next = "social_homes_total + times_step(social_homes_rate / year)"
+
+[state.poverty_at_start]
+doc = "Working-age poverty in the base month, which homelessness takes as normal; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(poverty_at_start < -0.5, working_age_poverty_rate, poverty_at_start)"
+
+[state.unemployment_at_start]
+doc = "Unemployment in the base month, which homelessness takes as normal; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(unemployment_at_start < -0.5, unemployment_rate, unemployment_at_start)"
+
+[var.homelessness_target]
+label = "Temporary accommodation its drivers point to"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "max(temporary_accommodation_2024 * (1.0 - homeless_rent_controls * rent_controls - homeless_homes_effect * (homes_policy_level - 1.0) + select(poverty_at_start < -0.5 or unemployment_at_start < -0.5, 0.0, homeless_poverty_effect * (working_age_poverty_rate - poverty_at_start) + homeless_unemployment_effect * (unemployment_rate - unemployment_at_start)) + homeless_mortgage_effect * (mortgage_rate - mortgage_rate_2024)) - homeless_social_share * social_homes_total / home_unit, 0.0)"
+
+[param.home_unit]
+doc = "Turns a number of homes into a number of households"
+type = "real"
+unit = "home"
+value = 1.0
+
+[state.homelessness]
+label = "Homeless households"
+doc = "Households in temporary accommodation in England: 126,040 on 30 September 2024. Fewer with rent controls, more homes built and a social housing programme; more with poverty, unemployment and dearer mortgages"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 126040.0
+next = "homelessness + (homelessness_target - homelessness) / homeless_adjust_months"
+
+# ================================================================= productivity
+
+[param.productivity_business_effect]
+doc = "Productivity for each unit of business investment against 2024's, grown with the economy's trend: a fifth more investment, 1% more output per job in time (the capital stock about 2.5% higher after five years, at a capital share of about 0.3, and some of it to come; a judgement)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[param.productivity_public_effect]
+doc = "Productivity for each unit of public investment against 2024's, grown with the economy's trend: a fifth more (about half a point of output), 0.5% in time (the OBR, 2024: a sustained point of output more public investment raises potential output about 0.4% in five years; a judgement)"
+type = "real"
+unit = "1"
+value = 0.025
+
+[param.productivity_school_effect]
+doc = "Productivity for each unit of school attainment (the share of pupils with grade 5 in English and maths) against the start: 10 points, 1% in time, as better-schooled cohorts join the workforce (a judgement after Hanushek and Woessmann; only a few cohorts join in a term)"
+type = "real"
+unit = "1"
+value = 0.1
+
+[param.productivity_health_effect]
+doc = "Productivity for each year of healthy life expectancy against the start: 1% (fewer people kept from work by ill health; a judgement)"
+type = "real"
+unit = "1/year"
+value = 0.01
+
+[param.productivity_adjust_months]
+doc = "Months over which productivity follows its drivers, exponentially: about five years (a judgement: capital and skills build slowly)"
+type = "real"
+unit = "1"
+value = 60.0
+
+[var.productivity_drivers]
+doc = "Business and public investment against their trend, school attainment and healthy life, weighted: the part of productivity's target that policy moves"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "productivity_business_effect * business_investment / (business_investment_2024 * trend_index) + productivity_public_effect * public_investment / (public_investment_2024 * trend_index) + productivity_school_effect * school_attainment + productivity_health_effect * healthy_life_expectancy"
+
+[param.business_investment_2024]
+doc = "Business investment in 2024, a month (an estimate: models/uk/README.md, Known weaknesses)"
+type = "money"
+unit = "GBP/month"
+value = 23889147500
+
+[param.public_investment_2024]
+doc = "Public investment in 2024, a month (ONS public sector finances)"
+type = "money"
+unit = "GBP/month"
+value = 11849333333
+
+[state.productivity_drivers_at_start]
+doc = "The drivers in the base month; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(productivity_drivers_at_start < -0.5, productivity_drivers, productivity_drivers_at_start)"
+
+[var.productivity_target]
+doc = "Productivity its drivers point to, against 2024 = 100"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(productivity_drivers_at_start < -0.5, 100.0, 100.0 * (1.0 + productivity_drivers - productivity_drivers_at_start))"
+
+[state.productivity]
+label = "Productivity"
+doc = "Output per job against 2024 = 100, beyond its trend: higher with more business and public investment, better schools and longer healthy lives, over about five years. Pay and exports follow it"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 100.0
+next = "productivity + (productivity_target - productivity) / productivity_adjust_months"
+
+[var.productivity_change]
+label = "Productivity's growth this month"
+doc = "What private pay gains beyond prices and trend productivity this month (model.toml)"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "(productivity_target - productivity) / productivity_adjust_months / productivity"
