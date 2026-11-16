@@ -16,11 +16,11 @@ import tomllib
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 UK = ROOT / "models" / "uk"
 SEED = 2025
 PENCE_PER_MILLION = 100_000_000  # £1 million in pence
@@ -32,9 +32,8 @@ def model():
     return load_model(UK)
 
 
-# With 20,000 households the oracle takes about a second a month, so these tests cover two
-# years; the 30-year checks run on the engine (crates/core/tests/uk_long_run.rs), which the
-# recorded hashes below hold to the oracle.
+# These tests cover two years, the length of the recorded hashes; the 30-year checks are in
+# crates/core/tests/uk_long_run.rs.
 STEPS = 24
 
 
@@ -292,9 +291,9 @@ class Households(unittest.TestCase):
 
 class Reproducibility(unittest.TestCase):
     def test_matches_the_recorded_hashes(self):
-        # Recorded with:
-        # python -m polisim_oracle run ../models/uk/scenarios/2025.toml --steps 120
-        #     --columns step,hash --out ../models/uk/golden/2025.hashes.csv   (with --steps 24)
+        # Recorded with (tools/record_goldens.py):
+        # polisim run models/uk/scenarios/2025.toml --steps 24 --columns step,hash
+        #     --out models/uk/golden/2025.hashes.csv
         with open(UK / "golden" / "2025.hashes.csv", newline="", encoding="utf-8") as handle:
             golden = [row["hash"] for row in csv.DictReader(handle)]
         self.assertEqual(len(golden), STEPS)

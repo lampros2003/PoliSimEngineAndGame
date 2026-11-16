@@ -1,14 +1,20 @@
-//! Command-line runner. Its CSV is byte for byte the Python oracle's:
+﻿//! Command-line runner:
 //!
 //! ```text
 //! polisim run models/toy/scenarios/baseline.toml --out run.csv
 //! ```
 //!
-//! Money columns are whole numbers of minor units (pence), so the file is exact.
+//! Money columns are whole numbers of minor units (pence), so the file is exact. Reals are
+//! written in the shortest form that reads back to the same value (Python's `repr`), the
+//! form the recorded hashes and fixtures were written in.
 //! Exit codes: 0 finished, 1 the model or scenario could not be loaded, 2 the run failed
 //! part-way (the rows completed before the failure are still written).
+//!
+//! `polisim serve` drives one run line by line for tests and tools (docs/spec/09-serve.md).
 
+mod json;
 mod play;
+mod serve;
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -18,9 +24,10 @@ use std::time::Instant;
 
 use polisim_core::{Error, Row, Simulation, Val, load_scenario, pyfmt};
 
-const USAGE: &str = "\
+pub(crate) const USAGE: &str = "\
 usage: polisim run <scenario.toml> [options]
        polisim play <scenario.toml> [--seed N] [--resume FILE]
+       polisim serve <scenario.toml | model folder> [--mod DIR]... [--seed N] [--preset P]
        polisim text <scenario.toml> [LANGUAGE]
        polisim version
 
@@ -33,6 +40,17 @@ options:
   --resume FILE    continue from a save file; seed and parameters come from the save
   --time           report milliseconds per step on standard error
   --profile N      report the N formulas that took longest, per step, on standard error
+
+polisim serve answers one request per line on standard input with one JSON line on
+standard output (the first line says whether the model loaded):
+  new {seed = N, preset = \"P\", params = {..}, levers = {..}}   start the run again
+  set NAME VALUE      change a lever, or answer a dilemma, in the next step
+  step [N]            run N steps (default 1); the rows: step, hash, every national value
+  get NAME            a value now: one number, or one per record or cell
+  evaluate {formula = \"..\", entity = \"..\", type = \"real\", unit = \"1\"}
+  votes | model | symbols | scenario | quit
+Values are TOML. An error is {\"error\": message, \"kind\": model|formula|run|request}.
+See docs/spec/09-serve.md.
 
 polisim text lists the languages a scenario's model and mods have text in, or, given one,
 what the model has words for that the language does not translate (exit 1 if anything).";
@@ -60,7 +78,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--out" => options.out = Some(value("--out")?.into()),
             "--steps" => options.steps = Some(value("--steps")?.parse().map_err(|_| "--steps needs a whole number")?),
             "--seed" => {
-                // Any whole number; it is reduced to 64 bits as the oracle does.
+                // Any whole number; it is reduced to 64 bits.
                 let seed: i128 = value("--seed")?.parse().map_err(|_| "--seed needs a whole number")?;
                 options.seed = Some(seed as u64);
             }
@@ -93,7 +111,7 @@ fn write_csv(out: &mut dyn Write, names: &[String], rows: &[Row], columns: Optio
     }
     let all: Vec<String> = ["step", "hash"].iter().map(|s| s.to_string()).chain(names.iter().cloned()).collect();
     let chosen: &[String] = columns.unwrap_or(&all);
-    // A requested column that does not exist is written empty, as the oracle writes it.
+    // A requested column that does not exist is written empty.
     let positions: Vec<Option<usize>> = chosen.iter().map(|c| all.iter().position(|n| n == c)).collect();
     writeln!(out, "{}", chosen.join(","))?;
     for row in rows {
@@ -250,6 +268,7 @@ fn main() -> ExitCode {
     let outcome = match args.first().map(String::as_str) {
         Some("run") => parse_options(&args[1..]).and_then(run),
         Some("play") => parse_options(&args[1..]).and_then(play_session).map(|()| ExitCode::SUCCESS),
+        Some("serve") => serve::serve(&args[1..]),
         Some("text") => text_check(&args[1..]),
         Some("version") => {
             println!("polisim {}", polisim_core::VERSION);

@@ -1,6 +1,5 @@
-//! Thirty years of unchanged policy in the UK model (models/uk), on the engine. The oracle's
-//! tests (oracle/tests/test_uk.py) cover the first two years, where the recorded hashes tie
-//! the engine to the oracle; with 20,000 households the oracle is too slow for 360 months.
+//! Thirty years of unchanged policy in the UK model (models/uk). tests/test_uk.py covers
+//! the first two years in detail, where the recorded hashes pin the run.
 //! Ranges are wide on purpose: they catch a model that breaks, not one slightly off.
 
 use std::collections::HashMap;

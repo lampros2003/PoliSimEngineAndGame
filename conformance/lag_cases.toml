@@ -1,5 +1,6 @@
-# Lags (docs/spec/06-model-format-1.md, stage S10.5): cases that both the oracle
-# (oracle/tests/test_lags.py) and the engine (crates/core/tests/lags.rs) run.
+# Lags (docs/spec/06-model-format-1.md, stage S10.5): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/lags.rs).
 #
 # Each case appends `add` to the base model (\n stands for a line break), schedules the
 # `commands` ([step, lever, value], none if absent), runs `steps` steps and expects one of:

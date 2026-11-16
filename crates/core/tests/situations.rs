@@ -1,5 +1,5 @@
-//! Stage S7.3: situations. The shared cases in conformance/situation_cases.toml, which the
-//! oracle runs too (oracle/tests/test_situations.py).
+//! Stage S7.3: situations. The shared cases in conformance/situation_cases.toml, with their
+//! recorded outcomes.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ fn same(got: Option<Val>, want: &Value) -> bool {
 }
 
 #[test]
-fn shared_cases_match_the_oracle() {
+fn shared_cases_match_their_recorded_outcomes() {
     let text = std::fs::read_to_string(root().join("conformance/situation_cases.toml")).unwrap();
     let cases: toml::Table = text.parse().unwrap();
     let base = cases["base"].as_str().unwrap();
@@ -64,7 +64,7 @@ fn shared_cases_match_the_oracle() {
                 for (i, (value, series)) in case["series"].as_table().unwrap().iter().enumerate() {
                     for (step, want) in series.as_array().unwrap().iter().enumerate() {
                         let got = after[step][i];
-                        assert!(same(got, want), "{name}: {value} after step {step} is {got:?}, the oracle {want:?}");
+                        assert!(same(got, want), "{name}: {value} after step {step} is {got:?}, recorded {want:?}");
                     }
                 }
             }

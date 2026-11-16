@@ -1,5 +1,5 @@
-//! Model format 1 (docs/spec/06-model-format-1.md): the engine refuses the same bad
-//! declarations and data files as the oracle (oracle/tests/test_format1.py).
+//! Model format 1 (docs/spec/06-model-format-1.md): bad declarations and data files are
+//! refused. The rest of format 1's behaviour is tested in tests/test_format1.py.
 
 use std::path::PathBuf;
 
@@ -91,15 +91,14 @@ fn a_data_file_must_hold_every_cell_once() {
 }
 
 #[test]
-fn reserved_function_names_match_the_oracle() {
-    // The oracle reserves the name of every function it implements
-    // (oracle/polisim_oracle/expr.py, FUNCTIONS); a model may not name an element after one.
-    let oracle =
-        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../oracle/polisim_oracle/expr.py"))
+fn reserved_function_names_are_the_recorded_list() {
+    // A model may not name an element after a function. The list is pinned by
+    // conformance/functions.txt, written in stage S14.2 from the functions the Python
+    // reference implementation had: adding or removing a function changes both.
+    let recorded =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance/functions.txt"))
             .unwrap();
-    let mut names: Vec<&str> =
-        oracle.lines().filter_map(|l| l.trim().strip_prefix("def _fn_")).filter_map(|l| l.split('(').next()).collect();
-    names.sort();
+    let names: Vec<&str> = recorded.lines().collect();
     assert_eq!(names, polisim_core::model::FUNCTIONS.to_vec());
 }
 

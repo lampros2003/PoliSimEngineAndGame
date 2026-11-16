@@ -1,5 +1,6 @@
-# Bills (docs/spec/06-model-format-1.md, stage S5.4): cases that both the oracle
-# (oracle/tests/test_bills.py) and the engine (crates/core/tests/bills.rs) run.
+# Bills (docs/spec/06-model-format-1.md, stage S5.4): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/bills.rs).
 #
 # Each case edits the base model (`replace`: pairs of [old text, new text], each old text
 # found exactly once; in them \n stands for a line break), schedules lever changes for
@@ -238,7 +239,7 @@ replace = [['format = 1', 'format = 0'], ['[dim.bloc]\nmembers = ["a", "b", "c"]
 expect = "refused"
 
 # Renames (stage S7.0, docs/spec/06-model-format-1.md): `[renamed]` on the same base. The
-# oracle has no saves, but both loaders accept and refuse the same sections.
+# reference implementation had no saves; its loader accepted and refused the same sections.
 
 [[case]]
 name = "a rename to an element"

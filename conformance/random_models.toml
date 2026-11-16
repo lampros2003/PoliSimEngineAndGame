@@ -1,7 +1,7 @@
-# Stage S10.7: random whole models and the oracle's state hash after each step
-# (tools/gen_random_models.py, which explains them). The engine must give the same
+# Stage S10.7: random whole models and the state hash after each step, recorded by the
+# Python reference implementation (retired in stage S14.2 with its generator,
+# tools/gen_random_models.py). A frozen fixture: the engine must give the same
 # hashes on one, two and eight threads (crates/core/tests/random_models.rs).
-# Regenerate only on purpose.
 
 [[model]]
 name = "random1"

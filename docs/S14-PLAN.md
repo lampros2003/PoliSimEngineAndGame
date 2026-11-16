@@ -46,7 +46,7 @@ What three surveys of the code found (so the plan stands on facts):
 | Notices | One place (a line under the top bar), gone after a few seconds or on a click. A voted-down bill is told once, in the report, not also in a notice |
 | Groups | One ring round the centre. Each group is an arc of the ring; families are separated by a gap and named once. An arc's length is the group's share of the electorate within its family, with a least length so every arc can carry its pictogram. Just outside each arc runs its approval arc, filled in proportion to approval and coloured green, yellow or red. Name and figure show on hover and stay for the largest groups. A click opens the group's popup as now |
 | What is good approval | The scenario says (`[play.web]` `approval_good`, `approval_bad`). The UK: green from 38%, red below 28%, yellow between. A group with no governing party to back (Northern Ireland) is grey |
-| Statistics | An indicator's ring is blue when it stands about where it stood when the government took office, green when it is better, red when it is worse, by the scenario's `better` and a band (`band`, by default 2% of the value, or 0.2 points for a rate). An indicator with no `better` is always blue. The small triangle for last month's movement stays |
+| Statistics | An indicator's colour says what kind of thing it measures, and does not change in play: red for a bad thing (crime, unemployment, poverty, debt), green for a good thing (output, healthy life, homes built), blue for the rest. The scenario's `better` decides: `low` is a bad thing, `high` a good one, none is neutral. The small triangle for last month's movement stays |
 | Situations | Green if good, red if bad, blue if neither (a question waiting keeps its ochre). They sit in one strip under the top bar, which is always there, so they never move a node |
 | Policies | As they are |
 | Links | Green when the effect is good for what it reaches, red when bad, blue when neither can be said. Width for strength. A sign (+ or -) at the arrowhead says rise or fall, so colour never has to carry two meanings |
@@ -98,6 +98,7 @@ hurt play:
 | A slump heals in months | Employment follows output with a lag (firms hoard labour, then shed it), and long unemployment lowers the workforce for a time |
 | A large tax rise first worsens the deficit | Found and fixed, with a test |
 | Pensioner poverty falls nine points in one month | The synthetic households' pensions are spread as the published distribution is, so they do not cross the line together |
+| No homelessness and no productivity on the board | Two new statistics, asked for by the owner. Homelessness (households in temporary accommodation, from the published 2024 figure) moves with rents, homes built, social housing, benefits and unemployment; it is a bad thing, so red. Productivity (output per hour or per job against 2024) moves with business and public investment, school results and health; it is a good thing, so green, and it feeds pay and output over time |
 | Austerity only ties with doing nothing | Re-measured after the above, then tuned: the eight strategies are run again |
 
 Each change keeps the 2024 base month to the published figures and is tested on the engine.
@@ -133,7 +134,7 @@ After every stage, from the repository root (close the game first; it locks the 
 | # | Status |
 |---|---|
 | S14.1 | Under way |
-| S14.2 | Under way |
+| S14.2 | Done. `oracle/` is gone; the engine is the only implementation and `docs/spec` the specification (00 §12, "One implementation, pinned"). `polisim serve` (`crates/cli/src/serve.rs`, `docs/spec/09-serve.md`) holds one or more runs of a loaded model and answers one request a line in JSON: set, step, get a column, evaluate, votes, symbols. `tools/engine.py` gives the tests and the UK tools the calls they had. Of the 196 old tests, 179 moved to `tests/` and run on the engine (19 rewritten through `evaluate`), 17 were already in Rust, parts of 2 are new Rust tests (`crates/core/tests/language.rs`); none lost (`tests/README.md` lists each). The suite takes about a minute, from forty. The hindcast, the calibration's base month and `screen.py` run on the engine; the hindcast's committed results and all eight recorded hash files are reproduced (`tools/record_goldens.py --check`). `models/` is unchanged but for README wording. The comparison tool and the fixture generators are removed; `conformance/` stays as frozen fixtures. CI runs the engine's tests, the Python suite, the recorded hashes and the hindcast check |
 | S14.3 | Under way |
 | S14.4 | Planned |
 | S14.5 | Planned |

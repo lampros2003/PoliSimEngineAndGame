@@ -3,6 +3,8 @@
     python tools/uk/hindcast.py            run and write models/uk/hindcast/
     python tools/uk/hindcast.py --check    run and fail if the committed results differ
 
+It runs on the engine (tools/engine.py; build it first with cargo build --release).
+
 The model is calibrated to 2004 (tools/uk/calibrate.py with base year 2004) and run month
 by month from January 2005 to December 2024. What the model takes as given follows the
 published figures:
@@ -49,11 +51,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-sys.path.insert(0, str(ROOT / "oracle"))
+sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(HERE))
 
 import calibrate  # noqa: E402
-from polisim_oracle import Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
 BASE = "2004"
 FIRST, LAST = 2005, 2024

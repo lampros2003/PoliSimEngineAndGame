@@ -1,7 +1,16 @@
-"""The formula language and the loader's checks (docs/spec/02-formula-language-v0.md)."""
+"""The formula language and the loader's checks (docs/spec/02-formula-language-v0.md).
+
+Formulas are evaluated against a small model (SCOPE: three national values, two household
+columns, one tax table, one random stream) through the engine's `evaluate`. What the
+engine's own functions do at their edges (exp, ln, sqrt and pow against the C library,
+the random numbers' known answers, money read from a decimal, the marginal schedule on its
+own) is tested in Rust: crates/core/src/program.rs, rng.rs, model.rs and
+crates/core/tests/language.rs (tests/README.md lists where each old test went).
+"""
 
 from __future__ import annotations
 
+import functools
 import math
 import sys
 import tempfile
@@ -9,42 +18,100 @@ import textwrap
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
-from polisim_oracle.expr import compile_formula, marginal_amount  # noqa: E402
-from polisim_oracle.model import Decl, Entity, Table, convert  # noqa: E402
-from polisim_oracle.rng import fnv1a32, philox4x32_10, uniform  # noqa: E402
-from polisim_oracle.sim import Runtime  # noqa: E402
-from polisim_oracle.units import parse_unit  # noqa: E402
+from engine import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
+
+# Money in whole units (minor_units = 1), so values read as they are written.
+SCOPE = """
+[model]
+id = "scope"
+format = 0
+currency = "GBP"
+minor_units = 1
+step = "month"
+phases = ["one", "two"]
+
+[sector.public]
+[sector.private]
+
+[instrument.money]
+unit = "GBP"
+issuer = "public"
+
+[account.public_money]
+sector = "public"
+instrument = "money"
+
+[account.stock]
+sector = "private"
+instrument = "money"
+initial = 5000
+
+[param.sales]
+type = "money"
+unit = "GBP/month"
+value = 1200
+
+[param.rate]
+type = "real"
+unit = "1"
+value = 0.2
+
+[param.allowance]
+type = "money"
+unit = "GBP/month/household"
+value = 100000
+
+[entity.household]
+data = "households.csv"
+id = "id"
+weight = "weight"
+
+[entity.household.columns.wage]
+type = "money"
+unit = "GBP/month/household"
+
+[state.working]
+entity = "household"
+type = "bool"
+unit = "1"
+phase = "one"
+initial = { column = "working0" }
+next = "working"
+
+[table.bands]
+kind = "marginal"
+unit = "GBP/month/household"
+bands = [{ from = "allowance", rate = "rate" }, { from = "allowance * 4", rate = "rate * 2.0" }]
+
+[stream.draws]
+"""
+HOUSEHOLDS = "id,weight,wage,working0\n10,2,150000,1\n11,3,90000,0\n12,5,700000,1\n"
+
+
+def write(folder: Path, model: str, files: dict[str, str] | None = None) -> Path:
+    (folder / "model.toml").write_text(model, encoding="utf-8", newline="\n")
+    for name, text in (files or {}).items():
+        (folder / name).write_text(text, encoding="utf-8", newline="\n")
+    return folder
+
+
+@functools.lru_cache(maxsize=None)
+def scope_model():
+    with tempfile.TemporaryDirectory() as folder:
+        return load_model(write(Path(folder), SCOPE, {"households.csv": HOUSEHOLDS}))
 
 
 class Scope:
-    """A hand-built scope: three scalars, two household columns, one tax table."""
+    """A run of SCOPE with seed 99, before its first step."""
 
     def __init__(self):
-        gbp_month, per_hh = parse_unit("GBP/month"), parse_unit("GBP/month/household")
-        self.step_unit = parse_unit("month")
-        self.symbols = {
-            "sales": Decl("sales", "var", "int", gbp_month),
-            "stock": Decl("stock", "account", "int", parse_unit("GBP")),
-            "rate": Decl("rate", "param", "real", parse_unit("1")),
-            "allowance": Decl("allowance", "param", "int", per_hh),
-            "wage": Decl("wage", "column", "int", per_hh, entity="household"),
-            "working": Decl("working", "state", "bool", parse_unit("1"), entity="household"),
-        }
-        self.tables = {"bands": Table("bands", per_hh, [("allowance", "rate"), ("allowance * 4", "rate * 2.0")])}
-        self.streams = {"draws": fnv1a32("draws")}
-        self.entities = {"household": Entity("household", [10, 11, 12], [2, 3, 5], {})}
-        self.rt = Runtime(seed=99)
-        self.rt.S.update(sales=1200, stock=5000, rate=0.2, allowance=100_000)
-        self.rt.C.update(wage=[150_000, 90_000, 700_000], working=[True, False, True])
-        self.rt.PS.update(sales=1000, stock=4000)
-        self.rt.PC.update(working=[False, False, True])
+        self.sim = Simulation(scope_model(), seed=99)
 
     def value(self, src, typ="int", unit="1", ctx=None, record=0):
-        fn, _, _ = compile_formula(src, self, self.rt, ctx, typ, parse_unit(unit), "test")
-        return fn(record)
+        got = self.sim.evaluate(src, entity=ctx, type=typ, unit=unit)
+        return got[record] if ctx else got
 
 
 class Arithmetic(unittest.TestCase):
@@ -143,16 +210,12 @@ class TablesAggregatesAndLags(unittest.TestCase):
         self.s = Scope()
 
     def test_marginal_schedule(self):
-        # 20% from 1,000 to 4,000 and 40% above, amounts in pence.
-        self.assertEqual(marginal_amount(500_000, [100_000, 400_000], [0.2, 0.4], "t"), 100_000)
-        self.assertEqual(marginal_amount(50_000, [100_000, 400_000], [0.2, 0.4], "t"), 0)
-        self.assertEqual(marginal_amount(100_001, [100_000, 400_000], [0.2, 0.4], "t"), 0)
-        self.assertEqual(marginal_amount(100_003, [100_000, 400_000], [0.2, 0.4], "t"), 1)
-        with self.assertRaises(SimError):
-            marginal_amount(1, [400_000, 100_000], [0.2, 0.4], "t")
+        # 20% from 100,000 to 400,000 and 40% above. The schedule on its own (rounding at
+        # the band edges, bands out of order) is in crates/core/tests/language.rs.
         per_hh = "GBP/month/household"
         self.assertEqual(self.s.value("marginal(wage, bands)", unit=per_hh, ctx="household", record=2),
                          round(0.2 * 300_000 + 0.4 * 300_000))
+        self.assertEqual(self.s.value("marginal(wage, bands)", unit=per_hh, ctx="household", record=1), 0)
 
     def test_weighted_aggregates(self):
         self.assertEqual(self.s.value("wsum(household, wage)", unit="GBP/month"),
@@ -169,26 +232,53 @@ class TablesAggregatesAndLags(unittest.TestCase):
             self.s.value("wsum(household, wage)", unit="GBP/month", ctx="household")
 
     def test_prev_reads_last_step(self):
-        self.assertEqual(self.s.value("sales - prev(sales)", unit="GBP/month"), 200)
-        self.assertIs(self.s.value("working and not prev(working)", "bool", ctx="household", record=0), True)
+        # A state moved on in phase one is read at its new value in phase two, and prev()
+        # gives its value at the end of the step before.
+        extra = """
+            [state.level]
+            type = "money"
+            unit = "GBP/month"
+            phase = "one"
+            initial = 1000
+            next = "level + round(level * 0.2)"
+
+            [state.flag]
+            entity = "household"
+            type = "bool"
+            unit = "1"
+            phase = "one"
+            initial = { column = "working0" }
+            next = "true"
+
+            [var.change]
+            type = "money"
+            unit = "GBP/month"
+            phase = "two"
+            expr = "level - prev(level)"
+
+            [var.started]
+            entity = "household"
+            type = "bool"
+            unit = "1"
+            phase = "two"
+            expr = "flag and not prev(flag)"
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            sim = Simulation(load_model(write(Path(folder), SCOPE + textwrap.dedent(extra),
+                                              {"households.csv": HOUSEHOLDS})))
+        self.assertEqual(sim.step()["change"], 200)
+        self.assertEqual(sim.column("started"), [False, True, False])
         with self.assertRaises(FormulaError):
             self.s.value("prev(rate)", "real")
 
     def test_random_draws_depend_only_on_seed_stream_record_and_step(self):
+        # The exact value, philox(seed, stream, record id, step), is checked in
+        # crates/core/tests/language.rs.
         first = self.s.value("rand(draws)", "real", ctx="household", record=1)
-        self.assertEqual(first, uniform(99, fnv1a32("draws"), 11, 0))
         self.assertTrue(0.0 <= first < 1.0)
-        self.s.rt.step = 1
+        self.assertEqual(Scope().value("rand(draws)", "real", ctx="household", record=1), first)
+        self.s.sim.step()
         self.assertNotEqual(self.s.value("rand(draws)", "real", ctx="household", record=1), first)
-
-    def test_philox_known_answers(self):
-        # Vectors from the Random123 reference distribution.
-        self.assertEqual(philox4x32_10((0, 0, 0, 0), (0, 0)),
-                         (0x6627E8D5, 0xE169C58D, 0xBC57AC4C, 0x9B00DBD8))
-        self.assertEqual(philox4x32_10((0xFFFFFFFF,) * 4, (0xFFFFFFFF,) * 2),
-                         (0x408F276D, 0x41C83B0E, 0xA20BC7C6, 0x6D5451FD))
-        self.assertEqual(philox4x32_10((0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344), (0xA4093822, 0x299F31D0)),
-                         (0xD16CFE09, 0x94FDCCEB, 0x5001E420, 0x24126EA1))
 
 
 MINIMAL = """
@@ -252,19 +342,6 @@ class Loader(unittest.TestCase):
                 unit = "GBP"
                 value = 1.005
             """)
-
-    def test_money_is_scaled_from_the_number_as_typed(self):
-        # The same cases are in crates/core/src/model.rs.
-        cases = [(2301745961.03, 230174596103), (0.29, 29), (1.1, 110), (-5072066666.6, -507206666660),
-                 (24217000000.0, 2421700000000), (1e16, 10**18), (12.5, 1250)]
-        for raw, pence in cases:
-            self.assertEqual(convert(raw, "int", True, 100, "x"), pence)
-        self.assertEqual(convert(3.0, "int", True, 1, "x"), 3)
-        for raw in (1.005, 0.123456789, 2301745961.035, 1.5e-7):
-            with self.assertRaises(ModelError):
-                convert(raw, "int", True, 100, "x")
-        with self.assertRaises(ModelError):
-            convert(1.5, "int", True, 1, "x")
 
     def test_reading_a_later_phase_is_rejected(self):
         with self.assertRaises(ModelError):
@@ -352,82 +429,29 @@ class Loader(unittest.TestCase):
                 Simulation(m, commands={0: {"grant": 5000}}).step()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Exp(unittest.TestCase):
-    """Stage S5.1: exp by a fixed algorithm (docs/spec/02-formula-language-v0.md)."""
-
-    def test_within_two_units_in_the_last_place_of_the_c_library(self):
-        import math
-        import random
-        import struct
-
-        from polisim_oracle.expr import exp_fixed
-
-        def ulps(a: float, b: float) -> int:
-            return abs(struct.unpack("<q", struct.pack("<d", a))[0] - struct.unpack("<q", struct.pack("<d", b))[0])
-        rng = random.Random(51)
-        for _ in range(20000):
-            x = rng.choice([rng.uniform(-708.0, 709.0), rng.uniform(-30.0, 30.0), rng.uniform(-0.4, 0.4)])
-            self.assertLessEqual(ulps(exp_fixed(x), math.exp(x)), 2, x)
-
-    def test_limits(self):
-        import math
-
-        from polisim_oracle.expr import exp_fixed
-        self.assertEqual(exp_fixed(0.0), 1.0)
-        self.assertEqual(exp_fixed(709.5), math.inf)
-        self.assertEqual(exp_fixed(-708.5), 0.0)
-        self.assertTrue(math.isnan(exp_fixed(math.nan)))
+    """Stage S5.1: exp by a fixed algorithm (docs/spec/02-formula-language-v0.md). Its accuracy
+    and limits: crates/core/src/program.rs."""
 
     def test_in_a_formula(self):
         s = Scope()
         self.assertAlmostEqual(s.value("exp(rate) / (1.0 + exp(rate))", "real"), 0.549833997312478, places=12)
-        with self.assertRaises(Exception):
+        with self.assertRaises(FormulaError):
             s.value("exp(sales)", "real")  # money has a unit
 
 
 class LnSqrtPow(unittest.TestCase):
-    """Stage S10.6: ln, sqrt and pow by fixed algorithms (docs/spec/02-formula-language-v0.md)."""
-
-    def test_ln_within_two_units_in_the_last_place_of_the_c_library(self):
-        import math
-        import random
-        import struct
-
-        from polisim_oracle.expr import ln_fixed
-
-        def ulps(a: float, b: float) -> int:
-            return abs(struct.unpack("<q", struct.pack("<d", a))[0] - struct.unpack("<q", struct.pack("<d", b))[0])
-        rng = random.Random(106)
-        for _ in range(20000):
-            x = rng.choice([rng.uniform(0.5, 2.0), rng.uniform(0.999, 1.001), math.exp(rng.uniform(-744.0, 709.0)),
-                            rng.uniform(0.0, 1e9)])
-            if x > 0.0:
-                self.assertLessEqual(ulps(ln_fixed(x), math.log(x)), 2, x)
-
-    def test_limits(self):
-        import math
-
-        from polisim_oracle.expr import ln_fixed, pow_fixed, sqrt_fixed
-        self.assertEqual((ln_fixed(1.0), ln_fixed(2.0), ln_fixed(5e-324)), (0.0, math.log(2.0), -744.4400719213812))
-        self.assertEqual((ln_fixed(0.0), ln_fixed(math.inf)), (-math.inf, math.inf))
-        self.assertTrue(math.isnan(ln_fixed(-1.0)) and math.isnan(ln_fixed(math.nan)))
-        self.assertEqual(sqrt_fixed(2.0), math.sqrt(2.0))
-        self.assertTrue(math.isnan(sqrt_fixed(-1.0)))
-        self.assertEqual((pow_fixed(5.0, 2.0), pow_fixed(-2.0, 3.0), pow_fixed(-2.0, -2.0)), (25.0, -8.0, 0.25))
-        self.assertEqual((pow_fixed(math.nan, 0.0), pow_fixed(0.0, -1.0), pow_fixed(-0.0, -1.0)),
-                         (1.0, math.inf, -math.inf))
-        self.assertTrue(math.isnan(pow_fixed(-2.0, 2.5)) and math.isnan(pow_fixed(1.0, math.nan)))
-        self.assertEqual((pow_fixed(0.0, 0.5), pow_fixed(0.0, -0.5)), (0.0, math.inf))
-        self.assertEqual((pow_fixed(math.inf, 0.5), pow_fixed(math.inf, -0.5)), (math.inf, 0.0))
+    """Stage S10.6: ln, sqrt and pow by fixed algorithms (docs/spec/02-formula-language-v0.md).
+    Their accuracy and limits: crates/core/src/program.rs."""
 
     def test_in_a_formula(self):
         s = Scope()
         self.assertAlmostEqual(s.value("pow(1.0 + rate, 12)", "real"), 1.2 ** 12, places=12)
         self.assertAlmostEqual(s.value("exp(ln(2.0) * 0.5) - sqrt(2.0)", "real"), 0.0, places=15)
         for bad in ("ln(sales)", "sqrt(sales)", "pow(sales, 2)", "pow(2.0)"):
-            with self.assertRaises(Exception):
+            with self.assertRaises(FormulaError):
                 s.value(bad, "real")
+
+
+if __name__ == "__main__":
+    unittest.main()

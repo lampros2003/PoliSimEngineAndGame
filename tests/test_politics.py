@@ -9,11 +9,11 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 UK = ROOT / "models" / "uk"
 REGIONS = ["north_east", "north_west", "yorkshire", "east_midlands", "west_midlands", "east", "london", "south_east",
            "south_west", "wales", "scotland", "northern_ireland"]

@@ -1,5 +1,6 @@
-# Situations (docs/spec/06-model-format-1.md, stage S7.3): cases that both the oracle
-# (oracle/tests/test_situations.py) and the engine (crates/core/tests/situations.rs) run.
+# Situations (docs/spec/06-model-format-1.md, stage S7.3): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/situations.rs).
 #
 # Each case appends `add` to the base model (\n stands for a line break), runs `steps`
 # steps and expects one of:

@@ -7,7 +7,7 @@ import csv
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "models" / "uk" / "data" / "elections"
 BLOCS = ["centre_left", "centre_right", "liberal", "populist_right", "green", "scottish_nationalist",
          "welsh_nationalist", "northern_ireland", "other"]

@@ -13,11 +13,11 @@ import tomllib
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 UK = ROOT / "models" / "uk"
 SEED = 2025
 TWO_YEARS = 25  # the base month and two years after a change made in the second

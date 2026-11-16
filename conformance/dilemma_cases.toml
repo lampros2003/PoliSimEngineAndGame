@@ -1,5 +1,6 @@
-# Dilemmas (docs/spec/06-model-format-1.md, stage S9.1): cases that both the oracle
-# (oracle/tests/test_dilemmas.py) and the engine (crates/core/tests/dilemmas.rs) run.
+# Dilemmas (docs/spec/06-model-format-1.md, stage S9.1): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/dilemmas.rs).
 #
 # Each case appends `add` to the base model (\n stands for a line break), schedules the
 # `answers` ([step, dilemma, answer], none if absent), runs `steps` steps and expects one of:

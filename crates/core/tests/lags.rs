@@ -1,5 +1,5 @@
-//! Stage S10.5: lags. The shared cases in conformance/lag_cases.toml, which the oracle runs
-//! too (oracle/tests/test_lags.py), a save in the middle of a lag, and the catalogue.
+//! Stage S10.5: lags. The shared cases in conformance/lag_cases.toml, with their recorded
+//! outcomes, a save in the middle of a lag, and the catalogue.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -68,7 +68,7 @@ fn cases() -> toml::Table {
 }
 
 #[test]
-fn shared_cases_match_the_oracle() {
+fn shared_cases_match_their_recorded_outcomes() {
     let cases = cases();
     let base = cases["base"].as_str().unwrap();
     let list = cases["case"].as_array().unwrap();
@@ -98,7 +98,7 @@ fn shared_cases_match_the_oracle() {
                 for (i, (value, series)) in case["series"].as_table().unwrap().iter().enumerate() {
                     for (step, want) in series.as_array().unwrap().iter().enumerate() {
                         let got = after[step][i];
-                        assert!(same(got, want), "{name}: {value} after step {step} is {got:?}, the oracle {want:?}");
+                        assert!(same(got, want), "{name}: {value} after step {step} is {got:?}, recorded {want:?}");
                     }
                 }
             }

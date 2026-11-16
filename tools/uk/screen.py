@@ -33,7 +33,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "oracle"))
+sys.path.insert(0, str(ROOT / "tools"))
 EXE = "polisim.exe" if sys.platform == "win32" else "polisim"
 LEVELS = ("low", "central", "high")
 SEED = 6
@@ -87,7 +87,7 @@ def main() -> int:
     parser.add_argument("--months", type=int, default=60)
     parser.add_argument("--engine", type=Path, default=ROOT / "target" / "release" / EXE)
     args = parser.parse_args()
-    from polisim_oracle import load_model
+    from engine import load_model
     space = factors(load_model(ROOT / "models" / "uk"))
     names = list(space)
 

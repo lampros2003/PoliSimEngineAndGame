@@ -1,5 +1,5 @@
 //! Weights that change (docs/spec/06-model-format-1.md, stage S4.4): the cases in
-//! conformance/rake_cases.toml, which the oracle runs too (oracle/tests/test_raking.py),
+//! conformance/rake_cases.toml, with their recorded outcomes,
 //! and the test model models/raking through saves, explanations and a reload.
 
 use std::path::PathBuf;
@@ -59,7 +59,7 @@ fn outcome(cases: &toml::Table, case: &toml::Table, index: usize) -> Outcome {
 }
 
 #[test]
-fn shared_cases_match_the_oracles_expectations() {
+fn shared_cases_match_their_expectations() {
     let text = std::fs::read_to_string(root().join("conformance/rake_cases.toml")).unwrap();
     let cases: toml::Table = text.parse().unwrap();
     let list = cases["case"].as_array().unwrap();
@@ -93,14 +93,14 @@ fn golden() -> Vec<String> {
 }
 
 #[test]
-fn the_test_model_matches_the_oracles_recorded_hashes() {
+fn the_test_model_matches_the_recorded_hashes() {
     let golden = golden();
     assert_eq!(golden.len(), 36);
     let (model, config) = raking();
     let mut sim = Simulation::new(model, config).unwrap();
     for (step, want) in golden.iter().enumerate() {
         let row = sim.step().unwrap();
-        assert_eq!(pyfmt::hex(&row.hash), *want, "raking state hash differs from the oracle at step {step}");
+        assert_eq!(pyfmt::hex(&row.hash), *want, "raking state hash differs from the recorded hash at step {step}");
     }
 }
 

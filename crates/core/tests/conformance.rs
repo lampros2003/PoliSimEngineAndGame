@@ -1,5 +1,5 @@
 //! Every line of conformance/cases.tsv and conformance/format1.tsv must evaluate to what
-//! the oracle recorded:
+//! was recorded (by the Python reference implementation, until stage S14.2):
 //! the same value bit for bit, or the same kind of refusal.
 
 use std::path::PathBuf;
@@ -68,7 +68,7 @@ fn check_corpus(model: &str, seed: u64, corpus: &str, at_least: usize) {
             Err(Error::Model(message)) => format!("E:model {message}"),
         };
         if got != want {
-            mismatches.push(format!("line {}: {formula:?}\n    oracle {want}\n    engine {got}", number + 1));
+            mismatches.push(format!("line {}: {formula:?}\n    recorded {want}\n    engine {got}", number + 1));
         }
     }
     assert!(

@@ -1,55 +1,19 @@
-"""Weights that change (docs/spec/06-model-format-1.md, stage S4.4): the shared cases in
-conformance/rake_cases.toml, which the engine runs too, and the test model models/raking."""
+"""Weights that change (docs/spec/06-model-format-1.md, stage S4.4) on the test model
+models/raking. The shared cases in conformance/rake_cases.toml are run by
+crates/core/tests/raking.rs."""
 
 from __future__ import annotations
 
 import csv
 import sys
-import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-CASES = tomllib.loads((ROOT / "conformance" / "rake_cases.toml").read_text(encoding="utf-8"))
-
-
-def outcome(case: dict):
-    """("refused" | "runtime" | "weights", the weights after step 0 or the error)."""
-    text = CASES["base"]
-    for old, new in case.get("replace", []):
-        old, new = old.replace("\\n", "\n"), new.replace("\\n", "\n")
-        assert text.count(old) == 1, (case["name"], old)
-        text = text.replace(old, new)
-    files = dict(CASES["files"], **case.get("files", {}))
-    with tempfile.TemporaryDirectory() as folder:
-        root = Path(folder)
-        (root / "model.toml").write_text(text, encoding="utf-8")
-        for name, content in files.items():
-            (root / name).write_text(content, encoding="utf-8")
-        try:
-            sim = Simulation(load_model(root))
-        except (ModelError, FormulaError, SimError, KeyError, TypeError) as exc:
-            return "refused", exc
-        try:
-            sim.step()
-        except SimError as exc:
-            return "runtime", exc
-        return "weights", sim.column("w")
-
-
-class SharedCases(unittest.TestCase):
-    def test_every_case(self):
-        for case in CASES["case"]:
-            with self.subTest(case["name"]):
-                kind, detail = outcome(case)
-                self.assertEqual(kind, case["expect"], detail)
-                if kind == "weights":
-                    self.assertEqual(detail, case["weights"])
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestModel(unittest.TestCase):

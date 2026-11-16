@@ -3,7 +3,7 @@
 Stage S7.4. A model's words (labels, help text, the names of dimension members and
 sectors, a scenario's title) are in its own files, in one language. A translation is a
 file of the same words in another, kept apart from the model so that it never changes a
-run: text is outside the model hash and the oracle never reads it. The engine reads it
+run: text is outside the model hash and a run never reads it. The engine reads it
 (`crates/core/src/text.rs`) for a game client.
 
 Related: [model format 0](01-model-format-v0.md), [mods](07-mods.md),

@@ -2,8 +2,8 @@
 
 A political and economic simulation game in which the player is head of government, with
 an economy and a population simulated in real units. This repository holds the simulation
-engine, the specification it implements, a reference implementation it is tested against,
-and the research behind the design.
+engine, the specification it implements, the tests and recorded results that pin its
+behaviour, and the research behind the design.
 
 You govern the United Kingdom from January 2025: a monthly stock-flow model of the
 economy and public finances calibrated to 2024, 20,000 synthetic households under the
@@ -27,15 +27,15 @@ a mod.
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |
 | `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, pictograms, type and sounds, and its scripted tests |
-| `oracle/` | The reference evaluator: a deliberately naive Python implementation of the contract. It defines the behaviour; the engine is tested against it |
+| `tests/` | The behaviour tests (Python, standard library only), run on the engine through `polisim serve`; `tests/README.md` says where each test of the retired Python reference implementation went |
 | `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and 19 real-life policies, 6 indicators and 23 interest groups (`models/uk/POLICIES.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
 | `mods/` | Mods the game ships with: `wealth_tax`, the example in `docs/MODDING.md` |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
 | `models/valmora/` | The same economy scaled to an invented country, where the client was first built |
 | `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |
 | `models/cohort/`, `models/raking/` | Test models for format 1: a population by region, sex and age; weights raked to targets |
-| `conformance/` | Formulas with the result the oracle gives for each; both implementations check every line |
-| `tools/` | Synthetic data generators and `diff_engine.py`, which runs random scenarios through both implementations |
+| `conformance/` | Frozen fixtures the engine's Rust tests read: formulas with their results, shared cases, random whole models with their hashes |
+| `tools/` | Synthetic data generators, the UK pipeline (`tools/uk/`), `engine.py` (drives `polisim serve` from Python) and `record_goldens.py` (records or checks every model's state hashes) |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
 | `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S13-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
@@ -81,22 +81,29 @@ The engine's tests: recorded hashes, the conformance corpus, save and resume.
 cargo test --release --workspace
 ```
 
-The oracle's tests need Python 3.11 or later and nothing else:
-
-```bash
-cd oracle
-```
+The behaviour tests, on the engine (Python 3.11 or later and nothing else, after
+`cargo build --release`; a few minutes):
 
 ```bash
 python -m unittest discover -s tests
 ```
 
-Random scenarios through both implementations, compared byte for byte (from the
-repository root, after `cargo build --release`):
+The recorded state hashes and the UK hindcast, checked against the committed files:
 
 ```bash
-python tools/diff_engine.py --count 200
+python tools/record_goldens.py --check
 ```
+
+```bash
+python tools/uk/hindcast.py --check
+```
+
+The engine is the only implementation and `docs/spec/` the specification. Until stage S14.2
+a deliberately naive Python implementation (the oracle) defined the behaviour and the
+engine was tested against it on every step; it was retired once the engine had matched it
+throughout, because it was some fifty times slower and its suite took 40 to 50 minutes.
+What it recorded (the state hashes, `conformance/`) now pins the engine
+(`docs/spec/00-engine-contract.md`, section 12).
 
 ## Where things stand
 
@@ -122,7 +129,7 @@ first stages' exit criteria.
 |---|---|
 | Engine matches the oracle on 1,000 random scenarios | Met: 708 finished, 84 failed part-way at the same step, 208 refused by both; 15,098 steps identical byte for byte |
 | Save, load and continue equals an uninterrupted run | Met: tested at six save points, including across a policy change |
-| Identical results on Windows and Linux | Met: CI runs the engine's tests and 150 random scenarios through both implementations on each system |
+| Identical results on Windows and Linux | Met: CI ran the engine's tests and 150 random scenarios through both implementations on each system (since S14.2: the engine's tests and the behaviour tests) |
 | Step time at ten times toy size | 1.2 ms per step at 10,000 households, against a target of well under a second per turn. See the timings below |
 | A term is playable from the command line | Met: `polisim play` |
 | Python module | **Not built.** The runner's CSV serves analysis for now |
@@ -137,7 +144,7 @@ on a shared cloud machine (Intel Xeon at 2.1 GHz). Not yet measured on a laptop.
 | 100,000 | 12 |
 | 1,000,000 | 153 |
 
-The oracle takes about 17 ms per step at 1,000 households. Each engine step includes
+The oracle took about 17 ms per step at 1,000 households. Each engine step includes
 posting, the identity checks and a SHA-256 hash of the state. These timings are from stage
 S1, before any optimisation. Stage S10 (`docs/S10-PLAN.md`) added threads, register reuse
 and shared work computed once, with every result unchanged. The full UK model (20,000

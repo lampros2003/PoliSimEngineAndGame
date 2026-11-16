@@ -1,5 +1,6 @@
 """Model format 1: dimensions (docs/spec/06-model-format-1.md), on models/cohort and on
-small models written by the tests."""
+small models written by the tests. Bad declarations and data files are refused in
+crates/core/tests/format1.rs."""
 
 from __future__ import annotations
 
@@ -12,11 +13,11 @@ import textwrap
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
+from engine import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 COHORT = ROOT / "models" / "cohort"
 
 HEAD = """
@@ -71,44 +72,6 @@ class Loading(unittest.TestCase):
             value = 0.5
         """)
         self.assertEqual(sim.rt.C["rate"], [0.5] * 8)
-
-    def test_bad_declarations_are_refused(self):
-        bad = {
-            "dims in format 0": ("", {"format": 0}),
-            "an unknown dimension": ('[var.x]\ntype = "real"\nunit = "1"\nphase = "one"\ndims = ["height"]\nexpr = "1.0"\n', {}),
-            "a repeated dimension": ('[var.x]\ntype = "real"\nunit = "1"\nphase = "one"\ndims = ["age", "age"]\nexpr = "1.0"\n', {}),
-            "a dimensioned lever": ('[lever.x]\ntype = "real"\nunit = "1"\ndefault = 1.0\ndims = ["age"]\n', {}),
-            "a member named like an element": ('[param.female]\ntype = "real"\nunit = "1"\nvalue = 1.0\n', {}),
-        }
-        for what, (extra, change) in bad.items():
-            with self.subTest(what):
-                head = HEAD.replace("format = 1", f"format = {change.get('format', 1)}")
-                if change.get("format") == 0:
-                    extra = ""
-                with tempfile.TemporaryDirectory() as folder:
-                    (Path(folder) / "model.toml").write_text(head + extra, encoding="utf-8")
-                    with self.assertRaises(ModelError):
-                        load_model(folder)
-
-    def test_a_data_file_must_hold_every_cell_once(self):
-        param = """
-            [param.rate]
-            type = "real"
-            unit = "1"
-            dims = ["sex", "age"]
-            data = "rates.csv"
-        """
-        full = "sex,age,value\n" + "".join(f"{s},{a},0.1\n" for s in ("female", "male") for a in range(10, 14))
-        cases = {
-            "missing": full.replace("male,13,0.1\n", ""),
-            "repeated": full + "male,13,0.2\n",
-            "unknown": full.replace("male,13", "male,14"),
-            "no value column": full.replace("value", "rate"),
-        }
-        build(param, {"rates.csv": full})
-        for what, text in cases.items():
-            with self.subTest(what), self.assertRaises(ModelError):
-                build(param, {"rates.csv": text})
 
 
 class Scope(unittest.TestCase):

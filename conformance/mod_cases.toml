@@ -1,5 +1,6 @@
-# Mods (docs/spec/07-mods.md, stage S7.1): cases that both the oracle
-# (oracle/tests/test_mods.py) and the engine (crates/core/tests/mods.rs) run.
+# Mods (docs/spec/07-mods.md, stage S7.1): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/mods.rs).
 #
 # Each case writes the base model into a folder, and each of its `mods` into a folder of
 # its own (`toml` is the mod.toml; `files` the mod's other files, by name), loads the model

@@ -1,6 +1,5 @@
-//! Stage S7.1: mods. The shared cases in conformance/mod_cases.toml, which the oracle runs
-//! too (oracle/tests/test_mods.py): the same outcome, the same values and the same model
-//! hash on both sides.
+//! Stage S7.1: mods. The shared cases in conformance/mod_cases.toml: the recorded outcome,
+//! values and model hash.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -63,7 +62,7 @@ fn same(got: Option<Val>, want: &Value) -> bool {
 }
 
 #[test]
-fn shared_cases_match_the_oracle() {
+fn shared_cases_match_their_recorded_outcomes() {
     let file = std::fs::read_to_string(root().join("conformance/mod_cases.toml")).unwrap();
     let cases: toml::Table = file.parse().unwrap();
     let base = cases["base"].as_str().unwrap();
@@ -81,7 +80,7 @@ fn shared_cases_match_the_oracle() {
                 for (value, want) in case["values"].as_table().unwrap() {
                     assert!(
                         same(sim.scalar(value), want),
-                        "{name}: {value} is {:?}, the oracle {want:?}",
+                        "{name}: {value} is {:?}, recorded {want:?}",
                         sim.scalar(value)
                     );
                 }

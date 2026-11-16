@@ -279,8 +279,8 @@ def household_base() -> dict[str, float]:
     """The households' taxes and benefits in the base month (pence a month), from the
     standalone households model (models/uk/households/, written by tools/uk/make_rules.py)."""
     import sys
-    sys.path.insert(0, str(ROOT / "oracle"))
-    from polisim_oracle import Simulation, load_model
+    sys.path.insert(0, str(ROOT / "tools"))
+    from engine import Simulation, load_model  # the engine, built with cargo build --release
     row = Simulation(load_model(ROOT / "models" / "uk" / "households"), seed=1).step()
     return {"income_tax": row["income_tax_total"], "ni": row["employee_ni_total"] + row["employer_ni_total"],
             "benefits": row["child_benefit_total"] + row["universal_credit_total"]}

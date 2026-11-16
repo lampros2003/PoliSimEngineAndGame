@@ -1,7 +1,7 @@
 //! Stage S10.7: random whole models (conformance/random_models.toml, written by
-//! tools/gen_random_models.py from the oracle). On one, two and eight threads, the engine
-//! must give the oracle's state hash after every step, and stop at the step the oracle
-//! stopped at. They test whole runs: phases and levels, records and their sums, values with
+//! the Python reference implementation until stage S14.2; now a frozen fixture). On one,
+//! two and eight threads, the engine must give the recorded state hash after every step,
+//! and stop at the recorded step. They test whole runs: phases and levels, records and their sums, values with
 //! dimensions, states, prev, lags, situations, a flow between accounts, random draws and
 //! lever commands, together.
 
@@ -39,7 +39,8 @@ fn run(text: &str, records: i64, config: RunConfig, steps: usize, threads: usize
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("model.toml"), text).unwrap();
     std::fs::write(dir.join("rec.csv"), records_csv(records)).unwrap();
-    let model = Arc::new(load_model(&dir).unwrap_or_else(|e| panic!("the engine refused a model the oracle ran: {e}")));
+    let model =
+        Arc::new(load_model(&dir).unwrap_or_else(|e| panic!("the engine refused a model recorded as running: {e}")));
     let _ = std::fs::remove_dir_all(&dir);
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
     pool.install(|| {
@@ -56,7 +57,7 @@ fn run(text: &str, records: i64, config: RunConfig, steps: usize, threads: usize
 }
 
 #[test]
-fn random_models_match_the_oracle_on_one_two_and_eight_threads() {
+fn random_models_match_the_recorded_hashes_on_one_two_and_eight_threads() {
     let file: toml::Table =
         std::fs::read_to_string(root().join("conformance/random_models.toml")).unwrap().parse().unwrap();
     let models = file["model"].as_array().unwrap();
@@ -82,14 +83,17 @@ fn random_models_match_the_oracle_on_one_two_and_eight_threads() {
         for threads in [1, 2, 8] {
             let (got, failed) = run(text, records, config.clone(), steps, threads);
             for (step, (got, want)) in got.iter().zip(&want).enumerate() {
-                assert_eq!(got, want, "{name} on {threads} thread(s): the hash after step {step} is not the oracle's");
+                assert_eq!(
+                    got, want,
+                    "{name} on {threads} thread(s): the hash after step {step} is not the recorded one"
+                );
             }
             assert_eq!(got.len(), want.len(), "{name} on {threads} thread(s): ran {} steps", got.len());
             assert_eq!(failed.as_ref().map(|f| f.0), error, "{name} on {threads} thread(s): stopped at {failed:?}");
             if let (Some((_, got)), Some(want)) = (&failed, message) {
                 assert!(
                     got.contains(want),
-                    "{name} on {threads} thread(s): the engine says {got:?}, the oracle {want:?}"
+                    "{name} on {threads} thread(s): the engine says {got:?}, recorded {want:?}"
                 );
             }
         }

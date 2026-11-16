@@ -1,6 +1,6 @@
 //! Bills (docs/spec/06-model-format-1.md, stage S5.4): the cases in
-//! conformance/bill_cases.toml, which the oracle runs too (oracle/tests/test_bills.py), and
-//! the UK model's coalition losing a bill, against the oracle's recorded hashes.
+//! conformance/bill_cases.toml, with their recorded outcomes, and the UK model's coalition
+//! losing a bill, against its recorded hashes.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -74,7 +74,7 @@ fn same(got: Option<Val>, want: &Value) -> bool {
 }
 
 #[test]
-fn shared_cases_match_the_oracles_expectations() {
+fn shared_cases_match_their_expectations() {
     let text = std::fs::read_to_string(root().join("conformance/bill_cases.toml")).unwrap();
     let cases: toml::Table = text.parse().unwrap();
     let list = cases["case"].as_array().unwrap();
@@ -111,14 +111,18 @@ fn shared_cases_match_the_oracles_expectations() {
 }
 
 #[test]
-fn a_coalition_loses_a_bill_as_the_oracle_recorded() {
+fn a_coalition_loses_a_bill_as_recorded() {
     let scenario = load_scenario(&root().join("models/uk/scenarios/coalition_bill.toml")).unwrap();
     let recorded = std::fs::read_to_string(root().join("models/uk/golden/coalition_bill.hashes.csv")).unwrap();
     let golden: Vec<&str> = recorded.lines().skip(1).map(|line| line.split(',').nth(1).unwrap()).collect();
     let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
     for (step, want) in golden.iter().enumerate() {
         let row = sim.step().unwrap();
-        assert_eq!(pyfmt::hex(&row.hash), *want, "coalition bill state hash differs from the oracle at step {step}");
+        assert_eq!(
+            pyfmt::hex(&row.hash),
+            *want,
+            "coalition bill state hash differs from the recorded hash at step {step}"
+        );
     }
     let votes: Vec<(&str, i64, bool)> = sim.votes().iter().map(|v| (v.lever.as_str(), v.votes_for, v.passed)).collect();
     assert_eq!(votes, [("basic_rate", 283, false), ("personal_allowance", 283, false), ("vat_rate", 627, true)]);

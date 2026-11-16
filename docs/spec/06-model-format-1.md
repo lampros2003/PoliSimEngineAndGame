@@ -7,8 +7,8 @@ per cell. It is what the cohort population table and the industries of stage S3.
 and what households of stage S4 will look values up in. Everything in format 0 keeps its
 meaning; a model opts in with `format = 1`.
 
-The oracle (`oracle/polisim_oracle/`) defines the behaviour and the engine must match it
-bit for bit, so every operation below states its order of evaluation.
+Results must be the same bit for bit on every machine and at any thread count, so every
+operation below states its order of evaluation.
 
 ## Declaring a dimension
 
@@ -367,7 +367,7 @@ Each key is a name the model no longer has (neither an element nor a dimension);
 value is the name the element has now, or a name that was itself renamed later, in which
 case the chain is followed to an element. Keep the entries for as long as old saves
 should load. Formulas never see old names. The section is accepted in format 0 models
-too; the oracle checks it as the engine does, though it has no saves.
+too, and checked there as in format 1.
 
 ## Situations (stage S7.3)
 
@@ -394,7 +394,7 @@ end = "output_growth > 0.005"
 So `[situation.x]` is exactly `[state.x]` with `type = "bool"`, `unit = "1"`,
 `initial = false` and `next = "select(x, not (<end>), <start>)"` (or `next = "<start>"`
 without an end), plus `situation = "good"` or `"bad"`, which the catalogue passes on so a
-client can show it. The oracle and the engine expand it the same way, after mods are
+client can show it. The engine expands it after mods are
 applied (a mod may add situations); the shared cases are in
 `conformance/situation_cases.toml`. Any other key is an error. The section is accepted in
 format 0 models too.
@@ -526,8 +526,8 @@ error, in the dilemma or an option, as are: an `option` that is not an array of 
 tables; a missing, repeated or non-identifier `name`; `months` or `again_after` that is
 not a whole number of at least 1; an effect naming anything but a declared `var`, `flow`
 or `state`, or one without a formula; an effect that is not a formula; and any name the
-dilemma would make (its own six, and each `T_before_d`) that the model already has. The oracle and the engine expand dilemmas
-and check answers the same way; the shared cases are in `conformance/dilemma_cases.toml`.
+dilemma would make (its own six, and each `T_before_d`) that the model already has. The shared cases of how dilemmas are expanded
+and answers checked are in `conformance/dilemma_cases.toml`.
 The section is accepted in format 0 models too.
 
 ## Load-time checks
@@ -571,14 +571,14 @@ other than `sum`, `largest`, `smallest` and `sum_by` (means and shares are writt
 population by region, sex and age with births, deaths, migration and monthly ageing; an
 integer state on a range starting at 16; a parameter with a column per preset; a
 dimensioned var read through `prev()`; and records that look a rate up by region.
-`oracle/tests/test_format1.py` tests the rules; `models/cohort/golden/` holds the
-oracle's state hashes, which the engine must reproduce.
+`tests/test_format1.py` and `crates/core/tests/format1.rs` test the rules;
+`models/cohort/golden/` holds the recorded state hashes, which the engine must reproduce.
 
 `models/raking/` (written by `tools/make_raking.py`) tests weights that change: 2,000
 invented households raked once a year to three margins (adults by region, sex and age
 band, three slots per household; children by region; households by size, a whole-number
 target on a range dimension), with aggregates before and after the rake. The hand-worked
 cases of `conformance/rake_cases.toml` (the rake's arithmetic, its skips and rounding, and
-every refusal and run-time error above) are run by both `oracle/tests/test_raking.py` and
-`crates/core/tests/raking.rs`. Likewise `conformance/bill_cases.toml` for bills, run by
-`oracle/tests/test_bills.py` and `crates/core/tests/bills.rs`.
+every refusal and run-time error above) are run by `crates/core/tests/raking.rs`, and the
+test model's behaviour by `tests/test_raking.py`. Likewise `conformance/bill_cases.toml`
+for bills, run by `crates/core/tests/bills.rs`, and the UK's bills by `tests/test_bills.py`.

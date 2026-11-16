@@ -2,8 +2,8 @@
 
 A save is a snapshot taken between two steps. It holds everything needed to continue the
 run, and nothing that can be recomputed. The implementation that defines it is
-`crates/core/src/save.rs`. The Python oracle does not read or write saves; the guarantee
-below is tested against the engine itself.
+`crates/core/src/save.rs`. The guarantee below is tested against the engine itself
+(`crates/core/tests/save.rs`).
 
 Related: [engine contract](00-engine-contract.md).
 

@@ -1,9 +1,9 @@
 # Mods
 
 Stage S7.1. A mod changes a model without editing its files: it adds elements and
-patches existing ones. The oracle (`oracle/polisim_oracle/model.py`) and the engine
-(`crates/core/src/model.rs`) load mods the same way, give the same model hash, and are
-held to the shared cases in `conformance/mod_cases.toml`. A guide with a worked example is
+patches existing ones. The engine (`crates/core/src/model.rs`) loads mods and is held to
+the shared cases in `conformance/mod_cases.toml`, each with its recorded outcome and model
+hash. A guide with a worked example is
 in [`docs/MODDING.md`](../MODDING.md).
 
 Related: [model format 0](01-model-format-v0.md), [model format 1](06-model-format-1.md),

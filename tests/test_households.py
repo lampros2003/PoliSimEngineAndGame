@@ -8,7 +8,7 @@ import csv
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 HOUSEHOLDS = ROOT / "models" / "uk" / "households" / "households.csv"
 
 
@@ -72,8 +72,8 @@ class Rules(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import sys
-        sys.path.insert(0, str(ROOT / "oracle"))
-        from polisim_oracle import Simulation, load_model
+        sys.path.insert(0, str(ROOT / "tools"))
+        from engine import Simulation, load_model
         cls.Simulation = Simulation
         cls.model = load_model(ROOT / "models" / "uk" / "households")
         cls.first = Simulation(cls.model, seed=1).step()
@@ -109,8 +109,8 @@ class Breakdowns(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import sys
-        sys.path.insert(0, str(ROOT / "oracle"))
-        from polisim_oracle import Simulation, load_model
+        sys.path.insert(0, str(ROOT / "tools"))
+        from engine import Simulation, load_model
         cls.Simulation = Simulation
         cls.model = load_model(ROOT / "models" / "uk" / "households")
         cls.sim = Simulation(cls.model, seed=1)

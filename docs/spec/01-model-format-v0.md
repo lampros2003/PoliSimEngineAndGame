@@ -2,7 +2,7 @@
 
 A model is a folder of TOML files plus CSV data. The engine contains no model: everything
 it simulates is read from these files, and the base game will be one such folder. The
-loader that defines this format is `oracle/polisim_oracle/model.py`; a complete example
+engine's loader (`crates/core/src/model.rs`) implements this format; a complete example
 is `models/toy/`.
 
 Related: [engine contract](00-engine-contract.md), [formula language](02-formula-language-v0.md).

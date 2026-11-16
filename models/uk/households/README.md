@@ -7,7 +7,7 @@ A model of the UK's 28.6 million households as 20,000 weighted records (stage S4
 |---|---|---|
 | `households.csv`, `HOUSEHOLDS.md` | The records and their calibration report (every target and its error, every assumption) | `python tools/uk/households.py` |
 | `model.toml`, `rules.toml` | The model: the records as the entity `household`, and the rules | `python tools/uk/make_rules.py` |
-| `scenarios/base.toml`, `golden/` | A three-month run and the oracle's state hashes, which the engine reproduces | by hand; the oracle |
+| `scenarios/base.toml`, `golden/` | A three-month run and its recorded state hashes, which the engine reproduces | by hand; `python tools/record_goldens.py` |
 
 ## The records
 
@@ -40,7 +40,7 @@ after income tax and National Insurance, with Child Benefit net of the charge an
 Credit) and average it by decile, household type and region (`net_income_by_decile`,
 `net_income_by_household_type`, `net_income_by_region`) and over all households
 (`net_income_average`). The groups' averages, weighted by their households, add up to the
-national average (tested in `oracle/tests/test_households.py`). In the first month net
+national average (tested in `tests/test_households.py`). In the first month net
 income runs from about £10,200 a year in the poorest tenth to £105,000 in the richest; all
 households average £41,800.
 
@@ -78,8 +78,9 @@ not the record. A household's decile is fixed in the base year.
 20,000. `python tools/uk/bench_households.py --records 100000` builds 100,000 the same way
 and times the UK model with them: 68 ms a month on a four-core 2.1 GHz server (13 ms for
 the rake, 54 ms for the rules), against S4.4's limit of 100 ms. The model stays at 20,000
-until the rules are complete (the roadmap's order), because the oracle, which every test
-compares the engine with, takes five times longer with 100,000.
+until the rules are complete (the roadmap's order); when it was written, the Python
+reference implementation every test compared the engine with (retired in stage S14.2)
+took five times longer with 100,000.
 
 ## First month against published totals (a year)
 

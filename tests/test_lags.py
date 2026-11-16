@@ -1,5 +1,5 @@
-"""Lags (docs/spec/06-model-format-1.md, stage S10.5): the shared cases in
-conformance/lag_cases.toml, which the engine runs too, and what the loader makes."""
+"""Lags (docs/spec/06-model-format-1.md, stage S10.5): what the loader makes. The shared
+cases in conformance/lag_cases.toml are run by crates/core/tests/lags.rs."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ import tomllib
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from polisim_oracle import FormulaError, ModelError, SimError, Simulation, load_model  # noqa: E402
+from engine import Simulation, load_model  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 CASES = tomllib.loads((ROOT / "conformance" / "lag_cases.toml").read_text(encoding="utf-8"))
-REFUSED = (ModelError, FormulaError, SimError, KeyError, TypeError)
 
 
 def write(folder: Path, add: str) -> Path:
@@ -24,46 +23,13 @@ def write(folder: Path, add: str) -> Path:
     return folder
 
 
-def outcome(case: dict):
-    """("refused", error), ("runtime", step, error) or ("ran", rows)."""
-    commands: dict[int, dict] = {}
-    for step, name, value in case.get("commands", []):
-        commands.setdefault(step, {})[name] = value
-    with tempfile.TemporaryDirectory() as folder:
-        try:
-            sim = Simulation(load_model(write(Path(folder), case["add"])), commands=commands)
-        except REFUSED as exc:
-            return ("refused", exc)
-        rows = []
-        for step in range(case["steps"]):
-            try:
-                rows.append(sim.step())
-            except SimError as exc:
-                return ("runtime", step, exc)
-        return ("ran", rows)
-
-
-class SharedCases(unittest.TestCase):
-    def test_every_case(self):
-        self.assertGreaterEqual(len(CASES["case"]), 25)
-        for case in CASES["case"]:
-            with self.subTest(case["name"]):
-                got = outcome(case)
-                self.assertEqual(got[0], case["expect"], got[1:])
-                if got[0] == "ran":
-                    for name, values in case["series"].items():
-                        self.assertEqual([row[name] for row in got[1]], values, name)
-                if got[0] == "runtime":
-                    self.assertEqual(got[1], case["at"], got[2])
-
-
 class Loader(unittest.TestCase):
     ADD = '[lag.back]\nlabel = "Back"\ndoc = "Three months ago"\nof = "cells"\nsteps = 3\ninitial = 0.0'
 
     def test_a_lag_is_a_chain_of_states_and_a_var_in_the_first_phase(self):
         with tempfile.TemporaryDirectory() as folder:
             model = load_model(write(Path(folder), self.ADD))
-        made = sorted(n for n, d in model.symbols.items() if d.spec.get("lag") == "back")
+            made = sorted(n for n, d in model.symbols.items() if d.spec.get("lag") == "back")
         self.assertEqual(made, ["back", "back__1", "back__2", "back__3"])
         var = model.symbols["back"]
         self.assertEqual((var.kind, var.type, var.unit, var.dims, var.spec["phase"], var.spec["expr"]),

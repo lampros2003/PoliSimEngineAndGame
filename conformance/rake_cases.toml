@@ -1,5 +1,6 @@
-# Weights that change (docs/spec/06-model-format-1.md, stage S4.4): cases that both the
-# oracle (oracle/tests/test_raking.py) and the engine (crates/core/tests/raking.rs) run.
+# Weights that change (docs/spec/06-model-format-1.md, stage S4.4): cases with the
+# outcome recorded for each (by the Python reference implementation until stage S14.2),
+# which the engine runs (crates/core/tests/raking.rs).
 #
 # Each case edits the base model (`replace`: pairs of [old text, new text], each old text
 # found exactly once; in them \n stands for a line break) and its data files (`files`),

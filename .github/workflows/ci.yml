@@ -5,32 +5,11 @@ on:
   pull_request:
 
 jobs:
-  oracle:
-    # The recorded state hashes must be reproduced on every platform and Python version.
-    name: Oracle tests (${{ matrix.os }}, Python ${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        python: ["3.11", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Run tests
-        working-directory: oracle
-        run: python -m unittest discover -s tests
-      - name: The UK hindcast reproduces its committed results
-        # Its inputs use the platform's exp and log, so it is checked on one platform.
-        if: runner.os == 'Linux' && matrix.python == '3.13'
-        run: python tools/uk/hindcast.py --check
-
   engine:
-    # The engine must match the oracle: recorded hashes, the conformance corpus, save and
-    # resume, and random scenarios run through both and compared byte for byte.
-    name: Engine against the oracle (${{ matrix.os }})
+    # The engine and its pins: the recorded state hashes, the conformance fixtures, save and
+    # resume (Rust tests), the behaviour tests on the engine through `polisim serve`, and the
+    # UK hindcast's committed results.
+    name: Engine (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -52,15 +31,14 @@ jobs:
         run: cargo test --release --workspace
       - name: Build the runner
         run: cargo build --release
-      - name: Random scenarios through oracle and engine
-        run: python tools/diff_engine.py --count 150
-      - name: Random UK scenarios through oracle and engine
-        # With 20,000 households the oracle takes about a second a month: short scenarios.
-        run: python tools/diff_engine.py --model models/uk --count 10 --max-steps 4
-      - name: Random format 1 (cohort) scenarios through oracle and engine
-        run: python tools/diff_engine.py --model models/cohort --count 40
-      - name: Random scenarios with raked weights through oracle and engine
-        run: python tools/diff_engine.py --model models/raking --count 40
+      - name: Behaviour tests on the engine
+        run: python -m unittest discover -s tests
+      - name: The recorded state hashes, through the runner
+        run: python tools/record_goldens.py --check
+      - name: The UK hindcast reproduces its committed results
+        # Its inputs use the platform's exp and log, so it is checked on one platform.
+        if: runner.os == 'Linux'
+        run: python tools/uk/hindcast.py --check
 
   client:
     # The game client: build the engine library, let Godot register it, play 60 scripted
@@ -109,7 +87,7 @@ jobs:
 
   bench-self-check:
     # Builds the S0 benchmark and runs its checks: the three rule-set variants must agree
-    # with each other, and the random generator must agree with the oracle.
+    # with each other, and the random generator must give its recorded values.
     name: Benchmark self-check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:

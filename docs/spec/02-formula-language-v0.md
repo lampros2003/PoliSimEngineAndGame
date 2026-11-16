@@ -2,7 +2,8 @@
 
 Formulas are pure expressions: no assignment, no loops, no side effects. Each one
 computes a single value, either for the nation or for one record of an entity. The
-implementation that defines the language is `oracle/polisim_oracle/expr.py`.
+engine implements the language in `crates/core/src/syntax.rs`, `compile.rs` and `vm.rs`;
+`conformance/cases.tsv` and `format1.tsv` pin the result of each listed formula.
 
 Related: [engine contract](00-engine-contract.md), [model format](01-model-format-v0.md).
 

@@ -1,5 +1,5 @@
 //! Stage S10.8: the parts of a record formula that are the same for every record are
-//! computed once (docs/S10-PLAN.md). The values must be what the oracle gives, and a
+//! computed once (docs/S10-PLAN.md). The values must be what plain evaluation gives, and a
 //! national part that fails must stop the run at the same step, naming the same variable.
 
 use std::sync::Arc;
@@ -67,9 +67,9 @@ fn simulation(extra: &str) -> Result<Simulation, String> {
 }
 
 #[test]
-fn national_parts_give_the_oracles_values() {
+fn national_parts_give_the_plain_values() {
     let mut sim = simulation("").unwrap();
-    // As the oracle gives them: tick is 0, 1, 2 when read in its own phase.
+    // As plain evaluation gives them: tick is 0, 1, 2 when read in its own phase.
     for (step, want) in [[109, 105, 112], [209, 205, 212], [309, 305, 312]].iter().enumerate() {
         sim.step().unwrap();
         assert_eq!(sim.column("scaled"), Some(&Col::I(want.to_vec())), "step {step}");
@@ -82,7 +82,7 @@ fn national_parts_give_the_oracles_values() {
 fn a_national_part_that_fails_stops_the_run_as_before() {
     // round(1.0 / (zero * tick)) is the same for every record and fails at once; the
     // record part div(ci, ci - 3) fails for the second record. The run stops in step 0,
-    // naming the variable, as the oracle's does (the contract names the step and the
+    // naming the variable, as before (the contract names the step and the
     // variable; which of a formula's failures is described may differ).
     let extra = "[var.fragile]\ntype = \"int\"\nunit = \"1\"\nentity = \"rec\"\nphase = \"one\"\n\
                  expr = \"div(ci, ci - 3) + round(1.0 / (zero * tick))\"\n";
