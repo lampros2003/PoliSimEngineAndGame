@@ -1,0 +1,29 @@
+# A dock strike in Valmora: an example of a dilemma. It opens at the end of the third
+# month; the answer changes the government's purchases or firms' sales for some months.
+
+[state.dock_strike_month]
+label = "Months since the game began"
+type = "int"
+unit = "1"
+phase = "government"
+initial = 0
+next = "dock_strike_month + 1"
+
+[dilemma.dock_strike_walkout]
+label = "Dock strike"
+doc = "Valmora's dockers have walked out over pay. While the ports are shut, firms lose sales"
+start = "dock_strike_month >= 2"
+
+[[dilemma.dock_strike_walkout.option]]
+name = "settle"
+label = "Pay the dockers"
+doc = "The government meets the claim: its purchases rise by a fifth for six months"
+months = 6
+effect = { gov_spending = "round({base} * 1.2)" }
+
+[[dilemma.dock_strike_walkout.option]]
+name = "wait"
+label = "Wait them out"
+doc = "The ports stay shut for three months: firms' sales fall by a tenth"
+months = 3
+effect = { net_sales = "round({base} * 0.9)" }

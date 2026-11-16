@@ -33,7 +33,8 @@ fn philox4x32_10(mut c: [u32; 4], mut k: [u32; 2]) -> [u32; 4] {
     c
 }
 
-/// A real in [0, 1) keyed by (seed, stream, entity, step). Same definition as the oracle.
+/// A real in [0, 1) keyed by (seed, stream, entity, step). Same definition as the engine's
+/// (`crates/core/src/rng.rs`, and the retired Python reference's before it).
 #[inline(always)]
 fn uniform(seed: u64, stream: u32, entity: u64, step: u32) -> f64 {
     let o = philox4x32_10([entity as u32, (entity >> 32) as u32, step, stream], [seed as u32, (seed >> 32) as u32]);
@@ -414,7 +415,8 @@ fn self_check() {
         philox4x32_10([0x243F_6A88, 0x85A3_08D3, 0x1319_8A2E, 0x0370_7344], [0xA409_3822, 0x299F_31D0]),
         [0xD16C_FE09, 0x94FD_CCEB, 0x5001_E420, 0x2412_6EA1]
     );
-    // The value the Python oracle prints for the same key.
+    // The value the retired Python reference printed for the same key, and the engine's
+    // own rng test checks.
     assert_eq!(uniform(1, 2, 3, 4), 0.282_889_125_902_804_7);
     assert_eq!(muldiv(-7, 10, 3), -24);
     assert_eq!(muldiv(4_611_686_018_427_387_904, 6, 4), 6_917_529_027_641_081_856);

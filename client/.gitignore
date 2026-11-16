@@ -1,0 +1,3 @@
+# Godot's import cache and the engine library, both rebuilt from source.
+.godot/
+bin/

@@ -1,8 +1,9 @@
 //! PoliSim simulation engine.
 //!
 //! Loads a model written in model-file format 0, compiles its formulas to bytecode and
-//! steps it. The behaviour is defined by docs/spec/ and by the Python oracle in
-//! `oracle/`; this crate is correct when its state hash equals the oracle's on every step.
+//! steps it. The behaviour is defined by docs/spec/; this crate is its only implementation
+//! (the Python reference it was checked against was retired in stage S14.2), and the
+//! recorded state hashes (`models/*/golden/`, `conformance/`) pin it on every step.
 //!
 //! ```no_run
 //! use std::sync::Arc;
@@ -16,21 +17,35 @@
 //! ```
 
 pub mod compile;
+pub mod describe;
 pub mod error;
+pub mod explain;
 pub mod model;
 pub mod program;
 pub mod pyfmt;
 pub mod rng;
 pub mod save;
+pub mod session;
 pub mod sim;
 pub mod syntax;
+pub mod text;
 pub mod units;
 pub mod vm;
 
+pub use describe::{Catalogue, Link};
 pub use error::{Error, Result};
-pub use model::{Model, Scenario, load_model, load_scenario};
+pub use explain::{Explanation, Num, Part};
+pub use model::{
+    DilemmaInfo, DilemmaOption, ModInfo, Model, Scenario, load_model, load_model_with_mods, load_scenario,
+    load_scenario_with_mods, read_mod,
+};
 pub use program::{Col, Ty, Val};
-pub use sim::{Computed, Row, RunConfig, Simulation};
+pub use save::Migration;
+pub use session::{Effect, Forecast, Fork, Outlook, Record, Session};
+pub use sim::{Ballot, Chamber, Computed, Row, RunConfig, Simulation, Vote, VotePreview, bill_cost, check_lever};
+pub use text::{Text, languages, load_text};
+/// A parsed TOML document, for clients that read scenario files themselves.
+pub use toml::Table as RawTable;
 /// A raw value as written in a model or scenario file, before it is given a type.
 pub use toml::Value as RawValue;
 

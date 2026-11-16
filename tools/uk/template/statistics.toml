@@ -1,0 +1,626 @@
+# Two statistics the owner asked for (stage S14.5, docs/S14-PLAN.md, "The economy"):
+# homelessness and productivity. GENERATED: copied from tools/uk/template/statistics.toml by
+# tools/uk/calibrate.py. Edit the template. Sources and judgements: models/uk/POLICIES.md,
+# "Homelessness and productivity". Both are at their 2024 levels in the base month and stay
+# there with every policy as in 2024 and the economy as in the base month.
+
+# ================================================================= homelessness
+
+[param.temporary_accommodation_2024]
+doc = "Households in temporary accommodation in England on 30 September 2024: 126,040 (Ministry of Housing, Communities and Local Government, Statutory homelessness in England, July to September 2024)"
+type = "real"
+unit = "1"
+value = 126040.0
+
+[param.homeless_rent_controls]
+doc = "Temporary accommodation for each step of rent controls: 5% fewer households when rises are capped, 10% when strict, as fewer private tenancies end in an unaffordable rise or a no-fault eviction, the largest single cause of homelessness (a judgement)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[param.homeless_homes_effect]
+doc = "Temporary accommodation per unit of private homes built against 2024's (planning rules and rent controls, homes_policy_level): 10% more homes a year, 5% fewer households in temporary accommodation as rents ease (a judgement)"
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.homeless_social_share]
+doc = "The share of the programme's new social homes let to households in temporary accommodation: about a third of new general needs lettings go to homeless households (MHCLG, Social housing lettings in England, 2023-24; a judgement)"
+type = "real"
+unit = "1"
+value = 0.33
+
+[param.homeless_poverty_effect]
+doc = "Temporary accommodation for each point of working-age poverty above the start: 4% more (benefits that fall behind rents; a judgement)"
+type = "real"
+unit = "1"
+value = 4.0
+
+[param.homeless_unemployment_effect]
+doc = "Temporary accommodation for each point of unemployment above the start: 4% more (a judgement)"
+type = "real"
+unit = "1"
+value = 4.0
+
+[param.homeless_mortgage_effect]
+doc = "Temporary accommodation for each point the mortgage rate is above 2024's: 3% more, through arrears and repossessions, a small cause of homelessness (a judgement)"
+type = "real"
+unit = "1"
+value = 3.0
+
+[param.homeless_rent_effect]
+doc = "Stage S15.2: temporary accommodation per unit of real rents against 2024's: rents a tenth higher in real terms, 3% more households (a judgement)"
+type = "real"
+unit = "1"
+value = 0.3
+
+[param.homeless_adjust_months]
+doc = "Months over which temporary accommodation follows its drivers, exponentially (a judgement)"
+type = "real"
+unit = "1"
+value = 12.0
+
+[state.social_homes_total]
+label = "Social homes the programme has built"
+type = "real"
+unit = "home"
+phase = "accounts"
+initial = 0.0
+next = "social_homes_total + times_step(social_homes_rate / year)"
+
+[state.poverty_at_start]
+doc = "Working-age poverty in the base month, which homelessness takes as normal; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(poverty_at_start < -0.5, working_age_poverty_rate, poverty_at_start)"
+
+[state.unemployment_at_start]
+doc = "Unemployment in the base month, which homelessness takes as normal; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(unemployment_at_start < -0.5, unemployment_rate, unemployment_at_start)"
+
+[var.homelessness_target]
+label = "Temporary accommodation its drivers point to"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "max(temporary_accommodation_2024 * (1.0 - homeless_rent_controls * rent_controls - homeless_homes_effect * (homes_policy_level - 1.0) + select(poverty_at_start < -0.5 or unemployment_at_start < -0.5, 0.0, homeless_poverty_effect * (working_age_poverty_rate - poverty_at_start) + homeless_unemployment_effect * (unemployment_rate - unemployment_at_start)) + homeless_mortgage_effect * (mortgage_rate - mortgage_rate_2024) + homeless_rent_effect * (real_rents - 1.0)) - homeless_social_share * social_homes_total / home_unit, 0.0)"
+
+[param.home_unit]
+doc = "Turns a number of homes into a number of households"
+type = "real"
+unit = "home"
+value = 1.0
+
+[state.homelessness]
+label = "Homeless households"
+doc = "Households in temporary accommodation in England: 126,040 on 30 September 2024. Fewer with rent controls, more homes built and a social housing programme; more with poverty, unemployment and dearer mortgages"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 126040.0
+next = "homelessness + (homelessness_target - homelessness) / homeless_adjust_months"
+
+# ================================================================= productivity
+
+[param.productivity_business_effect]
+doc = "Productivity for each unit of business investment against 2024's, grown with the economy's trend: a fifth more investment, 1% more output per job in time (the capital stock about 2.5% higher after five years, at a capital share of about 0.3, and some of it to come; a judgement)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[param.productivity_public_effect]
+doc = "Productivity for each unit of public investment against 2024's, grown with the economy's trend: a fifth more (about half a point of output), 0.5% in time (the OBR, 2024: a sustained point of output more public investment raises potential output about 0.4% in five years; a judgement)"
+type = "real"
+unit = "1"
+value = 0.025
+
+[param.productivity_school_effect]
+doc = "Productivity for each unit of school attainment (the share of pupils with grade 5 in English and maths) against the start: 10 points, 1% in time, as better-schooled cohorts join the workforce (a judgement after Hanushek and Woessmann; only a few cohorts join in a term)"
+type = "real"
+unit = "1"
+value = 0.1
+
+[param.productivity_health_effect]
+doc = "Productivity for each year of healthy life expectancy against the start: 1% (fewer people kept from work by ill health; a judgement)"
+type = "real"
+unit = "1/year"
+value = 0.01
+
+[param.productivity_rd_effect]
+doc = "Stage S15.2: productivity for each unit of research and development's share of output against 2024's: a fifth more, 1% in time (a judgement after the OECD's estimates of returns to R&D)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[param.productivity_adjust_months]
+doc = "Months over which productivity follows its drivers, exponentially: about five years (a judgement: capital and skills build slowly)"
+type = "real"
+unit = "1"
+value = 60.0
+
+[var.productivity_drivers]
+doc = "Business and public investment against their trend, school attainment and healthy life, weighted: the part of productivity's target that policy moves"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "productivity_rd_effect * research_development / research_development_2024 + productivity_business_effect * business_investment / (business_investment_2024 * trend_index) + productivity_public_effect * public_investment / (public_investment_2024 * trend_index) + productivity_school_effect * school_attainment + productivity_health_effect * healthy_life_expectancy"
+
+[param.business_investment_2024]
+doc = "Business investment in 2024, a month (an estimate: models/uk/README.md, Known weaknesses)"
+type = "money"
+unit = "GBP/month"
+value = {{business_investment_2024}}
+
+[param.public_investment_2024]
+doc = "Public investment in 2024, a month (ONS public sector finances)"
+type = "money"
+unit = "GBP/month"
+value = {{public_investment_2024}}
+
+[state.productivity_drivers_at_start]
+doc = "The drivers in the base month; -1 until known"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(productivity_drivers_at_start < -0.5, productivity_drivers, productivity_drivers_at_start)"
+
+[var.productivity_target]
+doc = "Productivity its drivers point to, against 2024 = 100"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(productivity_drivers_at_start < -0.5, 100.0, 100.0 * (1.0 + productivity_drivers - productivity_drivers_at_start))"
+
+[state.productivity]
+label = "Productivity"
+doc = "Output per job against 2024 = 100, beyond its trend: higher with more business and public investment, better schools and longer healthy lives, over about five years. Pay and exports follow it"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 100.0
+next = "productivity + (productivity_target - productivity) / productivity_adjust_months"
+
+[var.productivity_change]
+label = "Productivity's growth this month"
+doc = "What private pay gains beyond prices and trend productivity this month (model.toml)"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "(productivity_target - productivity) / productivity_adjust_months / productivity"
+
+# ================================================================= stage S15.2: twelve more statistics
+#
+# Each at its published 2024 level in the base month (models/uk/POLICIES.md, "Stage S15.2",
+# gives the source of each) and nil-change there: every driver is read against its level at
+# the start.
+
+[state.real_gdp_at_start]
+doc = "Output at 2024 prices in the base month; -1 until known"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+initial = -1.0
+next = "select(real_gdp_at_start < 0.0, real_gdp, real_gdp_at_start)"
+
+[state.household_emissions_at_start]
+doc = "Households' emissions in the base month; -1 until known"
+type = "real"
+unit = "tonne/month"
+phase = "accounts"
+initial = -1.0
+next = "select(household_emissions_at_start < 0.0, household_emissions, household_emissions_at_start)"
+
+# ---- inequality: the Gini coefficient of equivalised net income across people, from the
+# households, by the Lorenz curve at each tenth (exact at the tenths, straight between them,
+# which puts it a little low), scaled so the base month is HBAI's 35%.
+
+[var.income_tenth_1]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.1, people)"
+
+[var.lorenz_1]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_1, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_2]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.2, people)"
+
+[var.lorenz_2]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_2, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_3]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.3, people)"
+
+[var.lorenz_3]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_3, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_4]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.4, people)"
+
+[var.lorenz_4]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_4, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_5]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.5, people)"
+
+[var.lorenz_5]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_5, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_6]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.6, people)"
+
+[var.lorenz_6]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_6, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_7]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.7, people)"
+
+[var.lorenz_7]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_7, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_8]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.8, people)"
+
+[var.lorenz_8]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_8, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.income_tenth_9]
+type = "real"
+unit = "GBP/month/household"
+phase = "income"
+expr = "quantile(household, equivalised_income, 0.9, people)"
+
+[var.lorenz_9]
+type = "real"
+unit = "1"
+phase = "income"
+expr = "wsum(household, select(equivalised_income <= income_tenth_9, people * equivalised_income, 0.0)) / wsum(household, people * equivalised_income)"
+
+[var.gini_households]
+label = "Gini coefficient of the households' incomes"
+doc = "One less the area under the Lorenz curve, twice, by the trapezium rule at each tenth"
+type = "real"
+unit = "1"
+phase = "income"
+expr = "1.0 - 0.1 * (2.0 * (lorenz_1 + lorenz_2 + lorenz_3 + lorenz_4 + lorenz_5 + lorenz_6 + lorenz_7 + lorenz_8 + lorenz_9) + 1.0)"
+
+[state.gini_at_start]
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = -1.0
+next = "select(gini_at_start < 0.0, gini_households, gini_at_start)"
+
+[param.gini_2024]
+doc = "The Gini coefficient of equivalised household income before housing costs, UK, FYE 2024: 35% (DWP, Households Below Average Income, FYE 1995 to FYE 2024; unchanged from FYE 2023)"
+type = "real"
+unit = "1"
+value = 0.35
+
+[var.inequality]
+label = "Inequality"
+doc = "The Gini coefficient of household income, 35% in 2023-24: the households' own, scaled to the published level, less the wealth tax's effect (the records hold no wealth: 0.3 points for each 1%, a judgement)"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(gini_at_start < 0.0, gini_2024, gini_2024 * gini_households / gini_at_start) - 0.3 * net_wealth_tax"
+
+# ---- the tax burden
+
+[var.tax_burden]
+label = "Tax burden"
+doc = "Public sector current receipts as a share of output: 38.6% in 2024 (ONS, public sector finances; the model's base month)"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "public_receipts / gdp"
+
+# ---- rents and house prices
+
+[param.rents_2024]
+doc = "Average private rent, Great Britain, December 2024: £1,327 a month (ONS, Price Index of Private Rents)"
+type = "money"
+unit = "GBP/month/household"
+value = 1327
+
+[var.rent_growth]
+label = "Rent growth, annual rate"
+doc = "Consumer inflation plus a point (rents' real rise of the 2010s, a judgement), less 0.3 of the change in homes built by the policies, plus half the change in net migration; capped at inflation by capped rises, at a point below it by strict controls"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(rent_controls == 2, min(rent_growth_free, consumer_inflation_annual - 0.01), select(rent_controls == 1, min(rent_growth_free, consumer_inflation_annual), rent_growth_free))"
+
+[var.rent_growth_free]
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "consumer_inflation_annual + 0.01 - 0.3 * (homes_policy_level - 1.0) + 0.5 * (policy_migration_factor - 1.0)"
+
+[state.rents]
+label = "Rents"
+doc = "Average private rent a month: £1,327 in December 2024"
+type = "real"
+unit = "GBP/month/household"
+phase = "accounts"
+initial = 132700.0
+next = "select(months_elapsed == 0, rents, rents * (1.0 + rent_growth / 12.0))"
+
+[var.real_rents]
+doc = "Rents against 2024's at consumer prices"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "rents / rents_2024 / consumer_price_index"
+
+[param.house_price_2024]
+doc = "Average house price, UK, December 2024: £268,000 (ONS, UK House Price Index)"
+type = "money"
+unit = "GBP/home"
+value = 268000
+
+[var.house_price_target]
+type = "real"
+unit = "GBP/home"
+phase = "accounts"
+expr = "house_price_2024 * consumer_price_index * max(1.0 - 8.0 * (mortgage_rate - mortgage_rate_2024), 0.5) * (1.0 - 0.5 * (homes_policy_level - 1.0))"
+
+[state.house_prices]
+label = "House prices"
+doc = "The average house price: £268,000 in December 2024. It follows prices, falls 8% for each point on the mortgage rate and as more homes are built, over about a year (judgements)"
+type = "real"
+unit = "GBP/home"
+phase = "accounts"
+initial = 26800000.0
+next = "house_prices + (house_price_target - house_prices) / 12.0"
+
+# ---- energy bills
+
+[param.energy_bills_2024]
+doc = "Ofgem's price cap for a typical household, January to March 2025: £1,738 a year"
+type = "money"
+unit = "GBP/year/household"
+value = 1738
+
+[var.energy_bills]
+label = "Energy bills"
+doc = "A typical household's energy bill a year: £1,738 under Ofgem's cap for January 2025. Up with prices and the carbon price households pay; down with insulation, onshore wind (£15 a year for each £1bn a year of support, a judgement) and help with bills"
+type = "real"
+unit = "GBP/year/household"
+phase = "accounts"
+expr = "energy_bills_2024 * consumer_price_index + (carbon_tax_households - energy_bills_saved) * year / (homes_2024 * household_per_home) - wind_built * wind_bill_saving - energy_bill_help"
+
+[param.wind_bill_saving]
+type = "money"
+unit = "GBP/year/household"
+value = 15
+
+# ---- days lost to strikes
+
+[param.strike_days_2024]
+doc = "Working days lost to strikes in 2024: about 0.6 million (ONS, labour disputes; the monthly figures run from about 40,000 to about 110,000; the year's total is an estimate, not opened)"
+type = "real"
+unit = "1"
+value = 600000.0
+
+[var.strike_days_target]
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "strike_days_2024 * exp(-20.0 * (public_real_pay - 1.0)) * (1.0 + 0.4 * (1 - trade_union_law)) * (1.0 - 0.3 * strike_limits) * (1.0 + 0.1 * rail_ownership) * max(1.0 - 5.0 * select(unemployment_at_start < 0.0, 0.0, unemployment_rate - unemployment_at_start), 0.3)"
+
+[state.strike_days]
+label = "Days lost to strikes"
+doc = "Working days lost to strikes a year: about 0.6 million in 2024. Many more when public pay falls behind prices (a 5% squeeze nearly triples them, as in 2022-23), with stronger unions and fewer with limits on strikes (judgements); over about six months"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 600000.0
+next = "strike_days + (strike_days_target - strike_days) / 6.0"
+
+# ---- business confidence
+
+[param.business_confidence_2024]
+doc = "Lloyds Business Barometer, December 2024: 39%"
+type = "real"
+unit = "1"
+value = 39.0
+
+[var.business_confidence_target]
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "business_confidence_2024 - 100.0 * (corporation_tax_rate - 0.25) - 300.0 * select(borrowing_cost_at_start < -0.5 or borrowing_cost_smoothed < -0.5, 0.0, borrowing_cost_smoothed - borrowing_cost_at_start) + 200.0 * (output_growth - 0.015) - 20.0 * (trade_barrier_eu + trade_barrier_united_states + trade_barrier_china + trade_barrier_rest_of_world) - 3.0 * (strike_days / strike_days_2024 - 1.0)"
+
+[state.business_confidence]
+label = "Business confidence"
+doc = "The Lloyds Business Barometer: 39% in December 2024. Down with corporation tax (a point for each point), dearer borrowing, trade barriers and strikes, up with growth, over about six months (judgements). Business investment follows it a little"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 39.0
+next = "select(months_elapsed == 0, business_confidence, business_confidence + (business_confidence_target - business_confidence) / 6.0)"
+
+[var.confidence_factor]
+doc = "Business investment, for confidence: 0.2% for each point of the barometer against 2024's (a judgement)"
+type = "real"
+unit = "1"
+phase = "spending"
+expr = "clamp(1.0 + 0.002 * (business_confidence - business_confidence_2024), 0.8, 1.2)"
+
+# ---- farm incomes
+
+[param.farm_incomes_2024]
+doc = "Total income from farming, UK, 2024: £7.7bn (Defra, first estimate, June 2025)"
+type = "money"
+unit = "GBP/year"
+value = 7700000000
+
+[param.farm_emissions_priced]
+doc = "The farm emissions whose carbon price falls on farm incomes: half of about 45 million tonnes a year (a judgement)"
+type = "real"
+unit = "tonne/year"
+value = 22500000.0
+
+[var.farm_incomes]
+label = "Farm incomes"
+doc = "Total income from farming a year: £7.7bn in 2024. Up with farm support (80% of it reaches incomes); down with trade barriers (a tenth on all partners, 10%), the carbon price on half the farms' emissions and fuel duty (£20m a year a penny, a judgement)"
+type = "real"
+unit = "GBP/year"
+phase = "accounts"
+expr = "farm_incomes_2024 * price_index * (1.0 - 0.25 * (trade_barrier_eu + trade_barrier_united_states + trade_barrier_china + trade_barrier_rest_of_world)) + 0.8 * farm_support_cost * year - carbon_price * farm_emissions_priced - farm_fuel_cost * (fuel_duty - fuel_duty_2024) / fuel_penny"
+
+[param.farm_fuel_cost]
+type = "money"
+unit = "GBP/year"
+value = 20000000
+
+[param.fuel_penny]
+type = "real"
+unit = "GBP/litre"
+value = 1.0
+
+# ---- congestion and air pollution
+
+[param.congestion_2024]
+doc = "Hours a UK driver lost to congestion in 2024: 62 (INRIX, 2024 Global Traffic Scorecard)"
+type = "real"
+unit = "1"
+value = 62.0
+
+[var.congestion_target]
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "congestion_2024 * select(real_gdp_at_start < 0.0, 1.0, pow(real_gdp / real_gdp_at_start, 1.5)) * (1.0 - 0.35 * min(0.02 * congestion_charge_pounds, 0.67)) * (1.0 - 0.03 * rail_ownership) * (1.0 + 0.02 * (bus_fare_cap / bus_fare_cap_2024 - 1.0)) * (1.0 - 0.1 * (spending_transport / spending_transport_2024 - 1.0))"
+
+[param.spending_transport_2024]
+type = "money"
+unit = "GBP/month"
+value = {{spending_transport_2024}}
+
+[state.congestion]
+label = "Congestion"
+doc = "Hours a driver loses to congestion a year: 62 in 2024. Up with traffic (output to the power 1.5), down with congestion charging (a third of the trips it puts off are in the worst traffic), public rail, cheaper buses and more on roads and railways, over about six months (judgements)"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 62.0
+next = "congestion + (congestion_target - congestion) / 6.0"
+
+[param.air_pollution_2024]
+doc = "Fine particles (PM2.5), population-weighted annual mean, about 7.5 micrograms a cubic metre in 2024 (Defra: 7.9 in England in 2023, falling; the 2024 figure is a judgement, not opened)"
+type = "real"
+unit = "1"
+value = 7.5
+
+[var.air_pollution]
+label = "Air pollution"
+doc = "Fine particles in the air people breathe, micrograms a cubic metre: about 7.5 in 2024. Two fifths follow households' emissions, two fifths traffic congestion, a fifth neither (judgements). Healthy life falls 0.05 years for each microgram"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "air_pollution_2024 * (0.2 + 0.4 * select(household_emissions_at_start < 0.0, 1.0, household_emissions / household_emissions_at_start) + 0.4 * congestion / congestion_2024)"
+
+# ---- research and development
+
+[param.research_development_2024]
+doc = "Gross domestic expenditure on research and development, UK, 2024: 2.71% of output (ONS, 2024 bulletin)"
+type = "real"
+unit = "1"
+value = 0.0271
+
+[var.research_development]
+label = "Research and development"
+doc = "Spending on research and development as a share of output: 2.71% in 2024. Business's part (about two thirds) follows business investment against its trend; grants add 1.4 times themselves (firms add their own; a judgement). Productivity follows it"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "research_development_2024 * (1.0 / 3.0 + 2.0 / 3.0 * business_investment / (business_investment_2024 * trend_index)) + 1.4 * rd_grants_cost / gdp"
+
+# ---- the trade balance
+
+[var.trade_balance]
+label = "Trade balance"
+doc = "Exports less imports: -£21bn in 2024 (ONS, national accounts; the base month)"
+type = "money"
+unit = "GBP/month"
+phase = "spending"
+expr = "exports - imports"
+
+# ---- what the groups read (beliefs.toml), worked out in the accounts phase, so that each is
+# nil in the base month
+
+[var.farm_income_change]
+doc = "Farm incomes against 2024's at today's prices, less one"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "farm_incomes / (farm_incomes_2024 * price_index) - 1.0"
+
+[var.house_price_change]
+doc = "House prices against 2024's at consumer prices, less one"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "house_prices / (house_price_2024 * consumer_price_index) - 1.0"
+
+[var.energy_bill_change]
+doc = "Energy bills against 2024's at consumer prices, less one"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "energy_bills / (energy_bills_2024 * consumer_price_index) - 1.0"

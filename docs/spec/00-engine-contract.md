@@ -1,12 +1,12 @@
 # Engine contract (v0)
 
-What any implementation of the simulation must do. The Python oracle in `oracle/` is this
-document in executable form; where the two disagree, the oracle is right and this
-document has a bug. The Rust engine is correct when it reproduces the oracle's state hash
-on every step of every scenario.
+What the simulation must do. The Rust engine (`crates/core/`) is the implementation and
+these documents (`docs/spec/`) are the specification; where the two disagree, one of them
+has a bug, and the recorded hashes and fixtures (section 12) say which behaviour was
+intended. Section 12 says how the engine's behaviour is pinned.
 
 Related: [model format](01-model-format-v0.md), [formula language](02-formula-language-v0.md),
-[toy model](03-toy-model.md).
+[toy model](03-toy-model.md), [`polisim serve`](09-serve.md).
 
 ## 1. Values
 
@@ -53,7 +53,12 @@ a run.
 Steps are numbered from 0. Step `t` does the following, in this order.
 
 1. **Commands.** Apply the lever changes scheduled for step `t`. A value outside the
-   lever's declared range is an error.
+   lever's declared range is an error. In a model with a legislature (format 1, stage
+   S5.4) a change to a lever with a `leaning` is first voted on, and applied only if it
+   passes ([format 1](06-model-format-1.md#bills-stage-s54)); a defeated change is not an
+   error and is never range-checked. With political capital (stage S12.4) a bill that
+   costs more than the capital left is refused before the vote, in the same way, and the
+   engine then stores what the step's bills spent in the legislature's `spent` lever.
 2. **Phases**, in the order the model declares them. For each phase:
    1. evaluate every `var` and `flow` of the phase, in dependency order;
    2. evaluate the `next` formula of every `state` updated in the phase;
@@ -101,9 +106,9 @@ so the issuer's balance is the negative of everything the other sectors hold.
    minus the sum of the flows out.
 2. For every instrument, the balances of all sectors sum to exactly zero.
 
-Both hold by construction in the oracle. They are stated because the engine will compute
-the same totals by a different route (blocks, later threads), and these are the tests
-that route must pass.
+Both follow from posting each flow to both its accounts. They are stated, and the engine
+checks them on every step, because it computes the totals by a faster route (blocks of
+records, threads) that must still pass them.
 
 ## 6. Random numbers
 
@@ -139,6 +144,12 @@ The second rule forbids vectorised or threaded real sums. It is acceptable becau
 that matter are whole numbers. If profiling shows real sums matter, a fixed blocked order
 will replace it in a later format version.
 
+Since stage S4.4 the engine evaluates a record-level formula over large entities on
+several threads, each thread taking whole blocks of records; records are independent, so
+every value is what one thread would compute, the parts are joined in record order, and
+the error reported is the first in record order. Sums still run in record order on one
+thread.
+
 ## 9. State hash
 
 SHA-256 over the following bytes:
@@ -167,22 +178,33 @@ earlier it stops the cheaper the fix.
 Command logs; mods and patches; threads; lags longer than one step; moving averages;
 dimensions other than one entity (regions, industries); native operators (cohort ageing,
 alignment, seat allocation); transcendental functions. Each is planned; none is needed by
-the toy model. Snapshot saves exist and are described in [save format 0](04-save-format-v0.md).
+the toy model. Snapshot saves exist and are described in [save formats 0 and 1](04-save-format-v0.md); a format 1 save follows the model when its files change (stage S7.0).
 
-## 12. Two implementations
+## 12. One implementation, pinned
 
-| | Oracle (`oracle/`) | Engine (`crates/core/`) |
-|---|---|---|
-| Language | Python | Rust |
-| Purpose | defines the behaviour | runs the game |
-| Formulas | closures, one record at a time | register bytecode, a block of records at a time |
-| Speed at 1,000 households | about 17 ms per step | about 0.2 ms per step |
+The engine (`crates/core/`, Rust) is the only implementation. Until stage S14.2 a second,
+deliberately naive one in Python (the "oracle") defined the behaviour and the engine was
+tested against it on every step; it was retired in S14.2 because the engine had matched it
+on every recorded hash, fixture and random scenario for many stages, while it took about a
+second a UK month (the engine 17 to 20 ms) and its test suite 40 to 50 minutes.
 
-They are held together by three tests. `conformance/cases.tsv` lists formulas with the
-result the oracle gives for each, and both sides check every line. The engine must
-reproduce the oracle's recorded hash on every step of the toy baseline. And
-`tools/diff_engine.py` generates random scenarios, runs both, and compares their output
-byte for byte, including the scenarios that fail.
+What it recorded stays, and pins the engine's behaviour:
 
-When the two disagree, the oracle is right unless this document says otherwise, and the
-fix goes into the engine. When the contract itself changes, the oracle changes first.
+- **Recorded hashes.** `models/*/golden/<scenario>.hashes.csv` hold the state hash after
+  each step of `models/*/scenarios/<scenario>.toml`. `crates/core/tests/golden.rs` (and the
+  other Rust tests named there) require them on every step. They are written by
+  `polisim run <scenario> --steps N --columns step,hash --out <file>`;
+  `python tools/record_goldens.py --check` checks them all and, without `--check`,
+  re-records them.
+- **Frozen fixtures.** `conformance/cases.tsv` and `format1.tsv` (formulas and their
+  results), `random_models.toml` (random whole models and their hashes), the shared cases
+  (`*_cases.toml`) and `functions.txt` (the reserved function names) were recorded by the
+  oracle and are read by the Rust tests in `crates/core/tests/`. They are not regenerated:
+  a new case is added by hand with the result the specification gives.
+- **Behaviour tests.** `tests/` (Python, standard library only) states what the models
+  must do, through `polisim serve` ([09-serve.md](09-serve.md)): `python -m unittest
+  discover -s tests`.
+
+A change meant to change results changes the specification first, then the engine, and
+re-records the hashes it moves in the same commit, saying why. A change not meant to
+change results (speed, structure) must leave every recorded hash as it is.

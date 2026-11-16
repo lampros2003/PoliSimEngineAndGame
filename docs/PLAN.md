@@ -12,8 +12,12 @@ in `README.md`. Update the status column here as milestones close.
 |---|---|
 | S0 Specification, oracle, data gate | Done except the data-licence check, which is recorded as not passed |
 | S1 Rust core | Done except the Python module, which was deferred |
-| S2 Playable shell | **Next.** Planned in detail below |
-| S3 to S7 | Outlined below; each gets its own detailed plan when it starts |
+| S2 Playable shell | Built and tested in CI (2026-11-14). The two exit tests that need the owner at a Windows machine are open |
+| S3 to S7 | Outlined below; S3 is planned in `docs/S3-PLAN.md` (done), S4 in `docs/S4-PLAN.md` (done), S5 in `docs/S5-PLAN.md` (done), S6 in `docs/S6-PLAN.md` (done), S7 in `docs/S7-PLAN.md` (its building milestones done; the business decisions are the owner's) |
+| S8 What government does | Added after S7: spending by function, what services deliver, emissions, the issues voters weigh (`docs/S8-PLAN.md`, done but for the NHS waiting list, whose source is not reachable from this environment) |
+| S9 Dilemmas, prices, history | Chosen by the owner on the decision page (2026-11-14): the NHS waiting list, dilemmas, taxes that reach prices, and the voters' reactions fitted to past elections (`docs/S9-PLAN.md`, done; the fit to past elections is weak evidence and only moves the judgements a little). Open for the play test: a seed of its own for each new game, and the size of the dilemmas' political costs |
+| S10 The engine: speed, reliability, power | At the owner's request (2026-11-14) (`docs/S10-PLAN.md`, done): a profile by formula; records, cells, sums and independent formulas on several threads (the UK's month 29 to 20 ms, every hash unchanged); thread-count, fuzzing and failure-order tests, and a game that survives a panic in its simulation thread; `div`, `mod`, `largest`, `smallest` and `sum_by` in the formula language; loading three times faster; lags (`[lag.x]`); `ln`, `sqrt`, `pow` and `quantile`; national parts of record formulas computed once |
+| S11 Curves, who loses out, speed | Chosen by the owner (2026-11-14): effect curves and the UK on them, poverty and median income against the government's statistics, and engine speed (`docs/S11-PLAN.md`, done). The UK's month is 14 to 16 ms on four threads with the poverty measures |
 
 ## Decisions this plan rests on
 
@@ -26,7 +30,9 @@ Taken by the owner on 2026-11-14:
 | Who tests S2 | The owner alone. Outside testers move to stage S4 |
 | Branches | Create `main`; each stage arrives as one pull request |
 | First build target | Windows (the owner's machine); Linux is kept working by CI |
-| First real country | Deferred to the start of S3 |
+| First real country | The United Kingdom (owner, 2026-11-14) |
+| Owner testing | The owner cannot test builds or check licence pages for now (2026-11-14). Work continues; items that need the owner are listed as open, not skipped |
+| After S8 (decision page, 2026-11-14) | Losing an election ends the game; descriptive blocs, not real parties; the judgements stand until data replace them; the Open Parliament Licence still to be checked before release; a play test within a week; Early Access decided after it; Steam Workshop with Early Access; no second country yet; closed source (`docs/S9-PLAN.md`) |
 
 Earlier decisions (the 22-question ballot) are in
 `research_notes/PoliSim engine architecture pathways/ballot_decisions.md`.
@@ -38,11 +44,14 @@ Earlier decisions (the 22-question ballot) are in
 - **Every milestone ends with something the owner can run** on Windows, downloaded from
   the pull request's CI run, plus a short note saying what to try.
 - **CI is the gate.** A milestone is not done until CI is green on Windows and Linux:
-  formatting, lints, the oracle's tests, the engine's tests, random scenarios through both
-  implementations, and from S2 on a scripted test of the client.
-- **The oracle stays the definition.** Any change to simulation behaviour goes into the
-  contract and the oracle first, then the engine. Features that only observe a run (the
-  trace view, charts, history) live in the engine alone and must not change a state hash.
+  formatting, lints, the engine's tests, the behaviour tests in `tests/`, the recorded
+  hashes, the hindcast check, and from S2 on a scripted test of the client. (Until stage
+  S14.2 it also ran the Python reference's tests and random scenarios through both
+  implementations.)
+- **The specification is the definition.** Since stage S14.2 the engine is the only
+  implementation: any change to simulation behaviour goes into the contract (`docs/spec/`)
+  first, then the engine, and re-records the hashes on purpose. Features that only observe a
+  run (the trace view, charts, history) must not change a state hash.
 - **Benchmarks before optimisation.** Nothing is tuned without a measurement that says it
   matters.
 - **This file is the memory.** Cloud sessions start with nothing but the repository, so
@@ -78,6 +87,10 @@ crates/core/         the engine, unchanged in behaviour
   different model should produce a different, working interface with no client change.
 
 ### Milestones
+
+Status on 2026-11-14: M2.0 to M2.6 are built. Every "done when" that a script can check
+passes in CI on Windows and Linux; the ones that need the owner at a Windows machine are
+open.
 
 | # | Milestone | What is built | Done when |
 |---|---|---|---|
@@ -172,6 +185,6 @@ roadmap; the notes here record what has changed since it was written.
 | Data licences not confirmed | S0 | Owner's check before S3; see the table above |
 | No benchmark on real hardware | S0 | Owner runs the bundled benchmark at M2.0 |
 | Python module not built | S1 | Built in S3, when calibration needs it |
-| No overflow checks in the S0 benchmark | S0 | The engine has them; re-measure with the engine when rule depth grows in S4 |
-| Saves break when any model file changes | S1 | Acceptable until S7, which adds migration |
-| Engine timings are for shallow rules only | S1 | Re-measure at S4 |
+| No overflow checks in the S0 benchmark | S0 | Done in S4.4: with overflow checks and the 2024-25 rules, 100,000 households take 68 ms a month (`models/uk/households/README.md`) |
+| Saves break when any model file changes | S1 | Done in S7.0: save format 1 follows the model when its files change (`docs/spec/04-save-format-v0.md`) |
+| Engine timings are for shallow rules only | S1 | Done in S4.4: the UK model with 20,000 households takes about 15 ms a month, with 100,000 about 68 ms, on a four-core server |

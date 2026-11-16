@@ -1,0 +1,991 @@
+-	real	person	largest(population, region, sex, age)	40c7575c68a1e065
+-	real	person	smallest(population, region, sex, age)	408ca99218b5f188
+-	real	person	largest(population, age, sex, region)	40c7575c68a1e065
+-	real	person	sum(largest(population, age), region, sex)	40ee529942ac407c
+-	real	person	largest(sum(population, age), region, sex)	4121ae4b2e4968fa
+-	int	1	largest(coord(age), age)	100
+-	int	1	smallest(coord(age), age)	0
+-	int	1	smallest(100 - coord(age), age)	0
+-	int	person	largest(cohort_count, band)	4000
+-	int	person	smallest(cohort_count, band)	160
+-	real	1	largest(mortality, sex, age) - smallest(mortality, sex, age)	3fa550f6dfe829ec
+-	real	1	largest(0.0 / 0.0 + coord(age), age)	nan
+-	real	person	largest(population, region, sex, region)	E:static
+-	bool	1	largest(coord(age) > 3, age)	E:static
+-	real	person	largest(population)	E:static
+-	real	person	sum(sum_by(population, age, 16 + div(coord(age), 25), band), region, sex, band)	4146f33309e6f472
+-	real	person	sum(select(coord(band) == 17, sum_by(population, age, 16 + div(coord(age), 25), band), 0.0), region, sex, band)	412a71ac0031ffc8
+-	real	person	sum(select(coord(band) == 20, sum_by(population[region: south], age, 16 + div(coord(age), 25), band), 0.0), sex, band)	40a7b97862411180
+-	int	1	sum(sum_by(coord(age), age, 16 + div(coord(age), 25), band), band)	5050
+-	int	1	sum(select(coord(band) == 20, sum_by(coord(age), age, 16 + div(coord(age), 25), band), 0), band)	100
+-	int	1	sum(select(coord(band) == 19, sum_by(1, age, 16 + mod(coord(age), 5), band), 0), band)	20
+-	real	1	largest(sum_by(mortality, age, 16 + div(coord(age), 25), band), sex, band)	3fee921c40ed1eea
+-	real	person	sum(sum_by(population, age, coord(age), band), region, sex, band)	E:runtime
+-	real	person	sum_by(population, age, 16, band)	E:static
+-	real	person	sum(sum_by(population, region, 16, band), band, region)	E:static
+-	real	person	sum(sum_by(population, age, 16.0, band), region, sex, band)	E:static
+-	real	person	sum(sum_by(population, age, cohort_count[band: 16], band), region, sex, band)	E:static
+-	real	person	sum(sum_by(population[age: coord(band)], age, 16, band), region, sex, band)	E:static
+-	real	person	sum(sum_by(coord(age) > 3, age, 16, band), band)	E:static
+-	real	person	sum(population, region, sex, age)	4146f33309e6f470
+-	real	person	sum(population, age, sex, region)	4146f33309e6f47a
+-	real	person	sum(sum(population, age), region, sex)	4146f33309e6f473
+-	real	person	sum(sum(sum(population, age), sex), region)	4146f33309e6f472
+-	int	person	sum(cohort_count, band)	5480
+-	int	person	sum(cohort_shift(cohort_count, band), band)	5480
+-	real	person	sum(cohort_shift(population, age), region, sex, age)	4146f33309e6f46f
+-	real	person	sum(cohort_shift(population, sex), region, sex, age)	4146f33309e6f470
+-	real	person	sum(cohort_shift(population, region), region, sex, age)	4146f33309e6f46d
+-	int	1	sum(coord(age), age)	5050
+-	int	1	sum(coord(band) * coord(region), band, region)	270
+-	real	person	population[region: south, sex: male, age: 0]	40c45513e50d1d04
+-	real	person	population[region: 2, sex: 1, age: 100]	40977d5b444d4b45
+-	real	person	population[age: 40, sex: female, region: midlands]	40b57fe1481ef191
+-	real	person	sum(population[sex: female], region, age)	413730c29919066d
+-	real	person	sum(population[age: min(coord(age) + 1, 100)], region, sex, age)	4146976acdc2c498
+-	real	person	sum(population[age: 100 - coord(age)], region, sex, age)	4146f33309e6f46d
+-	real	person	sum(births[sex: male], region)	409134c1d8999198
+-	real	1	sum(mortality * fertility, age, sex)	3f1ff0d820cc3035
+-	real	person	sum(select(coord(age) >= 65, population, 0.0), region, sex, age)	411c8233c0670442
+-	real	person	sum(population * mortality - deaths, region, sex, age)	c07604e9d48a66fe
+-	real	person	sum(population - prev(population), region, sex, age)	0000000000000000
+-	real	1	sum(local_rate[region: coord(region)], region)	3fe8000000000000
+-	real	town	wsum(town, local_rate[region: region_code])	4040e00000000000
+town	real	1	local_rate[region: region_code] * migration_rate[region: region_code]	3f0a36e2eb1c432d,befa36e2eb1c432d,3f1a36e2eb1c432d,3f1a36e2eb1c432d
+town	real	person	population[region: region_code, sex: female, age: 30]	40b5d3b2d75f14cd,40b9710c8815f660,40bd1ea91c402f72,40bd1ea91c402f72
+town	real	person	population[region: region_code, sex: region_code - region_code, age: region_code * 40]	40bedcebd65c8f18,40b57fe1481ef191,40a72a4376e32088,40a72a4376e32088
+-	real	town	sum(wsum_by(town, town_rate, region, region_code), region)	4040e1126e978d50
+-	int	town	sum(wcount_by(town, town_rate > 0.2, region, region_code), region)	135
+-	real	town	sum(wsum_by(town, local_rate[region: region_code], region, region_code) * coord(region), region)	4044a00000000000
+-	int	town	sum(wsum_by(town, region_code, region, region_code), region)	165
+-	real	town	sum(wsum_by(town, town_rate, region, 2 - region_code), region, sex)	4050e1126e978d50
+-	real	town	sum(wsum_by(town, town_rate, region, region_code + 1), region)	E:runtime
+-	real	town	wsum_by(town, town_rate, region, region_code)	E:static
+-	real	town	sum(wsum_by(town, town_rate, region), region)	E:static
+-	real	town	sum(wsum_by(town, town_rate, region, 0.5), region)	E:static
+town	real	town	wsum_by(town, town_rate, region, region_code)	E:static
+-	real	town	sum(wsum_by(nowhere, town_rate, region, region_code), region)	E:static
+-	int	town	sum(wcount_by(town, town_rate, region, region_code), region)	E:static
+-	real	town	sum(wsum_by(town, town_rate > 0.2, region, region_code), region)	E:static
+-	real	person	population[region: south, sex: male, age: 101]	E:runtime
+-	real	person	population[region: 3, sex: male, age: 1]	E:runtime
+-	real	person	sum(population[age: coord(age) + 1], region, sex, age)	E:runtime
+-	int	person	cohort_count[band: 15]	E:runtime
+town	real	person	population[region: region_code + 1, sex: male, age: 1]	E:runtime
+-	real	person	population	E:static
+-	real	person	sum(population, region, sex)	E:static
+-	real	person	sum(population, age, age)	E:static
+-	real	person	sum(sum(population, age), age, sex, region)	E:static
+-	int	1	coord(age)	E:static
+-	real	person	cohort_shift(population, age)	E:static
+-	real	person	population[region: south, region: north, sex: male, age: 1]	E:static
+-	real	person	population[height: 1, region: south, sex: male, age: 1]	E:static
+-	real	person	population[region: south, sex: male, age: 1.0]	E:static
+-	real	person	total_population[region: south]	E:static
+-	real	person	sum(population, height)	E:static
+-	real	person	sum(population)	E:static
+-	real	1	sum(rand(noise), age)	E:static
+town	real	person	sum(population, region, sex, age)	E:static
+town	int	1	coord(region)	E:static
+-	bool	1	sum(coord(age) > 3, age)	E:static
+-	real	person	sum(population, region, sex, age) + sum(mortality, sex, age)	E:static
+-	real	person	sum(cohort_shift((population[age: 19, region: south] + cohort_entry), sex), sex, band)	40f5b018e915fa84
+-	real	person	sum(((min((population - cohort_entry), (cohort_entry - population[age: 45])) + sum(min(population[age: 5], deaths[sex: male]), band)) + ((min(deaths[age: 0, region: 2], births[sex: 1]) - (total_population + births)) - (deaths[region: midlands, sex: 0] - select(coord(age) >= 35, deaths, deaths)))), age, sex, region)	c1db35edd85a947d
+-	real	1	sum(sum(mortality, sex, band), region, age)	40423da574cedef7
+-	real	1	sum(cohort_shift(ageing_share, age), age, band)	40450aaaaaaaaab4
+-	int	person	sum(cohort_count, band, sex)	10960
+-	real	person	sum(cohort_shift(arrivals[age: 0, region: 0], sex), sex, region)	4023bfd93e9229d4
+-	int	person	sum((cohort_entry - (cohort_count[band: 16] * coord(sex))), sex)	-140
+-	real	1	sum(max(min(cohort_shift(coord(age), sex), min(fertility, sum(ageing_share, region))), mortality), age, band, sex)	40294864279cd1f7
+-	int	person	sum(cohort_count[band: 16], age, region)	48480
+-	real	person	sum(births, sex, band, region)	40c500e6a0e7763a
+-	int	person	sum(sum(min(cohort_entry, cohort_entry), sex, region), age)	6060
+-	int	1	sum(coord(age), age)	5050
+-	real	person	sum(arrivals[age: 72, region: north, sex: female], band, region)	402025bf2eee5c84
+-	int	person	sum((cohort_shift(cohort_count[band: 16], sex) - min(cohort_count[band: 20], cohort_count[band: 20])), sex)	-7680
+-	int	person	sum((sum(min(min(cohort_count, cohort_count), (cohort_entry - cohort_count)), region) + ((cohort_shift(cohort_entry, sex) - select(coord(band) >= 19, cohort_entry, cohort_count[band: 16])) + select(coord(age) >= 63, sum(cohort_count, region), (cohort_count * coord(age))))), age, sex, band)	19272840
+-	int	person	sum((cohort_count[band: 19] - cohort_entry), sex, age, region)	599940
+-	int	person	sum(cohort_entry, band, region)	150
+-	int	person	sum(select(coord(region) >= 1, cohort_count, select(coord(band) >= 19, cohort_count, cohort_entry)), band, region)	15990
+-	int	person	sum(cohort_entry, age)	1010
+-	int	person	sum(cohort_count[band: 20], sex)	8000
+-	real	1	sum((boy_share + min(local_rate, mortality[sex: male])), band, age, region)	4088d376b9605e67
+-	int	person	sum((cohort_count[band: 19] - cohort_count), region, band)	-1440
+-	int	person	sum(cohort_entry, region)	30
+-	real	person	sum(cohort_entry, region)	403e000000000000
+-	int	1	sum(coord(band), band)	90
+-	int	person	sum(cohort_entry, sex)	20
+-	real	1	sum(cohort_shift(select(coord(band) >= 16, ageing_share, max(max(local_rate[region: 2], ageing_share), (mortality[age: 100, sex: female] + local_rate))), band), band, region)	3ff4000000000000
+-	int	person	sum(((sum(cohort_count, region) - cohort_entry) + (cohort_entry + min(cohort_entry, cohort_count))), band)	16490
+-	int	1	sum(sum((coord(region) - coord(band)), band), region)	-255
+-	real	1	sum(min(sum(min(coord(band), coord(band)), sex), max(boy_share, local_rate[region: north])), band, age)	407028f5c28f5c2c
+-	int	1	sum(((select(coord(region) >= 1, coord(region), coord(region)) + coord(region)) + cohort_shift((coord(region) - coord(region)), region)), region)	6
+-	real	person	sum((deaths[sex: female] - total_population), age, region)	c1cb29cae3a62524
+-	int	1	sum(coord(region), region, age, band)	1515
+-	real	1	sum(ageing_share, age, band, region)	405f8fffffffff3a
+-	real	person	sum(((cohort_entry * fertility[age: 0]) - births[region: 2, sex: 0]), sex)	c089003dad0b60dd
+-	int	person	sum((cohort_count + max(cohort_count, (cohort_shift(cohort_count, age) - (cohort_entry + cohort_count)))), band, age)	1106960
+-	real	person	sum(arrivals[age: 0, region: 0], sex)	400a5521a8c2e270
+-	int	1	sum((coord(band) - coord(band)), sex, age, band)	0
+-	real	person	sum((cohort_shift((cohort_count[band: 16] + total_population), region) * max(coord(region), min(boy_share, migration_rate))), region)	416cb063cc60b18c
+-	int	person	sum((cohort_entry + cohort_count), sex, band)	11060
+-	real	1	sum(max(migration_rate, fertility[age: 15]), region)	3f453f937a010926
+-	real	person	sum(((cohort_shift(max(total_population, cohort_count), age) + (cohort_shift(population[age: 0, region: south], band) * max(fertility[age: 6], local_rate[region: 0]))) - (cohort_shift((deaths[age: 28, region: 1] - cohort_count), age) - cohort_shift(arrivals[region: 0], age))), band, sex, age)	41e6aa070e323d1f
+-	real	1	sum(max(max(min(coord(age), local_rate[region: north]), min(mortality[sex: 0], coord(age))), max((ageing_share - coord(age)), sum(mortality, sex))), region, age)	4052d00000000000
+-	real	person	sum(population[region: south], age, sex, band)	4155df33341d5cdb
+-	real	person	sum(births[sex: female, region: midlands], sex)	4085daa030a61950
+-	real	1	sum(migration_rate[region: coord(region)], band, age, region)	3fd028f5c28f5ca2
+-	real	person	sum(total_population, band)	416cafffcc60b18c
+-	int	1	sum(max(min(((coord(sex) + coord(sex)) - cohort_shift(coord(sex), band)), coord(band)), coord(sex)), band, sex)	6
+-	real	1	sum(mortality[sex: female, age: 0], region)	3f1a36d1bd105b06
+-	real	person	sum((cohort_count[band: 20] + total_population), sex, region)	41713c42476d3754
+-	real	1	sum(coord(region), region, band, age)	4097ac0000000000
+-	real	person	sum(population[age: 100], region, sex, band)	40e372d84695966f
+-	real	person	sum((cohort_shift(min((cohort_entry + births[sex: male]), arrivals[age: 0, sex: female]), region) * (sum((ageing_share + fertility[age: 0]), band) - ageing_share)), region)	3ffb479a74b3a235
+-	real	person	sum(select(coord(band) >= 17, (sum((population[sex: female, age: 93] + deaths[age: 0, sex: female]), region) - min((arrivals[sex: female, region: midlands, age: 101] - deaths[age: 0, sex: 1, region: 1]), select(coord(band) >= 20, cohort_count, total_population))), select(coord(band) >= 17, sum(total_population, region, age), ((population[region: midlands, sex: 1, age: 13] - total_population) - (cohort_count + population[age: 0, region: south, sex: female])))), band)	E:runtime
+-	real	1	sum(sum(coord(sex), band, region), sex)	402e000000000000
+-	int	person	sum(min(cohort_count[band: 19], ((sum(cohort_entry, region) + (cohort_count[band: 20] + cohort_entry)) * max(min(coord(age), coord(age)), cohort_shift(coord(age), age)))), age)	100000
+-	real	1	sum((coord(region) + mortality[sex: male, age: 0]), region)	4008003c4ae78d76
+-	real	person	sum(deaths[region: 0], band, sex, age)	40d5687e00bbb667
+-	real	person	sum((sum((cohort_count - total_population), sex) + min(deaths[sex: male], total_population)), region, band, age)	c200f88dabef809a
+-	int	person	sum(cohort_entry, age)	1010
+-	real	1	sum(boy_share, age, sex)	4059db22d0e56047
+-	int	person	sum((cohort_count[band: 16] - cohort_entry), sex, region)	900
+-	int	person	sum(cohort_count[band: 16], age)	16160
+-	int	person	sum((cohort_entry + ((cohort_entry + cohort_entry) - (cohort_count[band: 16] * coord(region)))), region, age, sex)	-78780
+-	real	person	sum((cohort_shift((cohort_entry * ageing_share), band) - cohort_shift(cohort_shift(cohort_count, band), band)), band)	c0b563d555555555
+-	real	person	sum(deaths[region: north, age: 0], sex, band)	400793b8a3e57730
+-	int	person	sum(cohort_entry, sex, region)	60
+-	real	person	sum(max(min(population[region: south, age: 100 - coord(age)], population[region: north]), (total_population + total_population)), sex, band, age)	41f6a2dfd7444bc0
+-	real	person	sum(cohort_entry, region)	403e000000000000
+-	int	1	sum((select(coord(sex) >= 0, max((coord(sex) + coord(sex)), coord(sex)), max((coord(sex) - coord(sex)), coord(sex))) + (coord(sex) + min(sum(coord(sex), band, region), (coord(sex) - coord(sex))))), sex)	3
+-	int	person	sum((cohort_entry + sum(cohort_count[band: 20], band)), age, region, sex)	12126060
+-	real	person	sum(sum((population[region: midlands] * coord(age)), region), sex, age, band)	41bec9d57bc8b4c1
+-	real	person	sum(((total_population + (births + cohort_count[band: 16])) * cohort_shift(min(migration_rate, migration_rate), region)), region, sex)	40a7814d764e0afa
+-	real	1	sum(cohort_shift(min(coord(age), ageing_share), age), region, age)	4038ffffffffffea
+-	real	1	sum(min((boy_share + mortality[age: 8]), local_rate[region: 1]), sex)	3fe0000000000000
+-	real	1	sum((ageing_share + boy_share), band, region)	4021dc28f5c28f5c
+-	real	person	sum(min((cohort_entry * coord(region)), (total_population * coord(region))), band, sex, region)	4072c00000000000
+-	real	1	sum(fertility[age: 0], sex)	0000000000000000
+-	int	1	sum(min(coord(sex), coord(sex)), sex, age)	101
+-	real	1	sum(coord(sex), sex)	3ff0000000000000
+-	int	person	sum(sum(cohort_count[band: 20], sex), region)	24000
+-	int	person	sum((cohort_shift(select(coord(region) >= 0, cohort_entry, cohort_entry), band) + ((cohort_entry + cohort_count) * coord(region))), age, band, region)	1690740
+-	real	person	sum(cohort_entry, sex, age)	409f900000000000
+-	real	person	sum(cohort_shift(arrivals[region: south, age: 1], sex), band, region, sex)	4061dd8698045913
+-	real	person	sum(total_population, band, sex, age)	41e6a2dfd7444bc0
+-	real	1	sum(migration_rate, band, region)	3f647ae147ae147c
+-	real	1	sum(mortality, sex, age)	400374f4c0dca98d
+-	real	person	sum(births[region: 0], age, sex, band)	4112f10bc3cf7406
+-	real	1	sum(cohort_shift(ageing_share, region), sex, region)	3fe0000000000000
+-	real	1	sum(mortality[age: 0], band, sex)	3f377bc7a194bab6
+-	real	person	sum(births[region: south], sex)	40899d9fb7983f93
+-	real	1	sum((migration_rate + fertility[age: 0]), band, sex, region)	3f747ae147ae147c
+-	real	person	sum((deaths[age: 100, sex: male] - total_population), band, region)	c18583e6e069e1ed
+-	real	1	sum(ageing_share, band, sex, age)	40550aaaaaaaaa8d
+-	real	person	sum(select(coord(region) >= 0, sum(min((cohort_entry + births[sex: 1, region: 2]), cohort_shift(arrivals[sex: 0, region: south], region)), band, age), cohort_count[band: 16]), region)	40ab42cbad60db8c
+-	real	1	sum(min(coord(age), select(coord(age) >= 87, ((fertility - local_rate[region: north]) + select(coord(age) >= 51, migration_rate[region: 2], migration_rate[region: north])), max(coord(age), max(fertility, coord(age))))), age)	40ad3302de00d1b4
+-	real	1	sum(max(local_rate[region: midlands], ((cohort_shift(coord(sex), band) + coord(sex)) + cohort_shift(local_rate[region: 0], band))), sex, band)	4029800000000000
+-	real	person	sum(((((population[sex: male, age: 50] - cohort_entry) + min(population[sex: 1], population[region: coord(region), sex: male])) + sum((arrivals[sex: male, region: midlands] - population[sex: female, region: min(coord(region) + 1, 2)]), band)) + select(coord(region) >= 2, (min(population[sex: 0], total_population) - cohort_shift(deaths[region: 0, sex: 1], age)), cohort_shift(cohort_shift(cohort_entry, age), age))), age, region)	c152a0467e7ceaee
+-	real	person	sum((arrivals[region: midlands] - ((births[region: north] - births[region: 2, sex: female]) * (coord(sex) - migration_rate[region: south]))), age, sex)	40c0a15767d9f53f
+-	real	person	sum(select(coord(region) >= 1, (cohort_shift(births[sex: female, region: 1], band) + min(population[age: 33, sex: female], population[age: 16, sex: 0])), max((arrivals[sex: male, age: 35] * coord(region)), min(cohort_count, arrivals[age: 21, sex: female]))), band, region)	40f111783e7f59a3
+-	real	1	sum(ageing_share, region, age)	40393fffffffffe7
+-	int	person	sum((cohort_count * min(coord(band), coord(band))), region, sex, band)	642960
+-	real	1	sum(max(cohort_shift((cohort_shift(fertility[age: 0], band) + local_rate[region: 0]), sex), boy_share), sex, band)	40147ae147ae147c
+-	int	1	sum((coord(band) + coord(band)), band)	180
+-	real	1	sum(sum(migration_rate, band), region, sex)	3f747ae147ae147b
+-	int	person	sum(cohort_entry, band, sex)	100
+-	real	person	sum(arrivals[age: 83, sex: 1, region: north], age, band, region)	4083b15036f4d5cd
+-	real	person	sum(cohort_shift(births[region: min(coord(region) + 1, 2), sex: 1], region), band, region, sex)	40c78f2eccf6935d
+-	int	1	sum(select(coord(age) >= 27, coord(age), cohort_shift((coord(age) - coord(age)), age)), age)	4699
+-	int	person	sum(cohort_shift(cohort_count[band: 20], region), region)	12000
+-	real	person	sum(select(coord(age) >= 14, select(coord(sex) >= 1, (cohort_entry * min(coord(age), fertility[age: 100 - coord(age)])), cohort_entry), (population[region: 2] + total_population)), age, sex)	41942759e61ddd97
+-	real	person	sum(cohort_shift(select(coord(band) >= 20, deaths[region: 2], births[region: north, sex: female]), age), age, sex, band)	410e4b073d6e7381
+-	real	person	sum(max(deaths[sex: male, region: north], births[region: north]), age, sex)	40ee4e79394bed3e
+-	real	person	sum(select(coord(sex) >= 0, cohort_shift(arrivals[age: 89, sex: 0, region: 2], sex), cohort_shift(cohort_entry, sex)), sex)	3ff3a88bdada45d6
+-	real	person	sum(sum(deaths, age), region, band, sex)	40f2bb32d2cccab1
+-	real	person	sum((select(coord(region) >= 2, (arrivals[sex: female, region: 2] + cohort_shift(cohort_count[band: 18], region)), arrivals[sex: female, age: min(coord(age) + 1, 100)]) + total_population), region, age)	41cb2a190eea8eb4
+-	real	person	sum(select(coord(band) >= 20, cohort_count[band: coord(band)], cohort_entry), band)	40af900000000000
+-	real	person	sum((select(coord(band) >= 16, sum(arrivals[sex: 0, region: 2], age), cohort_shift(population[age: 0, sex: 1, region: midlands], band)) + sum(sum(cohort_entry, age), sex)), band)	40c5ff90f91d67a0
+-	real	person	sum(min((cohort_entry + arrivals[sex: 1, region: south]), cohort_entry), age)	408f900000000000
+-	real	person	sum(births[sex: male], age, region, band)	4120f88932237849
+-	real	1	sum(boy_share, region)	3ff89374bc6a7efa
+-	real	1	sum(max((coord(age) + local_rate[region: 0]), migration_rate[region: south]), age)	40b3d34000000000
+-	real	person	sum((total_population * (local_rate - migration_rate)), sex, region)	4151337640e4c7d8
+-	real	person	sum((arrivals[region: north] - population[region: south]), age, sex, band)	c155de5b6ca95bbf
+-	real	person	sum(((deaths[sex: 0, age: 101, region: min(coord(region) + 1, 2)] + cohort_entry) - (arrivals[sex: male] - arrivals[sex: male, region: coord(region)])), region, age)	E:runtime
+-	real	person	sum((deaths[region: north, age: 56] + ((deaths[age: 0, region: 2] - total_population) + arrivals[age: 0, region: 2])), sex)	c156f329369ec1aa
+-	real	person	sum((arrivals * sum(local_rate, band)), age, region, sex)	4084cd01c712e9eb
+-	real	person	sum(max(total_population, cohort_count[band: 16]), age, sex)	41c21be645d03ce0
+-	real	1	sum(max(sum(ageing_share, sex, band), mortality[sex: female, age: 100 - coord(age)]), age)	40550aaaaaaaaaa8
+-	real	person	sum(sum((cohort_count + cohort_count), age), band, sex)	4140e41000000000
+-	real	person	sum(arrivals[age: 13, region: north, sex: male], band)	401d12cad9315bb8
+-	real	person	sum(((total_population + min(population[age: 100 - coord(age), region: midlands, sex: 0], arrivals[sex: female, region: south])) - min(population[age: 94, sex: female, region: 2], sum(population[sex: female, region: 2], band))), age)	41b219cff516825a
+-	int	person	sum(((select(coord(region) >= 0, (cohort_entry * coord(region)), cohort_shift(cohort_entry, sex)) - select(coord(sex) >= 1, cohort_entry, (cohort_count[band: 20] + cohort_entry))) - cohort_entry), age, region, sex)	-1218060
+-	real	1	sum(fertility[age: 18], sex, band, region)	3f81926c28c8203d
+-	real	1	sum(cohort_shift(mortality, sex), sex, age)	400374f4c0dca990
+-	int	person	sum(cohort_count, band)	5480
+-	int	person	sum(cohort_shift(select(coord(sex) >= 0, (cohort_entry + cohort_entry), (cohort_entry * coord(sex))), sex), sex)	40
+-	real	person	sum((cohort_entry - population[age: 0, sex: female]), region)	c0daf949da4e9d53
+-	real	person	sum(cohort_entry, age, band)	40b3ba0000000000
+-	real	person	sum(max(select(coord(age) >= 62, total_population, population[sex: female, age: 0]), births[region: min(coord(region) + 1, 2)]), region, age, sex)	41c514756a9897ad
+-	real	1	sum(cohort_shift(cohort_shift(select(coord(age) >= 38, cohort_shift(mortality[sex: male], age), coord(age)), age), age), age)	408601ecbe411034
+-	int	person	sum(((cohort_entry + select(coord(band) >= 17, cohort_entry, (cohort_count + cohort_count[band: 16]))) + cohort_count[band: 16]), band)	1210
+-	real	person	sum(cohort_shift(births[sex: 0], region), region, age)	40f9e16ad2dc7d82
+-	real	1	sum(min(fertility, fertility), age)	3fbc9250287b381e
+-	int	person	sum(((cohort_shift(sum(cohort_entry, age), sex) + cohort_entry) * cohort_shift(cohort_shift(max(coord(sex), coord(region)), band), region)), band, sex, region)	40750
+-	real	1	sum(migration_rate[region: 0], sex)	3f3a36e2eb1c432d
+-	real	person	sum(population[sex: female], region, age)	413730c29919066d
+-	real	person	sum(((min(births[sex: 1], cohort_entry) - (deaths[sex: male, region: south] + total_population)) * min(ageing_share, select(coord(age) >= 27, migration_rate[region: min(coord(region) + 1, 2)], coord(age)))), age, region)	c172cba0c55a4d42
+-	real	person	sum(population, region, sex, age)	4146f33309e6f470
+-	real	1	sum(((cohort_shift(fertility[age: 33], band) - fertility[age: 75]) - (fertility[age: 0] + sum(boy_share, age))), region, sex, band)	c0983c71d548f23a
+-	real	1	sum((migration_rate[region: south] - ageing_share), age, band, region)	c05f69374bc6a77d
+-	real	person	sum((deaths - deaths[age: 0]), region, sex, age)	40cd90244ebf458e
+-	int	1	sum(coord(age), age)	5050
+-	real	person	sum(cohort_entry, age, band)	40b3ba0000000000
+-	real	1	sum(coord(band), sex, band, region)	4080e00000000000
+-	int	person	sum((cohort_shift(select(coord(band) >= 20, cohort_entry, cohort_count), sex) - ((cohort_entry - cohort_entry) - (cohort_count[band: coord(band)] - cohort_count))), band, age, sex)	300980
+-	int	person	sum(sum(cohort_shift((cohort_shift(cohort_count[band: coord(band)], sex) * max(coord(region), coord(band))), band), band), region, sex)	642960
+-	real	person	sum(max(cohort_entry, select(coord(band) >= 17, arrivals[region: midlands, sex: female, age: 100], arrivals[age: 9, region: south, sex: 0])), band)	4049000000000000
+-	int	person	sum((sum(select(coord(region) >= 1, (cohort_count + cohort_count), cohort_count), region) + cohort_count), sex, age, band)	6641760
+-	real	person	sum(cohort_count, sex, band)	40c5680000000000
+-	int	person	sum(cohort_entry, region)	30
+-	real	person	sum((deaths[age: 100, sex: 0] - arrivals[sex: 1, age: 100]), region)	40644aef1c819826
+-	int	person	sum(select(coord(sex) >= 1, cohort_entry, ((sum(cohort_entry, region) + (cohort_entry - cohort_count[band: coord(band)])) * (cohort_shift(coord(band), sex) - coord(band)))), sex, band)	103610
+-	real	person	sum(births, region, sex, band)	40c500e6a0e77639
+-	real	person	sum(cohort_shift(deaths[sex: male, age: 0], region), region)	3ff1881264bf67ad
+-	real	1	sum(max(fertility, min(local_rate, sum(fertility, sex))), age, band, region)	400ac92b25f38497
+-	real	person	sum(max(total_population, min(select(coord(age) >= 16, arrivals[age: min(coord(age) + 1, 100), region: 0], select(coord(sex) >= 0, total_population, births[region: 0])), cohort_entry)), age, sex)	41c21be645d03ce0
+-	int	1	sum(coord(age), age, sex, region)	30300
+-	real	1	sum(cohort_shift(min(boy_share, migration_rate[region: midlands]), sex), sex)	bf2a36e2eb1c432d
+-	real	person	sum(select(coord(region) >= 2, cohort_entry, births[sex: 2]), region)	E:runtime
+-	real	person	sum(((cohort_entry + cohort_entry) * (coord(region) + migration_rate)), age, region)	40b7ad028f5c28d5
+-	int	person	sum(sum(cohort_entry, band), sex, age, region)	30300
+-	real	person	sum(cohort_shift(arrivals[sex: male, region: south, age: 50], band), band)	4024d3251c2f0ff4
+-	real	person	sum(population[region: midlands, sex: male], age)	411e41116d09d173
+-	int	person	sum(cohort_count[band: 16], age, sex)	32320
+-	int	person	sum((cohort_shift(sum(cohort_entry, band, sex), age) - cohort_entry), age)	9090
+-	int	person	sum(cohort_shift(((cohort_count[band: 16] * coord(sex)) + cohort_count[band: 20]), age), sex, age)	824160
+-	real	person	sum(total_population, region)	41613666476d3754
+-	real	1	sum(migration_rate[region: north], age)	3f94af4f0d844cfe
+-	real	1	sum(min(mortality[sex: 2], coord(band)), region, band, age)	E:runtime
+-	real	1	sum(cohort_shift(local_rate[region: 2], age), sex, age, band)	406f900000000000
+-	int	person	sum(cohort_count[band: 20], region)	12000
+-	real	person	sum(deaths[sex: male, age: 0, region: 0], sex, band, age)	4073c359fc8a0e97
+-	real	1	sum(max(migration_rate, coord(region)), age, region)	4072f052bd3c361a
+-	real	1	sum(min(coord(sex), local_rate[region: 0]), sex)	3fd0000000000000
+-	int	person	sum(cohort_count, band)	5480
+-	int	1	sum((min(min((coord(age) - coord(age)), (coord(age) + coord(age))), (max(coord(band), coord(age)) + coord(band))) + cohort_shift(select(coord(age) >= 57, max(coord(band), coord(band)), coord(age)), band)), age, band)	11940
+-	real	person	sum(population[age: 80, region: 0], sex)	40b113b57bad790d
+-	int	person	sum(cohort_entry, sex)	20
+-	real	person	sum(((births[region: 1] * min(coord(age), mortality)) - (total_population + sum(total_population, band))), sex, age)	c1eb29d8fbbbbebb
+-	real	person	sum((arrivals[region: midlands, sex: 1] - births[region: south, sex: 2]), age)	E:runtime
+-	int	1	sum(select(coord(sex) >= 0, coord(sex), coord(sex)), sex)	1
+-	real	person	sum(((cohort_count[band: 19] - (cohort_count[band: 16] - deaths[region: south])) * select(coord(sex) >= 1, max(fertility, mortality), (local_rate[region: north] + boy_share))), sex, age)	40f09b63f685c6aa
+-	real	person	sum(arrivals[sex: 0, age: 0], region, sex)	402475b3d786b9a8
+-	int	1	sum(((coord(band) + (coord(band) + coord(band))) - cohort_shift(coord(band), band)), band)	180
+-	int	1	sum((sum(coord(age), age) + (coord(band) - coord(band))), band)	25250
+-	real	person	sum(max(deaths[region: 0, age: 0], births[region: 2]), sex, age)	40f4366006de2229
+-	real	1	sum(fertility[age: 61], region, band, sex)	0000000000000000
+-	real	1	sum(max(min((ageing_share + (migration_rate - fertility[age: 0])), max(sum(coord(region), band, age), select(coord(region) >= 2, boy_share, coord(region)))), mortality[sex: 0, age: 0]), region)	3fc5604188800b47
+-	real	1	sum(boy_share, band, sex)	40147ae147ae147c
+-	real	person	sum(cohort_shift(arrivals[age: 0], region), sex, region, band)	4049627e89a66c20
+-	int	person	sum(((cohort_count[band: 16] + cohort_count[band: 20]) - ((cohort_count[band: 16] - cohort_count[band: 20]) * coord(sex))), sex, region, age)	3684480
+-	real	1	sum(cohort_shift(max((cohort_shift(mortality[sex: female, age: 100], band) - sum(fertility, age)), sum(sum(migration_rate, region), age)), band), band)	3fd028f5c28f5c2c
+-	real	1	sum((boy_share + migration_rate), sex, region, band)	402ebae147ae147a
+-	real	person	sum(select(coord(age) >= 55, cohort_count[band: 16], births[sex: 1, region: north]), age)	40d8164f27c1b54b
+-	real	person	sum(cohort_shift((deaths[age: 100 - coord(age), sex: 0, region: 2] - cohort_shift(cohort_entry, age)), age), age)	409c7d68d2797f16
+-	real	1	sum(select(coord(band) >= 19, coord(band), mortality[age: 92]), band, sex)	40539000000225c2
+-	real	person	sum(max(population[age: 100, region: 2], births[region: 0]), sex, band)	40cda7d67ad155e1
+-	real	1	sum((cohort_shift(ageing_share, band) - max(max(mortality[sex: female, age: 0], mortality[sex: 1, age: 0]), migration_rate[region: midlands])), band)	3fdaa786c3f0a1da
+-	int	person	sum((cohort_entry + cohort_entry), region, age, sex)	12120
+-	real	1	sum(min(boy_share, fertility[age: 100]), band)	0000000000000000
+-	real	person	sum(sum(select(coord(age) >= 89, births[sex: min(coord(sex) + 1, 1)], population[region: min(coord(region) + 1, 2), sex: min(coord(sex) + 1, 1), age: 26]), band), region, age, sex)	41732f7bc78fccd2
+-	int	person	sum((select(coord(band) >= 19, cohort_count, cohort_count) * sum(coord(band), age)), band)	10823160
+-	real	person	sum((select(coord(sex) >= 1, select(coord(sex) >= 0, cohort_count[band: 20], deaths[region: 0]), deaths) - (select(coord(sex) >= 1, births[sex: min(coord(sex) + 1, 1)], deaths[region: coord(region)]) * select(coord(age) >= 37, fertility, mortality))), age, region, sex)	41329b4ef3f264d8
+-	real	1	sum(local_rate[region: 1], band, age, sex)	406f900000000000
+-	int	1	sum(cohort_shift(coord(age), age), sex, band, age)	50500
+-	real	person	sum(deaths[sex: male, age: 34], age, region)	40937d7845db94a2
+-	int	person	sum((((cohort_count[band: 16] - cohort_count) + sum(cohort_count, region)) + (select(coord(sex) >= 1, cohort_entry, cohort_count) + select(coord(age) >= 75, cohort_count[band: 17], cohort_count[band: 18]))), band, age, sex)	3095650
+-	int	1	sum(select(coord(age) >= 7, (cohort_shift(sum(coord(region), region, band), age) - min((coord(age) + coord(age)), coord(age))), coord(age)), age)	-3583
+-	int	person	sum(cohort_entry, age, sex)	2020
+-	real	1	sum(boy_share, region)	3ff89374bc6a7efa
+-	int	1	sum(min(coord(region), coord(age)), age, region)	299
+-	real	person	sum(sum((cohort_count - total_population), sex), band, age)	c1e6a0c355444bd6
+-	real	person	sum(cohort_entry, age, sex, band)	40c3ba0000000000
+-	real	person	sum(cohort_count, sex, region, band)	40e00e0000000000
+-	real	person	sum((population[sex: 1, age: 0] - cohort_count), band, sex, region)	410d521569066d61
+-	int	person	sum(min((cohort_count[band: 16] + cohort_entry), cohort_count[band: 16]), sex)	320
+-	int	person	sum(((cohort_entry * coord(age)) + max(cohort_entry, cohort_count)), age, band)	805980
+-	real	person	sum(deaths[region: south, age: 100], sex)	405ec29f795c5678
+-	int	1	sum(coord(sex), age, sex)	101
+-	real	1	sum((boy_share - mortality[sex: male, age: 0]), region, band)	401eb7bb30423d0e
+-	real	1	sum((coord(band) + boy_share), band, region, sex)	40815ae147ae147a
+-	real	1	sum(min(boy_share, select(coord(region) >= 0, migration_rate, migration_rate[region: 3])), age, region, band)	E:runtime
+-	real	1	sum(coord(band), age, band, sex)	40d1c10000000000
+-	real	person	sum(min(cohort_shift(population[region: 0, age: 0], sex), (births[region: midlands] * boy_share)), sex)	40677aa551e97a3e
+-	int	person	sum(cohort_entry, age, band)	5050
+-	int	person	sum((cohort_entry * coord(region)), region, band, sex)	300
+-	real	person	sum(select(coord(region) >= 0, ((cohort_entry - arrivals[sex: 0, age: 0]) + cohort_count[band: 16]), arrivals[sex: female, region: north, age: 100]), region)	407f8e2930a1e51a
+-	real	1	sum(min(local_rate[region: midlands], ageing_share), age)	4020d55555555550
+-	real	person	sum((deaths[age: 100, region: south] * local_rate[region: north]), sex, band)	406339a3abd9b60b
+-	real	person	sum(max((deaths[age: 75, region: north] * mortality[age: 41]), cohort_shift(((cohort_count + births[sex: 0, region: 0]) + min(cohort_count, births[region: north])), sex)), sex, band)	40cf8a20807eb3c1
+-	real	1	sum((max(cohort_shift(coord(region), age), fertility) - sum(min(coord(band), coord(sex)), band)), region, sex, age)	c08c6636dafd784c
+-	real	person	sum(cohort_shift(cohort_shift(cohort_count, age), age), sex, band, age)	4130e41000000000
+-	real	person	sum((((total_population * local_rate[region: 0]) - (deaths[region: 0, sex: female] - population[region: south])) - (cohort_entry + max(population[region: north, sex: female], population[region: 0]))), age, sex)	41a22432aae46c84
+-	int	1	sum(coord(sex), sex, band, age)	505
+-	real	1	sum((select(coord(age) >= 39, fertility, local_rate[region: 0]) + (boy_share - local_rate[region: 0])), age)	40421c0e9ab18b72
+-	real	person	sum(cohort_count, age, sex, band)	4130e41000000000
+-	int	person	sum(((cohort_entry * (coord(region) + coord(region))) * (select(coord(age) >= 94, coord(age), coord(sex)) - (coord(age) + coord(sex)))), sex, age, region)	-524940
+-	real	person	sum(cohort_shift(cohort_shift(cohort_shift((cohort_count[band: 20] - births[sex: min(coord(sex) + 1, 1), region: 0]), sex), sex), sex), sex)	40bccab7fa379b29
+-	real	1	sum(migration_rate[region: midlands], age)	bf84af4f0d844cfe
+-	int	person	sum(cohort_count, age, band)	553480
+-	real	person	sum(sum((total_population * mortality), sex), region, age, band)	419a2a05f143d6a5
+-	real	person	sum((select(coord(sex) >= 1, (total_population - arrivals[age: 93, region: coord(region)]), (cohort_entry - cohort_count)) * min((fertility[age: 88] + ageing_share), local_rate[region: 2])), sex, band, region)	414cad58e9a159ca
+-	real	1	sum(min(migration_rate[region: midlands], boy_share), age)	bf84af4f0d844cfe
+-	int	person	sum((cohort_count[band: 20] * coord(age)), age)	20200000
+-	real	1	sum(fertility[age: 0], region, sex)	0000000000000000
+-	real	1	sum(migration_rate[region: midlands], age)	bf84af4f0d844cfe
+-	real	1	sum(max(cohort_shift(cohort_shift((coord(region) - coord(region)), sex), region), migration_rate), region, sex)	3f53a92a30553262
+-	real	1	sum(sum(((fertility[age: 100] + migration_rate) - ageing_share), sex), region)	bfdfef9db22d0e55
+-	real	1	sum(min(fertility[age: 0], min((coord(sex) + coord(sex)), migration_rate[region: midlands])), sex)	bf2a36e2eb1c432d
+-	real	1	sum((ageing_share - ageing_share), sex)	0000000000000000
+-	real	person	sum(((cohort_shift(deaths[region: 2, sex: 0], age) * min(mortality[sex: 0], migration_rate[region: 0])) - ((deaths[region: north, sex: 0] - cohort_count[band: 16]) - births[sex: 0, region: south])), age)	40ea94be1f12f6e4
+-	real	1	sum(max(cohort_shift(coord(sex), age), local_rate[region: 0]), sex, age)	405fa00000000000
+-	real	person	sum(sum((((arrivals * boy_share) + max(deaths, population[age: 81, region: coord(region)])) + cohort_shift((population * migration_rate), band)), band, age), sex, region)	415cc01e4588b4eb
+-	real	person	sum(sum(population[region: 0, sex: female], region), sex, band, age)	4168d9450061a3e8
+-	int	1	sum(coord(age), age)	5050
+-	real	1	sum(fertility, band, sex, age)	3ff1db72194d0313
+-	real	person	sum(min((select(coord(age) >= 83, max(births[sex: male, region: 1], arrivals[region: 1, sex: male]), cohort_entry) - arrivals[sex: 0, age: 74, region: 2]), cohort_shift(min(cohort_shift(cohort_entry, age), max(cohort_count[band: 16], births[sex: female, region: south])), age)), age)	408c111ad1e3187c
+-	real	person	sum(population[region: 2, age: 75], region, age, sex)	413e5145b9e01145
+-	real	person	sum((arrivals[region: south, sex: male] + births[sex: male]), age, band, region)	4121133dcf8ab06d
+-	real	person	sum((cohort_count - total_population), band)	c16cad52cc60b18c
+-	real	person	sum((population[age: 0, sex: male] - cohort_count), band, region)	40fd521569066d60
+-	real	person	sum(births[sex: male, region: midlands], sex, band)	40aca936ce7d81b8
+-	real	person	sum((cohort_shift(cohort_shift(births, sex), age) * local_rate), age, region, sex)	40ea84565e576bba
+-	real	person	sum((total_population * ageing_share), region)	4126f33309e6f470
+-	real	person	sum(cohort_entry, sex, region, band)	4072c00000000000
+-	real	1	sum(max(coord(sex), (cohort_shift(min(fertility[age: 0], coord(sex)), sex) - mortality[age: 62, sex: female])), sex)	3ff0000000000000
+-	real	1	sum((min(cohort_shift(boy_share, age), fertility) - migration_rate[region: 1]), age)	3fbf283a0a2bc1c9
+-	int	person	sum(cohort_count[band: 20], age, region)	1212000
+-	real	person	sum(total_population, band, age, sex)	41e6a2dfd7444bc0
+-	int	person	sum((((cohort_entry + cohort_count[band: 20]) + (cohort_entry * coord(sex))) * coord(sex)), sex)	4020
+-	int	person	sum((cohort_shift(((cohort_entry * coord(age)) * coord(region)), region) + (sum(cohort_count, band) + ((cohort_count[band: 16] * coord(region)) - (cohort_count[band: 16] + cohort_entry)))), age, region)	1808910
+-	int	1	sum(coord(region), region, age)	303
+-	real	person	sum((deaths[sex: 0, age: 100, region: 2] - total_population), band, sex)	c17cafd8f7a98c6d
+-	real	person	sum((arrivals[age: 100, region: midlands] + cohort_shift(population[region: 0, age: 9], band)), band, sex)	40f330398f4b0e6e
+-	real	person	sum(births[region: 0], sex, age)	40ee4e79394bed22
+-	int	person	sum(cohort_count[band: 20], band, age, region)	6060000
+-	int	person	sum(((cohort_count[band: 19] + cohort_count[band: 16]) + cohort_count[band: 20]), sex, age)	1042320
+-	real	person	sum(max(sum((cohort_count - max(population[region: south, age: 0], cohort_entry)), band), arrivals[region: 0, age: 44]), sex)	3ffbf2b4156bb6b8
+-	int	1	sum(cohort_shift(max(coord(sex), coord(sex)), sex), sex)	1
+-	real	person	sum(population[region: 2], sex, age, band)	4155df33341d5cda
+-	real	1	sum(sum(ageing_share, region), age, band, sex)	406f900000000000
+-	real	1	sum(local_rate[region: midlands], sex, age)	4049400000000000
+-	real	person	sum((arrivals[region: 1, sex: female, age: 95] * select(coord(age) >= 49, max(mortality[sex: 1], ageing_share), ageing_share)), age)	bff05ba6958ed3c4
+-	real	person	sum(max((total_population - deaths[age: 0, region: 0]), (births[region: 2, sex: 0] * mortality[age: 83])), sex)	4156f332e42dcd04
+-	int	person	sum(select(coord(band) >= 17, cohort_count, cohort_entry), region, band)	15990
+-	real	person	sum(((((population[region: 0, sex: male, age: 37] + deaths[region: 2, sex: male]) + cohort_shift(total_population, band)) * min(coord(age), cohort_shift(ageing_share, age))) - total_population), band, age)	c1d4bf2e88aa09eb
+-	real	1	sum(sum(coord(band), region), age, band, sex)	40eaa18000000000
+-	real	person	sum(cohort_count, region, age, band)	4139561800000000
+-	real	person	sum(cohort_count, sex, age, band)	4130e41000000000
+-	real	person	sum(arrivals[age: 100 - coord(age), region: 0, sex: 0], age)	4055cccbe1d27500
+-	real	person	sum(cohort_count[band: 16], age, band)	40f3ba0000000000
+-	real	person	sum((cohort_entry + deaths[region: north, sex: female]), age)	40a87c4a0fdd046e
+-	real	1	sum(((min(select(coord(region) >= 1, boy_share, local_rate[region: min(coord(region) + 1, 2)]), local_rate) + max(migration_rate, (migration_rate[region: south] - mortality[sex: female]))) - select(coord(region) >= 1, (boy_share - (coord(region) + migration_rate)), select(coord(sex) >= 0, coord(sex), (boy_share + coord(sex))))), region, sex, age)	407c1d6f155983a8
+-	real	1	sum(local_rate[region: 0], age, band)	405f900000000000
+-	real	person	sum(((population[sex: 0] * coord(age)) + cohort_count), band, region, age)	41af5b6cdef5da60
+-	int	person	sum((((sum(cohort_entry, sex) - cohort_count) + (cohort_count[band: 20] + (cohort_count - cohort_entry))) - (cohort_entry * cohort_shift(coord(band), region))), region, age, band)	5802450
+-	int	person	sum((cohort_shift(select(coord(band) >= 18, cohort_count, cohort_count), region) - (cohort_count * ((coord(band) - coord(sex)) - coord(sex)))), sex, region, band)	-577200
+-	real	person	sum(population[age: 0], sex, region, band)	4110c5a46e7a2c83
+-	real	person	sum(((max(births[region: midlands, sex: 0], population[sex: 1, age: 31, region: north]) - cohort_entry) - sum(cohort_shift(deaths[region: 2], band), sex, age)), band)	c0a273b984ced038
+-	int	1	sum(min(coord(band), (min(coord(band), coord(band)) + coord(band))), band)	90
+-	real	person	sum(select(coord(region) >= 2, (cohort_entry - deaths[region: north, age: 0]), (births + deaths[age: 0])), region, sex)	40951efa7893786a
+-	int	person	sum(cohort_count, region, sex, band)	32880
+-	real	1	sum(ageing_share, band, region, age)	405f8fffffffff3a
+-	real	1	sum(migration_rate[region: 0], age)	3f94af4f0d844cfe
+-	real	person	sum(births, band, region, sex)	40c500e6a0e7763c
+-	real	1	sum((coord(age) + select(coord(sex) >= 0, ageing_share, local_rate[region: 0])), sex, age)	40c3c26aaaaaaaa4
+-	int	person	sum(cohort_count[band: 17], sex)	320
+-	real	person	sum(select(coord(age) >= 0, cohort_shift(min(cohort_entry, total_population), age), ((population[sex: female, region: 2] * mortality[age: min(coord(age) + 1, 100), sex: male]) + max(population[sex: 2, region: midlands], cohort_entry))), age)	E:runtime
+-	real	1	sum(max(coord(region), min(select(coord(region) >= 1, (migration_rate - migration_rate), min(boy_share, ageing_share)), (min(coord(region), local_rate[region: 1]) + (local_rate + fertility[age: 100])))), region)	4008aaaaaaaaaaaa
+-	real	person	sum(deaths[age: 6, region: 2, sex: male], region)	4000b168c68f996d
+-	real	person	sum((cohort_count - deaths[region: south]), band, age, sex)	413071d6b398a458
+-	real	1	sum(min(coord(region), mortality[sex: 1, age: 100]), region, band)	3fdaaaaaae3eed25
+-	real	person	sum(cohort_shift(sum(total_population, sex), age), band, age)	41e6a2dfd7444bd7
+-	int	1	sum(coord(region), age, sex, region)	606
+-	int	1	sum(coord(age), region, sex, age)	30300
+-	int	1	sum(coord(band), band)	90
+-	int	person	sum(sum(cohort_count, sex), age, region, band)	3320880
+-	int	person	sum(cohort_shift((cohort_count[band: 18] * coord(age)), age), age, sex)	1616000
+-	real	person	sum(total_population, age)	41b21be645d03cea
+-	real	person	sum((cohort_shift(arrivals[age: 0, region: south, sex: 0], age) - (births[sex: 0, region: 2] + (cohort_shift(population[age: 100, sex: male, region: 2], age) * max(ageing_share, mortality[sex: male])))), age)	c0e9affb62b2be5b
+-	real	person	sum(cohort_shift(population[sex: male], age), region, age)	4136b5a37ab4e270
+-	real	1	sum((coord(age) - boy_share), age, band, region)	40f24de51eb851a7
+-	int	person	sum(sum((cohort_entry * min(coord(age), coord(age))), age), region)	151500
+-	real	person	sum(deaths, sex, region, age)	40cdf8515147aab5
+-	real	person	sum((arrivals[sex: min(coord(sex) + 1, 1), region: south] * mortality), sex, age)	4002824399f35f0d
+-	real	1	sum(fertility[age: 17], band)	3f4b01eec295e732
+-	real	person	sum(arrivals[sex: 1, region: north, age: 46], age, sex)	40651a0337eba4b1
+-	int	1	sum(cohort_shift(cohort_shift(coord(sex), age), age), sex, age)	101
+-	real	1	sum((migration_rate[region: 0] - mortality[age: 100]), sex, band)	bfda89e6129909d3
+-	int	person	sum(select(coord(sex) >= 1, (cohort_entry - cohort_count[band: 16]), (cohort_entry * coord(sex))), age, sex)	-15150
+-	int	person	sum(((cohort_entry + cohort_count) + max(cohort_entry, cohort_count)), sex, band)	22020
+-	int	person	sum((cohort_entry * coord(region)), region, age)	3030
+-	real	person	sum((sum(total_population, region) - max(cohort_entry, (arrivals[region: 0] + cohort_entry))), sex, band, age)	4200fa268ada4a95
+-	int	1	sum(coord(band), band, region)	270
+-	real	person	sum(cohort_count, age, band)	4120e41000000000
+-	real	1	sum(migration_rate[region: 1], age)	bf84af4f0d844cfe
+-	int	person	sum((max((cohort_entry - cohort_entry), cohort_shift(cohort_entry, region)) + sum(cohort_count, band, age)), region)	1660470
+-	real	person	sum(deaths[region: 2, age: 100], sex)	405ec29f795c5678
+-	int	person	sum(cohort_count[band: 20], age)	404000
+-	int	person	sum(cohort_entry, sex, region, band)	300
+-	real	person	sum(min(select(coord(region) >= 0, select(coord(band) >= 18, total_population, total_population), arrivals[sex: male, age: 62]), deaths[age: 0]), band, region, sex)	4024a0fdf78616fd
+-	int	person	sum(((cohort_count * coord(region)) + cohort_entry), region, band)	16590
+-	real	person	sum(population[sex: male, region: north], age, sex)	4129f4a233982de8
+-	real	person	sum(cohort_shift(cohort_shift(select(coord(age) >= 87, (population[sex: 0, region: 0] * boy_share), births[sex: female, region: 1]), age), age), age)	40e2821289876efb
+-	real	1	sum(((migration_rate[region: 0] + migration_rate[region: 0]) - min(boy_share, boy_share)), sex)	bff05f06f6944674
+-	real	1	sum(max(min(sum((coord(sex) - local_rate), sex), select(coord(age) >= 82, coord(band), sum(ageing_share, sex))), sum(cohort_shift(cohort_shift(fertility, sex), region), sex)), region, age, band)	4075b80000000009
+-	real	person	sum(cohort_shift(total_population, sex), region, age, sex)	41db29d968b85b24
+-	real	person	sum(births[sex: 0], sex, region)	40a06648c2725ec5
+-	int	person	sum(min(select(coord(region) >= 2, max(cohort_count[band: 20], cohort_entry), cohort_entry), (cohort_entry - select(coord(region) >= 2, cohort_count[band: 20], cohort_count[band: 20]))), region, sex, age)	-2417940
+-	real	1	sum((max(mortality, mortality) + min(local_rate, coord(age))), age, region, sex)	4063a97b790a57c7
+-	real	person	sum(births, sex, band, region)	40c500e6a0e7763a
+-	int	person	sum((cohort_shift(cohort_entry, age) - cohort_shift(cohort_entry, band)), band, age, region)	0
+-	int	person	sum(cohort_entry, region)	30
+-	real	1	sum(boy_share, band)	40047ae147ae147b
+-	real	person	sum((cohort_shift(min(cohort_shift(arrivals[sex: male], band), (births[sex: 0] - total_population)), region) * sum((min(coord(band), local_rate) - (local_rate[region: north] - migration_rate)), sex)), band, age, region)	c140393bcb2fa56c
+-	int	1	sum(min(coord(band), coord(age)), age, band)	8230
+-	real	person	sum((deaths[region: 0, sex: 0] - births[sex: male, region: south]), age)	c0e3a90ac23379a1
+-	real	1	sum(local_rate, age, region, band)	4077ac0000000000
+-	real	1	sum(min(ageing_share, boy_share), age)	4020d55555555550
+-	real	1	sum((sum((select(coord(sex) >= 1, local_rate[region: 2], coord(sex)) - cohort_shift(migration_rate[region: 2], band)), band) + coord(sex)), sex)	4001f7ced916872c
+-	real	person	sum(((arrivals[sex: 0, region: 2, age: 100] + sum(cohort_entry, region, age)) - cohort_shift(cohort_entry, band)), sex, band)	40dd7f7db9353e99
+-	real	1	sum(mortality[sex: 1], age, region)	400e013781dda164
+-	int	person	sum(((cohort_count + cohort_count) - cohort_count), sex, band)	10960
+-	real	person	sum(cohort_shift(((cohort_entry + total_population) + (total_population * coord(sex))), band), region, sex, band)	41a023023af663df
+-	int	person	sum((cohort_entry + cohort_entry), age)	2020
+-	real	1	sum(sum(max(local_rate[region: north], fertility[age: 88]), band), region)	400e000000000000
+-	int	1	sum(coord(sex), sex)	1
+-	real	person	sum(population[region: north, age: 67], sex, age, band)	41465287898ac071
+-	int	person	sum(cohort_count, region, sex, band)	32880
+-	real	person	sum(sum(population[sex: female, age: 2, region: 0], sex), band)	40f5c5586008271f
+-	real	person	sum(total_population, sex)	4156f33309e6f470
+-	real	1	sum(ageing_share, region)	3fd0000000000000
+-	real	1	sum(cohort_shift(local_rate, band), region, age, band)	4077ac0000000000
+-	int	person	sum(((cohort_count + cohort_count) - sum(cohort_entry, sex)), band)	10860
+-	real	person	sum(cohort_shift(cohort_shift((cohort_count + total_population), band), band), region, band)	4185860199488529
+-	int	person	sum((select(coord(age) >= 27, (cohort_entry - cohort_entry), cohort_entry) - min(cohort_entry, (cohort_count * coord(age)))), age, band)	-3650
+-	real	1	sum(select(coord(sex) >= 1, max((ageing_share - local_rate[region: midlands]), fertility[age: 0]), cohort_shift((local_rate[region: 0] + coord(sex)), sex)), sex)	0000000000000000
+-	real	1	sum(select(coord(region) >= 0, select(coord(region) >= 1, max(coord(region), cohort_shift(boy_share, region)), cohort_shift(fertility[age: 100], region)), (select(coord(region) >= 2, coord(region), (migration_rate - local_rate)) - local_rate)), region)	4008000000000000
+-	real	person	sum(cohort_shift((select(coord(age) >= 21, cohort_count, total_population) - total_population), region), region, band, age)	c1eae27d9f9aa606
+-	real	1	sum(((coord(band) - fertility[age: 100]) + max(ageing_share, local_rate)), region, band)	40711c0000000000
+-	real	person	sum(min(min(total_population, cohort_count), (deaths[sex: 0, region: 0, age: 100] - cohort_entry)), band)	4066dc7ff15e2dd8
+-	int	person	sum(cohort_count, band)	5480
+-	int	person	sum((cohort_count[band: 16] + (cohort_count - cohort_entry)), sex, region, band)	37380
+-	real	1	sum(max(cohort_shift((boy_share - coord(region)), region), (min(fertility[age: 31], migration_rate) + cohort_shift(migration_rate, region))), region, sex)	3ff069ad42c3c9ee
+-	real	person	sum((births[region: 0, sex: male] * coord(sex)), age, sex, band)	4103656c4da13ba4
+-	int	person	sum(select(coord(band) >= 19, (cohort_entry + cohort_count[band: 17]), cohort_entry), band)	370
+-	real	person	sum((cohort_entry - cohort_count[band: 16]), region)	c07c200000000000
+-	real	person	sum((((total_population * ageing_share) + cohort_shift(deaths[region: 1, sex: 0], age)) - ((births[region: 0, sex: 0] - births[region: midlands, sex: male]) - (deaths[sex: female, region: midlands] - births[region: 0, sex: female]))), age)	417820aa48b77846
+-	real	1	sum(min(mortality[sex: female, age: 0], max(max(mortality[sex: male, age: 70], ageing_share), max(migration_rate, fertility[age: 69]))), region)	3f1a36d1bd105b06
+-	int	person	sum(select(coord(age) >= 89, (cohort_entry - cohort_count[band: 20]), (cohort_count[band: 20] - (cohort_entry * coord(age)))), age)	268960
+-	int	person	sum(select(coord(age) >= 5, min(cohort_entry, cohort_count), select(coord(age) >= 61, (cohort_entry * coord(band)), max(cohort_entry, cohort_entry))), region, age, band)	15150
+-	int	1	sum(cohort_shift(sum(coord(sex), sex, band), age), region, age)	1515
+-	int	person	sum(cohort_entry, region)	30
+-	int	person	sum(((cohort_count[band: 16] - sum(cohort_count[band: 16], age, sex)) * coord(region)), region)	-96480
+-	real	person	sum(population[sex: 0, region: 0, age: 0], region)	40d725b0e0c56b52
+-	real	person	sum(population[age: 100, sex: 1], band, region)	40d3418ea1510765
+-	real	person	sum((total_population + population[region: north]), age, band, sex)	41e6ab1246c716cc
+-	real	person	sum(min(select(coord(region) >= 1, population[age: 100, sex: male], births[sex: female]), (deaths[sex: 0, age: 66] + deaths[age: 27, sex: male])), region)	4059e5dc2ae094e2
+-	int	1	sum(coord(age), age)	5050
+-	real	1	sum(coord(sex), sex)	3ff0000000000000
+-	int	1	sum(select(coord(band) >= 16, min((coord(band) + (coord(band) - coord(band))), sum(max(coord(sex), coord(band)), sex)), coord(band)), band)	90
+-	int	person	sum((cohort_count[band: 19] + cohort_count[band: 20]), sex)	10000
+-	int	person	sum(((cohort_count[band: 16] + ((cohort_entry - cohort_entry) + cohort_entry)) + cohort_entry), region)	540
+-	int	person	sum(cohort_count[band: 18], sex)	320
+-	int	person	sum((max(min(cohort_entry, select(coord(sex) >= 1, cohort_count[band: 20], cohort_count[band: 17])), sum(cohort_count, age, band)) - (max(max(cohort_count[band: 20], cohort_entry), cohort_count[band: 16]) + cohort_count[band: 17])), sex)	1098640
+-	real	1	sum(max(coord(age), fertility[age: 73]), sex, age, region)	40dd970000000000
+-	int	1	sum((cohort_shift(coord(age), age) - cohort_shift(coord(sex), band)), age, band, sex)	49995
+-	int	person	sum(cohort_entry, sex)	20
+-	real	person	sum(arrivals[age: 0, region: 2], sex)	40218ff9965c55e8
+-	int	1	sum(cohort_shift(coord(region), age), age, band, region)	1515
+-	int	1	sum((coord(sex) - select(coord(sex) >= 1, min(coord(region), coord(sex)), cohort_shift(coord(region), sex))), region, sex)	1
+-	int	1	sum(coord(band), band)	90
+-	real	person	sum(sum(arrivals, age, region), band, sex)	40a4cd01c712e9f8
+-	int	person	sum((cohort_entry + cohort_shift(cohort_entry, sex)), sex)	40
+-	real	person	sum(population[sex: 0, age: 0, region: 0], region)	40d725b0e0c56b52
+-	real	person	sum(sum(population[region: 0, sex: 1], sex, band), age)	415038e5603f1cb1
+-	real	person	sum((cohort_shift(population[region: south, sex: 1], age) + cohort_shift((deaths[region: 0, sex: 0] - arrivals[sex: 1, region: 0]), age)), age, band)	4145b8713c019aa4
+-	int	person	sum((cohort_entry + min(cohort_count[band: 16], cohort_count[band: 19])), region, sex)	1020
+-	real	1	sum(mortality[sex: 1], age)	3ff400cfabe9164b
+-	int	person	sum((max(cohort_shift(min(cohort_entry, cohort_count[band: 20]), region), select(coord(region) >= 2, (cohort_entry + cohort_count[band: 16]), sum(cohort_entry, band, sex))) - sum(cohort_shift((cohort_count - cohort_entry), band), band)), region, age)	-1607920
+-	real	1	sum(ageing_share, region)	3fd0000000000000
+-	int	person	sum(cohort_shift(cohort_count[band: 20], sex), sex, region)	24000
+-	real	person	sum(deaths[sex: female, region: 1, age: 100], band)	4070f8d1de23b427
+-	real	person	sum(sum(cohort_entry, age), region, sex, band)	40dd970000000000
+-	real	person	sum((total_population + cohort_entry), age)	41b21bea37d03cea
+-	real	person	sum(select(coord(region) >= 1, sum(births[sex: 0], age, band), cohort_count[band: 20]), region)	411759efea94c66d
+-	int	person	sum(cohort_count, band, region)	16440
+-	real	person	sum((births - deaths[age: 0]), region, band, sex)	40c4fbbe616994b5
+-	real	1	sum(cohort_shift(max(boy_share, mortality[sex: 0]), region), age, region)	4063645a1cac0835
+-	real	1	sum((min(coord(band), ageing_share) + migration_rate), sex, region, band)	40040a3d70a3d70a
+-	int	person	sum(cohort_shift(cohort_entry, sex), band, age, sex)	10100
+-	real	1	sum(max(cohort_shift(migration_rate, band), min((cohort_shift(coord(band), region) - (ageing_share - fertility)), coord(region))), region, band, age)	4097ac676c8b4396
+-	real	person	sum(sum((cohort_entry + total_population), band), region, age, sex)	4200fa2b94533934
+-	real	person	sum(cohort_count[band: 16], band, age)	40f3ba0000000000
+-	real	person	sum(cohort_entry, region, band, age)	40cd970000000000
+-	real	person	sum(min(cohort_entry, arrivals[region: south, age: 0]), age, sex)	408bb735e149b7ab
+-	real	person	sum(cohort_shift((cohort_entry * ageing_share), age), age, region)	406f900000000025
+-	real	person	sum(sum(total_population, band, age), region)	41f0fa27e17338e0
+-	int	person	sum(cohort_shift(cohort_count, band), sex, band)	10960
+-	real	1	sum(ageing_share, band)	3fdaaaaaaaaaaaaa
+-	real	person	sum(arrivals[sex: male, age: 45], region)	4004fa12fef8456f
+-	real	person	sum((population[region: midlands] + (arrivals[region: midlands] * coord(band))), age, band, sex)	415313150e16f8f6
+-	real	person	sum(sum(cohort_count[band: 18], age), sex)	40df900000000000
+-	real	person	sum((total_population * select(coord(region) >= 1, coord(region), (migration_rate[region: 0] - ageing_share))), region, sex, age)	41da69267e4f13ce
+-	int	person	sum((cohort_shift(max(cohort_count, cohort_count), band) * select(coord(band) >= 16, ((coord(region) + coord(band)) + coord(band)), sum(select(coord(region) >= 1, coord(band), coord(sex)), age, sex))), band, region)	668280
+-	real	1	sum(sum(select(coord(band) >= 17, ((mortality - coord(region)) - max(fertility[age: 100], migration_rate)), cohort_shift(local_rate, sex)), region), sex, band, age)	c0a1879959720c3d
+-	real	person	sum((cohort_entry + (arrivals[sex: female, age: 82] + sum(births[sex: male], band))), region)	40b5a14b94417188
+-	real	person	sum(sum(select(coord(region) >= 2, arrivals[age: 0], total_population), sex, age), region)	41d21be72389ebea
+-	int	1	sum(max(cohort_shift(coord(band), band), min(coord(band), coord(age))), age, band)	10819
+-	real	person	sum(cohort_shift(arrivals[sex: female, region: midlands], age), band, sex, age)	c07fc5c334c27c0f
+-	int	person	sum(cohort_count[band: 16], age)	16160
+-	real	person	sum(min(population[age: 53, region: midlands], cohort_entry), region, sex, band)	4072c00000000000
+-	real	person	sum(cohort_shift(deaths[region: south, sex: male], age), age)	40a78dd08ce7e92a
+-	real	person	sum((cohort_entry - births[sex: male, region: 2]), band)	c0a000e1195732ee
+-	int	1	sum((coord(sex) + coord(sex)), sex)	2
+-	real	person	sum((total_population - (sum(births, sex, region) - (arrivals[age: 101, sex: male, region: 2] + total_population))), band, age)	E:runtime
+-	real	1	sum(coord(region), region, sex)	4018000000000000
+-	real	1	sum(min(coord(band), (coord(band) + migration_rate[region: 2])), sex, age, band)	40d1c10000000000
+-	real	person	sum(arrivals[region: south, age: 30, sex: 1], band)	402d30ad5843c289
+-	int	person	sum(((min(cohort_entry, cohort_count[band: 20]) + cohort_shift(cohort_entry, sex)) + cohort_count[band: 20]), sex, age)	812040
+-	int	person	sum(((cohort_shift(cohort_shift(cohort_entry, sex), sex) - cohort_entry) - cohort_shift(select(coord(region) >= 0, cohort_shift(cohort_count, region), cohort_entry), sex)), sex, region, band)	-32880
+-	real	person	sum(cohort_count[band: 18], sex)	4074000000000000
+-	int	person	sum((select(coord(region) >= 0, cohort_count, cohort_entry) * select(coord(region) >= 1, coord(band), coord(band))), sex, region, band)	642960
+-	real	person	sum(max(((cohort_count[band: 20] * coord(age)) * min(fertility, ageing_share)), (cohort_shift(deaths[sex: 0, region: 1], age) + births[sex: male, region: midlands])), age)	40e682bd2bf91f44
+-	real	person	sum(sum(cohort_shift(sum(total_population, band), sex), region), age, sex)	4200fa27e1733918
+-	real	person	sum(arrivals[region: 2, age: 100, sex: male], region, band, age)	408baf2d1c3be6ca
+-	real	person	sum(births[sex: female, region: south], band, sex)	40af404d184e3916
+-	real	1	sum(coord(region), region, age, band)	4097ac0000000000
+-	real	1	sum((cohort_shift(min(ageing_share, fertility[age: 0]), band) + ((ageing_share - boy_share) - max(coord(band), local_rate[region: midlands]))), band)	c057092c5f92c5fa
+-	real	person	sum((sum(((cohort_entry - births) + arrivals[age: 100, region: south]), band, sex) * cohort_shift(cohort_shift(cohort_shift(coord(region), region), region), region)), region)	c0c764e9d7ec9602
+-	real	1	sum(cohort_shift(min(cohort_shift(coord(age), age), ageing_share), age), age)	40207ffffffffff9
+-	int	person	sum(cohort_count, band)	5480
+-	real	person	sum((cohort_shift(select(coord(region) >= 0, arrivals[age: 100, sex: 1], cohort_shift(arrivals[sex: 0, age: 95], region)), band) * fertility[age: 0]), region, band)	0000000000000000
+-	real	person	sum(min((population[region: 3] * fertility), cohort_shift(total_population, age)), age, sex)	E:runtime
+-	int	person	sum((cohort_count[band: 16] - cohort_entry), sex, region)	900
+-	real	1	sum(min(max(local_rate, local_rate), fertility[age: 0]), region, sex)	0000000000000000
+-	real	1	sum((boy_share - migration_rate[region: 0]), sex)	3ff060aa64c2f838
+-	real	person	sum(sum((select(coord(band) >= 17, cohort_shift(arrivals[region: south, sex: male], band), cohort_count) + select(coord(band) >= 19, arrivals[sex: male], (population[sex: female] * local_rate[region: south]))), age, region), band)	4132315b46c54de5
+-	real	person	sum((cohort_entry * local_rate[region: 0]), sex)	4014000000000000
+-	real	person	sum(sum(births[sex: female, region: south], band), age)	4108a8bcd52db900
+-	int	person	sum(select(coord(age) >= 33, ((max(cohort_count, cohort_entry) * (coord(region) - coord(region))) + ((cohort_entry - cohort_entry) + select(coord(age) >= 80, cohort_entry, cohort_count[band: coord(band)]))), cohort_count[band: 20]), region, band, age)	2755830
+-	real	1	sum((cohort_shift(local_rate[region: south], region) - coord(age)), region, age)	c0cd712000000000
+-	real	1	sum(((select(coord(region) >= 2, (boy_share + fertility), min(coord(region), fertility)) + cohort_shift((mortality + local_rate), sex)) + ((cohort_shift(coord(age), age) - max(mortality[age: 0], fertility[age: 34])) + cohort_shift((mortality[age: 44, sex: male] - coord(sex)), region))), age, sex, region)	40dd8c06c5e5e508
+-	real	person	sum(select(coord(region) >= 2, deaths[age: 92, sex: 1, region: south], (arrivals[age: 100, sex: male] - cohort_entry)), region)	4043e29dd97b3e31
+-	real	1	sum(select(coord(age) >= 97, mortality, local_rate), age, region, sex)	4062500000044b78
+-	real	person	sum((cohort_count + births[region: 2, sex: 0]), band)	40bd381346138e45
+-	real	person	sum((deaths[sex: male, age: 85] + ((population[sex: 1, age: 100, region: south] * coord(band)) * (migration_rate[region: north] + fertility[age: 100]))), region, band)	40908016c31a39bc
+-	real	1	sum(max(cohort_shift(select(coord(age) >= 76, sum(boy_share, sex), migration_rate[region: north]), age), migration_rate[region: midlands]), age)	40399d7dbf487fd0
+-	real	person	sum((sum((cohort_count * boy_share), age) + cohort_shift((total_population + cohort_entry), sex)), region, band, sex)	4195ebcb9385f5ce
+-	int	1	sum(min((min(coord(band), coord(sex)) - min(min(coord(band), coord(age)), (coord(band) + coord(age)))), (cohort_shift((coord(sex) - coord(age)), sex) - coord(age))), band, sex, age)	-100495
+-	real	person	sum(cohort_count[band: 20], band, region)	40ed4c0000000000
+-	real	person	sum(((cohort_entry * cohort_shift(sum(fertility, region), sex)) - (arrivals[age: min(coord(age) + 1, 100), region: 0, sex: min(coord(sex) + 1, 1)] - (cohort_shift(population[region: 2, sex: female], age) - deaths[region: 1]))), band, age, sex)	4156001e58ba7176
+-	real	person	sum(population[region: north, age: 0], sex)	40ceabd19e1c308c
+-	real	1	sum(cohort_shift(mortality[sex: male], region), region, age)	400e013781dda179
+-	int	person	sum(cohort_count, band)	5480
+-	int	1	sum(coord(sex), age, sex)	101
+-	int	person	sum(cohort_entry, age)	1010
+-	real	1	sum(migration_rate, region)	3f40624dd2f1a9fc
+-	real	person	sum(total_population, age, region, sex)	41db29d968b85af8
+-	real	1	sum((local_rate + max(coord(region), select(coord(region) >= 1, mortality[age: 0, sex: male], boy_share))), region, band)	40354f5c28f5c290
+-	real	person	sum((cohort_entry * local_rate[region: min(coord(region) + 1, 2)]), age, region)	4087ac0000000000
+-	real	person	sum((cohort_shift((births[region: 0] + deaths[age: 0, region: north]), sex) - (deaths[region: south, age: 100] - cohort_shift(cohort_count[band: 16], sex))), sex)	408960a5e2ef9d4c
+-	real	person	sum(((arrivals[sex: female, region: 1] * mortality[sex: 1, age: 93]) - (population[age: 0, sex: 1, region: north] * mortality[sex: female, age: 0])), age)	c03c6315b3094b4b
+-	int	person	sum(select(coord(sex) >= 1, cohort_shift(cohort_count, region), (cohort_count * coord(sex))), band, sex, region)	16440
+-	int	person	sum(select(coord(sex) >= 1, (cohort_count[band: 16] * select(coord(sex) >= 1, cohort_shift(coord(sex), sex), min(coord(sex), coord(sex)))), cohort_count[band: 20]), sex)	4160
+-	real	1	sum(select(coord(sex) >= 1, coord(region), local_rate), sex, age, region)	4077ac0000000000
+-	int	person	sum(((cohort_count[band: 18] - cohort_count[band: 19]) + (sum(cohort_entry, sex) + cohort_entry)), region)	-2430
+-	real	person	sum(deaths[age: 0, region: 0], region, sex, band)	4021aeca7aec1962
+-	int	1	sum(coord(age), age)	5050
+-	int	1	sum(min(coord(region), max(((coord(region) - coord(region)) - sum(coord(sex), sex)), coord(region))), region, band)	15
+-	int	person	sum(((cohort_entry + cohort_entry) - cohort_count), band, region)	-16140
+-	real	1	sum((local_rate - local_rate), age, region, band)	0000000000000000
+-	int	1	sum(sum(coord(band), sex), band)	180
+-	int	person	sum(sum(cohort_entry, sex, band), age, region)	30300
+-	real	person	sum(population[age: 7, region: 2, sex: 0], region)	40e009f04da6d58c
+-	int	person	sum(cohort_shift((max(cohort_shift(cohort_entry, region), (cohort_entry * coord(region))) * max((coord(sex) + coord(sex)), (coord(sex) + coord(region)))), region), region, sex)	130
+-	real	person	sum(arrivals[age: 10, region: 0], sex)	4008b27be4ee033e
+-	int	person	sum(sum((cohort_count - cohort_entry), band, age), sex, region)	3290580
+-	real	person	sum((cohort_count * coord(band)), band)	40fa298000000000
+-	real	person	sum(max(cohort_count[band: 16], (cohort_shift(births[region: 0, sex: 1], age) - arrivals[sex: male, region: midlands])), age)	40df3ce38ebe46dd
+-	real	person	sum(cohort_shift((arrivals[region: north, age: 0] * local_rate[region: north]), sex), sex)	3fea5521a8c2e270
+-	int	1	sum((coord(sex) + cohort_shift(coord(sex), band)), sex, band)	10
+-	real	person	sum(deaths[sex: 1], band, age, region)	40e3500ee1e55208
+-	int	1	sum(max(coord(band), coord(sex)), age, band, sex)	18180
+-	int	person	sum((max(cohort_count[band: 20], cohort_count[band: 20]) + cohort_entry), sex)	8020
+-	real	person	sum(sum(births, sex, age), region)	410a84565e576ba0
+-	int	1	sum(select(coord(band) >= 18, (max(coord(band), coord(band)) + coord(age)), (sum(coord(region), region) - sum(coord(band), region))), band, age)	11514
+-	real	person	sum(sum(births, region, age), band, sex)	413092b5faf6a34f
+-	int	1	sum(coord(region), age, region)	303
+-	real	person	sum(select(coord(band) >= 17, (cohort_entry * min(mortality, local_rate[region: north])), ((total_population * boy_share) * (coord(band) + local_rate[region: midlands]))), band, sex, age)	41f2d555e84946db
+-	real	person	sum((cohort_shift(deaths[age: 100], sex) * select(coord(sex) >= 0, migration_rate[region: north], local_rate)), region, sex)	3fb08785e34dba27
+-	int	person	sum((cohort_entry - cohort_count), band)	-5430
+-	real	1	sum((fertility[age: 100] + boy_share), sex, band)	40147ae147ae147c
+-	real	person	sum(population[age: 0, region: north], sex)	40ceabd19e1c308c
+-	real	person	sum((cohort_count[band: 16] + cohort_shift((births[region: 0] * ageing_share), sex)), sex)	407733607232434d
+-	real	1	sum((boy_share - mortality), age, sex)	40593f7b2ade7af2
+-	int	person	sum(select(coord(age) >= 64, (cohort_shift(cohort_count[band: 19], age) - (cohort_entry + cohort_entry)), cohort_entry), age)	37900
+-	int	person	sum(sum((cohort_entry * coord(sex)), sex, band), region, age)	15150
+-	real	1	sum(migration_rate, region)	3f40624dd2f1a9fc
+-	real	1	sum(sum((fertility - min(coord(sex), migration_rate[region: 0])), sex), age, region)	3fe37d4cb51802fd
+-	int	person	sum((((cohort_count + cohort_entry) + (cohort_count + cohort_count[band: 20])) - (cohort_entry - cohort_count[band: coord(band)])), region, band, age)	11041320
+-	real	1	sum(boy_share, age, band)	407028f5c28f5c2c
+-	real	person	sum((births[region: north, sex: female] * boy_share), band, age)	40f2ee40be746765
+-	real	1	sum((local_rate[region: north] + ((ageing_share + boy_share) - max(fertility[age: 100], migration_rate[region: 2]))), band)	4010e60f04c756b3
+-	real	person	sum(total_population, sex, age)	41c21be645d03ce0
+-	real	person	sum((cohort_count - (total_population * coord(band))), region, band)	c1c8345fb87195ce
+-	real	1	sum(ageing_share, band, age, region)	405f8fffffffff3a
+-	real	person	sum(cohort_count, age, band, sex)	4130e41000000000
+-	real	1	sum((migration_rate[region: midlands] + cohort_shift(boy_share, band)), band)	400479db22d0e560
+-	int	person	sum((cohort_entry + cohort_count[band: 16]), sex, age)	34340
+-	real	person	sum(arrivals[sex: 1, region: 2, age: 0], region, band)	4050576eb9d676aa
+-	int	person	sum(max(cohort_shift((cohort_entry + cohort_count[band: 20]), region), ((cohort_entry + cohort_entry) * max(coord(region), coord(region)))), region)	12030
+-	real	person	sum((select(coord(band) >= 20, ((population[age: 0, sex: male, region: midlands] - cohort_entry) * coord(band)), (births[sex: female] * coord(region))) + cohort_shift(deaths[sex: 0, region: 0, age: 0], region)), region, band)	4120c65d572c6b51
+-	int	person	sum(((min(select(coord(age) >= 59, cohort_entry, cohort_entry), cohort_count[band: 16]) * max(cohort_shift(coord(age), age), min(coord(age), coord(age)))) - cohort_count[band: 18]), age)	35330
+-	real	1	sum(migration_rate[region: 0], sex)	3f3a36e2eb1c432d
+-	real	person	sum(select(coord(sex) >= 1, births, births[region: midlands]), region, sex, band)	40c4ff743e2dd6dc
+-	int	1	sum(sum((coord(age) + coord(age)), sex), age, region)	60600
+-	int	person	sum((cohort_count + (cohort_count[band: 16] - select(coord(band) >= 20, (cohort_count + cohort_entry), (cohort_count - cohort_count)))), band, sex)	4540
+-	real	person	sum(deaths[age: 8], sex, region, age)	4078ebddd6030391
+-	real	person	sum((sum(total_population, band) + cohort_shift(total_population, region)), region)	4189d1996b23d2fe
+-	int	1	sum(sum(coord(region), band), age, region)	1515
+-	int	1	sum(coord(region), region)	3
+-	int	1	sum(min(coord(sex), coord(region)), sex, region)	2
+-	real	person	sum(sum(cohort_entry, band, region), age)	40cd970000000000
+-	real	1	sum(migration_rate, region)	3f40624dd2f1a9fc
+-	real	person	sum(cohort_shift(population[region: north, sex: 1], band), band, age)	414038e5603f1cb2
+-	real	1	sum(max(max(sum(local_rate, region), max(migration_rate[region: 0], boy_share)), cohort_shift(sum(fertility[age: 100], region), band)), band)	400e000000000000
+-	int	1	sum(max((sum(coord(band), band) - coord(sex)), (coord(sex) - coord(sex))), sex)	179
+-	int	1	sum((coord(age) + coord(age)), age)	10100
+-	int	1	sum((coord(age) - coord(sex)), sex, age)	9999
+-	real	person	sum((total_population + cohort_count[band: 16]), region)	416136a2476d3754
+-	real	person	sum(min((sum(cohort_shift(births, band), sex) + cohort_entry), cohort_count), age, band, region)	41271fc4c6c190e0
+-	real	1	sum(min(sum((coord(band) - coord(age)), sex), boy_share), band, age, region)	c0f8e5dc28f5c277
+-	int	1	sum((select(coord(region) >= 0, coord(region), min(coord(region), cohort_shift(coord(region), region))) + coord(region)), region)	6
+-	real	person	sum(select(coord(band) >= 18, cohort_entry, (sum(select(coord(age) >= 20, births, population), sex) - ((cohort_count - deaths[sex: 1, region: north]) + births[region: south, sex: male]))), age, band, region)	4140ba6957252188
+-	real	1	sum(cohort_shift(select(coord(band) >= 18, min(fertility[age: 0], min(boy_share, coord(sex))), ((boy_share + local_rate[region: north]) + min(boy_share, coord(sex)))), band), region, sex, band)	40286e978d4fdf3c
+-	int	person	sum(cohort_entry, band, sex, age)	10100
+-	real	1	sum(cohort_shift(cohort_shift(max(mortality[age: 100 - coord(age), sex: female], (mortality[sex: 0] + migration_rate[region: 1])), age), band), band, age)	40270ba78b49ca99
+-	int	1	sum((select(coord(band) >= 20, (max(coord(band), coord(band)) + select(coord(band) >= 16, coord(band), coord(band))), max(min(coord(band), coord(band)), (coord(band) + coord(band)))) + sum((min(coord(sex), coord(sex)) + select(coord(sex) >= 0, coord(band), coord(band))), region, sex)), band)	735
+-	real	1	sum((local_rate[region: north] + coord(band)), band, sex)	4066d00000000000
+-	real	person	sum(select(coord(age) >= 56, max(births[sex: 0, region: 2], select(coord(age) >= 82, deaths[sex: male, region: south], cohort_count[band: 20])), (cohort_entry + (cohort_entry - cohort_count[band: 20]))), age)	c0fb2afb6c2827cd
+-	int	person	sum(cohort_shift(cohort_count[band: 16], region), region)	480
+-	int	1	sum(coord(sex), sex, age, band)	505
+-	real	1	sum(cohort_shift(sum(max(fertility[age: 100], coord(region)), band), region), sex, region)	403e000000000000
+-	int	1	sum(coord(band), region, band)	270
+-	real	person	sum(cohort_shift((births[sex: 0] - max(total_population, arrivals[age: 0])), region), region, band, sex)	c195835bda70ecb2
+-	int	person	sum((max(cohort_entry, cohort_count[band: 16]) - cohort_entry), region, sex)	900
+-	real	person	sum(cohort_count, band, region, sex)	40e00e0000000000
+-	int	person	sum(select(coord(region) >= 0, cohort_entry, sum(cohort_shift(cohort_entry, band), band, sex)), age, region)	3030
+-	real	person	sum((cohort_count[band: 16] * coord(age)), age)	4128a88000000000
+-	real	person	sum(((arrivals[region: north, age: 91] * migration_rate[region: 0]) - (total_population + cohort_count[band: 16])), sex)	c156f38309e5826c
+-	real	1	sum((migration_rate[region: north] - sum(max(coord(band), local_rate), band)), region, age)	c0daa17c1f212d97
+-	int	person	sum(cohort_count[band: 16], region)	480
+-	int	person	sum(select(coord(band) >= 18, cohort_entry, select(coord(band) >= 17, cohort_entry, cohort_entry)), band)	50
+-	real	person	sum(deaths[sex: female, age: 63], sex, region)	40639e1de48ab676
+-	real	person	sum(cohort_shift(cohort_shift(deaths, region), region), age, region, sex)	40cdf8515147aab3
+-	real	person	sum((total_population + max(births[region: north], cohort_entry)), sex)	4156f3ccabfc5ddc
+-	int	person	sum(cohort_count[band: 20], sex, region, age)	2424000
+-	real	1	sum(coord(band), band, sex)	4066800000000000
+-	real	person	sum(deaths[region: north], sex, band, age)	40d5687e00bbb664
+-	real	person	sum((cohort_entry * migration_rate[region: south]), band)	3f947ae147ae147b
+-	int	person	sum(cohort_count, sex, band)	10960
+-	real	1	sum(min(min(fertility[age: 100], migration_rate[region: 2]), min(migration_rate[region: south], mortality[age: 53, sex: 0])), band)	0000000000000000
+-	real	person	sum(total_population, age)	41b21be645d03cea
+-	real	1	sum(local_rate, age, sex, region)	4062f00000000000
+-	real	person	sum((select(coord(band) >= 16, cohort_entry, births[sex: 1, region: 0]) + deaths[region: 1]), age, band, sex)	40e1697d18504569
+-	real	person	sum(select(coord(sex) >= 0, cohort_shift(((cohort_count[band: 16] + cohort_count[band: 16]) - select(coord(sex) >= 0, population[age: 0, region: 0], cohort_count[band: 20])), sex), (cohort_shift(select(coord(sex) >= 0, arrivals[region: 0, age: 0], total_population), sex) + ((births[region: south] + total_population) - cohort_shift(arrivals[age: 100, region: south], sex)))), sex)	c0cd6bd19e1c308c
+-	real	person	sum(select(coord(band) >= 18, (population[age: 0] - arrivals[age: 101, region: south]), (cohort_count + cohort_count[band: 16])), band, region, sex)	E:runtime
+-	int	person	sum(sum(cohort_entry, region), age, band, sex)	30300
+-	real	1	sum(((boy_share - coord(sex)) + fertility[age: 16]), region, sex)	3fb29274d9932624
+-	real	person	sum((cohort_count[band: 16] + deaths[sex: female, age: 91]), region, sex)	4094132d777c0136
+-	int	person	sum(sum((cohort_count[band: 20] * coord(sex)), region), sex, band, age)	6060000
+-	int	person	sum(cohort_entry, age)	1010
+-	real	1	sum(select(coord(sex) >= 1, sum(boy_share, region), sum(mortality, band)), sex, age)	406421751f062a95
+-	real	person	sum(select(coord(region) >= 1, (total_population + deaths[sex: female]), sum(arrivals[sex: female], band)), region, age)	41c21bf17ecfe5e9
+-	real	person	sum(births, sex, band, region)	40c500e6a0e7763a
+-	real	person	sum(cohort_shift((deaths[region: midlands] * fertility), sex), age, sex)	3fe7ec2ab8e73c87
+-	int	person	sum(cohort_shift((sum((cohort_entry * coord(sex)), sex) - (cohort_count * cohort_shift(coord(region), region))), band), region, band)	-16290
+-	real	person	sum(select(coord(age) >= 29, cohort_count, (cohort_shift((cohort_count + cohort_count[band: 20]), region) - cohort_shift(sum(arrivals, sex), age))), region, band, age)	4149ef045cd72750
+-	int	person	sum((cohort_count + cohort_entry), band, region)	16590
+-	int	1	sum(((coord(sex) - coord(band)) + max(coord(sex), coord(sex))), sex, region, band)	-510
+-	int	person	sum(cohort_entry, region, sex)	60
+-	int	person	sum(sum((min(cohort_count, cohort_entry) + (cohort_entry - cohort_entry)), band), age, region, sex)	30300
+-	int	person	sum((cohort_entry - cohort_entry), band, sex, age)	0
+-	real	person	sum((births[region: midlands, sex: 0] + total_population), region, age)	41cb2aa856d5281e
+-	int	person	sum((cohort_count[band: 16] * coord(region)), sex, region)	960
+-	real	person	sum((min(cohort_entry, (deaths[age: 0, region: 0, sex: 0] * (boy_share + coord(band)))) - cohort_shift(deaths[age: 94], sex)), band, sex, region)	c09580a36c9d96de
+-	int	person	sum((cohort_entry + cohort_count), band)	5530
+-	int	person	sum(cohort_shift(cohort_entry, sex), sex, band, age)	10100
+-	real	person	sum((population[age: 100, region: south] + total_population), sex)	4156f62a38f33c92
+-	real	1	sum((min(cohort_shift(min(migration_rate[region: south], coord(region)), sex), (coord(sex) - max(local_rate, coord(region)))) - ageing_share), region, sex)	c013000000000000
+-	real	person	sum(arrivals[region: 0, age: 0, sex: male], band, sex, age)	4099c73626ab01fb
+-	int	person	sum(min(select(coord(sex) >= 0, cohort_count[band: 16], sum((cohort_count - cohort_entry), band, age)), sum((select(coord(sex) >= 0, cohort_count, cohort_count) + (cohort_entry - cohort_entry)), band, age)), region, sex)	960
+-	real	person	sum((sum(select(coord(band) >= 19, (births + deaths), arrivals[age: 7]), region, age) + min(((arrivals[region: midlands, age: 0] - arrivals[region: north, age: 64]) - (births[sex: female, region: 2] - total_population)), min((population[region: north, age: 10] * local_rate[region: midlands]), (cohort_count - arrivals[age: 100, region: north])))), sex, band)	411cfdddc97fa2fa
+-	int	person	sum(sum((cohort_count[band: coord(band)] * cohort_shift(select(coord(age) >= 66, coord(band), coord(region)), sex)), age, region), band, sex)	24673680
+-	real	person	sum(cohort_count[band: 16], sex, age, region)	40f7ac0000000000
+-	real	person	sum(sum(deaths[sex: female], sex), age, region, band)	40f22656c3b44356
+-	real	1	sum((cohort_shift(ageing_share, age) - min(boy_share, migration_rate[region: midlands])), age)	4020da812918b671
+-	real	1	sum(migration_rate, sex, region)	3f50624dd2f1a9fc
+-	real	1	sum(sum(max(max(migration_rate[region: midlands], ageing_share), (boy_share + coord(age))), region, age), band)	40f2aedae147ae27
+-	real	1	sum(cohort_shift(fertility[age: 88], band), band, sex)	0000000000000000
+-	real	person	sum(cohort_shift(arrivals[age: 100, region: 2, sex: 1], sex), age, sex)	405d87a7959539a7
+-	real	person	sum(max(cohort_shift(births[sex: male, region: midlands], band), select(coord(band) >= 16, population[age: 37, region: 2, sex: 0], arrivals[sex: male, region: 0, age: 0])), band)	40e02ddb87274007
+-	real	1	sum((min(min(mortality[age: 16, sex: 0], fertility[age: 0]), select(coord(band) >= 18, migration_rate[region: south], coord(band))) - select(coord(band) >= 17, (boy_share + boy_share), mortality[sex: female, age: 100])), band)	c0108cf87da20eab
+-	real	person	sum(select(coord(sex) >= 1, deaths[age: 39], cohort_shift(cohort_shift(total_population, sex), region)), sex, region)	40315e212730cdc4
+-	int	1	sum(sum(coord(band), band), region, sex)	540
+-	real	person	sum(max(cohort_entry, total_population), sex, region)	41713666476d3754
+-	real	person	sum((sum(deaths, band) + (total_population - population)), sex, region, age)	41db1eaabbfeb30f
+-	real	person	sum((population[sex: female, region: south] - total_population), age)	c1b2130f2039182e
+-	int	1	sum((coord(region) + coord(region)), band, region)	30
+-	real	person	sum(cohort_shift(cohort_entry, age), age)	408f900000000000
+-	real	1	sum(coord(age), band, region, age)	40f27e6000000000
+-	real	person	sum(max((cohort_entry + births[region: south, sex: female]), births[sex: 0]), band, region, age)	4122f4e99fe24a4a
+-	int	person	sum(((select(coord(region) >= 0, cohort_count[band: 19], cohort_count[band: 16]) * coord(region)) - ((cohort_entry - cohort_entry) * (coord(region) + coord(region)))), sex, region)	6000
+-	int	1	sum(cohort_shift((coord(age) - max((coord(sex) - coord(age)), (coord(sex) + coord(sex)))), age), sex, age)	9898
+-	int	1	sum(coord(region), age, sex, region)	606
+-	real	person	sum(cohort_shift(((arrivals[region: 0] * fertility[age: 100]) - population[region: 2]), band), sex, age, band)	c155df33341d5cda
+-	real	person	sum((deaths[sex: female, region: midlands] * fertility), age)	3fd67dcf95686a52
+-	real	1	sum(((mortality[age: 100] - mortality[age: 100]) + min(coord(region), local_rate)), sex, region)	3ff0000000000000
+-	int	1	sum(sum(coord(band), age), band, region, sex)	54540
+-	int	person	sum(sum(cohort_count, region), age, band, sex)	3320880
+-	real	person	sum(select(coord(region) >= 2, cohort_count, total_population), band, region)	417cb1564c60b18c
+-	real	person	sum(arrivals[region: north, sex: female, age: 100], region, band, age)	40752b75320194ba
+-	real	1	sum(select(coord(sex) >= 0, cohort_shift(min(ageing_share, local_rate[region: midlands]), sex), sum(migration_rate[region: 0], band)), sex)	3fc5555555555555
+-	int	person	sum(select(coord(age) >= 2, cohort_count[band: 16], sum(cohort_count, band, region)), age)	48720
+-	real	person	sum(total_population, age, band)	41d6a2dfd7444bd6
+-	real	1	sum(boy_share, sex)	3ff0624dd2f1a9fc
+-	real	1	sum(min((((boy_share + fertility[age: 0]) + mortality[age: 0]) + min(min(local_rate, mortality[age: 42, sex: male]), fertility[age: 0])), sum(mortality[sex: 0], age)), sex, band, region)	402eb8ded232e830
+-	int	person	sum((cohort_count[band: 16] - cohort_entry), region)	450
+-	real	person	sum(select(coord(age) >= 12, sum(population[region: north, age: 100], region), (cohort_shift(births[region: 0], age) + (population[sex: male, region: 0, age: 100 - coord(age)] - deaths[age: 0, region: south, sex: female]))), age, sex, band)	41485d5dff165ff8
+-	real	person	sum(population[sex: male], age, band, region)	415c630c59621af5
+-	int	person	sum(cohort_count[band: 16], region)	480
+-	real	person	sum((births[region: 2, sex: 1] - (births[sex: female] * mortality[sex: female])), region, age)	40febe4f1d64ca84
+-	int	1	sum(min(coord(band), coord(band)), band)	90
+-	int	1	sum(coord(band), band)	90
+-	real	1	sum((sum(local_rate, age, region) + (min(boy_share, max(coord(band), coord(band))) - cohort_shift((mortality[age: 0, sex: 1] - local_rate[region: 0]), band))), band)	4077e8f4f995ada6
+-	real	person	sum(population, age, sex, region)	4146f33309e6f47a
+-	real	1	sum(cohort_shift(boy_share, band), band, age)	407028f5c28f5c2c
+-	int	person	sum(cohort_count[band: 16], sex, band)	1600
+-	real	person	sum((cohort_count[band: 16] * local_rate), age, region, sex)	40d7ac0000000000
+-	int	person	sum(cohort_count[band: 20], sex, age)	808000
+-	real	person	sum((deaths[sex: 0, age: 83] - deaths[age: 0]), band, region, sex)	40a679e6dcb9cbe5
+-	real	person	sum(deaths[sex: 0, region: 2], age, band, region)	40e4c08922a8f385
+-	real	person	sum(sum(cohort_shift(arrivals, age), region, sex), age)	4080a4016c0f2192
+-	real	person	sum((births * ageing_share), sex, region)	4066675c675d4ae8
+-	int	1	sum(coord(band), band)	90
+-	real	person	sum((total_population * cohort_shift(sum(local_rate, region), age)), band, sex, age)	41e0fa27e173395b
+-	real	1	sum(coord(age), age, sex)	40c3ba0000000000
+-	int	1	sum(max(coord(age), coord(age)), age)	5050
+-	int	1	sum(min(sum(coord(age), region), min(coord(sex), coord(age))), band, age, sex)	500
+-	int	person	sum((max(sum(cohort_count, sex), cohort_count) + (max(cohort_count, cohort_entry) * (coord(region) - coord(region)))), region, age, band)	3320880
+-	int	person	sum(sum(cohort_count, age), sex, band)	1106960
+-	real	person	sum(cohort_count, region, band)	40d00e0000000000
+-	int	person	sum((cohort_count[band: 16] + cohort_count[band: 20]), sex, age)	840320
+-	int	person	sum(cohort_entry, region, sex, age)	6060
+-	real	person	sum(cohort_shift(max(population, arrivals[sex: 0, region: south, age: 0]), age), sex, region, age)	4146f33309e6f46d
+-	real	person	sum(arrivals[age: min(coord(age) + 1, 100)], sex, region, age)	40805db3746527bb
+-	int	1	sum(coord(band), band, region, sex)	540
+-	real	person	sum(cohort_count, age, band)	4120e41000000000
+-	int	1	sum(coord(region), region)	3
+-	int	1	sum(min(coord(sex), coord(sex)), sex)	1
+-	real	1	sum(max(fertility[age: 33], migration_rate[region: 2]), sex)	3f90fcb423bc2568
+-	real	person	sum((total_population * (fertility[age: 57] - boy_share)), age, sex)	c1b28b293d3fbb45
+-	real	1	sum(local_rate, region)	3fe8000000000000
+-	int	1	sum(coord(sex), sex)	1
+-	real	1	sum(coord(band), band, age)	40c1c10000000000
+-	real	1	sum(cohort_shift((ageing_share - migration_rate), age), region, age)	403933126e978d52
+-	int	person	sum((cohort_count[band: 16] - cohort_count[band: 16]), region, sex)	0
+-	int	person	sum(cohort_entry, age)	1010
+-	int	person	sum(((cohort_entry - cohort_count) - (cohort_entry * coord(band))), band, region)	-18990
+-	real	1	sum(fertility[age: 12], band)	0000000000000000
+-	int	person	sum(select(coord(age) >= 79, cohort_entry, (cohort_count[band: 18] + cohort_count[band: 18])), age)	25500
+-	real	person	sum((total_population - cohort_count), band)	416cad52cc60b18c
+-	real	person	sum(max(max(arrivals[region: 0, age: 0], cohort_entry), max(arrivals[region: 2, age: 0], births[region: north])), sex)	40833442ad2d93d0
+-	real	person	sum(population[region: midlands, age: 57, sex: 0], age)	411950332902e243
+-	real	1	sum(migration_rate[region: 0], sex)	3f3a36e2eb1c432d
+-	real	1	sum((min(min(mortality[sex: 1], select(coord(band) >= 16, migration_rate, local_rate)), (select(coord(band) >= 19, mortality[sex: female], coord(band)) + min(migration_rate[region: coord(region)], fertility))) - ageing_share), age, band, region)	c05f82c45409e4c9
+-	real	person	sum((births + (total_population + (cohort_count[band: 20] - arrivals[region: south]))), age, sex, region)	41db33eb6208ad8b
+-	real	1	sum(max(coord(band), boy_share), region, sex, band)	4080e00000000000
+-	int	person	sum((cohort_count[band: 20] - cohort_entry), age, region, sex)	2417940
+-	real	1	sum((coord(age) + mortality[age: 0]), region, age, sex)	40dd970163c676e8
+-	int	person	sum(cohort_count, band, sex, region)	32880
+-	real	person	sum((deaths[region: south] - cohort_shift(((cohort_count + total_population) - (population[region: 0] + cohort_entry)), age)), age, band, sex)	c1e69cb6b417f485
+-	int	person	sum(cohort_count[band: coord(band)], band, sex)	10960
+-	real	1	sum(coord(region), sex, region)	4018000000000000
+-	int	person	sum(cohort_count[band: 19], region, age)	303000
+-	real	person	sum(arrivals[region: 1, age: 77], sex, band)	c0066c65f43c4823
+-	int	1	sum(coord(region), age, band, region)	1515
+-	real	person	sum((sum(births[region: south], age) + cohort_shift(total_population, sex)), sex)	4157440c8a026cf9
+-	real	1	sum(((((mortality + migration_rate[region: 0]) + max(ageing_share, coord(age))) + (coord(age) - (coord(band) + boy_share))) + fertility), age, sex, band)	40f418d31236328d
+-	real	person	sum(population[age: 0, sex: 1], region)	40daaadded9ebde6
+-	int	person	sum((sum(max(cohort_entry, cohort_count), age, sex) * (select(coord(band) >= 19, coord(band), coord(band)) - coord(band))), band)	0
+-	real	person	sum((deaths[sex: female, region: midlands, age: 0] - arrivals[region: 2, age: 100]), sex)	bfe12d6214f1fb3c
+-	real	person	sum(births[region: south], sex, age)	40f4366006de2229
+-	real	person	sum(select(coord(band) >= 16, population[age: 81, sex: female, region: north], births[sex: male, region: 0]), band)	40c52c37ef0453c0
+-	real	person	sum(cohort_shift(sum((select(coord(region) >= 0, population[age: 0, region: 0], cohort_entry) * max(coord(sex), migration_rate[region: 3])), sex), region), region)	E:runtime
+-	int	person	sum(max(min(cohort_count[band: 19], cohort_shift(cohort_entry, age)), ((cohort_count[band: 20] * coord(sex)) - (cohort_entry * coord(sex)))), sex, age, region)	1212000
+-	real	person	sum(births[sex: male], region, age)	40fb2741e9d259b2
+-	int	person	sum(cohort_count[band: 20], age, region)	1212000
+-	real	person	sum((deaths[age: 100, sex: female] + deaths[sex: 1, age: 69]), region)	407269e8a0ad733a
+-	real	person	sum(population[age: 19, sex: female, region: north], sex, region)	40e3add9950c3036
+-	real	person	sum(population[sex: male], age, region, band)	415c630c59621af5
+-	int	1	sum((cohort_shift((coord(age) - coord(band)), band) + coord(sex)), band, age, sex)	32825
+-	real	person	sum(arrivals[age: 19, sex: 0, region: 2], sex, band)	4041e4cd4a54adcb
+-	int	1	sum(select(coord(age) >= 10, (max(coord(sex), coord(sex)) - select(coord(sex) >= 1, coord(age), coord(age))), ((coord(sex) - coord(age)) - cohort_shift(coord(sex), age))), sex, age)	-10008
+-	real	person	sum(((min(births[region: 0, sex: male], (births[sex: male, region: north] - population[sex: female, age: 100, region: north])) + ((cohort_count + arrivals[sex: male, age: 0, region: 2]) + (total_population + total_population))) * migration_rate[region: 0]), band)	40b7807844b7f448
+-	real	person	sum((cohort_shift((deaths[sex: 0, age: 100] * migration_rate[region: midlands]), region) + (population[age: 45, sex: male] - (cohort_entry * fertility[age: 41]))), region)	40cd0c310fa81601
+-	real	person	sum((deaths[sex: female, age: 84, region: 0] * local_rate[region: midlands]), band)	405b2e2fb5381d82
+-	int	1	sum(sum(min(coord(region), coord(sex)), region), age, band, sex)	1010
+-	int	1	sum((coord(band) + coord(sex)), band, sex)	185
+-	real	1	sum(fertility[age: 0], sex)	0000000000000000
+-	real	person	sum(min(total_population, cohort_shift((cohort_count[band: 20] - deaths[age: 83, sex: 0, region: south]), band)), band)	40d2fe7229abae28
+-	real	person	sum(cohort_entry, region, band, age)	40cd970000000000
+-	int	person	sum((cohort_count[band: 16] * coord(region)), region)	480
+-	real	person	sum(((population[region: south] + (arrivals[region: 0] * boy_share)) - (population[age: 0, region: 0, sex: coord(sex)] * (sum(local_rate, region) + (fertility - fertility[age: 33])))), sex, age)	c0de9bc17c6a1131
+-	real	person	sum(deaths[sex: 0], age, region)	40bd0a246c539eee
+-	real	person	sum((cohort_entry - deaths[age: 1, sex: male, region: north]), band)	404813d8de20c208
+-	real	person	sum((deaths[age: 100, region: 2] + cohort_shift(cohort_shift(deaths[region: 1, sex: 0], sex), sex)), age, sex)	40d0f91b82c4cca2
+-	int	person	sum((cohort_entry + ((select(coord(age) >= 33, cohort_entry, cohort_count) + max(cohort_entry, cohort_count)) + select(coord(band) >= 18, (cohort_entry - cohort_count), (cohort_entry * coord(age))))), age, band)	325640
+-	real	person	sum(population[age: min(coord(age) + 1, 100), region: south], age, sex)	413139618c7837d4
+-	real	1	sum((fertility + migration_rate[region: 0]), sex, age, band)	3ff516d67369aee3
+-	real	1	sum(coord(age), sex, age)	40c3ba0000000000
+-	real	person	sum(((cohort_entry - deaths[region: 0, sex: 0, age: 6]) + cohort_shift(population[sex: male, region: 2, age: 0], band)), band)	40e9704eddb71354
+-	int	person	sum(cohort_shift(sum((select(coord(region) >= 2, cohort_count, cohort_entry) + cohort_count[band: 18]), sex), age), band, age, region)	1611960
+-	real	person	sum(select(coord(band) >= 19, max(select(coord(region) >= 1, deaths[age: 95, region: 0, sex: 0], (births[sex: 0, region: north] + births[sex: 0])), (arrivals[sex: female, age: 0] - deaths[sex: 1, age: 0])), sum(total_population, age)), band, region)	41e45f63ba309ae2
+-	real	person	sum(cohort_shift((population[age: 57] + births), region), region, age, sex)	4144744860844afe
+-	real	1	sum((max(boy_share, min(local_rate[region: north], min(local_rate[region: 0], mortality[age: 100]))) - fertility[age: 0]), sex)	3ff0624dd2f1a9fc
+-	real	person	sum(total_population, region, sex, band)	419583ffd948852c
+-	int	person	sum(cohort_count, sex, band)	10960
+-	real	person	sum(population[sex: female, age: 0, region: north], age)	41285a52172508de
+-	int	person	sum(cohort_entry, age, region)	3030
+-	real	1	sum(coord(age), band, region, age)	40f27e6000000000
+-	int	1	sum(min(coord(age), ((coord(age) - coord(age)) - coord(sex))), sex, age, band)	-505
+-	real	1	sum((coord(region) + ageing_share), region)	400a000000000000
+-	real	person	sum(population[age: 100 - coord(age), sex: male, region: north], band, age)	414038e5603f1caf
+-	int	person	sum(cohort_entry, sex, band)	100
+-	real	person	sum(births[region: 1, sex: 0], sex, band, age)	41158e22fffbd3d7
+-	real	person	sum(cohort_shift(((select(coord(sex) >= 1, deaths[region: 1, age: 101], cohort_entry) * (local_rate[region: north] - ageing_share)) + cohort_entry), band), sex, band)	E:runtime
+-	real	person	sum(total_population, sex, region)	41713666476d3754
+-	real	1	sum((mortality[sex: female] + select(coord(sex) >= 1, local_rate[region: 0], migration_rate[region: north])), age, sex)	403ba24f0e7d68b8
+-	real	person	sum((deaths[age: 76] + (population[sex: min(coord(sex) + 1, 1)] - (births - (births[sex: 0] - cohort_count[band: 20])))), age, sex, region)	4121ea79846cf837
+-	real	1	sum(sum(fertility[age: 0], band), region, sex, age)	0000000000000000
+-	real	person	sum(arrivals[region: 0], sex, age)	406593f2001e48fb
+-	int	person	sum(select(coord(region) >= 1, cohort_count[band: 16], cohort_count[band: 20]), age, region)	436320
+-	int	person	sum(cohort_count, band, age)	553480
+-	int	person	sum((((cohort_entry - cohort_entry) - cohort_entry) + (min(cohort_entry, cohort_entry) - cohort_count[band: 17])), age)	-16160
+-	int	person	sum(cohort_shift((cohort_count[band: 19] - cohort_entry), sex), region, age, sex)	599940
+-	real	person	sum(cohort_count[band: 20], band, sex, age)	414ed2a000000000
+-	real	person	sum((cohort_entry - (cohort_entry - cohort_count)), sex, band)	40c5680000000000
+-	real	1	sum(local_rate, age, region, sex)	4062f00000000000
+-	real	person	sum(cohort_entry, age, region, band)	40cd970000000000
+-	real	person	sum(cohort_shift((population[region: 0, age: 100] - deaths[age: 100, region: 2]), sex), sex)	40a0d246c1f62274
+-	real	person	sum(total_population, age)	41b21be645d03cea
+-	int	person	sum(cohort_shift((((cohort_count[band: 20] - cohort_count) - (cohort_count - cohort_entry)) + sum((cohort_entry + cohort_count), sex)), region), region, age, band)	6105450
+-	int	person	sum(((cohort_count[band: 20] - cohort_entry) * min(coord(sex), coord(sex))), sex, age)	402990
+-	real	1	sum(sum(coord(sex), age, band), sex, region)	4097ac0000000000
+-	real	person	sum(cohort_entry, band)	4049000000000000
+-	int	person	sum(cohort_count, band)	5480
+-	int	person	sum(cohort_entry, age)	1010
+-	real	person	sum((total_population + cohort_shift(total_population, band)), band, region)	419583ffd9488528
+-	int	person	sum(cohort_count[band: 16], age)	16160
+-	int	person	sum((cohort_count[band: 20] * coord(sex)), sex)	4000
+-	int	person	sum(cohort_shift(sum((cohort_entry * coord(band)), band, region), sex), sex)	5400
+-	int	1	sum(coord(age), sex, age)	10100
+-	real	person	sum(cohort_shift(sum(cohort_count[band: 16], sex, region), band), band)	40b2c00000000000
+-	real	person	sum(population[sex: female, age: 101], band, region)	E:runtime
+-	int	1	sum(coord(band), age, band, region)	27270
+-	real	person	sum(deaths[sex: male, age: 100, region: min(coord(region) + 1, 2)], age, region, band)	40f595977c0f5252
+-	int	person	sum((cohort_count + sum(cohort_count, age, sex)), band)	1112440
+-	real	1	sum(select(coord(band) >= 17, sum(min(cohort_shift(fertility, band), (fertility + migration_rate[region: midlands])), age), boy_share), sex, band)	3ffd6080f6570134
+-	real	1	sum(select(coord(region) >= 2, local_rate, migration_rate), region)	3fd001a36e2eb1c4
+-	real	person	sum((cohort_count[band: 16] * mortality[age: 100]), sex)	402aaaaaae3eed25
+-	real	person	sum(deaths, age, sex, region)	40cdf8515147aab3
+-	real	person	sum(cohort_shift(births[region: north, sex: 1], age), age, band)	4103656c4da13ba9
+-	int	person	sum(cohort_count[band: 16], age)	16160
+-	real	person	sum(select(coord(sex) >= 0, sum((cohort_count * ageing_share), band), arrivals[region: 0, sex: min(coord(sex) + 1, 1), age: 37]), sex)	408c8aaaaaaaaaaa
+-	real	person	sum((((births[region: 0, sex: female] - arrivals[age: 0, sex: female, region: north]) + (population[sex: male, region: 2, age: 43] * local_rate[region: 0])) - max((arrivals[region: midlands, sex: 0, age: 100] * ageing_share), (total_population * ageing_share))), band)	c132fd87ab57653a
+-	int	person	sum(cohort_count[band: 19], age, region, sex)	606000
+-	real	person	sum(select(coord(region) >= 1, births, cohort_count[band: 16]), sex, region)	409d00e944752675
+-	real	1	sum(ageing_share, band, sex)	3feaaaaaaaaaaaab
+-	real	1	sum(min(boy_share, mortality), age, region, sex)	401d2f6f214afe6d
+-	real	person	sum((deaths[region: 0, sex: female] + population[sex: 0, region: 0]), age, band)	4140a597077f96e0
+-	real	person	sum(cohort_shift(births[region: north], sex), sex, band)	40a801535878f8c4
+-	real	person	sum(sum(sum(total_population, sex), age, band), region)	4200fa27e17338e0
+-	real	person	sum(total_population, region, age, band)	41f0fa27e17338f6
+-	real	person	sum(arrivals, age, sex, region)	4080a4016c0f2193
+-	real	person	sum(cohort_entry, sex)	4034000000000000
+-	real	1	sum(((max(migration_rate[region: north], boy_share) - select(coord(age) >= 59, ageing_share, local_rate[region: south])) - (coord(age) - mortality[sex: male, age: 100])), band, age)	c0d879697e4a632e
+-	real	1	sum(cohort_shift(local_rate, band), region, band, sex)	401e000000000000
+-	real	1	sum((mortality[age: 0] + fertility[age: 0]), sex, band)	3f377bc7a194bab7
+-	real	person	sum(((arrivals[sex: 0, region: 2, age: 0] - max(births[sex: 1, region: south], cohort_entry)) + total_population), band)	416caefc420ffc1c
+-	real	person	sum(births[region: 0], sex, age, band)	4112f10bc3cf7436
+-	real	person	sum(((population[age: 0] * fertility[age: 100]) * migration_rate), sex, region, band)	0000000000000000
+-	real	person	sum((arrivals[region: 0] * fertility), band, age, sex)	3ff3788997f38415
+-	real	person	sum(cohort_entry, region, age)	40a7ac0000000000
+-	real	1	sum(min(migration_rate, coord(region)), age, region, band)	3fc3645a1cac083f
+-	real	1	sum((coord(band) - fertility[age: 0]), band)	4056800000000000
+-	real	person	sum(sum(((cohort_entry - (deaths - cohort_entry)) * max(fertility, select(coord(age) >= 20, migration_rate, migration_rate[region: south]))), region), sex, age, band)	4049897751a7e657
+-	real	1	sum(coord(band), age, region, band)	40daa18000000000
+-	int	1	sum(coord(band), age, band)	9090
+-	int	1	sum(coord(region), band, sex, region)	30
+-	real	person	sum(sum(total_population, age, band), region, sex)	4200fa27e17338e1
+-	real	person	sum(arrivals, age, sex, region)	4080a4016c0f2193
+-	real	1	sum((ageing_share + fertility[age: 0]), sex)	3fc5555555555555
+-	int	1	sum((max(coord(sex), coord(sex)) + coord(region)), age, sex, region)	909
+-	real	person	sum(min(cohort_entry, sum(min(population[sex: female], population[region: north, sex: male]), band, region)), age)	408f900000000000
+-	real	person	sum(sum(cohort_count[band: coord(band)], band), region, age, sex)	4149561800000000
+-	real	1	sum(cohort_shift(min(migration_rate, min(coord(age), min(ageing_share, fertility))), region), age, band, region)	3fa256baf7b83278
+-	real	1	sum(coord(sex), band, region, sex)	402e000000000000
+-	real	1	sum((local_rate[region: 2] + coord(age)), age, sex)	40c3d34000000000
+-	real	person	sum((min(sum(population[age: 62], region), cohort_shift(cohort_entry, band)) + cohort_shift((births[region: south] - deaths[age: 42, region: 0]), band)), sex, band)	40b02d1150c5a48e
+-	real	person	sum(births[sex: female], age, region, band)	41202ce2c3c9ce08
+-	real	person	sum((((total_population - births[sex: male, region: 0]) - (cohort_count[band: 18] + population[age: 26, region: 0])) - (population[region: 0, age: 0] + select(coord(sex) >= 1, cohort_entry, births[region: north]))), sex)	4156d7144c1f7ab6
+-	real	person	sum(cohort_shift(population[age: 100, region: 0], band), band, sex)	40c63a72ad314671
+-	int	person	sum(min(cohort_shift(sum(cohort_entry, region), age), cohort_count[band: 20]), band, sex, age)	30300
+-	int	1	sum((max(coord(age), coord(age)) + sum(coord(sex), region)), band, age, sex)	52015
+-	real	person	sum(cohort_count, band)	40b5680000000000
+-	int	1	sum(coord(band), sex, band, age)	18180
+-	int	person	sum(sum((cohort_entry - cohort_count), region, age), band, sex)	-3290580
+-	real	person	sum(sum(cohort_shift((births + deaths), sex), sex), age, region, band)	4131be6928236ffb
+-	real	person	sum((population[sex: female, region: midlands] - deaths[sex: 0, region: 2]), age)	411eb8d3f3ebfd60
+-	real	person	sum(((cohort_count + population[sex: 0, region: 1]) + (((arrivals[sex: 1, region: south] * local_rate[region: 0]) - cohort_shift(deaths[sex: 1, region: 2], band)) - deaths[region: north, sex: female])), age, band)	41475692a6a53aad
+-	int	person	sum(cohort_count, age, region, band)	1660440
+-	real	1	sum(max(select(coord(age) >= 90, min(boy_share, cohort_shift(local_rate[region: 1], age)), migration_rate[region: south]), select(coord(age) >= 62, sum(local_rate, region), (select(coord(age) >= 65, mortality[age: 0, sex: 1], local_rate[region: south]) - (fertility + boy_share)))), age)	403d46594af4f0d8
+-	real	person	sum((population[region: 2, age: 100] * (max((ageing_share - coord(sex)), select(coord(sex) >= 0, local_rate[region: 0], ageing_share)) - select(coord(sex) >= 1, fertility[age: 100], max(fertility[age: 0], local_rate[region: north])))), sex, band)	409d5cb215609e16
+-	real	1	sum((min(ageing_share, fertility[age: 0]) + cohort_shift(fertility[age: 51], band)), band)	0000000000000000
+-	real	1	sum(ageing_share, band)	3fdaaaaaaaaaaaaa
+-	real	1	sum(sum(min(boy_share, coord(age)), age), region)	4063333333333337
+-	real	person	sum((select(coord(sex) >= 1, births[region: 2], cohort_count) - births[region: midlands]), band, sex)	40af37a193b0a23f
+-	real	person	sum(((cohort_count * ageing_share) + sum(cohort_entry, age)), sex, band, region)	40e021fffffffffe
+-	real	1	sum(cohort_shift(ageing_share, region), region, age)	4039400000000008
+-	int	person	sum((cohort_count[band: 16] - cohort_entry), region, age)	45450
+-	int	person	sum(cohort_entry, sex, age, band)	10100
+-	int	person	sum(cohort_entry, sex)	20
+-	real	person	sum(cohort_shift(cohort_count, age), band, age)	4120e41000000000
+-	int	1	sum((coord(region) + coord(sex)), sex, age, region)	909
+-	int	person	sum((min(cohort_shift(cohort_count[band: 20], region), cohort_shift(cohort_count[band: 16], region)) * coord(region)), region)	800
+-	int	1	sum((select(coord(band) >= 16, min(coord(band), coord(band)), coord(age)) - coord(age)), band, age)	-16160
+-	real	1	sum(max(max((fertility[age: 100 - coord(age)] + coord(sex)), (local_rate[region: 0] + migration_rate[region: 2])), migration_rate[region: north]), age, sex)	405f99ba7debcf50
+-	real	person	sum(sum(cohort_shift(births[region: north], sex), sex, region), age)	4106badaeaf8f1ea
+-	real	person	sum((select(coord(band) >= 18, births[region: midlands, sex: 0], cohort_count) * cohort_shift(boy_share, band)), band)	4088f041bb084b12
+-	real	1	sum(sum(mortality[age: 16, sex: male], band), age)	3fb34ef8e17db3dc
+-	real	1	sum(boy_share, region, band)	401eb851eb851ebc
+-	real	1	sum((sum((local_rate + cohort_shift(coord(age), age)), age) + (max(cohort_shift(boy_share, sex), coord(region)) - fertility[age: 97])), band, region, sex)	41029725eb851eb9
+-	int	1	sum(cohort_shift(coord(sex), band), band, sex)	5
+-	real	person	sum(cohort_count[band: 18], sex)	4074000000000000
+-	int	person	sum((sum(cohort_shift(cohort_entry, region), region) + cohort_count), band, age)	568630
+-	real	person	sum(max(total_population, deaths[region: 2, age: 99]), sex, region)	41713666476d3754
+-	real	1	sum(sum(mortality, band), age, region, sex)	40423da574cedee8

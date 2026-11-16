@@ -2,7 +2,8 @@
 
 use std::fmt;
 
-/// An engine error. The split mirrors the oracle's three exception types.
+/// An engine error, of three kinds (the split kept from the retired Python reference's
+/// three exception types).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     /// The model files are inconsistent. Raised while loading.

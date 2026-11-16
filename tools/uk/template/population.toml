@@ -1,0 +1,148 @@
+# The UK's people by ITL1 region, sex and single year of age (stage S3.6), model format 1.
+#
+# GENERATED from tools/uk/template/population.toml by tools/uk/calibrate.py. It starts from
+# ONS's mid-2024 estimates and moves month by month: deaths at the 2022-2024 life table's
+# rates (scaled by region to the region's deaths in the year to mid-2024), births to women
+# by age (an assumed age profile, scaled by region to its births), net migration by region
+# spread over ages (an assumed profile), and one twelfth of each age moving up a year each
+# month. The economy does not read it yet.
+
+[dim.region]
+members = ["north_east", "north_west", "yorkshire", "east_midlands", "west_midlands", "east", "london", "south_east", "south_west", "wales", "scotland", "northern_ireland"]
+labels = ["North East", "North West", "Yorkshire and The Humber", "East Midlands", "West Midlands", "East of England", "London", "South East", "South West", "Wales", "Scotland", "Northern Ireland"]
+
+[dim.sex]
+members = ["female", "male"]
+labels = ["Women", "Men"]
+
+[dim.age]
+doc = "Single years of age; 90 is 90 and over"
+range = [0, 90]
+
+[param.mortality]
+label = "Chance of dying this month"
+type = "real"
+unit = "1"
+dims = ["sex", "age"]
+data = "population/by_age.csv"
+column = "mortality"
+
+[param.death_factor]
+doc = "Regional mortality relative to the UK life table"
+type = "real"
+unit = "1"
+dims = ["region"]
+data = "population/by_region.csv"
+column = "death_factor"
+
+[param.fertility_profile]
+doc = "Relative chance of a birth by the mother's age (assumed shape)"
+type = "real"
+unit = "1"
+dims = ["age"]
+data = "population/by_age_women.csv"
+column = "fertility_profile"
+
+[param.fertility_scale]
+doc = "Births per woman per month at the profile's peak, by region"
+type = "real"
+unit = "1"
+dims = ["region"]
+data = "population/by_region.csv"
+column = "fertility_scale"
+
+[param.net_migration]
+label = "Net arrivals a month"
+doc = "International and internal migration, net, in the year to mid-2024"
+type = "real"
+unit = "person"
+dims = ["region"]
+data = "population/by_region.csv"
+column = "net_migration"
+
+[param.migration_profile]
+doc = "Share of a region's net arrivals by sex and age (assumed shape)"
+type = "real"
+unit = "1"
+dims = ["sex", "age"]
+data = "population/by_age.csv"
+column = "migration_profile"
+
+[param.boy_share]
+type = "real"
+unit = "1"
+value = {{boy_share}}
+
+[param.ageing_share]
+doc = "One twelfth of each year of age has a birthday each month"
+type = "real"
+unit = "1"
+value = 0.08333333333333333
+
+[var.deaths]
+label = "Deaths"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["region", "sex", "age"]
+expr = "population * mortality * death_factor"
+
+[var.births]
+label = "Births"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["region", "sex"]
+expr = "sum(population[sex: female] * fertility_profile, age) * fertility_scale * select(coord(sex) == 1, boy_share, 1.0 - boy_share)"
+
+[var.arrivals]
+label = "Net arrivals"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["region", "sex", "age"]
+expr = "net_migration * migration_profile * policy_migration_factor"
+
+[state.population]
+label = "People"
+type = "real"
+unit = "person"
+phase = "accounts"
+dims = ["region", "sex", "age"]
+initial = { data = "data/population.csv", column = "people" }
+next = "population - deaths + arrivals - ageing_share * (population - deaths) + ageing_share * cohort_shift(population - deaths, age) + select(coord(age) == 0, births, 0.0)"
+
+[var.population_total]
+label = "Population"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(population, region, sex, age)"
+
+[var.births_total]
+label = "Births this month"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(births, region, sex)"
+
+[var.deaths_total]
+label = "Deaths this month"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(deaths, region, sex, age)"
+
+[var.working_age_population]
+label = "People aged 16 to 64"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(select(coord(age) >= 16 and coord(age) <= 64, population, 0.0), region, sex, age)"
+
+[var.pension_age_population]
+label = "People aged 66 and over"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "sum(select(coord(age) >= 66, population, 0.0), region, sex, age)"

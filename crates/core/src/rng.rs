@@ -59,6 +59,8 @@ mod tests {
         );
     }
 
+    // Known answers recorded from the retired Python reference (the test keeps its old
+    // name); saves and recorded hashes replay only while they hold.
     #[test]
     fn uniform_matches_the_oracle() {
         assert_eq!(uniform(1, 2, 3, 4), 0.282_889_125_902_804_7);

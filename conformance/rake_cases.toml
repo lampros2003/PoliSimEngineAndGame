@@ -1,0 +1,268 @@
+# Weights that change (docs/spec/06-model-format-1.md, stage S4.4): cases with the
+# outcome recorded for each (by the Python reference implementation until stage S14.2),
+# which the engine runs (crates/core/tests/raking.rs).
+#
+# Each case edits the base model (`replace`: pairs of [old text, new text], each old text
+# found exactly once; in them \n stands for a line break) and its data files (`files`),
+# then expects one of:
+#   weights  - the run starts and step 0 gives these weights (worked out by hand below);
+#   refused  - loading or starting the model fails;
+#   runtime  - the model starts and step 0 fails.
+#
+# The base: four households in two groups, sizes 1, 2, 3 and 1, weights 10, 20, 30 and 40;
+# one margin, people by group, with targets 60 and 30; one pass. Group a: S = 10*1 + 20*2
+# = 50, f = 60/50 = 1.2, so 12 and 24. Group b: S = 30*3 + 40*1 = 130, f = 30/130, so
+# 6.923... and 9.230..., which round to 7 and 9.
+
+base = """
+[model]
+id = "rake"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one", "two"]
+
+[dim.grp]
+members = ["a", "b"]
+
+[entity.hh]
+data = "hh.csv"
+id = "id"
+weight = { state = "w" }
+
+[entity.hh.columns.group]
+type = "int"
+unit = "1"
+
+[entity.hh.columns.size]
+type = "int"
+unit = "person/hh"
+
+[param.people]
+type = "real"
+unit = "person"
+dims = ["grp"]
+data = "people.csv"
+
+[var.scale]
+type = "real"
+unit = "1"
+phase = "two"
+expr = "1.0"
+
+[state.w]
+entity = "hh"
+type = "int"
+unit = "1"
+phase = "one"
+initial = { column = "weight" }
+
+[state.w.rake]
+when = "true"
+passes = 1
+
+[[state.w.rake.margin]]
+target = "people"
+slots = [{ count = "size", at = ["group"] }]
+
+[var.total]
+type = "int"
+unit = "hh"
+phase = "two"
+expr = "wcount(hh, true)"
+"""
+
+[files]
+"hh.csv" = "id,weight,group,size\n1,10,0,1\n2,20,0,2\n3,30,1,3\n4,40,1,1\n"
+"people.csv" = "grp,value\na,60\nb,30\n"
+
+[[case]]
+name = "the base: one margin, one pass"
+expect = "weights"
+weights = [12, 24, 7, 9]
+
+[[case]]
+name = "a household with two slots in one cell is scaled once"
+# Sizes 1 and two slots each: S(a) = 10 + 10 + 20 + 20 = 60, T = 120, f = 2: 20 and 40.
+# S(b) = 140, T = 30: 6.43 and 8.57. Scaling twice would give 40 and 80, 1 and 2.
+replace = [['slots = [{ count = "size", at = ["group"] }]', 'slots = [{ count = "size", at = ["group"] }, { count = "size", at = ["group"] }]']]
+files = { "hh.csv" = "id,weight,group,size\n1,10,0,1\n2,20,0,1\n3,30,1,1\n4,40,1,1\n", "people.csv" = "grp,value\na,120\nb,30\n" }
+expect = "weights"
+weights = [20, 40, 6, 9]
+
+[[case]]
+name = "a zero target leaves its cell alone"
+files = { "people.csv" = "grp,value\na,60\nb,0\n" }
+expect = "weights"
+weights = [12, 24, 30, 40]
+
+[[case]]
+name = "a cell with no pairs is left alone"
+replace = [['count = "size"', 'count = "select(group == 0, size, 0)"']]
+expect = "weights"
+weights = [12, 24, 30, 40]
+
+[[case]]
+name = "weights round halves to even, and to at least 1"
+# a: T = 62.5, f = 1.25: 12.5 rounds to 12, and 25. b: T = 0.05: 0.01... and 0.015... become 1.
+files = { "people.csv" = "grp,value\na,62.5\nb,0.05\n" }
+expect = "weights"
+weights = [12, 25, 1, 1]
+
+[[case]]
+name = "when false leaves the weights"
+replace = [['when = "true"', 'when = "false"']]
+expect = "weights"
+weights = [10, 20, 30, 40]
+
+[[case]]
+name = "a whole-number target"
+replace = [['[param.people]\ntype = "real"', '[param.people]\ntype = "int"']]
+expect = "weights"
+weights = [12, 24, 7, 9]
+
+[[case]]
+name = "a var target computed in the same phase"
+replace = [['target = "people"', 'target = "people_now"'], ['[var.scale]', '[var.people_now]\ntype = "real"\nunit = "person"\nphase = "one"\ndims = ["grp"]\nexpr = "people"\n\n[var.scale]']]
+expect = "weights"
+weights = [12, 24, 7, 9]
+
+# ---- refused
+
+[[case]]
+name = "both next and rake"
+replace = [['initial = { column = "weight" }', 'initial = { column = "weight" }\nnext = "w"']]
+expect = "refused"
+
+[[case]]
+name = "neither next nor rake"
+replace = [['[state.w.rake]\nwhen = "true"\npasses = 1\n\n[[state.w.rake.margin]]\ntarget = "people"\nslots = [{ count = "size", at = ["group"] }]', '']]
+expect = "refused"
+
+[[case]]
+name = "a rake on a state that does not hold weights"
+replace = [['weight = { state = "w" }', 'weight = "weight"']]
+expect = "refused"
+
+[[case]]
+name = "a real weight state"
+replace = [['[state.w]\nentity = "hh"\ntype = "int"', '[state.w]\nentity = "hh"\ntype = "real"']]
+expect = "refused"
+
+[[case]]
+name = "a weight state with a unit"
+replace = [['[state.w]\nentity = "hh"\ntype = "int"\nunit = "1"', '[state.w]\nentity = "hh"\ntype = "int"\nunit = "hh"']]
+expect = "refused"
+
+[[case]]
+name = "a national weight state"
+replace = [['[state.w]\nentity = "hh"\n', '[state.w]\n'], ['initial = { column = "weight" }', 'initial = 1']]
+expect = "refused"
+
+[[case]]
+name = "a weight given as a table without a state"
+replace = [['weight = { state = "w" }', 'weight = { column = "weight" }']]
+expect = "refused"
+
+[[case]]
+name = "a sector held in an entity whose weights change"
+replace = [['[dim.grp]', '[sector.homes]\nentity = "hh"\n\n[sector.bank]\n\n[instrument.cash]\nunit = "GBP"\nissuer = "bank"\n\n[account.bank_cash]\nsector = "bank"\ninstrument = "cash"\n\n[account.home_cash]\nsector = "homes"\ninstrument = "cash"\ninitial = 0\n\n[dim.grp]']]
+expect = "refused"
+
+[[case]]
+name = "no passes"
+replace = [['passes = 1', 'passes = 0']]
+expect = "refused"
+
+[[case]]
+name = "too many passes"
+replace = [['passes = 1', 'passes = 1001']]
+expect = "refused"
+
+[[case]]
+name = "passes as text"
+replace = [['passes = 1', 'passes = "1"']]
+expect = "refused"
+
+[[case]]
+name = "no margin"
+replace = [['[[state.w.rake.margin]]\ntarget = "people"\nslots = [{ count = "size", at = ["group"] }]', '']]
+expect = "refused"
+
+[[case]]
+name = "a margin with no slot"
+replace = [['slots = [{ count = "size", at = ["group"] }]', 'slots = []']]
+expect = "refused"
+
+[[case]]
+name = "a slot without at"
+replace = [['slots = [{ count = "size", at = ["group"] }]', 'slots = [{ count = "size" }]']]
+expect = "refused"
+
+[[case]]
+name = "at with one formula too many"
+replace = [['at = ["group"]', 'at = ["group", "group"]']]
+expect = "refused"
+
+[[case]]
+name = "a target without dimensions"
+replace = [['target = "people"', 'target = "scale"']]
+expect = "refused"
+
+[[case]]
+name = "a lever as target"
+replace = [['target = "people"', 'target = "dial"'], ['[var.scale]', '[lever.dial]\ntype = "real"\nunit = "person"\ndefault = 1.0\n\n[var.scale]']]
+expect = "refused"
+
+[[case]]
+name = "a target computed in a later phase"
+replace = [['target = "people"', 'target = "people_later"'], ['[var.scale]', '[var.people_later]\ntype = "real"\nunit = "person"\nphase = "two"\ndims = ["grp"]\nexpr = "people"\n\n[var.scale]']]
+expect = "refused"
+
+[[case]]
+name = "a count whose unit does not match the target's"
+replace = [['count = "size"', 'count = "1"']]
+expect = "refused"
+
+[[case]]
+name = "a real member"
+replace = [['at = ["group"]', 'at = ["group * 1.0"]']]
+expect = "refused"
+
+[[case]]
+name = "a member with a unit"
+replace = [['at = ["group"]', 'at = ["size"]']]
+expect = "refused"
+
+[[case]]
+name = "when that is not true or false"
+replace = [['when = "true"', 'when = "1"']]
+expect = "refused"
+
+[[case]]
+name = "a starting weight of zero"
+files = { "hh.csv" = "id,weight,group,size\n1,0,0,1\n2,20,0,2\n3,30,1,3\n4,40,1,1\n" }
+expect = "refused"
+
+# ---- run-time errors
+
+[[case]]
+name = "a negative count"
+replace = [['count = "size"', 'count = "-size"']]
+expect = "runtime"
+
+[[case]]
+name = "a member outside its dimension"
+replace = [['at = ["group"]', 'at = ["group + 1"]']]
+expect = "runtime"
+
+[[case]]
+name = "a negative target"
+files = { "people.csv" = "grp,value\na,60\nb,-1\n" }
+expect = "runtime"
+
+[[case]]
+name = "a next formula that gives a weight of zero"
+replace = [['[state.w.rake]\nwhen = "true"\npasses = 1\n\n[[state.w.rake.margin]]\ntarget = "people"\nslots = [{ count = "size", at = ["group"] }]', ''], ['initial = { column = "weight" }', 'initial = { column = "weight" }\nnext = "w - 10"']]
+expect = "runtime"

@@ -1,0 +1,338 @@
+# Every UK series the model uses, by ONS or Bank of England code. Money is £ million at
+# current prices unless the unit says otherwise. "basis" records seasonal adjustment as
+# published; annual figures are the same either way.
+
+# ------------------------------------------------------------- expenditure measure of GDP
+[series.gdp]
+dataset = "qna"
+code = "BKTL"
+unit = "GBP million"
+meaning = "Gross domestic product at market prices"
+basis = "NSA"
+
+[series.household_consumption]
+dataset = "qna"
+code = "ABJQ"
+unit = "GBP million"
+meaning = "Households' final consumption expenditure (S.14, P.31), national concept"
+basis = "SA"
+
+[series.npish_consumption]
+dataset = "qna"
+code = "HAYE"
+unit = "GBP million"
+meaning = "Non-profit institutions serving households: final consumption expenditure (S.15, P.31)"
+basis = "SA"
+
+[series.government_consumption]
+dataset = "qna"
+code = "NMRP"
+unit = "GBP million"
+meaning = "General government final consumption expenditure (P.3)"
+basis = "SA"
+
+[series.investment]
+dataset = "qna"
+code = "NPQS"
+unit = "GBP million"
+meaning = "Gross fixed capital formation, whole economy (P.51g)"
+basis = "SA"
+
+[series.inventories]
+dataset = "qna"
+code = "CAEX"
+unit = "GBP million"
+meaning = "Changes in inventories including alignment adjustment (P.52)"
+basis = "SA"
+
+[series.valuables]
+dataset = "qna"
+code = "NPJQ"
+unit = "GBP million"
+meaning = "Acquisitions less disposals of valuables (P.53)"
+basis = "SA"
+
+[series.exports]
+dataset = "qna"
+code = "IKBH"
+unit = "GBP million"
+meaning = "Exports of goods and services"
+basis = "SA"
+
+[series.imports]
+dataset = "qna"
+code = "IKBI"
+unit = "GBP million"
+meaning = "Imports of goods and services"
+basis = "SA"
+
+[series.gdp_statistical_discrepancy]
+dataset = "qna"
+code = "GIXM"
+unit = "GBP million"
+meaning = "Difference between GDP from expenditure and the average measure of GDP"
+basis = "SA"
+
+# ------------------------------------------------------------- households
+[series.compensation_of_employees]
+dataset = "ukea"
+code = "HAEA"
+unit = "GBP million"
+meaning = "Compensation of employees paid by UK employers (S.1, D.1, uses)"
+basis = "NSA"
+
+[series.household_disposable_income]
+dataset = "ukea"
+code = "QWND"
+unit = "GBP million"
+meaning = "Households and NPISH: gross disposable income (S.14+S.15, B.6g)"
+basis = "NSA"
+
+[series.household_saving_ratio]
+dataset = "ukea"
+code = "RVGL"
+unit = "percent"
+meaning = "Households and NPISH saving ratio"
+basis = "NSA"
+
+# ------------------------------------------------------------- sector net lending (B.9)
+[series.net_lending_households]
+dataset = "ukea"
+code = "RPZT"
+unit = "GBP million"
+meaning = "Households and NPISH (S.14+S.15): net lending (+) / net borrowing (-)"
+basis = "NSA"
+
+[series.net_lending_nonfinancial_corporations]
+dataset = "ukea"
+code = "EABO"
+unit = "GBP million"
+meaning = "Non-financial corporations (S.11): net lending / net borrowing"
+basis = "NSA"
+
+[series.net_lending_financial_corporations]
+dataset = "ukea"
+code = "NHCQ"
+unit = "GBP million"
+meaning = "Financial corporations (S.12): net lending / net borrowing"
+basis = "NSA"
+
+[series.net_lending_government]
+dataset = "ukea"
+code = "NNBK"
+unit = "GBP million"
+meaning = "General government (S.13): net lending / net borrowing"
+basis = "NSA"
+
+[series.net_lending_rest_of_world]
+dataset = "ukea"
+code = "NHRB"
+unit = "GBP million"
+meaning = "Rest of the world (S.2): net lending / net borrowing (the UK's current account with the sign reversed, plus capital transfers)"
+basis = "NSA"
+
+# ------------------------------------------------------------- labour market
+[series.unemployment_rate]
+dataset = "lms"
+code = "MGSX"
+unit = "percent"
+meaning = "Unemployment rate, aged 16 and over"
+basis = "SA"
+
+[series.employment]
+dataset = "lms"
+code = "MGRZ"
+unit = "thousand people"
+meaning = "People in employment, aged 16 and over"
+basis = "SA"
+
+[series.unemployed]
+dataset = "lms"
+code = "MGSC"
+unit = "thousand people"
+meaning = "Unemployed, aged 16 and over"
+basis = "SA"
+
+[series.employees]
+dataset = "lms"
+code = "MGRN"
+unit = "thousand people"
+meaning = "Employees, aged 16 and over"
+basis = "SA"
+
+[series.population_16_plus]
+dataset = "lms"
+code = "MGSL"
+unit = "thousand people"
+meaning = "Population aged 16 and over"
+basis = "NSA"
+
+[series.average_weekly_earnings]
+dataset = "lms"
+code = "KAB9"
+unit = "GBP a week"
+meaning = "Average weekly earnings, whole economy, total pay"
+basis = "SA"
+
+# ------------------------------------------------------------- public sector (excluding public sector banks)
+[series.ps_current_receipts]
+dataset = "pusf"
+code = "JW2O"
+unit = "GBP million"
+meaning = "Public sector current receipts"
+basis = "NSA"
+
+[series.ps_current_expenditure]
+dataset = "pusf"
+code = "JW2Q"
+unit = "GBP million"
+meaning = "Public sector current expenditure"
+basis = "NSA"
+
+[series.ps_depreciation]
+dataset = "pusf"
+code = "JW2S"
+unit = "GBP million"
+meaning = "Public sector depreciation (consumption of fixed capital)"
+basis = "NSA"
+
+[series.ps_net_investment]
+dataset = "pusf"
+code = "JW2Z"
+unit = "GBP million"
+meaning = "Public sector net investment, as published (negative is spending)"
+basis = "NSA"
+
+[series.ps_net_borrowing]
+dataset = "pusf"
+code = "J5II"
+unit = "GBP million"
+meaning = "Public sector net borrowing, as published (negative is borrowing)"
+basis = "NSA"
+
+[series.ps_net_debt]
+dataset = "pusf"
+code = "HF6W"
+unit = "GBP billion"
+meaning = "Public sector net debt, end of period"
+basis = "NSA"
+
+[series.ps_interest]
+dataset = "pusf"
+code = "JW2P"
+unit = "GBP million"
+meaning = "Public sector interest and dividends paid to the private sector and the rest of the world"
+basis = "NSA"
+
+[series.ps_social_benefits]
+dataset = "pusf"
+code = "ANLY"
+unit = "GBP million"
+meaning = "Public sector net social benefits (D.62)"
+basis = "NSA"
+
+[series.ps_subsidies]
+dataset = "pusf"
+code = "JSJ5"
+unit = "GBP million"
+meaning = "Public sector subsidies"
+basis = "NSA"
+
+[series.cg_staff_costs]
+dataset = "pusf"
+code = "NMBG"
+unit = "GBP million"
+meaning = "Central government staff costs (D.1)"
+basis = "NSA"
+
+[series.lg_staff_costs]
+dataset = "pusf"
+code = "NMJE"
+unit = "GBP million"
+meaning = "Local government staff costs (D.1)"
+basis = "NSA"
+
+[series.cg_procurement]
+dataset = "pusf"
+code = "MF76"
+unit = "GBP million"
+meaning = "Central government purchases of goods and services"
+basis = "NSA"
+
+[series.lg_procurement]
+dataset = "pusf"
+code = "MSE9"
+unit = "GBP million"
+meaning = "Local government purchases of goods and services"
+basis = "NSA"
+
+[series.income_tax]
+dataset = "pusf"
+code = "LIBR"
+unit = "GBP million"
+meaning = "Income tax and capital gains tax (central government receipts)"
+basis = "NSA"
+
+[series.social_contributions]
+dataset = "pusf"
+code = "AIIH"
+unit = "GBP million"
+meaning = "Compulsory social contributions (National Insurance)"
+basis = "NSA"
+
+[series.vat]
+dataset = "pusf"
+code = "NZGF"
+unit = "GBP million"
+meaning = "Value added tax receivable"
+basis = "NSA"
+
+[series.corporation_tax]
+dataset = "pusf"
+code = "LIBP"
+unit = "GBP million"
+meaning = "Other taxes on income, mainly corporation tax"
+basis = "NSA"
+
+[series.taxes_on_production]
+dataset = "pusf"
+code = "NMBY"
+unit = "GBP million"
+meaning = "Central government taxes on production, including VAT"
+basis = "NSA"
+
+[series.council_tax]
+dataset = "pusf"
+code = "NMHM"
+unit = "GBP million"
+meaning = "Council tax"
+basis = "NSA"
+
+# ------------------------------------------------------------- money
+[series.bank_rate]
+dataset = "bankrate"
+code = "IUMABEDR"
+unit = "percent"
+meaning = "Bank Rate, monthly average; annual and quarterly values are averages of the months"
+basis = "NSA"
+
+[series.gilt_yield_10y]
+dataset = "giltyield"
+code = "IUMAMNPY"
+unit = "percent"
+meaning = "Yield on 10 year gilts (nominal par yield), monthly average; annual and quarterly values are averages of the months"
+basis = "NSA"
+
+[series.gdp_real]
+dataset = "qna"
+code = "ABMI"
+unit = "GBP million"
+meaning = "Gross domestic product, chained volume measure (prices of the ONS reference year); for real growth"
+basis = "SA"
+
+[series.gdp_deflator]
+dataset = "qna"
+code = "YBGB"
+unit = "index"
+meaning = "Implied GDP deflator at market prices (last full year = 100); for the price level"
+basis = "SA"

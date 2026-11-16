@@ -1,0 +1,99 @@
+# Situations (docs/spec/06-model-format-1.md, stage S7.3): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/situations.rs).
+#
+# Each case appends `add` to the base model (\n stands for a line break), runs `steps`
+# steps and expects one of:
+#   ran      - every step runs; `series` gives, for each named value, its value after each
+#              step;
+#   refused  - loading or starting the model fails.
+#
+# In the base, `count` is 1 after the first step, 2 after the second, and so on: it is
+# updated in the first phase, and a situation, by default, in the last.
+
+base = """
+[model]
+id = "situations"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one", "two"]
+
+[state.count]
+type = "int"
+unit = "1"
+phase = "one"
+initial = 0
+next = "count + 1"
+
+[var.level]
+type = "real"
+unit = "1"
+phase = "two"
+expr = "count * 1.0"
+"""
+
+[[case]]
+name = "on while its start holds, without an end"
+add = '[situation.busy]\nlabel = "Busy"\nstart = "count >= 2 and count <= 3"'
+steps = 5
+expect = "ran"
+series = { busy = [false, true, true, false, false] }
+
+[[case]]
+name = "an end gives it a margin: on at 2, off only at 4"
+add = '[situation.busy]\nstart = "level >= 2.0 and level < 3.0"\nend = "level >= 4.0"'
+steps = 5
+expect = "ran"
+series = { busy = [false, true, true, false, false] }
+
+[[case]]
+name = "a good situation, read by a formula"
+add = '[situation.calm]\ngood = true\nstart = "count >= 3"\n\n[var.calm_shown]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "select(calm, 1.0, 0.0)"'
+steps = 5
+expect = "ran"
+series = { calm = [false, false, true, true, true], calm_shown = [0.0, 0.0, 0.0, 1.0, 1.0] }
+
+[[case]]
+name = "a situation updated in the first phase"
+add = '[situation.early]\nphase = "one"\nstart = "count >= 2"'
+steps = 4
+expect = "ran"
+series = { early = [false, false, true, true] }
+
+[[case]]
+name = "a start that is not true or false"
+add = '[situation.busy]\nstart = "count + 1"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "no start"
+add = '[situation.busy]\nend = "count > 2"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an unknown key"
+add = '[situation.busy]\nstart = "count > 2"\nstop = "count > 3"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "good that is not true or false"
+add = '[situation.busy]\nstart = "count > 2"\ngood = "yes"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a situation with the name of a state"
+add = '[situation.count]\nstart = "level > 2.0"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a situation with the name of a var"
+add = '[situation.level]\nstart = "count > 2"'
+steps = 1
+expect = "refused"

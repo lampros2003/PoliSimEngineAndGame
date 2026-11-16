@@ -1,0 +1,12 @@
+# Growth over the year in French (stage S7.4 text, stage S10.5 lags).
+[text]
+language = "fr"
+name = "Français"
+
+[element.yoy_gdp_a_year_before]
+label = "Production un an plus tôt"
+doc = "La production (PIB) douze mois plus tôt ; rien pendant la première année de la partie"
+
+[element.yoy_growth]
+label = "Croissance sur un an"
+doc = "De combien la production mensuelle de Valmora dépasse celle d'il y a douze mois ; 0 pendant la première année de la partie"

@@ -1,0 +1,81 @@
+# The smallest model with a budget: a state that taxes wages and pays pensions to the
+# retired. It exists to check that the game client builds its screens from any model's
+# catalogue, not from names it expects (tests/second_model.gd).
+
+[model]
+id = "mini"
+format = 0
+title = "Pensions island"
+currency = "EUR"
+minor_units = 100
+step = "month"
+phases = ["pay"]
+
+[sector.people]
+entity = "person"
+
+[sector.state]
+
+[instrument.euro]
+unit = "EUR"
+issuer = "state"
+
+[account.purse]
+label = "Savings"
+sector = "people"
+instrument = "euro"
+initial = { column = "savings0" }
+
+[account.treasury]
+label = "Treasury position"
+sector = "state"
+instrument = "euro"
+
+[entity.person]
+data = "data/people.csv"
+id = "id"
+weight = "weight"
+
+[entity.person.columns.earnings]
+type = "money"
+unit = "EUR/month/person"
+
+[entity.person.columns.retired]
+type = "bool"
+
+[lever.wage_tax]
+label = "Wage tax"
+doc = "Share of earnings paid in tax"
+type = "real"
+unit = "1"
+default = 0.25
+range = [0, 0.9]
+
+[lever.pension]
+label = "State pension"
+doc = "Paid each month to every retired person"
+type = "money"
+unit = "EUR/month/person"
+default = 900
+range = [0, 3000]
+
+[flow.wage_tax_paid]
+label = "Wage tax"
+from = "people"
+to = "state"
+phase = "pay"
+expr = "select(retired, 0, round(wage_tax * earnings))"
+
+[flow.pensions]
+label = "Pensions"
+from = "state"
+to = "people"
+phase = "pay"
+expr = "select(retired, pension, 0)"
+
+[var.state_balance]
+label = "State surplus"
+type = "money"
+unit = "EUR/month"
+phase = "pay"
+expr = "wsum(person, wage_tax_paid) - wsum(person, pensions)"
