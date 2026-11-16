@@ -14,7 +14,8 @@ signal searched(found: Array)
 signal picked(result: Dictionary)
 signal pointed(result: Dictionary)
 
-const KINDS := {"policy": "Policies", "statistic": "Statistics", "group": "Groups", "situation": "Situations", "add": "Not in force: add"}
+const KINDS := {"policy": "Policies", "statistic": "Statistics", "group": "Groups", "situation": "Situations", "add": "Not in force: add",
+	"shelf": "Not on the board"}
 const SHOWN := 10
 
 ## Every thing to find: {key, kind, label, icon, node, words: [label, also, name, doc] lowercased}.

@@ -98,9 +98,9 @@ issues_at_election = "issue_at_election"
 #   a policy's `levels = ["...", ...]`  the names of a level policy's settings, in order from
 #                                  the lever's minimum: chosen by name, never as a number
 #   a policy's `off = <value>`     the setting (as typed: pounds for money) at which it is
-#                                  not in force: off the board, offered by the area's
-#                                  "introduce a policy" node, and "Repeal" when in force
-#   a policy's `line = "..."`      one line on what it does, in the area's introduce list
+#                                  not in force: off the board, offered on the Add policy
+#                                  sheet (stage S15.1), and "Repeal" when in force
+#   a policy's `line = "..."`      one line on what it does, on the Add policy sheet
 #   `unit` on a policy or an indicator, how its value reads: "years" (an age, a life:
 #                                  "18 years"), "year" (a calendar year: "2030"), "multiple"
 #                                  (of 2024's rates: "as now", "+20%"), "pence" ("52.95p"),
@@ -114,6 +114,20 @@ issues_at_election = "issue_at_election"
 #                                  which it is red (mustard between); 0.38 and 0.28 if absent
 #   an indicator's `better`        also its colour: "high" a good thing (green), "low" a bad
 #                                  thing (red), none neither (blue)
+#
+# Stage S15: search, situations on their nodes, stances, the shelf.
+#   `also = ["...", ...]`          on any policy, indicator or group: more words search finds
+#                                  it by; [play.web] `also = { name = [...] }` for anything else
+#   situations = { situation = row }  the statistic each situation belongs to: its node wears
+#                                  the situation's flag and is lit from its pennant
+#   stances = [{ row, label, low, high, low_group, high_group }]
+#                                  Parliament's scales of where the government stands, the
+#                                  belief groups (by key) at their ends
+#   places = [{ label, row, share, note }]  Parliament's table of the country by place
+#   shelf = [{ row, see }]         statistics off the board: found by search, and linked
+#                                  under "See also" from the popup of `see` (a row on the board)
+#   [play] `labels` by a policy's key  a shorter name for it on the board (its popup keeps
+#                                  the whole name)
 #
 # Icons are file names in client/icons (game-icons.net, credited in client/icons/CREDITS.md).
 [play.web]
@@ -172,6 +186,19 @@ stances = [
   { row = "stance_order", label = "Liberty against order", low = "Liberty", high = "Order", low_group = "liberals", high_group = "conservatives" },
   { row = "stance_green", label = "Green", low = "Less green", high = "Greener", high_group = "environmentalists" },
   { row = "stance_nation", label = "The nation", low = "The world", high = "The nation", high_group = "patriots" },
+]
+# Stage S15.5: the statistics that left the board in S15.2, still found by search and linked
+# from the statistic that stands for them.
+shelf = [
+  { row = "net_income_average", see = "median_income" },
+  { row = "workforce_jobs", see = "unemployment_rate" },
+  { row = "working_age_poverty_rate", see = "poverty_rate" },
+  { row = "exports", see = "trade_balance" },
+  { row = "imports", see = "trade_balance" },
+  { row = "public_receipts", see = "tax_burden" },
+  { row = "dwellings", see = "homes_built" },
+  { row = "treatments", see = "waiting_list" },
+  { row = "household_emissions", see = "emissions" },
 ]
 places = [
   { label = "Scotland", row = "approval_scotland", share = "share_scotland" },

@@ -25,7 +25,7 @@ func build(board: Web) -> void:
 		_families_word(board), roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0),
 		" Groups of belief answer to where the government stands, not how they are doing: Parliament shows the stances." if not board.play_web.get("stances", []).is_empty() else ""])
 	_row(grid, _links(), "Links", "Point at a node for what it moves, or what moves it, in a year. Green: good for what it reaches; red: bad; blue: neither can be said; grey: not yet measured. Thicker is stronger; + it rises, − it falls.")
-	_row(grid, _flags(), "Situations", "On the strip under the top bar, and as a small flag on the statistic that set it off: green good, red bad, blue neither; ochre, a question waiting for your answer. Click one to light its statistic and see why.")
+	_row(grid, _flags(), "Situations", "On the strip under the top bar, and as a small flag on the statistic that set it off: green a good situation, red a bad one; blue an answer you gave, in force; ochre, a question waiting for your answer. Click one to light its statistic and see why.")
 	var last := Label.new()
 	last.text = "A bigger node matters more. At the centre: approval, the months to the election and your political capital."
 	last.theme_type_variation = "Muted"

@@ -38,21 +38,23 @@ const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
 ## Stage S14.1: the strip under the top bar (situations, the one-line notices).
 const STRIP_HEIGHT := Strip.HEIGHT
-const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
+const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs in families, each arc's outer edge a gauge of how many of them back you; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
 
 [b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote. "In a year" shows what the change would do.
 
-[b]New policies[/b]: an area's plus sign lists its policies not in force. Choose one, pick a setting, see what it would do in a year, and put it to the Commons; it waits on the board, faint, until the vote. A policy that can be ended has Repeal in its popup.
+[b]New policies[/b]: Add policy on the top bar (or A) lists the policies not in force, area by area, with what each would cost, how the Commons would vote and who would cheer and who would boo. Choose one: its popup opens at its first step; see what it would do in a year, and put it to the Commons. It waits on the board, faint, until the vote. A policy that can be ended has Repeal in its popup.
 
-[b]See why[/b]: click an indicator for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most.
+[b]Find anything[/b] with the search field on the top bar (/ or Ctrl+F): policies, statistics, groups, situations, policies not in force, and the statistics kept off the board. The board dims to what matches; Enter opens the first; the arrows move between them.
 
-[b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers.
+[b]See why[/b]: click an indicator for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most; "See also" opens the statistics behind it that are not on the board.
 
-[b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
+[b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers; a situation also flags the statistic that set it off, and clicking its pennant lights that statistic and says why.
+
+[b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). Parliament shows the parties, where the government stands on four scales (the state against the market, liberty against order, green, the nation) with the groups of belief at their ends, and the country by group and by place. The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
 
 [b]After each month[/b] a line under the date says what moved. When the month brought something to tell (a bill passed, voted down or refused, a situation begun or ended, an election, a question answered) the month's report opens over the board: click a line to open it; click the date to see it again.
 
-[b]Keys[/b]: Space or Enter, next month; Esc closes the popup, then the report, then the sheet; B, The Budget; P, Parliament; K, the key.
+[b]Keys[/b]: Space or Enter, next month; A, Add policy; / or Ctrl+F, search; Esc clears the search, then closes the popup, the report, the sheet; B, The Budget; P, Parliament; K, the key.
 
 [color=#55606c]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
 
@@ -711,7 +713,7 @@ func guide_steps() -> Array:
 	var policy: String = first.call("policy")
 	if policy != "":
 		steps.append({"title": "Your policies", "target": func() -> Rect2: return _node_rect(policy),
-			"text": "Round the edge are your policies. Point at one to see what it moves; click it to change it."})
+			"text": "Round the edge are your policies. Point at one to see what it moves; click it to change it. Add policy, on the top bar, lists the ones not yet in force."})
 	var indicator: String = first.call("indicator")
 	if indicator != "":
 		steps.append({"title": "The country", "target": func() -> Rect2: return _node_rect(indicator),
@@ -719,7 +721,7 @@ func guide_steps() -> Array:
 	var group: String = first.call("group")
 	if group != "":
 		steps.append({"title": "The people", "target": func() -> Rect2: return _node_rect(group),
-			"text": "Round the middle are groups of voters, each with how many of them back you. Click one to meet some of their households."})
+			"text": "Round the middle are groups of voters in families, each arc's outer edge showing how many of them back you. Click one to see what moves them; some answer to where the government stands, which Parliament shows."})
 	steps.append({"title": "Next month", "target": func() -> Rect2: return _advance[0].get_global_rect(),
 		"text": "When you are ready, press Next month (or Space). Your changes take effect, and a short report says what happened."})
 	return steps
@@ -1159,6 +1161,17 @@ func _build_index() -> void:
 		items.append(_index_item(key, kind, n, also, key))
 	for key in board.available:
 		items.append(_index_item(key, "add", board.available[key], also, ""))
+	# Stage S15.5: the statistics kept off the board ([play.web] `shelf`), opened as any value's.
+	for item in play.get("web", {}).get("shelf", []):
+		var row := str(item.get("row", ""))
+		var entry: Dictionary = rows.get(row, {})
+		if entry.is_empty():
+			continue
+		var see: String = "indicator:" + str(item.get("see", ""))
+		var label := _key_label(row)
+		items.append({"key": "entry:" + str(entry["name"]), "kind": "shelf", "label": label, "row": row,
+			"icon": board.nodes[see]["icon"] if board.nodes.has(see) else Palette.icon("indicator"), "node": see if board.nodes.has(see) else "",
+			"words": [label, " ".join(also.get(row, [])), str(entry.get("label", "")) + " " + str(entry["name"]).replace("_", " "), str(entry.get("doc", ""))]})
 	for entry in situations:
 		var name := str(entry["name"])
 		var on_node: String = _situation_nodes.get(name, "")
@@ -1230,6 +1243,8 @@ func _open_result(result: Dictionary) -> void:
 			open_situation(key.trim_prefix("situation:"))
 		"add":
 			open_add_policy(key)
+		"shelf":
+			open_indicator(key.trim_prefix("entry:"), str(result.get("row", "")))
 		_:
 			board.light(key)
 			open_node(key)
@@ -1310,8 +1325,18 @@ func _entry_content(name: String, row_key: String, key := "") -> Control:
 	for m in found:
 		movers.append([m[0], board.nodes[m[0]]["label"], m[1], m[2]])
 	var icon: Texture2D = node.get("icon", Palette.icon("indicator"))
+	# Stage S15.5: a statistic off the board takes the pictogram of the one that stands for it.
+	for item in play.get("web", {}).get("shelf", []):
+		if node.is_empty() and str(item.get("row", "")) == row_key.trim_prefix("-") and board.nodes.has("indicator:" + str(item.get("see", ""))):
+			icon = board.nodes["indicator:" + str(item["see"])]["icon"]
 	card.build(name, row_key, entry, label, str(node.get("area", "")), icon, entries, play, _breakdowns_of(name), compare, movers)
 	card.follow.connect(func(target: String) -> void: _follow(target))
+	# Stage S15.5: the statistics off the board that this one stands for.
+	var see_also := []
+	for item in play.get("web", {}).get("shelf", []):
+		if str(item.get("see", "")) == row_key.trim_prefix("-") and rows.has(str(item.get("row", ""))):
+			see_also.append([_key_label(str(item["row"])), str(rows[str(item["row"])]["name"])])
+	card.set_see_also(see_also)
 	if card.trace == null:
 		return card  # stage S15.1: a situation's popup has no trace
 	card.trace.trail = PackedStringArray([name])

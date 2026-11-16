@@ -85,6 +85,35 @@ func _initialize() -> void:
 	await process_frame
 	if main.search.text != "" or board.searching or main.search.has_focus():
 		return _fail("Esc did not clear the search")
+	# Stage S15.5: a statistic off the board: found, opened with its breakdown; and linked from
+	# the one that stands for it.
+	var shelf := "nothing on the shelf"
+	if not main.play.get("web", {}).get("shelf", []).is_empty():
+		found = main.search_for("household income")
+		var hit: Array = found.filter(func(r): return r["kind"] == "shelf" and str(r["key"]) == "entry:net_income_average")
+		if hit.is_empty():
+			return _fail("household income: %s" % [found.map(func(r): return r["key"])])
+		main._open_result(hit[0])
+		await _settle()
+		var shelf_card = main.indicator_card()
+		if shelf_card == null or shelf_card.name_shown != "net_income_average" or shelf_card.breakdown == null or not shelf_card.breakdown.find_children("*", "", true, false).any(func(c): return c.get("text") != null and str(c.text).contains("decile")):
+			return _fail("household income's popup: %s" % [shelf_card.name_shown if shelf_card != null else main.popup_kind()])
+		main.close_popup()
+		main.search.clear_search()
+		await _settle()
+		main.open_node("indicator:median_income")
+		await _settle()
+		var median = main.indicator_card()
+		if median == null or not median.see_also.has("Household income"):
+			return _fail("Median income's See also: %s" % [median.see_also if median != null else "no popup"])
+		var link: Button = median.find_child("see_net_income_average", true, false)
+		link.pressed.emit()
+		await _settle()
+		if main.indicator_card() == null or main.indicator_card().name_shown != "net_income_average":
+			return _fail("See also did not open Household income")
+		main.close_popup()
+		await _settle()
+		shelf = "'household income' found off the board, its popup with the breakdown by income tenth; Median income's See also opens it"
 	# A pennant lights its node and opens the situation beside it, set off by its statistic.
 	main.strip.flag_pressed.emit({"key": "situation_strong_growth", "name": "strong_growth", "tone": "good", "text": "Strong growth"})
 	await _settle()
@@ -102,7 +131,7 @@ func _initialize() -> void:
 	if not board.node_flags.get(growth, []).has("good"):
 		return _fail("strong growth in force does not flag %s: %s" % [growth, board.node_flags])
 	print("add and search: no New policy node; A opens the sheet, %d policies to add in %d areas, each area's exact; %s chosen opens at its first step, waits as a ghost, then %s; '/' then 'strong growth' finds the situation and lights %s; 'fuel' finds Fuel duty and Enter opens it; Esc clears; a pennant lights its node, set off by %s; a situation in force flags its node" % [
-		offered, board.areas.size(), key, fate[0], growth, set_off])
+		offered, board.areas.size(), key, fate[0], growth, set_off + "; " + shelf])
 	while main.effects_running:
 		await process_frame
 	quit(0)

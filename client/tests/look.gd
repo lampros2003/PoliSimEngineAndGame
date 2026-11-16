@@ -103,6 +103,8 @@ func _initialize() -> void:
 			main.open_add_policy("" if str(args["add"]) == "1" else str(args["add"]))
 	if args.has("search"):
 		main.search_for(str(args["search"]).replace("+", " "))
+		if args.has("pick"):  # stage S15.5: --pick=N opens the Nth match (from 0)
+			main._open_result(main.search.found[int(args["pick"])])
 	if args.has("situation"):
 		main.open_situation(str(args["situation"]))
 	# Stage S14.1: --key=1 shows the key.

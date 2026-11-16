@@ -85,6 +85,9 @@ func _dump_breakdowns(shown: PackedStringArray, month: int) -> void:
 		main.open_indicator(total)
 		await _settle()
 		var panel = main.indicator_card().breakdown if main.indicator_card() != null else null
+		# Stage S15.5: "Who gains, who loses" opens when its heading is pressed, as a player does.
+		if panel != null and panel.get_parent().has_meta("fold"):
+			(panel.get_parent().get_meta("fold") as Callable).call(true)
 		if panel == null or not panel.visible:
 			push_error("the popup of %s shows no breakdowns" % total)
 			return

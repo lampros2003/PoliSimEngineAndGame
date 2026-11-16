@@ -114,8 +114,10 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	if not breakdowns.is_empty():
 		breakdown = BreakdownPanel.new()
 		breakdown.fmt = fmt
-		add_child(Palette.fold("Who gains, who loses", breakdown))
+		var fold := Palette.fold("Who gains, who loses", breakdown)
+		add_child(fold)
 		breakdown.build(play, entries, breakdowns)
+		(fold.get_meta("fold") as Callable).call(false)  # build shows the panel: shut again
 	if not movers.is_empty():
 		_movers = VBoxContainer.new()
 		_movers.add_theme_constant_override("separation", 2)
@@ -185,6 +187,35 @@ func set_off_by(words: String, key: String) -> void:
 	add_child(line)
 	move_child(line, 2)
 	set_off_text = words
+
+
+## Stage S15.5: "See also": the statistics off the board this one stands for, each a link
+## (`items` [[label, entry name]]).
+func set_see_also(items: Array) -> void:
+	see_also = items.map(func(i): return str(i[0]))
+	if items.is_empty():
+		return
+	var line := HBoxContainer.new()
+	line.name = "see_also"
+	line.add_theme_constant_override("separation", 8)
+	var caps := Palette.caps("See also")
+	caps.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(caps)
+	for item in items:
+		var link := Button.new()
+		link.name = "see_" + str(item[1])
+		link.text = str(item[0])
+		link.theme_type_variation = "Link"
+		link.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
+		var target := str(item[1])
+		link.pressed.connect(func() -> void: follow.emit(target))
+		line.add_child(link)
+	add_child(line)
+	move_child(line, mini(3, get_child_count() - 1))
+
+
+## For the checks: the labels "See also" lists.
+var see_also: Array = []
 
 
 ## For the checks: the "Set off by" line's words, or "".
