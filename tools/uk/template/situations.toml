@@ -184,3 +184,16 @@ label = "Homelessness rising"
 doc = "More than 5% more households in temporary accommodation than on 30 September 2024 (126,040 in England); stage S14.5"
 start = "homelessness > 1.05 * temporary_accommodation_2024"
 end = "homelessness < 1.03 * temporary_accommodation_2024"
+
+# Stage S15.2: strikes and rents (statistics.toml).
+[situation.strike_wave]
+label = "A wave of strikes"
+doc = "More than twice 2024's working days lost to strikes, at an annual rate"
+start = "strike_days > 2.0 * strike_days_2024"
+end = "strike_days < 1.5 * strike_days_2024"
+
+[situation.rents_soaring]
+label = "Rents soaring"
+doc = "Private rents rising more than 7% a year"
+start = "rent_growth > 0.07"
+end = "rent_growth < 0.05"

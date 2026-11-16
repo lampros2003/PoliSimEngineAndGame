@@ -97,7 +97,10 @@ func _initialize() -> void:
 	# Stage S15.1: --add=1 (or --add=KEY) the Add policy sheet; --search=WORDS the search
 	# with its results; --situation=NAME a situation's popup on its lit node.
 	if args.has("add"):
-		main.open_add_policy("" if str(args["add"]) == "1" else str(args["add"]))
+		if str(args["add"]).begins_with("area:"):
+			main.open_introduce(str(args["add"]).trim_prefix("area:").replace("+", " "))
+		else:
+			main.open_add_policy("" if str(args["add"]) == "1" else str(args["add"]))
 	if args.has("search"):
 		main.search_for(str(args["search"]).replace("+", " "))
 	if args.has("situation"):

@@ -1,0 +1,140 @@
+"""Stances, and what the groups of stage S15.2 react to (docs/S15-PLAN.md, Groups).
+
+Written into models/uk/beliefs.toml by tools/uk/calibrate.py, after the files that declare
+the levers. Four stances are worked out each month from the policies' settings against their
+2024 settings: the state against the market, liberty against order, green, and the nation.
+Each tagged lever adds weight x (setting - 2024's) / step, where a step is what counts as one
+clear move of that policy (five points of a tax rate, a tenth of a spending line, a level). A
+stance is so the number of clear moves made toward it, net. The belief groups react to their
+stance through government_standing, by membership; the groups of work and place react to
+what they are about. Everything is nil at the 2024 settings.
+"""
+
+from __future__ import annotations
+
+import tomllib
+from pathlib import Path
+
+# lever: (step, {stance: weight}). A step of ("x", f) is f times the lever's 2024 setting.
+TEN = ("x", 0.1)
+STANCES = {
+    # the state (+) against the market (-)
+    "basic_rate": (0.05, {"state": 1.0}), "higher_rate": (0.05, {"state": 0.5}), "additional_rate": (0.05, {"state": 0.5}),
+    "ni_main_rate": (0.02, {"state": 0.7}), "corporation_tax_rate": (0.05, {"state": 1.0}), "vat_rate": (0.05, {"state": 0.5}),
+    "spending_health": (TEN, {"state": 1.0}), "spending_education": (TEN, {"state": 1.0}),
+    "spending_social_care": (TEN, {"state": 0.5}), "spending_general": (TEN, {"state": 0.3}),
+    "spending_environment_housing": (TEN, {"state": 0.3, "green": 0.3}), "spending_transport": (TEN, {"state": 0.3}),
+    "spending_culture": (TEN, {"state": 0.2}), "public_investment_bill": (TEN, {"state": 1.0}),
+    "subsidies_bill": (TEN, {"state": 0.3}), "benefits_bill": (TEN, {"state": 1.0}), "uc_single": (TEN, {"state": 0.7}),
+    "child_benefit_eldest": (TEN, {"state": 0.3}), "social_housing": (100_000_000, {"state": 1.0}),
+    "rent_controls": (1, {"state": 1.0}), "free_school_meals": (1, {"state": 0.5}),
+    "tuition_fee_cap": (3000, {"state": -0.5}), "prescription_charge": (5.0, {"state": -0.3}),
+    "winter_fuel_payment": (1, {"state": 0.5}), "planning_rules": (1, {"state": -0.3}),
+    "net_wealth_tax": (0.01, {"state": 1.5}), "rail_ownership": (1, {"state": 1.5}),
+    "rd_grants": (100_000_000, {"state": 0.3}), "energy_bill_help": (200, {"state": 0.5}),
+    "free_childcare": (1, {"state": 0.7}), "farm_support": (100_000_000, {"state": 0.3, "nation": 0.3}),
+    "public_pay_settlement": (0.02, {"state": 0.7}),
+    "trade_union_law": (1, {"state": -1.0, "order": 0.5}), "strike_limits": (1, {"state": -0.5, "order": 0.7}),
+    # liberty (-) against order (+)
+    "sentencing": (1, {"order": 1.0}), "drinking_age": (1, {"order": 0.5}), "cannabis_law": (1, {"order": -1.0}),
+    "spending_public_order": (TEN, {"order": 0.7}), "visa_threshold": (5000.0, {"order": 0.5, "nation": 0.7}),
+    "identity_cards": (1, {"order": 1.5, "nation": 0.5}),
+    # green
+    "carbon_price": (25, {"green": 1.0}), "fuel_duty": (5.0, {"green": 0.5}), "petrol_ban_year": (2, {"green": -1.0}),
+    "ev_grant": (1000, {"green": 0.5}), "insulation_programme": (100_000_000, {"green": 0.7}),
+    "bus_fare_cap": (1.0, {"green": -0.3}), "onshore_wind": (100_000_000, {"green": 1.0}),
+    "congestion_charge": (5.0, {"green": 0.7}),
+    # the nation
+    "trade_barrier_eu": (0.05, {"nation": 0.4}), "trade_barrier_united_states": (0.05, {"nation": 0.4}),
+    "trade_barrier_china": (0.05, {"nation": 0.4}), "trade_barrier_rest_of_world": (0.05, {"nation": 0.4}),
+    "transfers_abroad_bill": (TEN, {"nation": -0.7}), "spending_defence": (TEN, {"nation": 0.7}),
+}
+NAMES = {"state": ("The state against the market", "positive toward the state, negative toward the market"),
+         "order": ("Liberty against order", "positive toward order, negative toward liberty"),
+         "green": ("Green", "positive greener, negative less green"),
+         "nation": ("The nation", "positive toward the nation, negative toward the world")}
+
+# Utility a voter type gains, per clear move of a stance, times its membership over the group's
+# share of adults: (group, sign).
+BELIEF_EFFECT = 0.2
+SATURATION = 1.0  # a stance's pull approaches this many clear moves and no more
+REACTIONS = {"state": [("socialists", 1.0), ("capitalists", -1.0)],
+             "order": [("conservatives", 1.0), ("liberals", -1.0)],
+             "green": [("environmentalists", 1.0), ("motorists", -1.0)],
+             "nation": [("patriots", 1.0), ("liberals", -1.0)]}
+
+
+def levers(out_dir: Path) -> dict[str, dict]:
+    found = {}
+    for path in sorted(out_dir.glob("*.toml")):
+        if path.name == "beliefs.toml":
+            continue
+        found.update(tomllib.loads(path.read_text(encoding="utf-8")).get("lever", {}))
+    return found
+
+
+def write(out_dir: Path) -> str:
+    specs = levers(out_dir)
+    out = ['# Stances and what the groups of stage S15.2 react to. GENERATED by tools/uk/beliefs.py',
+           '# (called by tools/uk/calibrate.py); do not edit. models/uk/politics/README.md, "Beliefs,',
+           '# work and places", says what each term is and why.', '']
+    terms = {k: [] for k in NAMES}
+    for lever, (step, weights) in STANCES.items():
+        spec = specs[lever]
+        kind = spec["type"]
+        default = spec["default"]
+        size = default * step[1] if isinstance(step, tuple) else step
+        if kind == "money":
+            size = round(size)
+        elif kind == "int":
+            size = int(size)
+        for name, value in (("base", default), ("step", size)):
+            out += [f"[param.stance_{name}_{lever}]", f'type = "{kind}"', f'unit = "{spec["unit"]}"',
+                    f"value = {value!r}", ""]
+        for stance, w in weights.items():
+            terms[stance].append(f"{w!r} * ({lever} - stance_base_{lever}) / stance_step_{lever}")
+    for stance, (label, sense) in NAMES.items():
+        out += [f"[var.stance_{stance}]", f'label = "Stance: {label}"',
+                f'doc = "Clear moves of policy since 2024, net, {sense}"', 'type = "real"', 'unit = "1"',
+                'phase = "politics"', f'expr = "{" + ".join(terms[stance])}"', ""]
+    # Each group's membership over its share of all adults: above one where the group is
+    # over-represented, so a stance pleases the types where its friends are many and its
+    # opponents few, and the country as a whole hardly moves.
+    # A stance's pull saturates at SATURATION clear moves (S s / (S + |s|)). Each side is counted by
+    # its membership over its share of adults, whose mean over the electorate is one, so the
+    # electorate's mean reaction to any stance move is nil: a stance moves support from one side
+    # to the other and hands out no votes of its own.
+    pull = {s: f"({SATURATION!r} * stance_{s} / ({SATURATION!r} + abs(stance_{s})))" for s in REACTIONS}
+    belief = " + ".join(f"{pull[s]} * ({' + '.join(f'{w!r} * group_member[group: {g}] / group_share[group: {g}]' for g, w in groups)})"
+                        for s, groups in REACTIONS.items())
+    out += [
+        "[param.belief_effect]",
+        'doc = "Utility a voter of a belief group gains for each clear move of policy toward its stance (a judgement, sized so a clear move of two policies shifts the group two to five points and the country under one)"',
+        'type = "real"', 'unit = "1"', f"value = {BELIEF_EFFECT!r}", "",
+        # Groups of work and place, each reading what it is about, nil at the defaults.
+        "[param.public_pay_2024]", 'doc = "The public pay bill in 2024, a month"', 'type = "money"',
+        'unit = "GBP/month"', "value = {{public_pay_2024}}", "",
+        "[var.belief_standing]",
+        'label = "Where the government stands"',
+        'doc = "Belief groups: belief_effect times the stances, by membership. Town and countryside, each by membership less its share of adults so the mean over the electorate is nil: fuel duty (countryside -0.004 a penny above 2024, towns +0.001), cheaper buses (towns +0.01 a pound off the cap), planning (each step liberal: towns +0.005, countryside -0.008), roads and railways (towns +0.05, countryside +0.02 a unit). Judgements, nil at the 2024 settings"',
+        'type = "real"', 'unit = "1"', 'phase = "politics"', 'dims = ["voter_type"]',
+        'expr = "belief_effect * (' + belief + ')'
+        ' + (0.001 * (group_member[group: town] - group_share[group: town]) - 0.004 * (group_member[group: countryside] - group_share[group: countryside])) * (fuel_duty - fuel_duty_2024) / fuel_penny'
+        ' + 0.01 * (group_member[group: town] - group_share[group: town]) * (bus_fare_cap_2024 - bus_fare_cap) / bus_pound'
+        ' + (0.005 * (group_member[group: town] - group_share[group: town]) - 0.008 * (group_member[group: countryside] - group_share[group: countryside])) * (planning_rules - 2)'
+        ' + (0.05 * (group_member[group: town] - group_share[group: town]) + 0.02 * (group_member[group: countryside] - group_share[group: countryside])) * (spending_transport / spending_transport_2024 - 1.0)"', "",
+        "[var.voter_conditions]",
+        'label = "What the new groups of work and place feel of their conditions"',
+        'doc = "Public sector workers: public pay against prices (0.5 a unit) and the public pay bill, which sets their jobs (0.2 a unit); trade unionists 0.3 and 0.1; farmers: farm incomes (0.05 a unit); each times the membership of the group over its share of adults, so the types where it is over-represented feel it. Renters: real rents (-0.2 a unit); home owners: real house prices (+0.1 a unit); motorists: congestion (-0.05 a unit); low incomes and pensioners: energy bills (-0.1 a unit); everyone: strikes (-0.005 for each multiple of the 2024 level). Judgements, each against 2024 and so nil in the base month; a fundamental like jobs and prices, not a reaction to a decision"',
+        'type = "real"', 'unit = "1"', 'phase = "politics"', 'dims = ["voter_type"]',
+        'expr = "group_member[group: public_sector] / group_share[group: public_sector] * (0.5 * (public_real_pay - 1.0)'
+        ' + 0.2 * (public_pay_bill / public_pay_2024 - 1.0)) + group_member[group: trade_unionists] / group_share[group: trade_unionists] * (0.3 * (public_real_pay - 1.0)'
+        ' + 0.1 * (public_pay_bill / public_pay_2024 - 1.0)) + 0.05 * group_member[group: farmers] / group_share[group: farmers] * (farm_income_change)'
+        ' - 0.2 * group_member[group: renters] * (real_rents - 1.0)'
+        ' + 0.1 * group_member[group: home_owners] * (house_price_change)'
+        ' - 0.05 * group_member[group: motorists] * (congestion / congestion_2024 - 1.0)'
+        ' - 0.1 * (group_member[group: low_income] + group_member[group: pensioner]) * (energy_bill_change)'
+        ' - 0.005 * (strike_days / strike_days_2024 - 1.0)"', "",
+        "[param.bus_pound]", 'type = "money"', 'unit = "GBP/journey"', "value = 1", "",
+    ]
+    return "\n".join(out) + "\n"

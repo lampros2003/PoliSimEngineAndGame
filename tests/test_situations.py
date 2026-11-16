@@ -30,7 +30,9 @@ class UnitedKingdom(unittest.TestCase):
                                  # Stage S13.8: the public finances.
                                  "lenders_confidence",
                                  # Stage S14.5: homelessness.
-                                 "homelessness_rising"])
+                                 "homelessness_rising",
+                                 # Stage S15.2: strikes and rents.
+                                 "strike_wave", "rents_soaring"])
         scenario.commands = {1: {d.name: d.spec["default"] * 3 // 4 for d in scenario.model.symbols.values()
                                  if d.kind == "lever" and d.name.startswith("spending_")}}
         sim = from_scenario(scenario)

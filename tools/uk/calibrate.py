@@ -497,7 +497,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     (out_dir / "calibration.toml").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     detail = (("population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml",
                "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml",
-               "finances.toml", "labour.toml", "statistics.toml")
+               "finances.toml", "labour.toml", "statistics.toml", "beliefs.toml")
               if people else ())
     files = ["calibration.toml", "economy.toml", *detail]
     fills = {**write_population(out_dir, a), **write_industries(out_dir)} if people else {}
@@ -536,7 +536,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         (out_dir / "emissions.toml").write_text(emissions.write(out_dir), encoding="utf-8", newline="\n")
         import nhs
         (out_dir / "nhs.toml").write_text(nhs.write(), encoding="utf-8", newline="\n")
-    fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income)" if people
+    fills["income_tax_expr"] = ("round(income_tax_total + other_income_tax_rate * other_income) + policy_household_taxes" if people
                                 else "round(income_tax_rate * (wages + public_pay + benefits + other_income))")
     fills["nics_expr"] = ("round(ni_scale * (employee_ni_total + employer_ni_total))" if people
                           else "round(nics_rate * (wages + public_pay))")
@@ -563,7 +563,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     # Stage S14.5: interest rates reach the Treasury, households and firms (finances.toml);
     # each term is nil at the base month's rates, and none is in the hindcast model.
     rates = {"reserves_interest": " + reserves_interest", "mortgage_income": " - mortgage_interest_rise + mortgage_interest_fall",
-             "investment_rates": " * investment_rate_factor", "firm_interest": " + firm_interest_rise - firm_interest_fall"}
+             "investment_rates": " * investment_rate_factor * confidence_factor", "firm_interest": " + firm_interest_rise - firm_interest_fall"}
     fills.update({k: (val if people else "") for k, val in rates.items()})
     # Stage S14.5: firms hoard labour and long unemployment raises the natural rate for a time
     # (labour.toml); the hindcast model keeps the plain hiring speed and natural rate.
@@ -585,6 +585,11 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
     fills["productivity_pay"] = " + productivity_change" if people else ""
     fills["business_investment_2024"] = monthly(v.business_investment)
     fills["public_investment_2024"] = monthly(v.public_investment)
+    # Stage S15.2: public sector pay policy (policies.toml) and roads and railways' 2024 setting.
+    fills["public_pay_policy"] = " * public_pay_level" if people else ""
+    if people:
+        functions_toml = tomllib.loads((out_dir / "functions.toml").read_text(encoding="utf-8"))
+        fills["spending_transport_2024"] = str(functions_toml["lever"]["spending_transport"]["default"])
     fills["wage_gap"] = ("curve(natural_unemployment_now - unemployment_rate, wage_shape)" if people
                          else "(natural_unemployment - unemployment_rate)")
     if people:
@@ -593,7 +598,7 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         fills["benefits_expr"] += " + policy_benefits"
     for name in ("model.toml", "economy.toml",
                  *(d for d in detail if d not in ("households.toml", "politics.toml", "trade.toml", "functions.toml",
-                                                  "emissions.toml", "nhs.toml"))):
+                                                  "emissions.toml", "nhs.toml", "beliefs.toml"))):
         text = (HERE / "template" / name).read_text(encoding="utf-8")
         for k, val in opening.items():
             text = text.replace("{{opening.%s}}" % k, str(val))
@@ -604,6 +609,10 @@ def write_model(year: str, out_dir: Path, data: dict | None = None, a: dict | No
         if "{{" in text.replace("{{double braces}}", ""):
             raise SystemExit(f"{name}: a placeholder was not filled")
         (out_dir / name).write_text(text, encoding="utf-8", newline="\n")
+    if people:  # stage S15.2: the stances and the new groups' reactions, from every lever written above
+        import beliefs
+        (out_dir / "beliefs.toml").write_text(beliefs.write(out_dir).replace("{{public_pay_2024}}", str(monthly(v.public_pay))),
+                                              encoding="utf-8", newline="\n")
     return v
 
 

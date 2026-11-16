@@ -85,7 +85,21 @@ STRATEGIES: dict[str, tuple[str, int, list]] = {
         ("Dec 2027", "spending_health", ("x", 1.03)), ("Jan 2029", "free_school_meals", 2),
         ("Mar 2029", "spending_health", ("x", 1.03 ** 2)), ("May 2029", "spending_health", ("x", 1.03 ** 3)),
         ("Jul 2029", "spending_health", ("x", 1.03 ** 4))]),
+    # Stage S15.2: two that exercise the new policies and the belief groups.
+    "i": ("A socialist programme", 1, [
+        ("Feb 2025", "net_wealth_tax", 0.01), ("Feb 2025", "rail_ownership", 1), ("Feb 2025", "trade_union_law", 0),
+        ("Feb 2025", "public_pay_settlement", 0.01), ("Jun 2025", "corporation_tax_rate", 0.28),
+        ("Sep 2025", "spending_health", ("x", 1.05)), ("Jan 2026", "rent_controls", 1),
+        ("Jun 2026", "free_childcare", 1), ("Jan 2027", "energy_bill_help", 200),
+        ("Jun 2027", "spending_education", ("x", 1.05))]),
+    "j": ("A law and order government", 1, [
+        ("Feb 2025", "sentencing", 3), ("Feb 2025", "spending_public_order", ("x", 1.1)),
+        ("Feb 2025", "identity_cards", 1), ("Jun 2025", "visa_threshold", 45000), ("Sep 2025", "strike_limits", 1),
+        ("Jan 2026", "spending_defence", ("x", 1.1)), ("Jun 2026", "trade_union_law", 2),
+        ("Jan 2027", "sentencing", 4), ("Jun 2027", "transfers_abroad_bill", ("x", 0.8))]),
 }
+BELIEFS = ["socialists", "capitalists", "liberals", "conservatives", "environmentalists", "patriots",
+           "public_sector", "trade_unionists", "farmers", "town", "countryside"]
 
 
 def play(scenario, key: str, steps: int = 60) -> dict:
@@ -199,6 +213,17 @@ def main() -> None:
         _, seats, _ = result["election"]
         print(f"({key}) election seats " + ", ".join(f"{b} {round(s)}" for b, s in zip(BLOCS, seats))
               + f"; largest month's move: approval {a:.2f} pts, unemployment {u:.2f} pts")
+    if all(f"approval_{g}" in results[key]["rows"][0] for key in results for g in BELIEFS):
+        print()
+        print("Group approval, June 2029 (against doing nothing where (a) was played): " + ", ".join(BELIEFS))
+        base = results.get("a")
+        for key, result in results.items():
+            r = result["rows"][JUN29]
+            cells = []
+            for g in BELIEFS:
+                v = r[f"approval_{g}"] * 100
+                cells.append(f"{v:.1f}" + (f" ({v - base['rows'][JUN29][f'approval_{g}'] * 100:+.1f})" if base and key != "a" else ""))
+            print(f"({key}) " + " | ".join(cells))
     if args.months:
         for key, result in results.items():
             print()

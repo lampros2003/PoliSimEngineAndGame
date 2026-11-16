@@ -38,6 +38,25 @@ var _share := 0.0
 var _drivers: GridContainer
 var _homes: GridContainer
 var _homes_note: Label
+var _stance_note: Label
+## For the checks: what the stance line says ("" for a group no stance moves).
+var stance_text := ""
+
+
+## Stage S15.3: the stance a belief group answers to, and where the government stands on it.
+func set_stance(words: String) -> void:
+	var first := stance_text == "" and words != ""
+	stance_text = words
+	if _stance_note != null:
+		_stance_note.text = words
+		_stance_note.visible = words != ""
+		# A group of belief opens on what moves it: where the government stands.
+		var fold := find_child("fold_what_is_moving_them", false, false)
+		if first and fold != null and fold.has_meta("fold"):
+			for other in get_children():
+				if other != fold and other.has_meta("fold"):
+					(other.get_meta("fold") as Callable).call(false)
+			(fold.get_meta("fold") as Callable).call(true)
 
 
 ## `node` the board's group node; `drivers` [[plain name, value name]] in order; `movers`
@@ -116,6 +135,12 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		amount.custom_minimum_size = Vector2(80, 0)
 		_drivers.add_child(amount)
+	# Stage S15.3: for a belief group, which stance its "Where the government stands" reads.
+	_stance_note = _muted("")
+	_stance_note.name = "stance_note"
+	_stance_note.add_theme_color_override("font_color", Palette.INK)
+	_stance_note.visible = false
+	moving.add_child(_stance_note)
 	moving.add_child(_muted("Each is a pull on their vote, for the government (right) or against it (left), from where things stood at the last election."))
 	add_child(Palette.fold("What is moving them", moving))
 	var share := VBoxContainer.new()

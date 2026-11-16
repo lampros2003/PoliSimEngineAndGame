@@ -21,16 +21,26 @@ func build(board: Web) -> void:
 	add_child(grid)
 	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; Add policy, on the top bar, lists those not in force.")
 	_row(grid, _indicators(), "Indicators", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
-	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in families. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure." % [
-		roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0)])
+	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in %s, each named once inside it. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure.%s" % [
+		_families_word(board), roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0),
+		" Groups of belief answer to where the government stands, not how they are doing: Parliament shows the stances." if not board.play_web.get("stances", []).is_empty() else ""])
 	_row(grid, _links(), "Links", "Point at a node for what it moves, or what moves it, in a year. Green: good for what it reaches; red: bad; blue: neither can be said; grey: not yet measured. Thicker is stronger; + it rises, − it falls.")
-	_row(grid, _flags(), "Situations", "On the strip under the top bar: green good, red bad, blue neither; ochre, a question waiting for your answer. Click one to open it.")
+	_row(grid, _flags(), "Situations", "On the strip under the top bar, and as a small flag on the statistic that set it off: green good, red bad, blue neither; ochre, a question waiting for your answer. Click one to light its statistic and see why.")
 	var last := Label.new()
 	last.text = "A bigger node matters more. At the centre: approval, the months to the election and your political capital."
 	last.theme_type_variation = "Muted"
 	last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	last.custom_minimum_size.x = 600.0
 	add_child(last)
+
+
+## "seven families", as many as the board has.
+static func _families_word(board: Web) -> String:
+	var seen := {}
+	for k in board.keys_of("group"):
+		seen[board.nodes[k]["family"]] = true
+	var words := ["no families", "one family", "two families", "three families", "four families", "five families", "six families", "seven families", "eight families", "nine families"]
+	return words[seen.size()] if seen.size() < words.size() else "%d families" % seen.size()
 
 
 func _row(grid: GridContainer, sample: Control, heading: String, words: String) -> void:
@@ -91,7 +101,7 @@ func _groups(board: Web) -> Control:
 	var ring: Web.Ring = web._group_ring
 	var length := ring.length()
 	var specs := [["group-young", "good", board.approval_good + 0.08], ["group-parents", "mixed", (board.approval_good + board.approval_bad) / 2.0],
-		["pensioner", "bad", board.approval_bad - 0.06], ["group-northern-ireland", "none", -1.0]]
+		["pensioner", "bad", board.approval_bad - 0.06], ["group-patriots", "none", -1.0]]
 	var f := -(4 * 52.0 + 3 * 4.0) / 2.0 / length
 	for i in specs.size():
 		var f1 := f + 52.0 / length

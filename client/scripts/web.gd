@@ -40,11 +40,14 @@ const LINK_FLOOR := 0.0005
 ## Stage S13.4: a policy's links to groups, besides its links to indicators.
 const MAX_GROUP_LINKS := 3
 ## Stage S14.5: where the first area may begin, in half turns before the top, in order of trial.
-const START_TURNS := [0.22, 0.16, 0.28, 0.10, 0.34]
+const START_TURNS := [0.22, 0.16, 0.28, 0.10, 0.34, 0.19, 0.25, 0.13, 0.31, 0.04, 0.40]
 ## Stage S14.1: the group ring, in pixels at a unit scale of 1: the band's thickness, the gap
 ## between two families and between two groups of a family, and the approval arc's offset
 ## from the band and thickness.
 const RING_BAND := 34.0
+## Stage S15.3: a group's arc is never shorter than this many times the band's thickness (room
+## for its pictogram, set square).
+const ARC_LEAST := 1.02
 const FAMILY_GAP := 16.0
 const SEGMENT_GAP := 3.0
 const ARC_OFFSET := 3.0
@@ -80,6 +83,8 @@ var input_enabled := true
 ## Stage S14.1: approval from which a group's arc is green, and below which it is red
 ## ([play.web] approval_good, approval_bad).
 var approval_good := 0.38
+## Stage S15.3: the scenario's [play.web], for the screens that read presentation keys from it.
+var play_web := {}
 var approval_bad := 0.28
 ## Stage S14.1: a board drawn for the key (main.gd): its nodes are set by hand, never laid out.
 var demo := false
@@ -198,6 +203,7 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 	hidden_levers = PackedStringArray(web.get("hide", []))
 	groups = web.get("groups", [])
 	budget_row = str(web.get("balance", "budget_balance"))
+	play_web = web
 	approval_good = float(web.get("approval_good", 0.38))
 	approval_bad = float(web.get("approval_bad", 0.28))
 	var player := {}
@@ -214,8 +220,14 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 				if own.is_empty():
 					continue
 				var key := "policy:" + str(p.get("key", own[0]))
-				_add(key, "policy", str(p.get("label", entries[own[0]].get("label", own[0]))), str(p.get("icon", "")),
-					int(p.get("size", 2)), a["name"], own, "", own[0])
+				# Stage S15.3: [play] `labels` may give a policy a shorter name for the board, by its
+				# key; its popup keeps the whole name.
+				var long := str(p.get("label", entries[own[0]].get("label", own[0])))
+				var pk := str(p.get("key", ""))
+				var own_row: bool = rows.has(pk) and str(entries.get(rows[pk], {}).get("kind", "")) != "lever"  # a statistic's label, not this
+				var short: String = long if own_row else str(play.get("labels", {}).get(pk, long))
+				_add(key, "policy", short, str(p.get("icon", "")), int(p.get("size", 2)), a["name"], own, "", own[0])
+				nodes[key]["long_label"] = long
 				a["policies"].append(key)
 				# Stage S13.5: how its first lever reads (levels, a unit, what an amount is for),
 				# written into the catalogue entry so every screen says it the same way; and the
@@ -774,20 +786,23 @@ func _place_groups(keys: Array) -> void:
 	# Stage S15.1: more groups than the ring's free holds at full thickness (thirty on a small
 	# screen): the band thins until every arc still takes its pictogram, never under two thirds.
 	for attempt in 3:
-		var fits := (TAU * (free - ring_reach_for(band)) - gaps) / (keys.size() * 1.15)
+		var fits := (TAU * (free - ring_reach_for(band)) - gaps) / (keys.size() * ARC_LEAST)
 		if fits >= band or band <= RING_BAND * u * 0.67:
 			break
 		band = maxf(fits, RING_BAND * u * 0.67)
 	_group_band = band
 	reach = ring_reach_for(band)
-	var need := (keys.size() * band * 1.15 + gaps) / TAU
+	var need := (keys.size() * band * ARC_LEAST + gaps) / TAU
 	var radius := maxf(free - reach, need)
 	_group_ring = Ring.new(_c, radius, radius)
 	var length := _group_ring.length()
 	var usable := maxf(length - gaps, 1.0)
-	var least := minf(band * 1.15, usable / keys.size())
+	var least := minf(band * ARC_LEAST, usable / keys.size())
 	var text_ring := Ring.new(_c, radius - band / 2.0 - 11.0 * u, radius - band / 2.0 - 11.0 * u)
 	var f := 0.0
+	var names: Array = []  # [text, centre (fraction of the text ring), width (fraction)]
+	var name_px := int(roundf(clampf(12.0 * u, 12.0, 17.0)))
+	var name_font := Palette.display(600, 2)
 	for i in families.size():
 		var members: Array = families[i][1]
 		var room := usable * members.size() / keys.size()
@@ -808,9 +823,33 @@ func _place_groups(keys: Array) -> void:
 			f = n["f1"] + SEGMENT_GAP * u / length
 		f -= SEGMENT_GAP * u / length
 		var mid := (start + f) / 2.0
-		_curved_text(str(families[i][0]).to_upper(), text_ring, text_ring.fraction(_group_ring.angle(mid)), (f - start) * text_ring.length() * 0.95,
-			int(roundf(clampf(12.0 * u, 12.0, 17.0))), _families)
+		var text := str(families[i][0]).to_upper()
+		names.append([text, text_ring.fraction(_group_ring.angle(mid)), name_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_px).x / text_ring.length()])
 		f += FAMILY_GAP * u / length
+	# Stage S15.3: every family named once. A name longer than its family's arc takes room from
+	# its neighbours' where theirs are shorter: the names are pushed apart round the ring until
+	# none overlaps (when they cannot all fit, the last are left out).
+	var pad := 14.0 * u / text_ring.length()
+	var total := 0.0
+	for n in names:
+		total += float(n[2]) + pad
+	for attempt in 40:
+		var moved := false
+		for i in names.size():
+			var a: Array = names[i]
+			var b: Array = names[(i + 1) % names.size()]
+			var gap := fposmod(float(b[1]) - float(a[1]), 1.0)
+			var want := (float(a[2]) + float(b[2])) / 2.0 + pad
+			if gap < want and names.size() > 1:
+				var push := (want - gap) / 2.0 + 1e-5
+				a[1] = fposmod(float(a[1]) - push, 1.0)
+				b[1] = fposmod(float(b[1]) + push, 1.0)
+				moved = true
+		if not moved:
+			break
+	for n in names:
+		if total <= 1.0:
+			_curved_text(n[0], text_ring, n[1], INF, name_px, _families)
 
 
 ## How far the group ring reaches out from its middle line: the band and the approval arc.

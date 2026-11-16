@@ -526,3 +526,56 @@ The policies are national formulas and a few dimensioned by voter type (the reac
 new per-household value. The UK month in the engine took 16.4 to 18.2 ms before and 16.1 to
 16.5 ms after, within the run-to-run noise (`polisim run models/uk/scenarios/2025.toml --steps 24
 --time`, four runs each).
+
+## Stage S15.2: twelve more policies, twelve statistics
+
+`docs/S15-PLAN.md`, "Policies to add" and "Statistics". The policies are in
+`tools/uk/template/policies.toml` (the end), the statistics in `tools/uk/template/statistics.toml`,
+the stances and the new groups' reactions in `tools/uk/beliefs.py` (written to `beliefs.toml`;
+`politics/README.md`, "Beliefs, work and places"). Every size not given a source is a
+judgement.
+
+### The policies
+
+Ten start not in force (`off = 0` on the board) and two are in force at a neutral setting.
+Each is nil at its default; its money goes through the existing hooks.
+
+| Policy | Lever, range | Money | Moves | Reactions (besides its stances) | Capital weight |
+|---|---|---|---|---|---|
+| Wealth tax | `net_wealth_tax`, 0 to 3% a year | Receipts on 30% of households' deposits (the mod's 0.4 less avoidance), on income tax (`policy_household_taxes`) | Tax burden; inequality (0.3 points for each 1%: the records hold no wealth) | High incomes -0.05, low incomes +0.01 for each 1% | 1.0 |
+| Farm support | `farm_support`, £0 to £250m a month | Subsidies | Farm incomes (80% of it) | Countryside +0.01, towns -0.002 for each £1bn a year; farmers through farm incomes | 0.6 |
+| Public ownership of rail | `rail_ownership`, levels 0 to 2 | £0.5bn a year a level in subsidies; the second level also £2bn a year in investment | Congestion -3% a level; strikes +10% a level | Trade unionists +0.01, towns +0.005, high incomes -0.004 a level | 0.6 |
+| Congestion charging | `congestion_charge`, £0 to £20 a trip | Other receipts on 44 million trips a month, 2% fewer a pound (at most two thirds fewer) | Congestion, so air pollution, so healthy life | Motorists -0.004, towns +0.001 a pound | 0.5 |
+| Research grants | `rd_grants`, £0 to £500m a month | Subsidies | Research and development (1.4 times the grants), so productivity | High incomes +0.01, low incomes -0.005 for each £1bn a year | 0.6 |
+| Onshore wind | `onshore_wind`, £0 to £300m a month | Subsidies | Energy bills -£15 a household a year for each £1bn a year, as farms come on over two years | Countryside -0.01, towns +0.004 for each £1bn a year | 0.6 |
+| Free childcare | `free_childcare`, levels 0 to 2 | £3bn a year a level in purchases (after the IFS's costings) | The labour force +0.17% a level over two years | Parents +0.015, pensioners -0.004 a level | 0.6 |
+| Help with energy bills | `energy_bill_help`, £0 to £600 a household a year | Benefits | Energy bills | Low incomes +0.01, pensioners +0.005, high incomes -0.003 for each £100 | 0.6 |
+| Identity cards | `identity_cards`, 0 or 1 | About £1bn a year in purchases (the 2006 scheme's £5.4bn over ten years) | Crime -0.5% | Pensioners +0.01, the young -0.015 | 0.5 |
+| Limits on strikes | `strike_limits`, levels 0 to 2 | None | Strikes -30% a level | Trade unionists -0.03, public sector workers -0.01, pensioners +0.005 a level | 0.6 |
+| Trade union law (in force) | `trade_union_law`, levels 0 to 2, 1 as in 2024 | None | Strikes +40% for stronger unions, -40% for the tightest | Each step tighter: trade unionists -0.03, public sector workers -0.01, the self-employed +0.005 | 0.6 |
+| Public sector pay (in force) | `public_pay_settlement`, -5 to +5 points a year above the plans | Public pay (`public_pay_level` on the flow; public employment is unchanged) | Public pay against prices, so strikes and the public sector's approval | Through public pay (`voter_conditions`) | 2.0 |
+
+No policy was replaced. The congestion charge leaves London's own charge as it is; public
+ownership of rail starts from the 2024 plan to take operators over as contracts end.
+
+### The statistics
+
+Each starts at its published 2024 level in the base month (money as it is held, in pence).
+
+| Statistic | Row | 2024 level and source | Moves with | Feeds |
+|---|---|---|---|---|
+| Inequality | `inequality` | Gini 35%, before housing costs, FYE 2024: DWP, Households Below Average Income (search result read: unchanged from FYE 2023's 35%) | The households' own Gini (Lorenz curve at each tenth of equivalised income across people, exact at the tenths), scaled to 35%; the wealth tax | Nothing (an outcome) |
+| Tax burden | `tax_burden` | 38.6%: public sector current receipts over output, 2024 (ONS; the base month) | Receipts and output | Neutral; nothing |
+| Rents | `rents` | £1,327 a month, Great Britain, December 2024: ONS, Price Index of Private Rents (search result read) | Consumer inflation plus a point, less homes built by the policies, plus migration; capped by rent controls | Homelessness; renters |
+| House prices | `house_prices` | £268,000, UK, December 2024: ONS, UK House Price Index (search result read) | Prices; -8% a point on the mortgage rate; homes built | Home owners. Neutral |
+| Energy bills | `energy_bills` | £1,738 a year, Ofgem's cap for January to March 2025 (search result read) | Prices, households' carbon price, insulation, onshore wind, help with bills | Low incomes and pensioners |
+| Days lost to strikes | `strike_days` | About 0.6 million a year (ONS labour disputes: monthly figures from about 40,000 to 110,000 in 2024; the total is an estimate, not opened) | Public pay against prices (a 5% squeeze nearly triples them), union law, strike limits, rail ownership, unemployment | Business confidence; everyone a little; "A wave of strikes" |
+| Business confidence | `business_confidence` | 39%: Lloyds Business Barometer, December 2024 (search result read) | Corporation tax, the cost of borrowing, growth, trade barriers, strikes | Business investment (0.2% a point) |
+| Farm incomes | `farm_incomes` | £7.7bn: Defra, Total income from farming, UK 2024, first estimate (search result read) | Farm support, trade barriers, the carbon price on half of farms' 45 million tonnes, fuel duty | Farmers |
+| Congestion | `congestion` | 62 hours a driver: INRIX, 2024 Global Traffic Scorecard, UK (search result read) | Output (to the power 1.5), congestion charging, rail ownership, the bus fare cap, roads and railways | Air pollution; motorists |
+| Air pollution | `air_pollution` | About 7.5 micrograms of PM2.5 a cubic metre (Defra: 7.9 population-weighted in England in 2023, falling; the 2024 figure is a judgement) | Households' emissions and congestion | Healthy life, -0.05 years a microgram |
+| Research and development | `research_development` | 2.71% of output, 2024: ONS, Gross domestic expenditure on R&D (search result read) | Business investment against its trend; research grants | Productivity (a fifth more, 1% in time) |
+| Trade balance | `trade_balance` | -£21bn, 2024: exports less imports (ONS national accounts; the base month) | Everything the economy does | Nothing |
+
+"A wave of strikes" comes on at twice 2024's days lost and goes at one and a half times;
+"Rents soaring" at rent growth above 7% a year, off below 5%.

@@ -48,7 +48,7 @@ label = "Public sector pay"
 from = "government"
 to = "households"
 phase = "income"
-expr = "round(public_pay_bill * trend_index)"
+expr = "round(public_pay_bill * trend_index * public_pay_level)"
 
 [flow.benefits]
 label = "Social benefits"
@@ -105,7 +105,7 @@ label = "Income tax"
 from = "households"
 to = "government"
 phase = "income"
-expr = "round(income_tax_total + other_income_tax_rate * other_income)"
+expr = "round(income_tax_total + other_income_tax_rate * other_income) + policy_household_taxes"
 
 [flow.national_insurance]
 label = "National Insurance"
@@ -184,7 +184,7 @@ label = "Business investment"
 type = "money"
 unit = "GBP/month"
 phase = "spending"
-expr = "round(investment_share * investment_demand * prev(private_demand) * investment_rate_factor)"
+expr = "round(investment_share * investment_demand * prev(private_demand) * investment_rate_factor * confidence_factor)"
 
 [var.private_demand]
 label = "Sales by firms"

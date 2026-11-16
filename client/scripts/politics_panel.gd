@@ -30,6 +30,18 @@ var _rows: Array = []  # per bloc: {cells: [name, polls, change, seats, projecte
 var _seats := PackedFloat64Array()
 var _governing := PackedFloat64Array()
 var _groups_fold: Control
+## Stage S15.3: the four stances ([play.web] stances), each a scale; and the country by place
+## ([play.web] places). For the checks: the stances shown, as {item, value, words, control}.
+var stance_rows: Array = []
+var _stances: VBoxContainer
+var _stances_fold: Control
+var _places: GridContainer
+var _places_fold: Control
+var _place_rows: Array = []
+## Group key -> {label, row, approval}, for the ends of the stances' scales; and what moved a
+## stance last: stance row -> words (set by the screen).
+var group_info := {}
+var last_moved := {}
 var _groups: GridContainer
 var _group_rows: Array = []  # {key, row, share, note, cells: [share, bar, approval, change]}
 
@@ -69,7 +81,13 @@ func _ready() -> void:
 	var folds := VBoxContainer.new()
 	folds.add_theme_constant_override("separation", 8)
 	box.add_child(folds)
-	folds.add_child(Palette.fold("The parties", _grid, true))
+	folds.add_child(Palette.fold("The parties", _grid))
+	_stances = VBoxContainer.new()
+	_stances.name = "stances"
+	_stances.add_theme_constant_override("separation", 10)
+	_stances_fold = Palette.fold("Where the government stands", _stances, true)
+	_stances_fold.visible = false
+	folds.add_child(_stances_fold)
 	_groups = GridContainer.new()
 	_groups.name = "groups"
 	_groups.columns = 5
@@ -78,6 +96,15 @@ func _ready() -> void:
 	Palette.rule_rows(_groups)
 	_groups_fold = Palette.fold("The country by group", _groups)
 	folds.add_child(_groups_fold)
+	_places = GridContainer.new()
+	_places.name = "places"
+	_places.columns = 5
+	_places.add_theme_constant_override("h_separation", 14)
+	_places.add_theme_constant_override("v_separation", 4)
+	Palette.rule_rows(_places)
+	_places_fold = Palette.fold("The country by place", _places)
+	_places_fold.visible = false
+	folds.add_child(_places_fold)
 
 
 func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.FONT_SIZE) -> Label:
@@ -105,8 +132,22 @@ func build(play: Dictionary) -> void:
 	_rows.clear()
 
 
-## Stage S13.4: a row per interest group on the board.
-func build_groups(board: Control) -> void:
+## Stage S13.4: a row per interest group on the board. Stage S15.3: and the stances and the
+## places the scenario's [play.web] gives (`web`).
+func build_groups(board: Control, web := {}) -> void:
+	_build_stances(web.get("stances", []))
+	# Stage S15.3: the stances open first where there are any (the House above shows the
+	# parties); else the parties' table.
+	if web.get("stances", []).is_empty():
+		var parties: Node = _grid.get_parent()
+		if parties != null and parties.has_meta("fold"):
+			(parties.get_meta("fold") as Callable).call(true)
+		_stances_fold.get_meta("fold").call(false)
+	_build_places(web.get("places", []))
+	_build_ring_groups(board)
+
+
+func _build_ring_groups(board: Control) -> void:
 	for child in _groups.get_children():
 		_groups.remove_child(child)
 		child.queue_free()
@@ -117,6 +158,9 @@ func build_groups(board: Control) -> void:
 		return
 	for heading in ["", "Share of adults", "Backing the government", "", "Last month"]:
 		_groups.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
+	group_info.clear()
+	for key in keys:
+		group_info[key.trim_prefix("group:")] = {"label": str(board.nodes[key]["label"]), "row": str(board.nodes[key]["row"]), "approval": ""}
 	for key in keys:
 		var node: Dictionary = board.nodes[key]
 		var name := Button.new()
@@ -138,6 +182,95 @@ func build_groups(board: Control) -> void:
 			"button": name, "cells": cells})
 
 
+## Stage S15.3: the stances: each a labelled scale, its ends named with their belief groups.
+func _build_stances(list: Array) -> void:
+	for child in _stances.get_children():
+		_stances.remove_child(child)
+		child.queue_free()
+	stance_rows.clear()
+	_stances_fold.visible = not list.is_empty()
+	for item in list:
+		var scale := Control.new()
+		scale.name = "stance_" + str(item.get("row", ""))
+		scale.custom_minimum_size = Vector2(0, 78)
+		var info := {"item": item, "value": 0.0, "control": scale, "words": ""}
+		scale.draw.connect(func() -> void: _draw_stance(scale, info))
+		_stances.add_child(scale)
+		stance_rows.append(info)
+	if not list.is_empty():
+		var note := Label.new()
+		note.text = "Each scale counts the government's clear moves of policy since 2024, net; the marker is where it stands now. The groups at its ends answer to it."
+		note.theme_type_variation = "Muted"
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size.x = 560
+		_stances.add_child(note)
+
+
+## Stage S15.3: one stance: its name, and what moved it last, above; a line with ticks and
+## nought in the middle; the marker where the government stands; each end's words and group.
+func _draw_stance(c: Control, info: Dictionary) -> void:
+	var item: Dictionary = info["item"]
+	var w := c.size.x
+	var head := Palette.display(600, 1)
+	var body := Palette.text(500)
+	var strong := Palette.text(600)
+	c.draw_string(head, Vector2(0, 14), str(item.get("label", "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.INK)
+	if str(info["words"]) != "":
+		c.draw_string(body, Vector2(0, 14), str(info["words"]), HORIZONTAL_ALIGNMENT_RIGHT, w, Palette.SMALL, Palette.MUTED)
+	var value := float(info["value"])
+	var span := maxf(3.0, ceilf(absf(value) * 1.2))
+	var x0 := 180.0
+	var x1 := w - 210.0
+	var y := 42.0
+	c.draw_line(Vector2(x0, y), Vector2(x1, y), Palette.INK, 2.0)
+	for k in range(-int(span), int(span) + 1):
+		var x := lerpf(x0, x1, (float(k) + span) / (2.0 * span))
+		c.draw_line(Vector2(x, y - (7.0 if k == 0 else 4.0)), Vector2(x, y + (7.0 if k == 0 else 4.0)), Palette.INK if k == 0 else Color(Palette.INK, 0.5), 1.5 if k == 0 else 1.0)
+	var mx := lerpf(x0, x1, (clampf(value, -span, span) + span) / (2.0 * span))
+	var marker := PackedVector2Array([Vector2(mx, y - 3), Vector2(mx - 9, y - 18), Vector2(mx + 9, y - 18)])
+	c.draw_colored_polygon(marker, Palette.OCHRE)
+	marker.append(marker[0])
+	c.draw_polyline(marker, Palette.INK, 1.5, true)
+	for end in ["low", "high"]:
+		var words := str(item.get(end, ""))
+		var group := str(item.get(end + "_group", ""))
+		var who := ""
+		if group_info.has(group):
+			who = str(group_info[group]["label"]) + ("  " + str(group_info[group]["approval"]) if str(group_info[group]["approval"]) != "" else "")
+		var x := 0.0 if end == "low" else x1 + 14.0
+		var width := x0 - 14.0 if end == "low" else w - x
+		var align := HORIZONTAL_ALIGNMENT_RIGHT if end == "low" else HORIZONTAL_ALIGNMENT_LEFT
+		c.draw_string(strong, Vector2(x, y + 5), words, align, width, Palette.SMALL, Palette.INK)
+		if who != "":
+			c.draw_string(body, Vector2(x, y + 24), who, align, width, Palette.SMALL, Palette.MUTED)
+	c.draw_string(body, Vector2(x0, y + 28), "%+.1f" % value, HORIZONTAL_ALIGNMENT_CENTER, x1 - x0, Palette.SMALL, Palette.MUTED)
+
+
+## Stage S15.3: the regions, off the ring: a row each, as in the groups' table.
+func _build_places(list: Array) -> void:
+	for child in _places.get_children():
+		_places.remove_child(child)
+		child.queue_free()
+	_place_rows.clear()
+	_places_fold.visible = not list.is_empty()
+	if list.is_empty():
+		return
+	for heading in ["", "Share of adults", "Backing the government", "", "Last month"]:
+		_places.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
+	for item in list:
+		var name := _cell(str(item.get("label", "")), Palette.TEXT, false)
+		name.custom_minimum_size = Vector2(190, 0)
+		_places.add_child(name)
+		var bar := Control.new()
+		bar.custom_minimum_size = Vector2(200, 18)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.draw.connect(func() -> void: _draw_approval(bar))
+		var cells := [_cell("–"), bar, _cell("–"), _cell("–", Palette.MUTED)]
+		for c in cells:
+			_places.add_child(c)
+		_place_rows.append({"row": str(item.get("row", "")), "share": str(item.get("share", "")), "note": str(item.get("note", "")), "cells": cells})
+
+
 ## A group's approval as a bar from nought to a half, with a tick at the national rating.
 func _draw_approval(bar: Control) -> void:
 	var v := float(bar.get_meta("approval", 0.0))
@@ -152,7 +285,15 @@ func _draw_approval(bar: Control) -> void:
 
 func _show_groups(latest: Callable, previous: Callable) -> void:
 	var national: Variant = latest.call(str(settings.get("support", "")))
-	for g in _group_rows:
+	for key in group_info:
+		var a: Variant = latest.call(str(group_info[key]["row"]))
+		group_info[key]["approval"] = fmt.percent(float(a)) if a != null else ""
+	for info in stance_rows:
+		var v: Variant = latest.call(str(info["item"].get("row", "")))
+		info["value"] = float(v) if v != null else 0.0
+		info["words"] = str(last_moved.get(str(info["item"].get("row", "")), ""))
+		(info["control"] as Control).queue_redraw()
+	for g in _group_rows + _place_rows:
 		var cells: Array = g["cells"]
 		var share: Variant = latest.call(g["share"]) if g["share"] != "" else null
 		var now: Variant = latest.call(g["row"])

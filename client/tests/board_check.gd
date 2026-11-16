@@ -36,6 +36,21 @@ func _initialize() -> void:
 		return _fail("the game did not start")
 	var board = main.board
 	var want_areas: int = main.play["web"]["areas"].size()  # stage S15.1: as the scenario has it
+	# Stage S15.3: every pictogram the scenario names exists in client/icons.
+	var missing_icons := []
+	var icons_named := []
+	for area in main.play["web"]["areas"]:
+		icons_named.append(area.get("icon", ""))
+		for list in [area.get("policies", []), area.get("indicators", [])]:
+			for item in list:
+				icons_named.append(item.get("icon", ""))
+	for g in main.play["web"].get("groups", []):
+		icons_named.append(g.get("icon", ""))
+	for icon in icons_named:
+		if str(icon) != "" and not ResourceLoader.exists("res://icons/%s.svg" % icon):
+			missing_icons.append(icon)
+	if not missing_icons.is_empty():
+		return _fail("pictograms named but missing: %s" % [missing_icons])
 	if not board.authored or board.areas.size() != want_areas:
 		return _fail("the board has %d areas (authored: %s)" % [board.areas.size(), board.authored])
 	var policies: int = board.keys_of("policy").size()
@@ -121,7 +136,7 @@ func _initialize() -> void:
 			var missing := Array(board.order).filter(func(k): return not board.nodes[k]["kind"] in ["centre", "group"] and not board.nodes[k]["rest"])
 			return _fail("at %dx%d only %d of %d nodes are labelled at rest: not %s" % [view.x, view.y, labelled, labels, missing])
 		rested.append("%d of %d and %d groups at %dx%d" % [labelled, labels, groups_labelled, view.x, view.y])
-	# Stage S15.1: a ring of seven families and thirty groups (the coming UK's) still fits at
+	# Stage S15.1: a ring of thirty groups (the scenario's, its last family grown) still fits at
 	# 1366x768: every arc long enough for its pictogram, the families in order, the names all
 	# at rest or none, nothing overlapping.
 	var real: Array = Array(board.keys_of("group"))
@@ -130,7 +145,7 @@ func _initialize() -> void:
 	while real.size() + extra.size() < 30:
 		var copy: Dictionary = board.nodes[real[i % real.size()]].duplicate()
 		copy["key"] = "group:extra_%d" % i
-		copy["family"] = "Beliefs"
+		copy["family"] = board.nodes[real[-1]]["family"]  # the last family grows
 		board.nodes[copy["key"]] = copy
 		extra.append(copy["key"])
 		i += 1

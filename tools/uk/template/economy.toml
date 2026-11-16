@@ -48,7 +48,7 @@ label = "Public sector pay"
 from = "government"
 to = "households"
 phase = "income"
-expr = "round(public_pay_bill * trend_index)"
+expr = "round(public_pay_bill * trend_index{{public_pay_policy}})"
 
 [flow.benefits]
 label = "Social benefits"

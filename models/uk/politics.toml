@@ -373,7 +373,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 * type_age + policy_standing + finances_standing"
+expr = "0.0 * type_age + policy_standing + finances_standing + belief_standing"
 
 [var.voter_jobs]
 doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
@@ -444,7 +444,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + voter_jobs + voter_services + voter_finances"
+expr = "government_standing + fundamentals + voter_jobs + voter_services + voter_finances + voter_conditions"
 
 [var.utility]
 type = "real"
@@ -516,8 +516,8 @@ expr = "sum(select(governing, vote_intention, 0.0), bloc)"
 # ---- stage S13.4: interest groups (models/uk/politics/README.md, Groups)
 
 [dim.group]
-members = ["young", "midlife", "pensioner", "low_income", "middle_income", "high_income", "in_work", "out_of_work", "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north", "midlands", "south", "motorists", "home_owners", "renters", "drinkers", "smokers"]
-labels = ["The young", "Mid-life", "Pensioners", "Low incomes", "Middle incomes", "High incomes", "In work", "Out of work", "Parents", "Lone parents", "The self-employed", "Scotland", "Wales", "Northern Ireland", "London", "The North", "The Midlands", "The South", "Motorists", "Home owners", "Renters", "Drinkers", "Smokers"]
+members = ["young", "midlife", "pensioner", "low_income", "middle_income", "high_income", "in_work", "out_of_work", "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north", "midlands", "south", "motorists", "home_owners", "renters", "drinkers", "smokers", "socialists", "capitalists", "liberals", "conservatives", "environmentalists", "patriots", "public_sector", "trade_unionists", "farmers", "town", "countryside"]
+labels = ["The young", "Mid-life", "Pensioners", "Low incomes", "Middle incomes", "High incomes", "In work", "Out of work", "Parents", "Lone parents", "The self-employed", "Scotland", "Wales", "Northern Ireland", "London", "The North", "The Midlands", "The South", "Motorists", "Home owners", "Renters", "Drinkers", "Smokers", "Socialists", "Capitalists", "Liberals", "Conservatives", "Environmentalists", "Patriots", "Public sector workers", "Trade unionists", "Farmers", "Town and city", "Countryside"]
 
 [var.voters_parents]
 doc = "Adults aged 18 and over in the group 'parents', by voter type, from the households"
@@ -583,13 +583,101 @@ dims = ["voter_type"]
 data = "politics/estimated_groups.csv"
 column = "smokers"
 
+[param.estimated_member_socialists]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'socialists', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "socialists"
+
+[param.estimated_member_capitalists]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'capitalists', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "capitalists"
+
+[param.estimated_member_liberals]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'liberals', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "liberals"
+
+[param.estimated_member_conservatives]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'conservatives', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "conservatives"
+
+[param.estimated_member_environmentalists]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'environmentalists', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "environmentalists"
+
+[param.estimated_member_patriots]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'patriots', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "patriots"
+
+[param.estimated_member_public_sector]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'public_sector', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "public_sector"
+
+[param.estimated_member_trade_unionists]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'trade_unionists', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "trade_unionists"
+
+[param.estimated_member_farmers]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'farmers', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "farmers"
+
+[param.estimated_member_town]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'town', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "town"
+
+[param.estimated_member_countryside]
+doc = "Stage S13.5: the share of each voter type's adults in the group 'countryside', an estimate from published shares by income quintile and age band (models/uk/POLICIES.md, Groups)"
+type = "real"
+unit = "1"
+dims = ["voter_type"]
+data = "politics/estimated_groups.csv"
+column = "countryside"
+
 [var.group_member]
 doc = "The share of each voter type's adults in each group: 1 or 0 by the type's region, age band, income quintile and work; from the households for parents, lone parents and the self-employed; estimated for motorists, home owners, renters, drinkers and smokers (stage S13.5)"
 type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type", "group"]
-expr = "select(coord(group) == 0, select(type_age <= 1, 1.0, 0.0), select(coord(group) == 1, select(type_age == 2 or type_age == 3, 1.0, 0.0), select(coord(group) == 2, select(type_age == 4, 1.0, 0.0), select(coord(group) == 3, select(type_quintile == 0, 1.0, 0.0), select(coord(group) == 4, select(type_quintile >= 1 and type_quintile <= 3, 1.0, 0.0), select(coord(group) == 5, select(type_quintile == 4, 1.0, 0.0), select(coord(group) == 6, select(type_in_work == 1, 1.0, 0.0), select(coord(group) == 7, select(type_in_work == 0 and type_age <= 3, 1.0, 0.0), select(coord(group) == 8, safe_div(1.0 * voters_parents, 1.0 * voters, 0.0), select(coord(group) == 9, safe_div(1.0 * voters_lone_parents, 1.0 * voters, 0.0), select(coord(group) == 10, safe_div(1.0 * voters_self_employed, 1.0 * voters, 0.0), select(coord(group) == 11, select(type_region == 10, 1.0, 0.0), select(coord(group) == 12, select(type_region == 9, 1.0, 0.0), select(coord(group) == 13, select(type_region == 11, 1.0, 0.0), select(coord(group) == 14, select(type_region == 6, 1.0, 0.0), select(coord(group) == 15, select(type_region <= 2, 1.0, 0.0), select(coord(group) == 16, select(type_region == 3 or type_region == 4, 1.0, 0.0), select(coord(group) == 17, select(type_region == 5 or type_region == 7 or type_region == 8, 1.0, 0.0), select(coord(group) == 18, estimated_member_motorists, select(coord(group) == 19, estimated_member_home_owners, select(coord(group) == 20, estimated_member_renters, select(coord(group) == 21, estimated_member_drinkers, estimated_member_smokers))))))))))))))))))))))"
+expr = "select(coord(group) == 0, select(type_age <= 1, 1.0, 0.0), select(coord(group) == 1, select(type_age == 2 or type_age == 3, 1.0, 0.0), select(coord(group) == 2, select(type_age == 4, 1.0, 0.0), select(coord(group) == 3, select(type_quintile == 0, 1.0, 0.0), select(coord(group) == 4, select(type_quintile >= 1 and type_quintile <= 3, 1.0, 0.0), select(coord(group) == 5, select(type_quintile == 4, 1.0, 0.0), select(coord(group) == 6, select(type_in_work == 1, 1.0, 0.0), select(coord(group) == 7, select(type_in_work == 0 and type_age <= 3, 1.0, 0.0), select(coord(group) == 8, safe_div(1.0 * voters_parents, 1.0 * voters, 0.0), select(coord(group) == 9, safe_div(1.0 * voters_lone_parents, 1.0 * voters, 0.0), select(coord(group) == 10, safe_div(1.0 * voters_self_employed, 1.0 * voters, 0.0), select(coord(group) == 11, select(type_region == 10, 1.0, 0.0), select(coord(group) == 12, select(type_region == 9, 1.0, 0.0), select(coord(group) == 13, select(type_region == 11, 1.0, 0.0), select(coord(group) == 14, select(type_region == 6, 1.0, 0.0), select(coord(group) == 15, select(type_region <= 2, 1.0, 0.0), select(coord(group) == 16, select(type_region == 3 or type_region == 4, 1.0, 0.0), select(coord(group) == 17, select(type_region == 5 or type_region == 7 or type_region == 8, 1.0, 0.0), select(coord(group) == 18, estimated_member_motorists, select(coord(group) == 19, estimated_member_home_owners, select(coord(group) == 20, estimated_member_renters, select(coord(group) == 21, estimated_member_drinkers, select(coord(group) == 22, estimated_member_smokers, select(coord(group) == 23, estimated_member_socialists, select(coord(group) == 24, estimated_member_capitalists, select(coord(group) == 25, estimated_member_liberals, select(coord(group) == 26, estimated_member_conservatives, select(coord(group) == 27, estimated_member_environmentalists, select(coord(group) == 28, estimated_member_patriots, select(coord(group) == 29, estimated_member_public_sector, select(coord(group) == 30, estimated_member_trade_unionists, select(coord(group) == 31, estimated_member_farmers, select(coord(group) == 32, estimated_member_town, estimated_member_countryside)))))))))))))))))))))))))))))))))"
 
 [var.governing_choice]
 doc = "Share of each voter type choosing a governing bloc"
@@ -666,7 +754,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["group"]
-expr = "sum(voters * group_member * government_standing, voter_type) / group_voters"
+expr = "sum(voters * group_member * (government_standing - belief_standing), voter_type) / group_voters"
 
 [var.group_driver_finances]
 label = "Approval drivers: the public finances"
@@ -676,6 +764,24 @@ unit = "1"
 phase = "politics"
 dims = ["group"]
 expr = "sum(voters * group_member * voter_finances, voter_type) / group_voters"
+
+[var.group_driver_stances]
+label = "Approval drivers: where the government stands"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * belief_standing, voter_type) / group_voters"
+
+[var.group_driver_conditions]
+label = "Approval drivers: rents, bills, pay and farm incomes"
+doc = "The group's mean, weighted by adults, of this term of the governing blocs' utility"
+type = "real"
+unit = "1"
+phase = "politics"
+dims = ["group"]
+expr = "sum(voters * group_member * voter_conditions, voter_type) / group_voters"
 
 [var.approval_young]
 label = "Approval: the young"
@@ -998,6 +1104,160 @@ type = "real"
 unit = "1"
 phase = "politics"
 expr = "group_share[group: 22]"
+
+[var.approval_socialists]
+label = "Approval: socialists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 23]"
+
+[var.share_socialists]
+label = "Share of the electorate: socialists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 23]"
+
+[var.approval_capitalists]
+label = "Approval: capitalists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 24]"
+
+[var.share_capitalists]
+label = "Share of the electorate: capitalists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 24]"
+
+[var.approval_liberals]
+label = "Approval: liberals"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 25]"
+
+[var.share_liberals]
+label = "Share of the electorate: liberals"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 25]"
+
+[var.approval_conservatives]
+label = "Approval: conservatives"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 26]"
+
+[var.share_conservatives]
+label = "Share of the electorate: conservatives"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 26]"
+
+[var.approval_environmentalists]
+label = "Approval: environmentalists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 27]"
+
+[var.share_environmentalists]
+label = "Share of the electorate: environmentalists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 27]"
+
+[var.approval_patriots]
+label = "Approval: patriots"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 28]"
+
+[var.share_patriots]
+label = "Share of the electorate: patriots"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 28]"
+
+[var.approval_public_sector]
+label = "Approval: public sector workers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 29]"
+
+[var.share_public_sector]
+label = "Share of the electorate: public sector workers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 29]"
+
+[var.approval_trade_unionists]
+label = "Approval: trade unionists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 30]"
+
+[var.share_trade_unionists]
+label = "Share of the electorate: trade unionists"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 30]"
+
+[var.approval_farmers]
+label = "Approval: farmers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 31]"
+
+[var.share_farmers]
+label = "Share of the electorate: farmers"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 31]"
+
+[var.approval_town]
+label = "Approval: people in towns and cities"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 32]"
+
+[var.share_town]
+label = "Share of the electorate: people in towns and cities"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 32]"
+
+[var.approval_countryside]
+label = "Approval: people in the countryside"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_approval[group: 33]"
+
+[var.share_countryside]
+label = "Share of the electorate: people in the countryside"
+type = "real"
+unit = "1"
+phase = "politics"
+expr = "group_share[group: 33]"
 
 [var.household_support]
 label = "Support for the government in the household"

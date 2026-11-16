@@ -578,6 +578,86 @@ unemployment before, when a cut to a service put its staff out of work in one mo
 - Austerity ties doing nothing rather than winning, as the target allows. Voters reward a fall
   in borrowing at about a seventh of the rate they punish a rise.
 
+## After S15.2
+
+Played a fifth time on 2026-11-16 with stage S15.2 of `docs/S15-PLAN.md` in the model: eleven new
+groups (beliefs, work, places), four stances the belief groups react to, twelve new policies
+(ten not in force), twelve new statistics, and the conditions the new groups feel
+(`models/uk/politics/README.md`, "Beliefs, work and places"; `models/uk/POLICIES.md`, "Stage
+S15.2"). The stances are centred: the electorate's mean reaction to any stance move is nil, so a
+stance moves support between its two sides and hands out no votes of its own. `[params]`:
+`vote_wear_effect` -0.025 to -0.022 (below); the rest unchanged. `python tools/uk/strategies.py`
+as before, with two new strategies:
+
+- **(i) A socialist programme:** a 1% wealth tax, every rail operator taken over, stronger unions
+  and public pay 1 point a year above the plans (Feb 2025); corporation tax 28% (Jun 2025); 5% more
+  for the NHS (Sep 2025); capped rent rises (Jan 2026); 30 hours of childcare for all (Jun 2026);
+  £200 a year off energy bills (Jan 2027); 5% more for schools (Jun 2027).
+- **(j) A law and order government:** tougher sentencing, a tenth more for police, courts and
+  prisons, identity cards (Feb 2025); a £45,000 visa threshold (Jun 2025); minimum service levels
+  in strikes (Sep 2025); a tenth more for defence (Jan 2026); tighter union law (Jun 2026); tough
+  sentencing (Jan 2027); a fifth off aid (Jun 2027).
+
+### Strategies at a glance, after S15.2 (election in July 2029; the majority is 326)
+
+Approval columns are Jan 2026 / Jan 2027 / Jun 2029. Seats in brackets are after S14.5.
+
+| Strategy | Approval | CL seats (S14.5) | Government after | Balance Jun 2029 £bn/yr | Debt % GDP | Unemployment | Bills passed | Lenders refuse |
+|---|---|---|---|---|---|---|---|---|
+| (a) Nothing, first answers | 32.7 / 31.5 / 28.5% | 325 (324) | CL+SNP | -184 | 105.2 | 5.0% | 0 | no |
+| (b) Nothing, second answers | 32.8 / 31.5 / 28.1% | 315 (316) | CL+SNP | -179 | 105.2 | 5.9% | 0 | no |
+| (c) Crowd-pleaser | 34.0 / 31.2 / 28.1% | 309 (305) | CL+SNP+PC | -223 | 108.9 | 5.7% | 17 | Mar 2028 |
+| (d) Austerity | 31.2 / 30.5 / 28.4% | 327 (324) | Centre-left | -53 | 97.7 | 6.6% | 29 | no |
+| (e) Reformer | 32.6 / 31.3 / 29.4% | 343 (336) | Centre-left | -180 | 103.7 | 4.8% | 8 | no |
+| (f1) Basic rate 30% in Feb 2025 | 31.5 / 30.9 / 29.2% | 335 (331) | Centre-left | -125 | 100.8 | 5.3% | 1 | no |
+| (f2) Health cut by a quarter in Feb 2025 | 28.0 / 27.2 / 26.6% | 284 (279) | CL+Lib+Grn+SNP+PC | -117 | 101.3 | 5.9% | 1 | no |
+| (g) Wrecker | 25.5 / 26.3 / 16.6% | 64 (68) | CR+PopR | +95 | 94.4 | 14.9% | 5 | no |
+| (h) Tax early, please late | 31.2 / 31.9 / 31.8% | 372 (373) | Centre-left | -152 | 99.1 | 4.4% | 13 | no |
+| (i) A socialist programme | 33.7 / 32.9 / 30.4% | 349 (new) | Centre-left | -197 | 103.7 | 4.9% | 10 | no |
+| (j) A law and order government | 33.6 / 32.4 / 29.6% | 349 (new) | Centre-left | -184 | 105.2 | 4.9% | 9 | no |
+
+The largest one-month move is 3.3 points of approval (the wrecker's first bills) and 0.6 of
+unemployment. With the stances off (`--param belief_effect=0`) the socialist programme holds 354
+and law and order 336: the stances are worth -5 and +13 seats.
+
+### The new groups, June 2029 (approval; change against doing nothing)
+
+| Strategy | Socialists | Capitalists | Liberals | Conservatives | Environmentalists | Patriots | Public sector | Trade unionists | Farmers | Town | Countryside |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| (a) Nothing | 30.1 | 28.0 | 31.7 | 26.0 | 31.0 | 26.1 | 33.3 | 32.5 | 25.8 | 29.5 | 24.4 |
+| (c) Crowd-pleaser | +0.5 | -1.5 | -0.2 | -0.5 | -0.3 | -0.7 | -1.1 | -1.4 | -1.1 | -0.3 | -1.0 |
+| (d) Austerity | -0.7 | +0.5 | -0.7 | +0.3 | -0.6 | +0.5 | -0.4 | -0.1 | +0.6 | -0.3 | +0.7 |
+| (e) Reformer | +1.6 | -0.1 | +0.5 | +1.3 | +0.4 | +1.1 | -0.5 | -0.7 | +0.3 | +1.0 | +0.6 |
+| (h) Tax early, please late | +4.3 | +2.3 | +3.6 | +3.2 | +3.5 | +3.0 | +2.5 | +2.1 | +2.4 | +3.5 | +2.4 |
+| (i) Socialist programme | +2.7 | +1.2 | +2.3 | +1.6 | +2.2 | +1.5 | +2.5 | +2.3 | +1.6 | +2.1 | +1.2 |
+| (j) Law and order | +0.6 | +0.9 | -1.1 | +2.7 | -0.8 | +2.8 | -1.2 | -0.6 | +1.9 | +0.8 | +2.5 |
+
+### The conclusions, a fifth time
+
+- **Doing nothing** keeps 325 seats with the first answers, inside 320 to 332; the second
+  answers give 315. Rents, energy bills and the slow squeeze on public pay now cost a little by
+  2029, so the scenario's wear of office was eased from -0.025 to -0.022 a year to keep (a) in
+  its band.
+- **Governing sensibly pays.** The reformer (343) and austerity (327) are at or above doing
+  nothing; the crowd-pleaser (309) is behind it; the wrecker is out of office.
+- **Two programmes, one result.** The socialist programme and law and order both hold 349. They
+  differ by what they do: the socialist one raises public pay and cuts energy bills and rents, so
+  every group gains (public sector workers +2.5, unions +2.3), and borrows £13bn a year more; law
+  and order costs the liberals, environmentalists and public sector workers while conservatives,
+  patriots and the countryside gain 2.5 to 2.8.
+- **Belief groups move less than asked.** Centred and capped so no programme wins more than about
+  15 seats from stances, a single clear move shifts its two groups by about 1.3 points each way
+  (conservatives against liberals) and a whole programme by 2 to 4 points relative to its
+  opponents. Under the socialist programme the capitalists still gain (+1.2), because its pay
+  and bills lift every group by more than the state stance takes from them. Larger stance
+  effects split the groups more but bring back a dominant law and order strategy (380 seats at
+  0.35 and a saturation of three); this is the trade-off the size settles.
+- **"Tax early, please late"** holds 372, 29 above the reformer. Its lead does not come from the
+  stances (375 with them off): it is the S13 finding that a tax rise paid early and spent late
+  wins. The stances could not narrow it honestly, and no other change was made for it.
+- **Still wrong:** groups move by who is in which voter types, not by members alone, so small
+  groups (farmers) and overlapping ones (unions with capitalists) move with their neighbours.
+
 ## Month by month, by strategy
 
 Groups: the lowest and highest group approval in that month. Capital: held at the end of the month; earned, spent and wasted at the cap over the 12 months to that month. Growth is the annual rate of output growth that month.

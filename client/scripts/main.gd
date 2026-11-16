@@ -742,7 +742,7 @@ func _model_changed() -> void:
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	politics.build(play)
 	board.build(entries, play, lever_entries, _key_label, func(l: String) -> Variant: return game.latest(l), game.pending())
-	politics.build_groups(board)
+	politics.build_groups(board, play.get("web", {}))
 	_build_headline()
 	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
 	# opened, loaded or reloaded).
@@ -872,8 +872,28 @@ func _show_date() -> void:
 	_date.text = fmt.month_name(maxi(done - 1, 0)) + ("  ·  start" if done == 0 else "  ·  %d/%d" % [done, term])
 
 
+## Stage S15.3: what moved each stance last: the newest bill passed among the levers its
+## formula reads (from the catalogue, so no engine call).
+func _stance_moves() -> void:
+	var words := {}
+	var changes := game.changes()
+	for item in play.get("web", {}).get("stances", []):
+		var row := str(item.get("row", ""))
+		var entry: Dictionary = rows.get(row, {})
+		var reads: PackedStringArray = entry.get("inputs", PackedStringArray())
+		for i in range(changes.size() - 1, -1, -1):
+			var c: Dictionary = changes[i]
+			if c.get("passed", true) and reads.has(str(c["lever"])):
+				var key := board.holds(str(c["lever"]))
+				var label := str(board.policy_node(key).get("long_label", board.policy_node(key).get("label", c["lever"]))) if key != "" else str(c["lever"])
+				words[row] = "last moved by %s, %s" % [label, fmt.month_name(int(c["step"]))]
+				break
+	politics.last_moved = words
+
+
 ## The sheets' figures (read elsewhere too, so kept up to date while shut).
 func _refresh_sheets() -> void:
+	_stance_moves()
 	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
 	politics.refresh(func(name: String) -> Dictionary: return game.cells(name),
 		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
@@ -1155,6 +1175,7 @@ func _index_item(key: String, kind: String, n: Dictionary, also: Dictionary, nod
 		words.append(str(entries.get(lever, {}).get("label", "")))
 	var name := str(n.get("name", ""))
 	words.append(name.replace("_", " "))
+	words.append(str(n.get("long_label", "")))
 	var other := PackedStringArray()
 	for k in [key, key.get_slice(":", 1), name, str(n.get("row", ""))]:
 		for w in also.get(k, []):
@@ -1500,6 +1521,7 @@ func _group_content(key: String) -> Control:
 	for m in board.movers(key):
 		movers.append([m[0], board.nodes[m[0]]["label"], m[1], m[2]])
 	card.build(node, entries.get(node["name"], {}), _group_drivers(), movers)
+	card.set_stance(_stance_words(key))
 	card.follow.connect(func(target: String) -> void: _follow(target))
 	card.household_opened.connect(func(record: Dictionary) -> void:
 		popup.push(func() -> Control: return _household_content(record)))
@@ -1527,6 +1549,22 @@ func _group_index(node: Dictionary) -> int:
 		if share != null and (best < 0 or absf(values[i] - float(share)) < absf(values[best] - float(share))):
 			best = i
 	return best
+
+
+## Stage S15.3: for a belief group (an end of one of [play.web] `stances`), the stance its
+## "Where the government stands" reads and where the government stands on it; else "".
+func _stance_words(key: String) -> String:
+	var group := key.trim_prefix("group:")
+	for item in play.get("web", {}).get("stances", []):
+		var end := "high" if str(item.get("high_group", "")) == group else ("low" if str(item.get("low_group", "")) == group else "")
+		if end == "":
+			continue
+		var v: Variant = game.latest(str(item.get("row", "")))
+		var value := float(v) if v != null else 0.0
+		var toward := str(item.get("high" if value > 0.0 else "low", "")).to_lower()
+		var where := "where it stood in 2024" if absf(value) < 0.05 else "%.1f toward %s" % [absf(value), toward]
+		return "Where the government stands, for them: %s, %s (they want %s)." % [str(item.get("label", "")), where, str(item.get(end, "")).to_lower()]
+	return ""
 
 
 ## The drivers of a group's vote: [[plain name, value name]], from [play.web].
@@ -1618,6 +1656,7 @@ func _refresh_popup(pending: Dictionary, capital: float) -> void:
 	if group != null:
 		group.refresh(func(r: String) -> Variant: return game.latest(r), func(r: String) -> Variant: return game.previous(r),
 			func(name: String) -> Dictionary: return game.cells(name), _group_drivers())
+		group.set_stance(_stance_words(group.key))
 		var support := str(play.get("politics", {}).get("support", ""))
 		group.show_history(game.history_steps(), func(r: String) -> PackedFloat64Array: return game.series(r),
 			[support, "The country"] if support != "" else [])

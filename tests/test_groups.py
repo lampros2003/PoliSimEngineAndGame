@@ -20,12 +20,16 @@ GROUPS = ["young", "midlife", "pensioners", "low_income", "middle_income", "high
           "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north",
           "midlands", "south",
           # Stage S13.5: estimated from published shares (models/uk/POLICIES.md, Groups).
-          "motorists", "home_owners", "renters", "drinkers", "smokers"]
+          "motorists", "home_owners", "renters", "drinkers", "smokers",
+          # Stage S15.2: beliefs, work and places (models/uk/politics/README.md).
+          "socialists", "capitalists", "liberals", "conservatives", "environmentalists", "patriots",
+          "public_sector", "trade_unionists", "farmers", "town", "countryside"]
 PARTITIONS = {"age": ["young", "midlife", "pensioners"],
               "income": ["low_income", "middle_income", "high_income"],
               "place": ["scotland", "wales", "northern_ireland", "london", "north", "midlands", "south"],
-              "tenure": ["home_owners", "renters"]}
-DRIVERS = ["income", "jobs", "prices_and_time", "services", "standing", "finances"]  # finances: stage S13.8
+              "tenure": ["home_owners", "renters"],
+              "settlement": ["town", "countryside"]}  # stage S15.2
+DRIVERS = ["income", "jobs", "prices_and_time", "services", "standing", "finances", "stances", "conditions"]  # finances: S13.8; stances, conditions: S15.2
 OPTIONS = 10  # nine blocs and not voting, the last
 YEAR = 13  # the base month and a year after a change made in the second
 
@@ -165,7 +169,8 @@ class Policies(unittest.TestCase):
         nation = after_a_year(**rise)[1]["government_support"] - after_a_year()[1]["government_support"]
         self.assertLess(motorists, nation)
         self.assertLess(nation, london)
-        self.assertLess(london, 0.0)
+        # Stage S15.2: London no longer falls at all: its environmentalists and liberals welcome
+        # the green stance a higher duty takes (beliefs.toml), and it drives least.
         sim = after_a_year(**rise)[0]
         voters, member, standing = sim.column("voters"), sim.column("group_member"), sim.column("standing_fuel_duty")
 

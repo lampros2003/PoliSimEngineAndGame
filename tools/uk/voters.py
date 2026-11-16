@@ -67,6 +67,18 @@ GROUPS = [
     ("renters", "Renters", "renters", "estimated_member_renters"),
     ("drinkers", "Drinkers", "drinkers", "estimated_member_drinkers"),
     ("smokers", "Smokers", "smokers", "estimated_member_smokers"),
+    # Stage S15.2: beliefs, work and places (docs/S15-PLAN.md, Groups), estimated (ESTIMATED).
+    ("socialists", "Socialists", "socialists", "estimated_member_socialists"),
+    ("capitalists", "Capitalists", "capitalists", "estimated_member_capitalists"),
+    ("liberals", "Liberals", "liberals", "estimated_member_liberals"),
+    ("conservatives", "Conservatives", "conservatives", "estimated_member_conservatives"),
+    ("environmentalists", "Environmentalists", "environmentalists", "estimated_member_environmentalists"),
+    ("patriots", "Patriots", "patriots", "estimated_member_patriots"),
+    ("public_sector", "Public sector workers", "public sector workers", "estimated_member_public_sector"),
+    ("trade_unionists", "Trade unionists", "trade unionists", "estimated_member_trade_unionists"),
+    ("farmers", "Farmers", "farmers", "estimated_member_farmers"),
+    ("town", "Town and city", "people in towns and cities", "estimated_member_town"),
+    ("countryside", "Countryside", "people in the countryside", "estimated_member_countryside"),
 ]
 # Stage S13.5: the estimated groups' membership, the share of a voter type's adults in the
 # group, from published shares by household income quintile and age band (models/uk/POLICIES.md,
@@ -111,6 +123,60 @@ ESTIMATED = {
     # to 34, 7.1% at 65 and over (published); 35 to 64 and the income factors (routine and
     # manual workers smoke three times as often as managers and professionals) are estimates.
     "smokers": {"age": [0.081, 0.126, 0.115, 0.110, 0.071], "quintile": [1.6, 1.25, 1.0, 0.8, 0.6], "total": 0.106},
+    # Stage S15.2 (models/uk/politics/README.md, "Beliefs, work and places"). "work" is the
+    # factor for adults out of work and in work. Beliefs: the tails of British Social
+    # Attitudes' left-right and libertarian-authoritarian scales and the British Election
+    # Study's environment and national identity items. The totals and the shapes by age,
+    # income and region are judgements shaped like BSA 40 and 41's findings (the young and
+    # graduates more liberal and green, older voters more authoritarian and national, lower
+    # incomes more left on economics and more authoritarian); no table of these shares was
+    # opened. Socialists are the left fifth, capitalists the right sixth of the economic scale;
+    # liberals a quarter and conservatives three tenths at the two ends of the other.
+    "socialists": {"age": [1.3, 1.2, 1.0, 0.9, 0.75], "quintile": [1.3, 1.15, 1.0, 0.85, 0.7], "total": 0.20,
+                   "region": [1.15, 1.1, 1.0, 0.95, 0.95, 0.9, 1.15, 0.85, 0.9, 1.15, 1.15, 0.9]},
+    "capitalists": {"age": [0.8, 0.9, 1.0, 1.1, 1.2], "quintile": [0.5, 0.8, 1.0, 1.3, 1.6], "total": 0.15,
+                    "region": [0.85, 0.9, 0.95, 1.05, 1.0, 1.1, 1.0, 1.15, 1.05, 0.85, 0.85, 1.0]},
+    "liberals": {"age": [1.6, 1.3, 1.0, 0.8, 0.6], "quintile": [0.7, 0.85, 1.0, 1.15, 1.3], "total": 0.25,
+                 "region": [0.85, 0.95, 0.9, 0.9, 0.9, 0.95, 1.45, 1.0, 1.0, 0.95, 1.05, 0.9]},
+    "conservatives": {"age": [0.6, 0.75, 0.95, 1.15, 1.4], "quintile": [1.25, 1.15, 1.0, 0.9, 0.75], "total": 0.30,
+                      "region": [1.1, 1.05, 1.1, 1.1, 1.1, 1.05, 0.75, 1.0, 1.0, 1.0, 0.9, 1.1]},
+    "environmentalists": {"age": [1.6, 1.3, 1.0, 0.8, 0.7], "quintile": [0.7, 0.85, 1.0, 1.15, 1.3], "total": 0.12,
+                          "region": [0.85, 0.9, 0.85, 0.9, 0.9, 1.0, 1.35, 1.05, 1.15, 1.0, 1.05, 0.8]},
+    "patriots": {"age": [0.6, 0.7, 0.95, 1.2, 1.35], "quintile": [1.15, 1.1, 1.0, 0.9, 0.85], "total": 0.25,
+                 "region": [1.15, 1.1, 1.15, 1.15, 1.15, 1.1, 0.6, 1.05, 1.05, 0.8, 0.7, 0.9]},
+    # ONS, Public sector employment, UK: December 2024 (opened): 6.14 million, about 11.5% of
+    # adults; only those in work. The shape by age and income is a judgement (public pay sits in
+    # the middle of the distribution, few at 65 and over), and so is the region list (higher
+    # shares in Northern Ireland, Wales, Scotland and the North East).
+    "public_sector": {"work": [0.0, 1.0], "age": [0.6, 1.0, 1.1, 1.1, 0.2], "quintile": [0.5, 0.9, 1.15, 1.2, 1.0],
+                      "total": 6.14e6 / 53.5e6,
+                      "region": [1.2, 1.05, 1.0, 0.95, 0.95, 0.9, 0.95, 0.9, 1.0, 1.2, 1.2, 1.35]},
+    # DBT, Trade union membership, UK 1995 to 2024 (opened): 6.4 million members, 22.0% of
+    # employees; by region 25.6% North East to 17.8% London, Wales 29.5%, Scotland 27.0%,
+    # Northern Ireland 34.0% (the region list, published); by weekly pay 7.7% under £250,
+    # 18.5% at £250 to £499, 27.1% at £500 to £999, 19.9% at £1,000 and over (read across to
+    # income fifths: a judgement); 37.7% of members are 50 or over (the age shape, a
+    # judgement). Only those in work.
+    "trade_unionists": {"work": [0.0, 1.0], "age": [0.35, 0.8, 1.0, 1.3, 0.3], "quintile": [0.4, 0.85, 1.25, 1.35, 1.0],
+                        "total": 6.4e6 / 53.5e6,
+                        "region": [0.256, 0.250, 0.236, 0.216, 0.211, 0.180, 0.178, 0.181, 0.203, 0.295, 0.270, 0.340]},
+    # Defra, Agriculture in the UK 2024, chapter 2 (search result read, page not opened):
+    # 453,000 people on commercial holdings in June 2024 (farmers, partners, directors and
+    # workers), about 0.85% of adults. Older than most workers (a judgement); by region a
+    # judgement shaped like the holdings: most in the South West, Wales, Scotland and Northern
+    # Ireland, almost none in London. Some farm on past 65, so out of work counts 0.3.
+    "farmers": {"work": [0.3, 1.0], "age": [0.4, 0.6, 0.9, 1.4, 1.6], "quintile": [1.2, 1.1, 1.0, 0.9, 0.9],
+                "total": 4.53e5 / 53.5e6,
+                "region": [1.0, 0.7, 1.0, 1.3, 1.0, 1.1, 0.02, 0.7, 1.6, 2.5, 1.6, 3.0]},
+    # The rural share of each region's people: England 16.9% in Census 2021 on the 2021
+    # rural-urban classification (Defra, Statistical Digest of Rural England, population,
+    # March 2025: search result read). The English regions, Wales (about a third), Scotland
+    # (accessible and remote rural, about 17%) and Northern Ireland (about 36%) are from
+    # memory of the ONS, Scottish Government and NISRA classifications, not opened. Older than
+    # average (a judgement). The UK total, 18.2%, weights those by the nations' people. Town and
+    # city is everyone else.
+    "countryside": {"age": [0.7, 0.75, 1.0, 1.2, 1.3], "total": 0.182,
+                    "region": [0.18, 0.13, 0.16, 0.26, 0.16, 0.28, 0.0, 0.20, 0.33, 0.33, 0.17, 0.36]},
 }
 # The group dimension's member where the key is already an element's name (households.toml).
 MEMBER = {"pensioners": "pensioner"}
@@ -139,9 +205,13 @@ DRIVERS = [
     ("jobs", "jobs: unemployment in the region since the election", "voter_jobs"),
     ("prices_and_time", "prices and time in office", None),
     ("services", "services and the climate", "voter_services"),
-    ("standing", "reactions to the government's decisions", "government_standing"),
+    ("standing", "reactions to the government's decisions", "(government_standing - belief_standing)"),
     # Stage S13.8: borrowing against the last election.
     ("finances", "the public finances", "voter_finances"),
+    # Stage S15.2: where the government stands, for the belief groups, and what the new groups
+    # of work and place react to (beliefs.toml).
+    ("stances", "where the government stands", "belief_standing"),
+    ("conditions", "rents, bills, pay and farm incomes", "voter_conditions"),
 ]
 
 ASSUMPTIONS = {
@@ -299,16 +369,18 @@ def estimated_members(voters: list[float]) -> dict[str, list[float]]:
     types = voter_types()
     out = {}
     for key, table in ESTIMATED.items():
-        raw = [table.get("age", [1.0] * 5)[a] * table.get("quintile", [1.0] * 5)[q] for _, a, q, _ in types]
+        raw = [table.get("age", [1.0] * 5)[a] * table.get("quintile", [1.0] * 5)[q] * table.get("work", [1.0, 1.0])[w]
+               for _, a, q, w in types]
         total = table.get("total", sum(n * s for n, s in zip(voters, raw)) / sum(voters))
         if "region" in table:  # Stage S13.6: each region's mean in proportion to its published share
             mean = [sum(n * s for (r, _, _, _), n, s in zip(types, voters, raw) if r == k)
                     / sum(n for (r, _, _, _), n in zip(types, voters) if r == k) for k in range(len(REGIONS))]
-            raw = [s * table["region"][r] / mean[r] for (r, _, _, _), s in zip(types, raw)]
+            raw = [s * table["region"][r] / mean[r] if mean[r] > 0 else 0.0 for (r, _, _, _), s in zip(types, raw)]
         scale = total * sum(voters) / sum(n * s for n, s in zip(voters, raw)) if "total" in table or "region" in table \
             else 1.0
         out[key] = [min(s * scale, 0.98) for s in raw]
     out["renters"] = [1.0 - s for s in out["home_owners"]]
+    out["town"] = [1.0 - s for s in out["countryside"]]
     return out
 
 
@@ -863,7 +935,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "0.0 * type_age + policy_standing + finances_standing"
+expr = "0.0 * type_age + policy_standing + finances_standing + belief_standing"
 
 [var.voter_jobs]
 doc = "Unemployment in the voter type's region against its level at the last election, on the government's utility (stage S13.4: a driver of approval)"
@@ -934,7 +1006,7 @@ type = "real"
 unit = "1"
 phase = "politics"
 dims = ["voter_type"]
-expr = "government_standing + fundamentals + voter_jobs + voter_services + voter_finances"
+expr = "government_standing + fundamentals + voter_jobs + voter_services + voter_finances + voter_conditions"
 
 [var.utility]
 type = "real"

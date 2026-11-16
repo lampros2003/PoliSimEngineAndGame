@@ -78,6 +78,37 @@ func _initialize() -> void:
 		if ni.approval_text != "–" or str(board.nodes["group:northern_ireland"]["value"]) != "–":
 			return _fail("Northern Ireland shows %s (board %s)" % [ni.approval_text, board.nodes["group:northern_ireland"]["value"]])
 		main.close_popup()
+	# Stage S15.3: a belief group's popup says which stance moves it, among its drivers.
+	var stance_said := "no belief groups"
+	if board.nodes.has("group:socialists"):
+		main.open_node("group:socialists")
+		await process_frame
+		var soc = main.group_card()
+		var named: bool = soc.drivers_shown.any(func(d): return str(d[0]) == "Where the government stands")
+		if not named or not soc.stance_text.contains("The state against the market"):
+			return _fail("the Socialists' popup: drivers %s, stance %s" % [soc.drivers_shown.map(func(d): return d[0]), soc.stance_text])
+		stance_said = soc.stance_text
+		main.close_popup()
+		await _settle()
+	# Stage S15.3: tougher sentencing: the Conservatives warm to it, the Liberals cool, in a year.
+	var order := ""
+	if board.nodes.has("policy:sentencing") and board.nodes.has("group:conservatives"):
+		main.type_lever("sentencing", 3.0)
+		await _settle()
+		var sentencing = main.policy_card()
+		for i in 600:
+			if not sentencing.year_all_groups.is_empty() and not sentencing.measuring:
+				break
+			await process_frame
+		var moved := {}
+		for g in sentencing.year_all_groups:
+			moved[g[0]] = g[1]
+		if not moved.get("Conservatives", 0.0) > 0.0 or not moved.get("Liberals", 0.0) < 0.0:
+			return _fail("tougher sentencing, in a year: Conservatives %s, Liberals %s" % [moved.get("Conservatives"), moved.get("Liberals")])
+		order = "tougher sentencing: Conservatives %+.2f pts, Liberals %+.2f pts in a year" % [moved["Conservatives"] * 100.0, moved["Liberals"] * 100.0]
+		main.game.cancel_lever("sentencing")
+		main.close_popup()
+		await _settle()
 	# Raising the basic rate: high incomes turn against it more than low incomes.
 	main.type_lever("basic_rate", 21.0)
 	await _settle()
@@ -100,6 +131,14 @@ func _initialize() -> void:
 		if main.board.effects.has("basic_rate") and not main.effects_running:
 			break
 		await process_frame
+	# Stage S15.3: the order stance moves with tougher sentencing in the effects table too.
+	if order != "":
+		for i in 6000:
+			if main.board.effects.has("sentencing") and not main.effects_running:
+				break
+			await process_frame
+		if not float(main.board.effects.get("sentencing", {}).get("stance_order", 0.0)) > 0.0:
+			return _fail("tougher sentencing does not move the order stance: %s" % main.board.effects.get("sentencing", {}).get("stance_order"))
 	main.hover("policy:income_tax")
 	var signs := {}
 	for link in board._links:
@@ -125,8 +164,8 @@ func _initialize() -> void:
 	await _settle()
 	if not board.keys_of("group").is_empty() or not board.overlaps().is_empty() or main.failed:
 		return _fail("valmora's board: %d groups, %s" % [board.keys_of("group").size(), board.overlaps()])
-	print("people: the young back the government at %s, as the model has it, its six drivers the model's; Northern Ireland shows a dash; eight of the young's households, all young, one's account adding up (%s); a 21%% basic rate costs high incomes %.2f pts and low incomes %.2f; Income tax links the budget balance and unemployment up, and %d groups; valmora's board has no groups" % [
-		young_text, net_text, groups["High incomes"] * 100.0, groups.get("Low incomes", 0.0) * 100.0, group_links.size()])
+	print("people: the young back the government at %s, as the model has it, its six drivers the model's; Northern Ireland shows a dash; eight of the young's households, all young, one's account adding up (%s); a 21%% basic rate costs high incomes %.2f pts and low incomes %.2f; Income tax links the budget balance and unemployment up, and %d groups; %s; the Socialists: %s; valmora's board has no groups" % [
+		young_text, net_text, groups["High incomes"] * 100.0, groups.get("Low incomes", 0.0) * 100.0, group_links.size(), order, stance_said])
 	quit(0)
 
 

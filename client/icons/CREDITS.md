@@ -119,7 +119,7 @@ file was removed so the client can tint the white artwork. Stage S13.2; the grou
 | `welfare.svg` | meeple-group | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `winter-fuel.svg` | fireplace | delapouite, available on https://game-icons.net, CC BY 3.0 |
 
-Stage S14.5: four pictograms drawn for this project (original art, in the style of the set
+Stage S14.5 (four) and stage S15.3 (the rest below): pictograms drawn for this project (original art, in the style of the set
 above: white silhouettes on a 512 square), not from game-icons.net.
 
 | File | Icon | Author |
@@ -128,3 +128,31 @@ above: white silhouettes on a 512 square), not from game-icons.net.
 | `mortgage-rate.svg` | a house with a percent badge | original to PoliSim |
 | `productivity.svg` | a cog with a rising arrow | original to PoliSim |
 | `homelessness.svg` | a figure under a bare roof line | original to PoliSim |
+| `group-socialists.svg` | a red rose | original to PoliSim |
+| `group-capitalists.svg` | a top hat | original to PoliSim |
+| `group-liberals.svg` | a dove in flight | original to PoliSim |
+| `group-conservatives.svg` | an oak | original to PoliSim |
+| `group-environmentalists.svg` | a leaf | original to PoliSim |
+| `group-patriots.svg` | a flag on a pole | original to PoliSim |
+| `group-public-sector.svg` | a lanyard and badge | original to PoliSim |
+| `group-trade-unionists.svg` | three figures under a banner | original to PoliSim |
+| `group-farmers.svg` | a tractor | original to PoliSim |
+| `group-town.svg` | town buildings | original to PoliSim |
+| `group-countryside.svg` | hills and a tree | original to PoliSim |
+| `inequality.svg` | a tipped balance | original to PoliSim |
+| `rents.svg` | a key and a tag | original to PoliSim |
+| `house-prices.svg` | a house and a rising arrow | original to PoliSim |
+| `energy-bills.svg` | a bulb and a bill | original to PoliSim |
+| `strikes.svg` | a picket placard | original to PoliSim |
+| `business-confidence.svg` | a briefcase with a gauge | original to PoliSim |
+| `farm-incomes.svg` | a wheat sheaf and a coin | original to PoliSim |
+| `farm-support.svg` | a wheat sheaf in a hand | original to PoliSim |
+| `congestion.svg` | a queue of cars | original to PoliSim |
+| `congestion-charge.svg` | a car at a barrier | original to PoliSim |
+| `air-pollution.svg` | a smoking chimney | original to PoliSim |
+| `research.svg` | a flask | original to PoliSim |
+| `wealth-tax.svg` | coins and a percent badge | original to PoliSim |
+| `childcare.svg` | a pram | original to PoliSim |
+| `id-card.svg` | a card with a portrait | original to PoliSim |
+| `union.svg` | clasped hands | original to PoliSim |
+| `wind.svg` | a wind turbine | original to PoliSim |

@@ -28,7 +28,10 @@ FIVE_YEARS = 61
 LEVERS = tomllib.loads((UK / "policies.toml").read_text(encoding="utf-8"))["lever"]
 GROUPS = ["young", "midlife", "pensioners", "low_income", "middle_income", "high_income", "in_work", "out_of_work",
           "parents", "lone_parents", "self_employed", "scotland", "wales", "northern_ireland", "london", "north",
-          "midlands", "south", "motorists", "home_owners", "renters", "drinkers", "smokers"]
+          "midlands", "south", "motorists", "home_owners", "renters", "drinkers", "smokers",
+          # Stage S15.2
+          "socialists", "capitalists", "liberals", "conservatives", "environmentalists", "patriots",
+          "public_sector", "trade_unionists", "farmers", "town", "countryside"]
 
 ONE = {"sentencing": 3, "tobacco_duty": 1.5, "ev_grant": 3000, "planning_rules": 3, "free_school_meals": 1,
        "winter_fuel_payment": 2, "visa_threshold": 50000, "prescription_charge": 12}

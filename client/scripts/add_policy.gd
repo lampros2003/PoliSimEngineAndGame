@@ -217,7 +217,7 @@ func _row(item: Dictionary) -> Button:
 			parts.append("[color=#%s][b]Cheer:[/b] %s[/color]" % [Palette.GOOD.to_html(false), ", ".join(cheer)])
 		if not boo.is_empty():
 			parts.append("[color=#%s][b]Boo:[/b] %s[/color]" % [Palette.BAD.to_html(false), ", ".join(boo)])
-		who.text = "    ".join(parts)
+		who.text = "\n".join(parts)  # stage S15.3: each on a line of its own, never broken after its heading
 		words.add_child(who)
 	elif bool(item.get("pending", false)):
 		var wait := Label.new()

@@ -16,6 +16,10 @@ Stage S14.5 added `test_economy.py` (22 tests): the tax rise and the State Pensi
 interest rates, slumps that last, the borrowing chance, homelessness and productivity. The
 eight strategies of `docs/S13-BALANCE.md` are played by `python tools/uk/strategies.py`.
 
+Stage S15.2 added `test_beliefs.py` (24 tests): the new groups' shares, the stances and the
+belief groups' reactions, each new policy and statistic, the situations' statistics and the
+board's size. `python tools/uk/audit.py` writes the statistics audit (`models/uk/STATISTICS.md`).
+
 ## Where the reference implementation's tests went
 
 Until stage S14.2 these tests ran on the Python reference implementation (`oracle/`), 196

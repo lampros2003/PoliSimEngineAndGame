@@ -40,7 +40,11 @@ func _initialize() -> void:
 		await _settle()
 		if main.overlay_open() != "parliament" or not panel.is_visible_in_tree():
 			return _fail("Parliament did not open")
-		print("politics: the 2024 House, the government's poll rating, the July 2029 election and the issues shown")
+		# Stage S15.3: the stances the scenario names, each a scale, and the country by place.
+		var want_stances: int = main.play.get("web", {}).get("stances", []).size()
+		if panel.stance_rows.size() != want_stances or panel._place_rows.size() != main.play.get("web", {}).get("places", []).size():
+			return _fail("Parliament shows %d stances and %d places" % [panel.stance_rows.size(), panel._place_rows.size()])
+		print("politics: the 2024 House, the government's poll rating, the July 2029 election and the issues shown; %d stances as scales; %d places" % [want_stances, panel._place_rows.size()])
 	else:
 		if main._dialog == null or not main._dialog.visible or not main._dialog.title.contains("lost office"):
 			return _fail("election night was not announced")

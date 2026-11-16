@@ -310,3 +310,64 @@ rests, is its net income less the change in its mortgage payments since the base
 adult and its income, times the change in the mortgage rate. Nil at 2024's rates; a point on
 the mortgage rate costs a household of 35 to 49 with £50,000 a year about £70 a month, and
 pensioners almost nothing.
+
+## Beliefs, work and places (stage S15.2)
+
+`docs/S15-PLAN.md`, Groups. Eleven groups join the model (`tools/uk/voters.py`, `ESTIMATED`), each
+estimated by voter type as the motorists and the home owners are, now also by work (in work or
+not):
+
+| Group | Share of adults | Source (opened or not) |
+|---|---|---|
+| Socialists | 20% | The left fifth of British Social Attitudes' left-right scale: a judgement shaped like BSA 40 and 41 (younger, lower incomes, Scotland, Wales, the North East, London); no table of shares opened |
+| Capitalists | 15% | The right sixth of that scale: older, richer, the South East: a judgement |
+| Liberals | 25% | The libertarian end of BSA's libertarian-authoritarian scale: younger, richer, London: a judgement |
+| Conservatives | 30% | Its authoritarian end: older, lower incomes, outside London: a judgement |
+| Environmentalists | 12% | The British Election Study's priority for the environment: younger, richer, London and the South West: a judgement |
+| Patriots | 25% | The British Election Study's national identity: older, England outside London: a judgement |
+| Public sector workers | 11.5% | ONS, Public sector employment, UK, December 2024: 6.14 million (opened). Only those in work; the shape by age, income and region a judgement |
+| Trade unionists | 12% | DBT, Trade union membership, UK 1995 to 2024 (opened): 6.4 million, 22.0% of employees; the density by region is published and used; by pay, read across to income fifths |
+| Farmers | 0.85% | Defra, Agriculture in the UK 2024, chapter 2: 453,000 people on commercial holdings in June 2024 (search result read, page not opened); by region a judgement |
+| Countryside | 18.2% | Defra, Statistical Digest of Rural England: 16.9% of England's people rural in Census 2021 (search result read); the English regions, Wales, Scotland and Northern Ireland from memory of the national classifications, not opened |
+| Town and city | 81.8% | Everyone else |
+
+A voter type's membership of a group is a share of its adults, so a voter can be in several
+groups, and groups move by who is in which voter types. The seven regions and smokers leave
+the ring in `[play.web]` but stay in the model and in Parliament's table by place.
+
+**Stances.** Four national rows, worked out each month (`tools/uk/beliefs.py`, written to
+`beliefs.toml`): `stance_state` (the state against the market), `stance_order` (liberty against
+order), `stance_green` and `stance_nation`. Every player policy is tagged with the stances it
+moves and how strongly (`STANCES`); a stance is the number of clear moves made toward it since
+2024, net, where a clear move is five points on a tax rate, a tenth on a spending line, a level
+of a level policy, and so on. Nil at the 2024 settings.
+
+**What the belief groups do.** Socialists and capitalists read the state stance, conservatives
+and liberals order, environmentalists and motorists green, patriots and liberals the nation.
+Each voter type gains `belief_effect` (0.2) times the stance's pull, which saturates at one
+clear move (s / (1 + |s|)), times its friends' membership over their share of adults, less its
+opponents' likewise. Membership over share has a mean of one over the electorate, so the
+electorate's mean reaction to any stance move is nil: a stance moves support from one side to
+the other and hands out no utility of its own. Votes can still move, since the two sides sit in
+different voter types, some winnable and some not: with the stances off (`belief_effect` 0) the
+law and order programme of `tools/uk/strategies.py` wins 13 fewer seats and the socialist one 5
+more. The saturation and the size were cut until no one-sided programme gains more than about 15
+seats from its stances. This is `belief_standing`, part of `government_standing`, and the group
+driver "Where the government stands". After a year, tougher sentencing with a £5,000 higher
+visa threshold moves conservatives +1.3 and liberals -1.3 against doing nothing, the country
++0.2; five points on the basic rate with a tenth more for the NHS moves socialists +1.2 and
+capitalists -0.1 (both on top of what the policies themselves do to incomes and services).
+
+The belief shares are judgements. For stage S15.2 a published table of BSA's left-right and
+libertarian-authoritarian scale positions, or the BES's equivalents, was looked for again: the
+NatCen reports could not be fetched from this machine and the search results give the scales'
+construction and averages but no shares, so none was opened.
+
+**What the groups of work and place do.** Policy reactions go into `belief_standing` (towns and
+the countryside on fuel duty, the bus fare cap, planning and roads and railways) and the new
+policies' own reactions into `policy_standing` (`standing_s15_policies`). Reactions to
+conditions go into `voter_conditions`, a fundamental beside jobs and prices with its own driver
+("Rents, bills, pay and farm incomes"): public sector workers and trade unionists to public pay
+against prices and the pay bill, farmers to farm incomes, renters to real rents, home owners to
+house prices, motorists to congestion, low incomes and pensioners to energy bills, everyone a
+little to strikes. Each is nil in the base month. The sizes are in each term's `doc`.

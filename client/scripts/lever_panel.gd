@@ -214,7 +214,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	head.add_child(titles)
 	titles.add_child(Palette.caps(str(node.get("area", "Policy")) + (" · not in force" if introducing else "")))
 	var title := Label.new()
-	title.text = str(node.get("label", ""))
+	title.text = str(node.get("long_label", node.get("label", "")))
 	title.theme_type_variation = "Title"
 	titles.add_child(title)
 	if entries.size() == 1 and str(entries[0].get("doc", "")) != "":

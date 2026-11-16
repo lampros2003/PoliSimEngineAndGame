@@ -21,7 +21,7 @@ currency = "GBP"
 minor_units = 100
 step = "month"
 phases = ["labour", "alignment", "income", "spending", "finance", "accounts", "politics"]
-files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml", "finances.toml", "labour.toml", "statistics.toml"]
+files = ["calibration.toml", "economy.toml", "population.toml", "industries.toml", "households.toml", "politics.toml", "trade.toml", "functions.toml", "emissions.toml", "nhs.toml", "prices.toml", "situations.toml", "dilemmas.toml", "capital.toml", "policies.toml", "finances.toml", "labour.toml", "statistics.toml", "beliefs.toml"]
 
 [sector.households]
 label = "Households"

@@ -23,7 +23,9 @@ A monthly stock-flow model of the UK economy and public finances in model format
 | `capital.toml` | Political capital: what bills cost and how the government earns it (stage S12.4, `docs/S12-PLAN.md`) | Copied from `tools/uk/template/capital.toml` by `tools/uk/calibrate.py` |
 | `finances.toml` | Stage S13.8: borrowing smoothed over a year, its level at the start, the lenders' premium on new gilts and the gilt yield (below, "The public finances"); stage S14.5: Bank Rate, the mortgage rate and what they cost (below, "Interest rates") | Copied from `tools/uk/template/finances.toml` by `tools/uk/calibrate.py` (the mortgages' size from the households) |
 | `labour.toml` | Stage S14.5: labour hoarding, long unemployment and slow pay cuts (below, "Slumps that last") | Copied from `tools/uk/template/labour.toml` by `tools/uk/calibrate.py` |
-| `statistics.toml` | Stage S14.5: homelessness and productivity (below, and `POLICIES.md`) | Copied from `tools/uk/template/statistics.toml` by `tools/uk/calibrate.py` |
+| `beliefs.toml` | Stage S15.2: the four stances and what the new groups react to (`politics/README.md`, "Beliefs, work and places") | Written by `tools/uk/beliefs.py`, called by `tools/uk/calibrate.py` |
+| `STATISTICS.md` | Stage S15.2: the statistics audit (below) | `python tools/uk/audit.py` |
+| `statistics.toml` | Stage S14.5: homelessness and productivity; stage S15.2: twelve more (below, and `POLICIES.md`) | Copied from `tools/uk/template/statistics.toml` by `tools/uk/calibrate.py` |
 | `policies.toml`, `POLICIES.md` | Stage S13.5: nineteen real policies (a drinking age, fuel and alcohol duty, an electric car grant, planning rules, a visa salary threshold and more), six indicators (crime, healthy life expectancy, school attainment, homes built, net migration, the electric share of new cars) and the groups' reactions; every source and judgement in `POLICIES.md` | Copied from `tools/uk/template/policies.toml` by `tools/uk/calibrate.py` |
 | `scenarios/2025.toml` | The playable scenario: a five-year term from January 2025 | By hand |
 | `golden/` | The recorded state hash for each of the first 24 months of `scenarios/2025.toml`, and of the first three of the election, bill and mod test scenarios: they pin the engine's results | Re-recorded when the model changes on purpose (command below) |
@@ -528,3 +530,28 @@ consumption £1,766.5bn, disposable income £1,867.3bn, compensation of employee
 £2,904.9bn, exports £882.4bn and imports £903.5bn, unemployment 4.3% and net debt of
 £2,816.4bn (97% of GDP). The first month is January 2025, so prices have already risen by
 one month of inflation; matches are within half a percent.
+
+## The statistics audit (stage S15.2)
+
+`python tools/uk/audit.py` moves each of the board's policies one step and reports, for every
+statistic on the board, how many move it noticeably within a year and what it feeds
+(`STATISTICS.md`). Run on the model before stage S15.2, it settled `docs/S15-PLAN.md`'s list:
+
+- **Left the board** (the rows stay in the model and the popups), as planned: tax receipts (moved
+  by 11 policies, but only a step toward the budget balance), exports and imports (the trade
+  balance replaces them), the housing stock (9, but homes built says it), NHS treatments (only
+  the NHS moves it, and only toward the waiting list), jobs (7, feeds nothing), household income
+  (7, feeds nothing; median income stays), working-age poverty (feeds only homelessness) and
+  homes' emissions (part of emissions).
+- **The edge cases, kept.** Productivity and healthy life move by less than 1% in a year
+  under any one policy, but they move over a term and feed pay, output and a situation.
+  Alcohol deaths, net migration, smoking and the prison population each move under one policy
+  only and feed little, but each is the only place that policy shows. Pay per job moves under
+  one policy and feeds nothing; it stays, as the one figure for pay.
+- After stage S15.2 the board holds 41 statistics and 40 policies in force (55 with the 15 not
+  in force). Rents and house prices move by under 1% in a year under one step of any policy
+  (they adjust over years), and the tax burden and the trade balance feed nothing: they are on
+  the board because the new groups and policies are about them.
+
+Situations name the statistic that sets them off in `[play.web]` (`situations`), since the
+model format takes no other key in a `[situation]` table.
