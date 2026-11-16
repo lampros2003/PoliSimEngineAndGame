@@ -28,6 +28,7 @@ func _init(heading: String, card_width := 860.0) -> void:
 
 
 func _ready() -> void:
+	add_to_group("popups")  # stage S14.1: a section opened inside asks it to fit again
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var veil := ColorRect.new()
 	veil.color = Color(Palette.INK, 0.3)
@@ -145,7 +146,11 @@ func _place() -> void:
 	if card == null:
 		return
 	var view := size
-	var room := view.y - top_margin - 48.0 - 140.0
+	# Stage S14.1: all the height there is but the card's own head and margins, so a sheet that
+	# fits a 1080p screen does not scroll.
+	var head: float = _scroll.position.y if _scroll.position.y > 0.0 else 100.0
+	var foot: float = _buttons.get_parent().get_combined_minimum_size().y if _buttons.get_parent().visible else 0.0
+	var room: float = view.y - top_margin - 36.0 - head - foot
 	_scroll.custom_minimum_size = Vector2(width, minf(body.get_combined_minimum_size().y + 44.0, room))
 	card.reset_size()
 	var box := card.get_combined_minimum_size()

@@ -34,6 +34,18 @@ const BAD := BRICK
 const SHADOW := Color("#1c2733")
 const SERIES := [BLUE, BRICK, Color("#b07a12"), SAGE]
 
+# Stage S14.1: what a colour says on the board, by role, in the same flat inks. An indicator,
+# a situation or a link is green when it is good (better than when the government took
+# office; good for what a link reaches), red when bad, blue when neither can be said. A
+# group's approval arc is green, mustard or red against the scenario's thresholds, grey
+# where there is no figure.
+const STEADY := BLUE
+const BETTER := Color("#4f7a45")  # a shade deeper than sage, to hold its own beside blue
+const WORSE := BRICK
+const MIXED := Color("#c9a227")  # mustard: yellower than the ochre that means "act here"
+const NO_FIGURE := Color("#9b968a")
+const ASK := OCHRE
+
 const FONT_SIZE := 15
 const SMALL := 14
 const CAPS := 13  # tracked capitals for small labels
@@ -229,6 +241,11 @@ static func make_theme() -> Theme:
 	_button_states(theme, "Link", _empty(), underline, underline, _empty(), BLUE, Color("#0f2f4d"), LINE)
 	theme.set_font("font", "Link", text(600))
 	theme.set_font_size("font_size", "Link", SMALL)
+	# Stage S14.1: a link in a table's row, with no more room above and below than its text.
+	theme.set_type_variation("LinkRow", "Link")
+	var row_line := _flat(Color(0, 0, 0, 0), Color("#0f2f4d"), 0, 4, 1)
+	row_line.border_width_bottom = 1
+	_button_states(theme, "LinkRow", _empty(4, 1), row_line, row_line, _empty(4, 1), BLUE, Color("#0f2f4d"), LINE)
 	# Stage S13.6: a line of the month's report, or a row in a sheet: a tint under the pointer.
 	theme.set_type_variation("ReportLine", "Button")
 	_button_states(theme, "ReportLine", _empty(6, 3), _flat(Color(INK, 0.07), Color(0, 0, 0, 0), 0, 6, 3),
@@ -238,6 +255,13 @@ static func make_theme() -> Theme:
 	theme.set_type_variation("Chip", "Button")
 	_button_states(theme, "Chip", _empty(10, 2), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 10, 2),
 		_flat(Color(INK, 0.12), Color(INK, 0.0), 0, 10, 2), _empty(10, 2), INK, INK, INK)
+
+	# Stage S14.1: the heading of a section that opens and closes: tracked capitals in ink.
+	theme.set_type_variation("Fold", "Button")
+	var fold_hover := _flat(Color(INK, 0.06), Color(0, 0, 0, 0), 0, 4, 3)
+	_button_states(theme, "Fold", _empty(4, 3), fold_hover, fold_hover, _empty(4, 3), INK, INK, MUTED)
+	theme.set_font("font", "Fold", display(600, 1))
+	theme.set_font_size("font_size", "Fold", CAPS)
 
 	# Stage S13.5: a step of a level policy's control: card stock, the step chosen in ink.
 	theme.set_type_variation("Step", "Button")
@@ -301,6 +325,7 @@ static func make_theme() -> Theme:
 	theme.set_color("font_color", "TooltipLabel", CARD)
 	theme.set_font_size("font_size", "TooltipLabel", SMALL)
 	theme.set_icon("arrow", "OptionButton", _triangle(12, false, INK))
+	theme.set_constant("arrow_margin", "OptionButton", 12)  # stage S14.1: clear of the edge
 	for type in ["CheckBox", "PopupMenu"]:
 		theme.set_icon("checked", type, _box_icon(true))
 		theme.set_icon("unchecked", type, _box_icon(false))
@@ -393,6 +418,35 @@ static func rule_rows(grid: GridContainer) -> void:
 			if bottom > 0.0 and start + grid.columns < count:
 				var y := floorf(bottom + gap / 2.0) + 0.5
 				grid.draw_line(Vector2(0, y), Vector2(grid.size.x, y), RULE, 1.0))
+
+
+## Stage S14.1: a section under a heading that opens and closes it (▸ shut, ▾ open). Of the
+## sections side by side in one box only one is open at a time, so a popup keeps its height;
+## an open or close asks the popup to fit itself again.
+static func fold(title: String, body: Control, open := false) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.name = "fold_" + title.to_lower().replace(" ", "_").replace(",", "")
+	box.add_theme_constant_override("separation", 6)
+	var head := Button.new()
+	head.theme_type_variation = "Fold"
+	head.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	box.add_child(head)
+	box.add_child(body)
+	var show := func(on: bool) -> void:
+		body.visible = on
+		head.text = ("▾  " if on else "▸  ") + title.to_upper()
+	show.call(open)
+	box.set_meta("fold", show)
+	head.pressed.connect(func() -> void:
+		var on := not body.visible
+		if on and box.get_parent() != null:
+			for other in box.get_parent().get_children():
+				if other != box and other.has_meta("fold"):
+					(other.get_meta("fold") as Callable).call(false)
+		show.call(on)
+		if box.is_inside_tree():
+			box.get_tree().call_group("popups", "relayout"))
+	return box
 
 
 ## A tracked-capitals label for a small heading.

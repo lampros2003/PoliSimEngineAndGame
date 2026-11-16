@@ -27,6 +27,7 @@ var _origin := Rect2()
 
 
 func _ready() -> void:
+	add_to_group("popups")  # stage S14.1: a section opened inside asks it to fit again
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
@@ -134,7 +135,7 @@ func _place(grow: bool) -> void:
 	# Stage S13.6: content that can fit itself to the room (a policy's controls) does so.
 	if content.has_method("fit_height"):
 		content.fit_height(room)
-	var tall := content.get_combined_minimum_size().y + 4.0
+	var tall := _holder.get_combined_minimum_size().y + 2.0  # stage S14.1: with its margins, so nothing scrolls that fits
 	_scroll.custom_minimum_size = Vector2(_width(), minf(tall, room))
 	card.reset_size()
 	var box := card.get_combined_minimum_size()
@@ -158,10 +159,11 @@ func _place(grow: bool) -> void:
 	card.scale = Vector2(0.18, 0.18)
 	card.modulate.a = 0.0
 	_veil.modulate.a = 0.0
+	# Stage S14.1: open in a tenth of a second, close in less; input is never held up.
 	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(card, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(card, "modulate:a", 1.0, 0.09)
-	_tween.tween_property(_veil, "modulate:a", 1.0, 0.18)
+	_tween.tween_property(card, "scale", Vector2.ONE, 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(card, "modulate:a", 1.0, 0.05)
+	_tween.tween_property(_veil, "modulate:a", 1.0, 0.08)
 
 
 ## Stage S13.4: the card's width: the content's own (a policy's two columns), or WIDTH.
@@ -181,9 +183,9 @@ func close() -> void:
 	content = null
 	stack.clear()
 	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(card, "scale", Vector2(0.7, 0.7), 0.11).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	_tween.tween_property(card, "modulate:a", 0.0, 0.11)
-	_tween.tween_property(_veil, "modulate:a", 0.0, 0.11)
+	_tween.tween_property(card, "scale", Vector2(0.85, 0.85), 0.035).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	_tween.tween_property(card, "modulate:a", 0.0, 0.035)
+	_tween.tween_property(_veil, "modulate:a", 0.0, 0.035)
 	_tween.chain().tween_callback(func() -> void:
 		if content == null:
 			visible = false

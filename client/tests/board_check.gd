@@ -15,7 +15,11 @@ extends SceneTree
 ## the policies in force on the board, those not in force kept off it and counted on their
 ## areas' introduce nodes, the indicators, and 23 groups in six families (the estimated
 ## groups' "Ways of life" last); every lever is on the board or available to introduce; at
-## least 90% of nodes labelled at 1366x768.
+## least 90% of nodes labelled at 1366x768. Stage S14.1: the board is the screen: the 23
+## groups are arcs of one ring, in family order, none running into the next or too short for
+## its pictogram, at the three sizes; every policy and indicator labelled at rest at all three
+## (the groups only where they fit); nothing in the ring; a drag and a wheel move no node; an
+## indicator's colour follows its `better`.
 
 var main: Control
 
@@ -81,32 +85,52 @@ func _initialize() -> void:
 	var own_size: Vector2 = board.size
 	var rested := []
 	for view in [Vector2(1366, 768), Vector2(1920, 1080), Vector2(2560, 1440)]:
-		board.size = view - Vector2(0, main.BAR_HEIGHT)
+		board.size = view - Vector2(0, main.BAR_HEIGHT + main.STRIP_HEIGHT)
 		board.layout()
-		# Four situations flagged at once must clear the nodes too.
-		board.set_flags([{"key": "a", "text": "Recession", "tone": "bad"}, {"key": "b", "text": "High unemployment", "tone": "bad"},
-			{"key": "c", "text": "Debt above a year's output", "tone": "bad"}, {"key": "d", "text": "Health service under strain", "tone": "bad"}])
 		var found: PackedStringArray = board.overlaps()
 		if not found.is_empty():
 			return _fail("at %dx%d: %s" % [view.x, view.y, ", ".join(found)])
 		var labelled := 0
 		var labels := 0
+		var groups_labelled := 0
 		for key in board.order:
-			if not board.nodes[key]["kind"] in ["centre", "flag"]:
+			var kind: String = board.nodes[key]["kind"]
+			if kind == "group":
+				groups_labelled += 1 if board.nodes[key]["rest"] else 0
+			elif kind != "centre":
 				labels += 1
 				labelled += 1 if board.nodes[key]["rest"] else 0
-		# Stage S13.6: nineteen in twenty from 1920x1080 (every one on the S13.4 board), and
-		# the earlier 85% at 1366x768.
-		if labelled < labels * (0.9 if view.x < 1900.0 else 0.95):
-			return _fail("at %dx%d only %d of %d nodes are labelled at rest" % [view.x, view.y, labelled, labels])
-		rested.append("%d of %d at %dx%d" % [labelled, labels, view.x, view.y])
+		if labelled != labels:
+			var missing := Array(board.order).filter(func(k): return not board.nodes[k]["kind"] in ["centre", "group"] and not board.nodes[k]["rest"])
+			return _fail("at %dx%d only %d of %d nodes are labelled at rest: not %s" % [view.x, view.y, labelled, labels, missing])
+		rested.append("%d of %d and %d groups at %dx%d" % [labelled, labels, groups_labelled, view.x, view.y])
 	board.size = own_size
-	board.set_flags([])
 	board.layout()
+	# The board cannot be moved: a drag across it and the wheel leave every node where it was.
+	var before := {}
+	for key in board.order:
+		before[key] = board.nodes[key]["pos"]
+	var at: Vector2 = board.size / 2.0 + Vector2(300, 200)
+	for e in [_button(at, true), _motion(at + Vector2(80, 40)), _motion(at + Vector2(200, 90)), _button(at + Vector2(200, 90), false)]:
+		board._gui_input(e)
+	for wheel in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_UP]:
+		var e := InputEventMouseButton.new()
+		e.button_index = wheel
+		e.pressed = true
+		e.position = at
+		board._gui_input(e)
+	await process_frame
+	for key in board.order:
+		if board.nodes[key]["pos"] != before[key]:
+			return _fail("%s moved under a drag or the wheel" % key)
+	# Colours: an indicator is green for a good thing, red for a bad one, blue for the rest.
+	for key in board.keys_of("indicator"):
+		var want: String = {"high": "better", "low": "worse"}.get(str(board.nodes[key]["better"]), "steady")
+		if str(board.nodes[key].get("state", "")) != want:
+			return _fail("%s (better %s) is %s" % [key, board.nodes[key]["better"], board.nodes[key].get("state")])
+	main.close_popup()
 	for key in board.order:
 		var kind: String = board.nodes[key]["kind"]
-		if kind == "flag":
-			continue
 		main.open_node(key)
 		await process_frame
 		var want: String = {"policy": "policy", "indicator": "indicator", "group": "group", "introduce": "introduce", "centre": ""}[kind]
@@ -149,8 +173,23 @@ func _initialize() -> void:
 	await _settle()
 	if board.authored or board.keys_of("policy").size() != 2 or board.keys_of("indicator").is_empty() or not board.overlaps().is_empty() 			or not board.keys_of("group").is_empty():
 		return _fail("mini's automatic board: %d policies, %d indicators, %s" % [board.keys_of("policy").size(), board.keys_of("indicator").size(), board.overlaps()])
-	print("board: ten areas, %d policies in force, %d to introduce on %d introduce nodes, %d indicators and 23 groups in six families, nothing overlapping at three sizes (labelled at rest: %s); every node opens its popup; a change waits with its cost; links shown, none under the centre; budget lines open; an automatic board for mini, its middle empty" % [policies, want_available, want_introduce, indicators, ", ".join(rested)])
+	print("board: ten areas, %d policies in force, %d to introduce on %d introduce nodes, %d indicators and 23 group arcs in six families, nothing overlapping at three sizes (labelled at rest: %s); unmoved by a drag or the wheel; indicator colours by `better`; every node opens its popup; a change waits with its cost; links shown, none under the centre; budget lines open; an automatic board for mini, its middle empty" % [policies, want_available, want_introduce, indicators, ", ".join(rested)])
 	quit(0)
+
+
+func _button(at: Vector2, pressed: bool) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.position = at
+	return e
+
+
+func _motion(at: Vector2) -> InputEventMouseMotion:
+	var e := InputEventMouseMotion.new()
+	e.position = at
+	e.relative = Vector2(40, 20)
+	return e
 
 
 func _fail(message: String) -> void:
@@ -161,7 +200,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

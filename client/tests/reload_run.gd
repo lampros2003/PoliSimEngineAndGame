@@ -85,7 +85,7 @@ func _write(path: String, text: String) -> void:
 func _settle() -> void:
 	for i in 3:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 3:
 		await process_frame

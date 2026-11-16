@@ -35,7 +35,7 @@ func _ready() -> void:
 	_grid = GridContainer.new()
 	_grid.columns = 4
 	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 9)
+	_grid.add_theme_constant_override("v_separation", 4)  # stage S14.1: the whole ledger on a 1080p screen
 	Palette.rule_rows(_grid)
 	box.add_child(_grid)
 
@@ -49,7 +49,9 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 		label.theme_type_variation = "Heading"
 	if right:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		label.custom_minimum_size = Vector2(118, 0)
+		label.custom_minimum_size = Vector2(130, 0)
+	else:
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # the names take the room left, the figures to the right
 	return label
 
 
@@ -64,10 +66,11 @@ func _line(name: String, entry: Dictionary, sign: int) -> void:
 	label.name = "line_" + name
 	label.text = str(entry.get("label", name))
 	label.tooltip_text = str(entry.get("doc", ""))
-	label.theme_type_variation = "Link"
+	label.theme_type_variation = "LinkRow"
 	label.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
 	label.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.custom_minimum_size = Vector2(260, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.pressed.connect(func() -> void: line_pressed.emit(name, label.get_global_rect()))
 	_grid.add_child(label)
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
@@ -119,7 +122,6 @@ func build(catalogue: Dictionary, entries: Dictionary, sector: String) -> void:
 		if counts.call(name):
 			_line(name, entries.get(name, {}), -1)
 	_total("spending", "Total spending")
-	_section("")
 	_total("balance", "Surplus or deficit")
 
 

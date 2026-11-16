@@ -30,8 +30,9 @@ func _initialize() -> void:
 		return _fail("no warning before the month: " + main.policy_card().capital_note.text)
 	main.advance(1)
 	await _settle()
-	if not main.notice_text().contains("Not enough political capital: a bill was not put to the Commons"):
-		return _fail("the refusal was not announced: " + main.notice_text())
+	# Stage S14.1: in the month's report, once.
+	if not main.report.visible or Array(main.report.lines_shown).filter(func(l): return str(l).contains(": refused, it needed")).size() != 1:
+		return _fail("the refusal was not announced: %s" % [main.report.lines_shown])
 	if main.game.latest("vat_rate") != 0.2 or main.game.latest("basic_rate") != 0.5:
 		return _fail("the rates are %s and %s" % [main.game.latest("basic_rate"), main.game.latest("vat_rate")])
 	print("capital: shown, a bill's cost shown before it is made, and a bill the government cannot pay for refused and announced")
@@ -46,7 +47,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

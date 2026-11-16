@@ -4,8 +4,7 @@ extends VBoxContainer
 ## history against the national rating; its share of the electorate as a hundred figures;
 ## what is moving it (the five drivers of its vote, as signed bars with plain names); the
 ## policies that move it most (each opens its popup); and eight of its households, drawn as
-## figures, each opening to its account for the year. In a wide window the policies and
-## households stand in a second column.
+## figures, each opening to its account for the year.
 
 const Palette := preload("res://scripts/palette.gd")
 const Chart := preload("res://scripts/chart.gd")
@@ -69,19 +68,9 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	title.text = str(node["label"])
 	title.theme_type_variation = "Title"
 	titles.add_child(title)
-	var body: BoxContainer = HBoxContainer.new() if wide else VBoxContainer.new()
-	body.add_theme_constant_override("separation", 36 if wide else 12)
-	add_child(body)
-	var left := VBoxContainer.new()
-	var right := VBoxContainer.new()
-	for column in [left, right]:
-		column.add_theme_constant_override("separation", 12)
-		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		column.custom_minimum_size.x = 500.0 if wide else 0.0
-		body.add_child(column)
 	var figures := HBoxContainer.new()
 	figures.add_theme_constant_override("separation", 14)
-	left.add_child(figures)
+	add_child(figures)
 	_figure = Label.new()
 	_figure.name = "approval"
 	_figure.theme_type_variation = "Figure"
@@ -98,28 +87,20 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	side.add_child(_change)
 	_note_label = _muted("")
 	_note_label.visible = false
-	left.add_child(_note_label)
-	var chart_head := HBoxContainer.new()
-	chart_head.add_child(Palette.caps("History"))
-	left.add_child(chart_head)
+	add_child(_note_label)
+	# Stage S14.1: one column of sections, one open at a time, so the popup fits the screen.
 	chart = Chart.new()
 	chart.fmt = fmt
 	chart.entry = entry
-	chart.custom_minimum_size = Vector2(0, 190)
-	left.add_child(chart)
-	left.add_child(Palette.caps("Share of the electorate"))
-	_share_label = _muted("")
-	left.add_child(_share_label)
-	_people = Control.new()
-	_people.custom_minimum_size = Vector2(0, 4 * 26)
-	_people.draw.connect(_draw_people)
-	left.add_child(_people)
-	left.add_child(Palette.caps("What is moving them"))
+	chart.custom_minimum_size = Vector2(0, 180)
+	add_child(Palette.fold("History", chart, true))
+	var moving := VBoxContainer.new()
+	moving.add_theme_constant_override("separation", 6)
 	_drivers = GridContainer.new()
 	_drivers.columns = 3
 	_drivers.add_theme_constant_override("h_separation", 12)
 	_drivers.add_theme_constant_override("v_separation", 6)
-	left.add_child(_drivers)
+	moving.add_child(_drivers)
 	for d in drivers:
 		var name := Label.new()
 		name.text = str(d[0])
@@ -135,42 +116,52 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		amount.custom_minimum_size = Vector2(80, 0)
 		_drivers.add_child(amount)
-	left.add_child(_muted("Each is a pull on their vote, for the government (right) or against it (left), from where things stood at the last election."))
+	moving.add_child(_muted("Each is a pull on their vote, for the government (right) or against it (left), from where things stood at the last election."))
+	add_child(Palette.fold("What is moving them", moving))
+	var share := VBoxContainer.new()
+	share.add_theme_constant_override("separation", 6)
+	_share_label = _muted("")
+	share.add_child(_share_label)
+	_people = Control.new()
+	_people.custom_minimum_size = Vector2(0, 4 * 26)
+	_people.draw.connect(_draw_people)
+	share.add_child(_people)
+	add_child(Palette.fold("Share of the electorate", share))
 	if not movers.is_empty():
-		right.add_child(Palette.caps("Policies that matter most to them"))
 		var list := VBoxContainer.new()
 		list.add_theme_constant_override("separation", 2)
-		right.add_child(list)
 		for m in movers.slice(0, 5):
 			var button := Button.new()
 			button.theme_type_variation = "Link"
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			var measured: bool = m[3]
 			var up := float(m[2]) > 0.0
-			button.text = (("▲ %s: raising it wins them over" if up else "▼ %s: raising it loses them") % str(m[1])) if measured \
-				else "%s  (through the model's formulas)" % str(m[1])
+			button.text = (("▲ %s: raising it wins them over" if up else "▼ %s: raising it loses them") % str(m[1])) if measured 				else "%s  (through the model's formulas)" % str(m[1])
 			var target := str(m[0])
 			button.pressed.connect(func() -> void: follow.emit(target))
 			list.add_child(button)
-	right.add_child(Palette.caps("Households"))
+		add_child(Palette.fold("Policies that matter most to them", list))
+	var homes := VBoxContainer.new()
+	homes.add_theme_constant_override("separation", 8)
 	_homes_note = _muted("Finding some of their households…")
 	# Stage S13.5: a group estimated from published shares has no households of its own.
 	estimate = str(node.get("estimate", ""))
 	if estimate != "":
 		_homes_note.name = "estimate_note"
 		_homes_note.text = "Who belongs to this group is an estimate, made from published shares (%s), not a fact recorded for any household. So it has no sample households to show." % estimate
-	right.add_child(_homes_note)
+	homes.add_child(_homes_note)
 	_homes = GridContainer.new()
 	_homes.name = "households"
 	_homes.columns = 4
 	_homes.add_theme_constant_override("h_separation", 10)
 	_homes.add_theme_constant_override("v_separation", 10)
-	right.add_child(_homes)
+	homes.add_child(_homes)
+	add_child(Palette.fold("Households", homes))
 
 
 ## The popup's width for this content.
 func popup_width() -> float:
-	return 1120.0 if wide else 640.0
+	return 640.0  # stage S14.1: one column, as every popup
 
 
 func _muted(words: String) -> Label:
@@ -325,7 +316,7 @@ class HouseholdTile extends Button:
 				parts = [" ".join(words.slice(0, cut)), " ".join(words.slice(cut))]
 			for part in parts:
 				var px := 13
-				while font.get_string_size(part, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > room and px > 10:
+				while font.get_string_size(part, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > room and px > 12:
 					px -= 1
 				draw_string(font, Vector2(8, y), part, HORIZONTAL_ALIGNMENT_LEFT, room, px, line[2])
 				y += 17.0

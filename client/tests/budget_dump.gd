@@ -103,7 +103,7 @@ func _dump_breakdowns(shown: PackedStringArray, month: int) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

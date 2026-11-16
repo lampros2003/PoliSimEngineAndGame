@@ -29,24 +29,28 @@ const MonthReport := preload("res://scripts/month_report.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Sound := preload("res://scripts/sound.gd")
 const IntroduceList := preload("res://scripts/introduce_list.gd")
+const Strip := preload("res://scripts/strip.gd")
+const KeyPage := preload("res://scripts/key_page.gd")
 
 const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
-const HELP := """[b]The board[/b] is the country. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, blue where the effect rises and brick where it falls, thicker for a stronger effect. Drag to move the board, turn the wheel to zoom, Home to see it all.
+## Stage S14.1: the strip under the top bar (situations, the one-line notices).
+const STRIP_HEIGHT := Strip.HEIGHT
+const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
 
-[b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote.
+[b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote. "In a year" shows what the change would do.
 
 [b]New policies[/b]: an area's plus sign lists its policies not in force. Choose one, pick a setting, see what it would do in a year, and put it to the Commons; it waits on the board, faint, until the vote. A policy that can be ended has Repeal in its popup.
 
 [b]See why[/b]: click an indicator for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most.
 
-[b]Advance time[/b] with Next month, Quarter or Year. When a question is put to you, answer it: no month runs until you do. Flags under the centre show the situations in force and your answers.
+[b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers.
 
 [b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
 
-[b]After each month[/b] a short report slides in: the bills passed, voted down or refused, the figures that moved most, and any situation that began or ended. Click a line to open it; click the date on the top bar to see the report again.
+[b]After each month[/b] a line under the date says what moved. When the month brought something to tell (a bill passed, voted down or refused, a situation begun or ended, an election, a question answered) the month's report opens over the board: click a line to open it; click the date to see it again.
 
-[b]Keys[/b]: Space or Enter, next month; Esc closes the popup, then the sheet; B, The Budget; P, Parliament; H or Home, the whole board; the arrow keys move the board, + and − zoom.
+[b]Keys[/b]: Space or Enter, next month; Esc closes the popup, then the report, then the sheet; B, The Budget; P, Parliament; K, the key.
 
 [color=#55606c]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
 
@@ -107,11 +111,20 @@ var _parliament_button: Button
 ## Top-bar buttons that drop their words on a narrow window, keeping their pictograms.
 var _wide: Array[Button] = []
 var _status: Label
-var _message: PanelContainer
-var _message_text: RichTextLabel
+var strip: Strip
+var _key_sheet: Sheet
 var _forecast_timer: Timer
 var _effects_timer: Timer
 var _scale_choice := 0.0  # 0 for automatic
+## Stage S14.1: a month's events arrived and the screen is not yet refreshed for them (while
+## a run of months goes on only the date follows them).
+var _stepped_waiting := false
+var _queued := 0  # months asked for while the engine was busy
+
+
+## True while months asked for wait for the engine.
+func advance_queued() -> bool:
+	return _queued > 0
 
 
 func _ready() -> void:
@@ -269,36 +282,18 @@ func _build_layout() -> void:
 	board.fmt = fmt
 	board.name = "board"
 	board.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	board.offset_top = BAR_HEIGHT
+	board.offset_top = BAR_HEIGHT + STRIP_HEIGHT
 	board.node_pressed.connect(func(key: String) -> void: open_node(key))
 	add_child(board)
+	# Stage S14.1: the strip under the top bar: the situations and the one-line notices.
+	strip = Strip.new()
+	strip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	strip.offset_top = BAR_HEIGHT
+	strip.offset_bottom = BAR_HEIGHT + STRIP_HEIGHT
+	strip.flag_pressed.connect(_open_flag)
+	strip.line_pressed.connect(func(full: String) -> void: _show_dialog("Notice", full))
+	add_child(strip)
 	_build_bar()
-	# A notice at the lower left: bills voted down, situations, mods, problems.
-	_message = PanelContainer.new()
-	_message.name = "notice"
-	_message.visible = false
-	_message.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_message.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_message.offset_left = 20
-	_message.offset_bottom = -20
-	_message.custom_minimum_size = Vector2(500, 0)
-	add_child(_message)
-	var message_row := VBoxContainer.new()
-	message_row.add_theme_constant_override("separation", 6)
-	_message.add_child(message_row)
-	_message_text = RichTextLabel.new()
-	_message_text.bbcode_enabled = true
-	_message_text.fit_content = true
-	_message_text.scroll_active = false
-	_message_text.custom_minimum_size = Vector2(460, 0)
-	_message_text.selection_enabled = true
-	message_row.add_child(_message_text)
-	var close := Button.new()
-	close.text = "Close"
-	close.theme_type_variation = "Link"
-	close.size_flags_horizontal = Control.SIZE_SHRINK_END
-	close.pressed.connect(func() -> void: _message.visible = false)
-	message_row.add_child(close)
 	_sheets = Control.new()
 	_sheets.name = "sheets"
 	_sheets.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -328,31 +323,34 @@ func _build_layout() -> void:
 	_forecast_timer.wait_time = 0.3
 	_forecast_timer.timeout.connect(_request_forecast)
 	add_child(_forecast_timer)
-	# The effects table is asked for once the screen has been idle a moment after a month.
+	# Stage S14.1: the effects table is asked for a moment after a month is shown (was 1.5 s).
 	_effects_timer = Timer.new()
 	_effects_timer.one_shot = true
-	_effects_timer.wait_time = 1.5
+	_effects_timer.wait_time = 0.3
 	_effects_timer.timeout.connect(_request_effects)
 	add_child(_effects_timer)
 	# Stage S13.6: the month's report, the first-minutes guide, sounds.
 	report = MonthReport.new()
-	report.top_margin = BAR_HEIGHT
+	report.top_margin = BAR_HEIGHT + STRIP_HEIGHT
 	report.line_pressed.connect(func(key: String) -> void:
 		if key.begins_with("entry:"):
 			open_indicator(key.trim_prefix("entry:"))
+		elif key == "election":
+			open_overlay("parliament")
 		else:
 			open_node(key))
 	add_child(report)
 	move_child(report, popup.get_index())  # under popups and sheets
-	# Stage S13.5: the board steps aside for the report while it is open.
-	report.docked.connect(func(open: bool) -> void:
-		board.offset_right = -(Web.DOCK_WIDTH if open else 0.0))
 	_date.mouse_filter = Control.MOUSE_FILTER_STOP
 	_date.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_date.tooltip_text = "The month's report"
 	_date.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			report.reopen())
+			if report.visible:
+				report.dismiss()
+			else:
+				close_popup()
+				report.reopen())
 	_date.mouse_entered.connect(func() -> void: _date.add_theme_color_override("font_color", Palette.BLUE))
 	_date.mouse_exited.connect(func() -> void: _date.remove_theme_color_override("font_color"))
 	guide = Guide.new()
@@ -365,7 +363,7 @@ func _build_layout() -> void:
 			Sound.play("tick"))
 	# Every button and slider shows the pointing hand, wherever it is made.
 	get_tree().node_added.connect(func(node: Node) -> void:
-		if node is BaseButton or node is Slider:
+		if (node is BaseButton and not (node as BaseButton).disabled) or node is Slider:
 			(node as Control).mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND)
 
 
@@ -419,10 +417,11 @@ func _build_bar() -> void:
 	_chips.clip_contents = true
 	row.add_child(_chips)
 	# Stage S12.5: the government's political capital, when the model has it.
+	# Stage S14.1: the political capital is at the centre of the board only (it was shown
+	# twice); this chip is kept off the bar.
 	_capital = _chip_button("Capital")
 	_capital.name = "capital"
 	_capital.visible = false
-	_capital.pressed.connect(func() -> void: open_overlay("parliament"))
 	row.add_child(_capital)
 	row.add_child(_rule())
 	_status = Label.new()
@@ -454,6 +453,16 @@ func _build_bar() -> void:
 		button.set_meta("words", spec[0])
 		row.add_child(button)
 		_wide.append(button)
+	# Stage S14.1: the key to the board.
+	var key := Button.new()
+	key.name = "open_key"
+	key.text = "?"
+	key.theme_type_variation = "Quiet"
+	key.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	key.custom_minimum_size.x = 34
+	key.tooltip_text = "The key: what every shape and colour on the board means (K)"
+	key.pressed.connect(show_key)
+	row.add_child(key)
 	_menu = MenuButton.new()
 	_menu.name = "menu"
 	_menu.text = "Menu"
@@ -468,7 +477,6 @@ func _build_bar() -> void:
 		menu.add_item(item[0], item[1])
 	menu.add_separator()
 	menu.add_check_item("Amounts a year", 3)
-	menu.add_item("See the whole board", 4)
 	var scales := PopupMenu.new()
 	scales.name = "scale"
 	scales.add_radio_check_item("Automatic", 100)
@@ -486,9 +494,10 @@ func _build_bar() -> void:
 	menu.add_submenu_node_item("Volume", volumes, 8)
 	menu.add_separator()
 	menu.add_item("Show the guide again", 9)
+	menu.add_item("The key", 4)
 	menu.add_item("Help", 6)
 	menu.id_pressed.connect(func(id: int) -> void:
-		menu_action(["save", "load", "reload", "per_year", "fit", "", "help", "sound", "", "guide"][id]))
+		menu_action(["save", "load", "reload", "per_year", "key", "", "help", "sound", "", "guide"][id]))
 	_update_menu()
 
 
@@ -500,7 +509,6 @@ func _fit_bar() -> void:
 		button.text = "" if narrow else str(button.get_meta("words"))
 	_advance[1].text = "3 months" if not narrow else "+3"
 	_advance[2].text = "Year" if not narrow else "+12"
-	_capital.visible = not narrow and _capital_text != ""
 
 
 func _rule() -> Control:
@@ -575,7 +583,7 @@ func _update_menu() -> void:
 	menu.set_item_disabled(menu.get_item_index(9), not started)
 
 
-## The menu's actions, by name: "save", "load", "reload", "per_year", "fit", "help".
+## The menu's actions, by name: "save", "load", "reload", "per_year", "key", "help".
 func menu_action(action: String) -> void:
 	match action:
 		"save":
@@ -586,8 +594,8 @@ func menu_action(action: String) -> void:
 			reload_model()
 		"per_year":
 			show_per_year(not fmt.per_year)
-		"fit":
-			board.fit()
+		"key":
+			show_key()
 		"help":
 			_show_dialog("How to play", HELP)
 		"sound":
@@ -737,7 +745,8 @@ func _build_headline() -> void:
 	_chip.clear()
 	for key in _headline_keys():
 		var entry := _key_entry(key)
-		if entry.is_empty():
+		# Stage S14.1: the approval is the centre of the board, so not also on the top bar.
+		if entry.is_empty() or key == _approval_key():
 			continue
 		var chip := _chip_button(_key_label(key))
 		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -772,9 +781,10 @@ func _start_of(lever: String) -> Variant:
 	return values[0] if not values.is_empty() else game.latest(lever)
 
 
+## Stage S14.1: what an engine event changed, redrawn: the sheets only while open (they are
+## refreshed when they open), the board's state without laying it out again.
 func _refresh(stepped := false) -> void:
-	var done := game.steps_done()
-	_date.text = fmt.month_name(maxi(done - 1, 0)) + ("  ·  start" if done == 0 else "  ·  %d/%d" % [done, term])
+	_show_date()
 	var modded := PackedStringArray()
 	for mod in game.active_mods():
 		modded.append(str(mod["name"]))
@@ -782,10 +792,7 @@ func _refresh(stepped := false) -> void:
 	_country.text = str(play.get("country", game.scenario_name())).to_upper() + (" · WITH " + ", ".join(modded).to_upper() if not modded.is_empty() else "")
 	for key in _chip:
 		_show_chip(key, stepped)
-	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
-	politics.refresh(func(name: String) -> Dictionary: return game.cells(name),
-		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
-		game.steps_done())
+	_refresh_sheets()
 	var pending: Dictionary = game.pending()
 	for name in _costs.keys():
 		if not pending.has(name):
@@ -793,9 +800,23 @@ func _refresh(stepped := false) -> void:
 	var capital := _show_capital()
 	_show_centre(capital)
 	board.refresh(latest_value, previous_value, func(l: String) -> Variant: return game.latest(l), _start_of, pending, stepped)
-	board.set_flags(_flags())
+	strip.set_flags(_flags())
 	_refresh_popup(pending, capital)
 	_set_controls(not failed and not lost)
+
+
+## The date on the top bar: the month shown and how far into the term.
+func _show_date() -> void:
+	var done := game.steps_done()
+	_date.text = fmt.month_name(maxi(done - 1, 0)) + ("  ·  start" if done == 0 else "  ·  %d/%d" % [done, term])
+
+
+## The sheets' figures (read elsewhere too, so kept up to date while shut).
+func _refresh_sheets() -> void:
+	budget.refresh(func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row))
+	politics.refresh(func(name: String) -> Dictionary: return game.cells(name),
+		func(row: String) -> Variant: return game.latest(row), func(row: String) -> Variant: return game.previous(row),
+		game.steps_done())
 
 
 ## A figure on the top bar; after a month it counts to its new value.
@@ -813,7 +834,7 @@ func _show_chip(key: String, count: bool) -> void:
 		var integer := typeof(now) == TYPE_INT
 		tween.tween_method(func(k: float) -> void:
 			var v: Variant = lerpf(float(shown), float(now), k)
-			value.text = fmt.value(entry, int(roundf(v)) if integer else v, true, false), 0.0, 1.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			value.text = fmt.value(entry, int(roundf(v)) if integer else v, true, false), 0.0, 1.0, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
 		value.text = fmt.value(entry, now, true, false)
 	change.text = ""
@@ -838,7 +859,6 @@ func _show_capital() -> float:
 	var name := str(catalogue.get("capital", ""))
 	var entry: Dictionary = entries.get(name, {})
 	var now: Variant = game.latest(str(entry.get("row", name))) if name != "" else null
-	_capital.visible = now != null and _bar.size.x >= 1560.0
 	if now == null:
 		_capital_text = ""
 		return -1.0
@@ -891,7 +911,7 @@ func _show_centre(capital: float) -> void:
 		var waiting := 0.0
 		for cost in _costs.values():
 			waiting += float(cost)
-		centre["capital"] = "Capital %.1f%s" % [capital, (" · %.1f waiting" % waiting) if waiting > 0.0 else ""]
+		centre["capital"] = "Capital %.1f%s" % [capital, (", %.1f waiting" % waiting) if waiting > 0.0 else ""]
 		centre["capital_colour"] = Palette.BAD if waiting > capital else (Palette.PENDING if waiting > 0.0 else Palette.INK)
 	board.centre = centre
 
@@ -902,7 +922,10 @@ func _set_controls(enabled: bool) -> void:
 	var waiting := not unanswered_dilemmas().is_empty()
 	for button in _advance:
 		button.disabled = not enabled or busy or waiting
-		button.tooltip_text = "Answer the question put to you first" if waiting else button.tooltip_text
+		# Stage S14.1: its own tooltip comes back once the question is answered.
+		if not button.has_meta("tip"):
+			button.set_meta("tip", button.tooltip_text)
+		button.tooltip_text = "Answer the question put to you first" if waiting else str(button.get_meta("tip"))
 	_status.text = "working…" if busy else ""
 	_update_menu()
 
@@ -927,12 +950,6 @@ func open_node(key: String, from := Rect2()) -> void:
 			board.select(key)
 			popup.open(func() -> Control: return _node_content(key), origin)
 			_after_open()
-			return
-		"flag":
-			if str(node.get("tone", "")) == "ask":
-				ask_dilemma()
-			elif str(node.get("name", "")) != "":
-				open_indicator(str(node["name"]), str(node.get("row", "")), origin)
 			return
 	board.select(key)
 	popup.open(func() -> Control: return _node_content(key), origin)
@@ -963,15 +980,50 @@ func _after_open() -> void:
 	_update_input()
 	_refresh_popup(game.pending(), _show_capital())
 	_request_forecast()
+	report.dismiss()
 
 
 func _node_rect(key: String) -> Rect2:
 	var node: Dictionary = board.nodes.get(key, {})
 	if node.is_empty():
 		return Rect2(get_viewport_rect().size / 2.0, Vector2.ONE)
-	var p: Vector2 = board.to_screen(node["pos"]) + board.position
-	var r: float = node["r"] * board.zoom
-	return Rect2(p - Vector2(r, r), Vector2(r, r) * 2.0)
+	var p: Vector2 = node["pos"] + board.position
+	var r: float = node["r"]
+	if str(node["kind"]) == "group":
+		r = board._group_band * 0.5 + 8.0  # the arc and its approval
+	var rect := Rect2(p - Vector2(r, r), Vector2(r, r) * 2.0)
+	# Stage S14.1: with its label (and the tag it shows when selected), so a popup opens
+	# beside both, not over them.
+	var label: Rect2 = node.get("label_rect", Rect2())
+	if label.size != Vector2.ZERO:
+		rect = rect.merge(Rect2(label.position + board.position, label.size).grow(10.0))
+	return rect
+
+
+## Stage S14.1: a pennant on the strip: a question waiting is asked; a situation opens its
+## popup, under its pennant.
+func _open_flag(flag: Dictionary) -> void:
+	if str(flag.get("tone", "")) == "ask":
+		ask_dilemma()
+	elif str(flag.get("name", "")) != "":
+		var origin := Rect2(Vector2(get_viewport_rect().size.x - 200.0, BAR_HEIGHT + STRIP_HEIGHT), Vector2(1, 1))
+		open_indicator(str(flag["name"]), str(flag.get("row", "")), origin)
+
+
+## Stage S14.1: the key, on a sheet of its own.
+func show_key() -> void:
+	close_popup()
+	if _key_sheet == null:
+		_key_sheet = _new_sheet("The key", 760.0)
+		_key_sheet.name = "key_sheet"
+		var page := KeyPage.new()
+		page.name = "key_page"
+		_key_sheet.body.add_child(page)
+		page.build(board)
+	for sheet in [_budget_sheet, _parliament_sheet]:
+		sheet.close()
+	_key_sheet.open()
+	_update_input()
 
 
 func _node_content(key: String) -> Control:
@@ -982,7 +1034,6 @@ func _node_content(key: String) -> Control:
 		var card := LeverPanel.new()
 		card.fmt = fmt
 		card.name = "policy_card"
-		card.wide = get_viewport_rect().size.x >= LeverPanel.WIDE_FROM
 		# Stage S13.5: a policy not in force opens to be introduced; one that can be ended
 		# offers its repeal.
 		card.introducing = board.available.has(key)
@@ -1004,6 +1055,7 @@ func _node_content(key: String) -> Control:
 			Sound.play("withdraw")
 			_refresh())
 		card.follow.connect(func(name: String) -> void: _follow(name))
+		card.more_toggled.connect(popup.relayout)
 		return card
 	if node["kind"] == "group":
 		return _group_content(key)
@@ -1166,7 +1218,6 @@ func _group_content(key: String) -> Control:
 	var card := GroupCard.new()
 	card.fmt = fmt
 	card.name = "group_card"
-	card.wide = get_viewport_rect().size.x >= LeverPanel.WIDE_FROM
 	card.index = _group_index(node)
 	var movers := []
 	for m in board.movers(key):
@@ -1396,9 +1447,10 @@ func open_overlay(which: String) -> void:
 	var sheet: Sheet = _budget_sheet if which == "budget" else _parliament_sheet
 	if which == "parliament" and politics.settings.is_empty():
 		return
-	for other in [_budget_sheet, _parliament_sheet]:
-		if other != sheet:
+	for other in [_budget_sheet, _parliament_sheet, _key_sheet]:
+		if other != null and other != sheet:
 			other.close()
+	report.dismiss()
 	sheet.open()
 	_refresh()
 	_update_input()
@@ -1451,9 +1503,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					close_overlay()
 				else:
 					open_overlay("parliament")
-			KEY_H, KEY_HOME:
-				close_popup()
-				board.fit()
+			KEY_K:
+				if _key_sheet != null and _key_sheet.visible:
+					_key_sheet.close()
+				else:
+					show_key()
 			_:
 				handled = false
 		if handled:
@@ -1462,6 +1516,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if popup.is_open():
 			close_popup()
+		elif report.visible:
+			report.dismiss()
 		else:
 			for i in range(_sheets.get_child_count() - 1, -1, -1):
 				var sheet: Sheet = _sheets.get_child(i)
@@ -1492,15 +1548,22 @@ func show_per_year(on: bool) -> void:
 
 
 func advance(months: int) -> void:
-	if failed or lost or game.is_busy():
+	if failed or lost:
+		return
+	if game.is_busy():
+		# Stage S14.1: the engine is finishing something (copying the game for the effects
+		# table, say): the months run as soon as it is free, never dropped.
+		_queued = months
 		return
 	if not unanswered_dilemmas().is_empty():
 		ask_dilemma()
 		return
-	close_popup()
-	report.dismiss()
+	# Stage S14.1: the engine is asked at once; the popup and the report close while it works.
 	_snapshot_for_report()
 	game.advance(months)
+	close_popup()
+	report.dismiss()
+	strip.hide_line()
 	_set_controls(true)
 
 
@@ -1676,27 +1739,18 @@ func _migration_note(event: Dictionary) -> String:
 	return "\n".join(lines)
 
 
+## Stage S14.1: a notice, on the line under the date: gone after a few seconds, or, for a
+## problem, when clicked (a longer one opens whole).
 func _show_message(bbcode: String, problem := false) -> void:
-	_message_text.text = bbcode
-	_message.add_theme_stylebox_override("panel", _notice_style(Palette.BAD if problem else Palette.OCHRE))
-	_message.visible = true
-
-
-## A notice: card stock edged in the notice's colour, with a thick band down the left.
-static func _notice_style(colour: Color) -> StyleBoxFlat:
-	var box := Palette.card(16, 6, 2)
-	box.border_color = colour.darkened(0.1)
-	box.border_width_left = 10
-	box.content_margin_left = 24
-	return box
+	strip.show_line(bbcode, problem, 0.0 if problem else 6.0)
 
 
 func notice_visible() -> bool:
-	return _message.visible
+	return strip.line_visible()
 
 
 func notice_text() -> String:
-	return _message_text.get_parsed_text() if _message.visible else ""
+	return strip.line_text
 
 
 func capital_text() -> String:
@@ -1708,7 +1762,7 @@ func title_text() -> String:
 
 
 func flag_text(key: String) -> String:
-	return board.flag_text(key)
+	return strip.flag_text(key)
 
 
 func _announce_term() -> void:
@@ -1876,27 +1930,11 @@ func situation_onset(row: String) -> int:
 	return int(steps[i])
 
 
-## Stage S7.3: tells the player which situations began or ended since the last step.
-func _announce_situations() -> void:
-	var lines := PackedStringArray()
+## Stage S7.3: which situations are on now. Stage S14.1: what began or ended is told once,
+## in the month's report.
+func _note_situations() -> void:
 	for entry in situations:
-		var name := str(entry["name"])
-		var now: bool = game.latest(str(entry["row"])) == true
-		var was: bool = _situations_on.get(name, false)
-		_situations_on[name] = now
-		var label := str(entry.get("label", name))
-		if now and not was:
-			var doc := str(entry.get("doc", ""))
-			lines.append("[b]%s[/b]%s" % [label, (": " + doc + ".") if doc != "" else "."])
-		elif was and not now:
-			lines.append("[b]%s[/b] is over." % label)
-	if lines.is_empty():
-		return
-	var note := "\n".join(lines)
-	if _message.visible:
-		_message_text.text += "\n" + note
-	else:
-		_show_message(note)
+		_situations_on[str(entry["name"])] = game.latest(str(entry["row"])) == true
 
 
 ## Stage S13.6: where the board stood before the months a report will cover.
@@ -1925,6 +1963,7 @@ func _build_report() -> void:
 	if months <= 0:
 		return
 	var bills := []
+	var decisions := []
 	var changes := game.changes()
 	for i in range(int(from["changes"]), changes.size()):
 		var c: Dictionary = changes[i]
@@ -1932,7 +1971,12 @@ func _build_report() -> void:
 		var key := board.holds(lever)
 		var passed: bool = c.get("passed", true)
 		if key == "" and passed:
-			continue  # an answer to a question, not a bill
+			# Stage S14.1: an answer to a question, told among the decisions.
+			for d in dilemmas:
+				var options: Array = d.get("options", [])
+				if str(d["name"]) == lever and int(c["value"]) >= 1 and int(c["value"]) <= options.size():
+					decisions.append({"text": "%s: %s" % [str(d.get("label", lever)), str(options[int(c["value"]) - 1].get("label", ""))], "tone": "plain", "key": ""})
+			continue
 		var was: Variant = from.get("levers", {}).get(lever, game.latest(lever)) if passed else game.latest(lever)
 		var what := _bill_words(lever, c["value"], was, passed and not c.get("refused", false))
 		# A line opens the policy's popup while it is on the board, else its area's list.
@@ -1947,7 +1991,7 @@ func _build_report() -> void:
 			bills.append({"text": what, "tone": "good" if what.contains(" introduced") else "plain", "key": key})
 		else:
 			bills.append({"text": "%s: passed" % what, "tone": "plain", "key": key})
-	if int(from["step"]) == 0 and bills.is_empty():
+	if int(from["step"]) == 0 and bills.is_empty() and decisions.is_empty():
 		return  # the base month: nothing before it to compare with, and nothing put forward
 	var moves := []
 	var values: Dictionary = from["values"]
@@ -1983,9 +2027,32 @@ func _build_report() -> void:
 		sits.append({"text": "%s %s" % [str(entry.get("label", name)), "began" if now else "is over"],
 			"tone": ("good" if str(entry["situation"]) == "good" else "bad") if now else "plain",
 			"key": key if board.nodes.has(key) else "entry:" + name})
+	# Stage S14.1: an election in these months, which opens Parliament.
+	var elections := []
+	var settings: Dictionary = play.get("politics", {})
+	var held: PackedFloat64Array = game.series(str(settings.get("election", ""))) if str(settings.get("election", "")) != "" else PackedFloat64Array()
+	for i in range(maxi(0, held.size() - months), held.size()):
+		if held[i] >= 0.5:
+			elections.append({"text": "The general election: the results", "tone": "plain", "key": "election"})
+			break
+	var notes := PackedStringArray()
+	if bills.any(func(b): return str(b["text"]).contains(": voted down")):
+		notes.append("Your government lacks a majority of its own; its partners and the opposition vote by their side of politics.")
+	if bills.any(func(b): return str(b["text"]).contains(": refused")):
+		notes.append("Capital comes back each month, faster while the government is popular.")
 	var last := game.steps_done() - 1
 	var heading := fmt.month_name(last) if months == 1 else "%s to %s" % [fmt.month_name(int(from["step"]), true), fmt.month_name(last, true)]
-	report.show_report(heading, [["Bills", bills], ["Moved most", moves.slice(0, 4).map(func(m): return m[1])], ["Situations", sits]])
+	var top: Array = moves.slice(0, 4).map(func(m): return m[1])
+	report.set_report(heading, [["Bills", bills, " ".join(notes)], ["Situations", sits], ["Election", elections], ["Decisions", decisions], ["Moved most", top]])
+	# Stage S14.1: the report opens only when the months have something to tell; an ordinary
+	# month is one line under the date.
+	if not (bills.is_empty() and sits.is_empty() and elections.is_empty() and decisions.is_empty()):
+		report.reopen()
+		Sound.play("notice" if not notes.is_empty() else "month")
+	else:
+		Sound.play("month")
+		var said := top.slice(0, 2).map(func(m): return str(m["text"]).replace("  ", " "))
+		strip.show_line("%s: %s" % [heading, ", ".join(said) if not said.is_empty() else "a quiet month"], false, 3.0)
 
 
 ## Stage S13.5: a bill in words: "Fuel duty to 62.95p a litre"; for a policy with an `off`
@@ -2019,52 +2086,30 @@ func _usual_move(row: String, months: int) -> float:
 	return total / count if count >= 2 else 0.0
 
 
-## Stage S5.4: says which bills the House of Commons voted down since the last message.
-func _announce_votes() -> void:
-	var changes := game.changes()
-	var lines := PackedStringArray()
-	var short := PackedStringArray()  # stage S12.5: refused for want of political capital
-	for i in range(_changes_seen, changes.size()):
-		var c: Dictionary = changes[i]
-		if c.get("passed", true):
-			continue
-		var what := "%s, in %s" % [_bill_words(str(c["lever"]), c["value"], game.latest(str(c["lever"])), false),
-			fmt.month_name(int(c["step"]))]
-		if c.get("refused", false):
-			short.append("%s: it needed %.1f political capital" % [what, float(c["cost"])])
-		else:
-			lines.append("%s: %d for, %d against" % [what, int(c["votes_for"]), int(c["seats"]) - int(c["votes_for"])])
-	_changes_seen = changes.size()
-	var notes := PackedStringArray()
-	if not lines.is_empty():
-		notes.append("[b]The House of Commons voted down %s[/b]\n%s\nYour government lacks a majority of its own; its partners and the opposition vote by their side of politics." % [
-			"a bill" if lines.size() == 1 else "%d bills" % lines.size(), "\n".join(lines)])
-	if not short.is_empty():
-		notes.append("[b]Not enough political capital: %s not put to the Commons[/b]\n%s\nCapital comes back each month, faster while the government is popular." % [
-			"a bill was" if short.size() == 1 else "%d bills were" % short.size(), "\n".join(short)])
-	if not notes.is_empty():
-		_show_message("\n\n".join(notes))
-		Sound.play("notice")
-
-
+## Stage S14.1: an engine event redraws only what it changed: a month refreshes the screen
+## (while a run of months goes on, only the date follows it, and the rest once it ends); the
+## effects table, a forecast, an explanation or households touch only their own panel.
 func _process(_delta: float) -> void:
 	if game == null or not started:
 		return
 	var events := game.poll()
-	var stepped := false
+	var whole := false
+	if _queued > 0 and not game.is_busy():
+		var months := _queued
+		_queued = 0
+		advance(months)
 	for event in events:
 		match str(event.get("kind", event.get("type", ""))):
 			"stepped":
-				stepped = true
+				_stepped_waiting = true
 				effects_running = false
-				_announce_votes()
-				_announce_situations()
 				_announce_election()
 				ask_dilemma.call_deferred()
 				if game.steps_done() >= term and not term_announced:
 					_announce_term.call_deferred()
 			"failed":
 				failed = true
+				whole = true
 				_show_message("[b]The simulation stopped[/b]\n%s\n\nLoad your save, or reload a corrected model." % event["error"], true)
 			"explained":
 				var trace := current_trace()
@@ -2104,8 +2149,9 @@ func _process(_delta: float) -> void:
 				if event["error"] != "":
 					_show_message("[b]Could not save[/b]: " + event["error"], true)
 				else:
-					_status.text = "saved"
+					_show_message("Game saved.")
 			"loaded":
+				whole = true
 				if event["error"] != "":
 					_show_message("[b]Could not load[/b]: " + event["error"], true)
 				else:
@@ -2124,10 +2170,11 @@ func _process(_delta: float) -> void:
 						note += _migration_note(event)
 					if note != "":
 						_show_message(note)
-					stepped = true
+					_stepped_waiting = true
 			"reloaded":
+				whole = true
 				if event["error"] != "":
-					_show_message("[b]The model files have a problem; the game carries on with the previous model.[/b]\n[code]%s[/code]" % event["error"], true)
+					_show_message("[b]The model files have a problem; the game carries on with the previous model.[/b]\n%s" % event["error"], true)
 				else:
 					failed = false
 					_model_changed()
@@ -2136,14 +2183,19 @@ func _process(_delta: float) -> void:
 					if not reset.is_empty():
 						note += " These started again from their initial values: " + ", ".join(reset)
 					_show_message(note)
-					stepped = true
-	if not events.is_empty():
+					_stepped_waiting = true
+	if _stepped_waiting and game.is_busy() and not whole:
+		_show_date()  # the months still running: the date counts
+		return
+	if _stepped_waiting or whole:
+		var stepped := _stepped_waiting
+		_stepped_waiting = false
+		_note_situations()
 		_refresh(stepped)
 		if stepped:
 			_want_effects()
-		# Stage S13.6: once the months asked for have all run, the report (or, after a new
-		# game's opening month, the guide on a first game).
-		if stepped and not game.is_busy():
+			# Stage S13.6: once the months asked for have all run, the report (or, after a new
+			# game's opening month, the guide on a first game).
 			if _opening:
 				_opening = false
 				_report_from = {}
@@ -2151,6 +2203,5 @@ func _process(_delta: float) -> void:
 					show_guide.call_deferred()
 			elif not _report_from.is_empty():
 				_build_report()
-				Sound.play("month")
 	elif _status.text == "working…" and not game.is_busy():
 		_set_controls(not failed and not lost)

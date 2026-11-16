@@ -86,7 +86,7 @@ func build(area_name: String, area_icon: Texture2D, items: Array) -> void:
 		var cost := Label.new()
 		cost.text = str(item["cost"])
 		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		cost.custom_minimum_size.x = 150
+		cost.custom_minimum_size.x = 190
 		cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		cost.add_theme_color_override("font_color", Palette.PENDING)

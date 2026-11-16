@@ -104,6 +104,12 @@ issues_at_election = "issue_at_election"
 #   a group's `estimate = "..."`   for a group with no households: where its membership is
 #                                  estimated from, said in its popup in their place
 #
+# Stage S14.1: the board as the screen.
+#   approval_good, approval_bad    the approval from which a group's arc is green, and below
+#                                  which it is red (mustard between); 0.38 and 0.28 if absent
+#   an indicator's `better`        also its colour: "high" a good thing (green), "low" a bad
+#                                  thing (red), none neither (blue)
+#
 # Icons are file names in client/icons (game-icons.net, credited in client/icons/CREDITS.md).
 [play.web]
 hide = ["starter_rate", "scottish_basic_rate", "scottish_basic_threshold", "intermediate_rate",
@@ -143,6 +149,10 @@ group_drivers = { income = "group_driver_income", jobs = "group_driver_jobs", pr
 # account for the year (a "-" in front is taken away).
 household = { entity = "household", support = "household_support", net_income = "net_income", change = "income_change", adults = "adults", children = "children", region = "region_code:region", type = "type:household_type", account = ["household_earnings", "household_pensions", "-income_tax_year", "-employee_ni_year", "household_benefits"] }
 group_driver_labels = { income = "Their incomes", jobs = "Jobs where they live", prices_and_time = "Prices and time in office", services = "Public services and the climate", standing = "The government's decisions", finances = "The public finances" }
+# Stage S14.1: a group's approval arc is green from approval_good, red below approval_bad,
+# mustard between (the share of its likely voters who back the government).
+approval_good = 0.38
+approval_bad = 0.28
 
 [[play.web.areas]]
 name = "Economy"

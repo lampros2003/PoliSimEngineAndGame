@@ -33,8 +33,10 @@ func _initialize() -> void:
 		return _fail("the change was not recorded as defeated 324 to 326: %s" % [changes])
 	if absf(float(main.game.latest("basic_rate")) - 0.2) > 1e-12:
 		return _fail("the basic rate changed although the bill was defeated")
-	if not main.notice_visible() or not main.notice_text().contains("voted down"):
-		return _fail("the player was not told: %s" % main.notice_text())
+	# Stage S14.1: told once, in the month's report, not also in a notice.
+	var told := Array(main.report.lines_shown).filter(func(l): return str(l).contains(": voted down, 324 to 326"))
+	if not main.report.visible or told.size() != 1 or main.notice_text().contains("voted down"):
+		return _fail("the player was not told once: report %s %s, notice %s" % [main.report.visible, main.report.lines_shown, main.notice_text()])
 	main.open_node(main.board.policy_of("basic_rate"))
 	await _settle()
 	if not main.policy_card().chart.markers.is_empty():
@@ -51,7 +53,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

@@ -92,32 +92,30 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 		add_child(chart_head)
 		chart = Chart.new()
 		chart.fmt = fmt
-		chart.custom_minimum_size = Vector2(0, 200)
+		chart.custom_minimum_size = Vector2(0, 150)
 		chart.entry = entry
 		chart.series_removed.connect(func(r: String) -> void:
 			if r != row and chart.series.size() > 1:
 				chart.series.resize(1)
 				chart.queue_redraw())
 		add_child(chart)
-	var why := Palette.caps("Why it moved last month")
-	add_child(why)
+	# Stage S14.1: the sections under the history open one at a time, so the popup fits the
+	# screen without a scroll bar; why it moved is open first.
 	trace = TracePanel.new()
 	trace.fmt = fmt
 	trace.entries = entries
-	add_child(trace)
+	add_child(Palette.fold("Why it moved last month", trace, true))
 	trace.follow.connect(func(n: String) -> void: follow.emit(n))
 	trace.chart.connect(func(r: String) -> void: compare_with(r, str(entries.get(_entry_of_row(entries, r), {}).get("label", r))))
 	if not breakdowns.is_empty():
-		add_child(Palette.caps("Who gains, who loses"))
 		breakdown = BreakdownPanel.new()
 		breakdown.fmt = fmt
-		add_child(breakdown)
+		add_child(Palette.fold("Who gains, who loses", breakdown))
 		breakdown.build(play, entries, breakdowns)
 	if not movers.is_empty():
-		add_child(Palette.caps("What moves it most"))
 		_movers = VBoxContainer.new()
 		_movers.add_theme_constant_override("separation", 2)
-		add_child(_movers)
+		add_child(Palette.fold("What moves it most", _movers))
 		for m in movers.slice(0, 6):
 			var button := Button.new()
 			button.theme_type_variation = "Link"

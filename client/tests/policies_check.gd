@@ -8,7 +8,7 @@ extends SceneTree
 ## policy offers its named levels and stores the level chosen; the drinking age reads in years
 ## and raising it shows the young's approval falling in a year; a higher fuel duty shows
 ## motorists against and receipts up, and pointing at it links motorists; an introduction the
-## government cannot afford is refused, its ghost goes and the notice says why; an estimated
+## government cannot afford is refused, its ghost goes and the report says why; an estimated
 ## group's popup says it is an estimate and shows no households.
 
 var main: Control
@@ -182,8 +182,8 @@ func _initialize() -> void:
 	await _month()
 	var refused: Array = main.game.changes().filter(func(c): return str(c["lever"]) == "cannabis_law" and c.get("refused", false))
 	if refused.is_empty() or board.nodes.has("policy:cannabis_law") or not main.available_policies("Law and order").has("policy:cannabis_law") \
-			or not main.notice_text().contains("Cannabis law, to be introduced at Legal and taxed"):
-		return _fail("the unaffordable introduction: refused %d, notice %s" % [refused.size(), main.notice_text()])
+			or Array(main.report.lines_shown).filter(func(l): return str(l).begins_with("Cannabis law, to be introduced at Legal and taxed: refused")).is_empty():
+		return _fail("the unaffordable introduction: refused %d, report %s" % [refused.size(), main.report.lines_shown])
 	# An estimated group: the note, no households.
 	main.open_node("group:motorists")
 	for i in 30:
@@ -233,7 +233,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

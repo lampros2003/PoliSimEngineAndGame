@@ -4,8 +4,9 @@ extends SceneTree
 ## three policies introduced in three areas and one refused for want of capital, level
 ## policies, a repeal) and every question answered as it comes, with a popup of each kind and
 ## both sheets opened along the way. It proves: no failed month; every bill's fate is what the
-## report and the notices say (passed or refused), with the capital spent, earned and held
-## adding up and never negative; the month's report after every month; the election in July
+## report says (passed or refused), with the capital spent, earned and held adding up and
+## never negative; the month's report after every month (stage S14.1: open over the board
+## for a month with bills, else its one line under the date); the election in July
 ## 2029 with its result announced; and a game saved in month 24 and loaded plays months 24 to
 ## 36 again to the same state hashes and headline figures.
 
@@ -150,8 +151,8 @@ func _month() -> bool:
 		if c.get("refused", false):
 			put["refused"] += 1
 			refused.append("%s in %s" % [c["lever"], name])
-			if not main.notice_text().contains("Not enough political capital") or absf(now - float(c["value"])) < 1e-9:
-				return _bad("%s: %s refused, but the notice says %s and it stands at %s" % [name, c["lever"], main.notice_text(), now])
+			if not main.report.visible or absf(now - float(c["value"])) < 1e-9:
+				return _bad("%s: %s refused, but the report is %s and it stands at %s" % [name, c["lever"], main.report.visible, now])
 		elif c.get("passed", true):
 			put["passed"] += 1
 			cost += float(c["cost"])
@@ -170,8 +171,9 @@ func _month() -> bool:
 	if after < 0.0 or absf(spent - cost) > 1e-6 or (before >= 0.0 and spent > before + 1e-9) or before >= 0.0 and absf(after - clampf(before - spent + earned, 0.0, 100.0)) > 1e-6:
 		return _bad("%s: capital %.3f, spent %.3f (bills %.3f), earned %.3f, now %.3f" % [name, before, spent, cost, earned, after])
 	# The month's report, every month after the base one.
-	if month > 0 and (not main.report.visible or main.report.title != name):
-		return _bad("%s: no report (%s)" % [name, main.report.title])
+	var told: bool = main.report.visible or main.notice_text().begins_with(name + ":")
+	if month > 0 and (main.report.title != name or not told or (put["passed"] + put["refused"] > 0 and not main.report.visible)):
+		return _bad("%s: no report (%s, shown %s, line %s)" % [name, main.report.title, main.report.visible, main.notice_text()])
 	# The election, in its month only, and its result.
 	var election: bool = main.game.latest("election_now") == true
 	if election != (name == ELECTION):
@@ -283,7 +285,7 @@ func _bad(message: String) -> bool:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

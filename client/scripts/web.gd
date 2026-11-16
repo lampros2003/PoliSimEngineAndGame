@@ -15,8 +15,17 @@ extends Control
 ## families, sized by their share of the electorate, with approval as a gauge and a figure;
 ## every node is labelled at rest where its label has room; a policy's links are its
 ## strongest effects on indicators and on groups, each weighed against the target's own
-## scale (what a typical policy does to it), and always the budget balance when it moves it; situation flags stand in the
-## window's corners.
+## scale (what a typical policy does to it), and always the budget balance when it moves it.
+##
+## Stage S14.1: the board is the screen. It cannot be dragged or zoomed; it fills the room it
+## is given and only a change of window changes it. The groups are one ring round the centre:
+## each group an arc of it, the families apart and named once inside it, each arc as long as
+## the group's share of its family (never too short for its pictogram), and outside each its
+## approval arc, coloured against the scenario's thresholds. An indicator's ring says what
+## kind of thing it measures: green a good thing (`better = "high"`), red a bad thing
+## (`better = "low"`), blue the rest; links green when good
+## for what they reach, red when bad, blue when neither, with + or - at the arrowhead. The
+## situations live on a strip of their own above the board (main.gd).
 
 const Palette := preload("res://scripts/palette.gd")
 
@@ -25,21 +34,21 @@ signal hover_changed(key: String)
 
 ## Node radius by tier, in pixels at a unit scale of 1.
 const RADIUS := [0.0, 17.0, 22.0, 29.0]
-const ZOOM_MIN := 0.6
-const ZOOM_MAX := 3.0
 ## Links shown for a policy: the strongest few, above a small threshold.
 const MAX_LINKS := 7
 const LINK_FLOOR := 0.0005
 ## Stage S13.4: a policy's links to groups, besides its links to indicators.
 const MAX_GROUP_LINKS := 3
-## The groups' ring, as a fraction of the way from the centre medallion to the indicators'.
-const GROUP_RING := Vector2(0.46, 0.4)
-## The gap between two families of groups, in the same terms as a group's room.
-const FAMILY_GAP := 26.0
-## The largest group's radius, in pixels at a unit scale of 1.
-const GROUP_MAX := 25.0
-## Stage S13.5: the room the month's report takes at the right while it is open.
-const DOCK_WIDTH := 412.0
+## Stage S14.1: the group ring, in pixels at a unit scale of 1: the band's thickness, the gap
+## between two families and between two groups of a family, and the approval arc's offset
+## from the band and thickness.
+const RING_BAND := 26.0
+const FAMILY_GAP := 18.0
+const SEGMENT_GAP := 3.0
+const ARC_OFFSET := 4.0
+const ARC_WIDTH := 6.0
+## The ring's widest shape: its width over its height.
+const RING_ASPECT := 1.75
 
 var fmt: RefCounted
 ## key -> node: {key, kind ("policy", "indicator", "group", "flag", "centre"), label, icon,
@@ -64,10 +73,14 @@ var authored := false
 var centre := {}  # approval, months, capital texts for the centre medallion
 var hover := ""
 var selected := ""
-var zoom := 1.0
-var pan := Vector2.ZERO
 ## While a popup or sheet is open the board takes no input.
 var input_enabled := true
+## Stage S14.1: approval from which a group's arc is green, and below which it is red
+## ([play.web] approval_good, approval_bad).
+var approval_good := 0.38
+var approval_bad := 0.28
+## Stage S14.1: a board drawn for the key (main.gd): its nodes are set by hand, never laid out.
+var demo := false
 
 var _entries := {}
 var _consumers := {}
@@ -81,9 +94,12 @@ var _rim: Array = []  # [glyph, position, angle, rect] for the area names along 
 var _arcs: Array = []  # per area, the rim arc's points (in two pieces, either side of its name)
 var _arc_ends: Array = []  # for each piece, the end of the area's arc it holds: 0 the start, 1 the end
 var _guides: Array = []  # the rings' outlines, as points
-var _group_ring: Ring  # stage S13.4: the groups' ring, or null
+var _group_ring: Ring  # the groups' ring (the band's middle line), or null
+var _group_band := 0.0  # its thickness in pixels
+var _families: Array = []  # glyphs of the families' names, as _rim's
 var _spokes: Array = []  # [rim point, middle-ring point] at each boundary between areas
-var _links: Array = []  # {from, to, sign, strength, measured, points}
+var _links: Array = []  # {from, to, sign, strength, measured, points, tone}
+var _linked := {}  # stage S14.1: the keys the links shown touch
 var _link_key := ""
 var _draw_in := 1.0
 var _flow := 0.0
@@ -91,10 +107,8 @@ var _dim := 0.0
 var _lift := {}  # key -> 0..1
 var _lift_tweens := {}
 var _pulses := {}  # key -> seconds since the pulse began
-var _flags: Array = []
-var _press := Vector2.ZERO
-var _dragging := false
-var _pressing := false
+var _animating := false  # stage S14.1: a layer moved last frame and wants one still frame after
+var _widths := {}  # stage S14.1: measured strings, "font/size/text" -> width
 var _tween_links: Tween
 var _tween_dim: Tween
 ## Stage S13.6: how many times the set of links shown has been replaced (for the checks:
@@ -130,13 +144,8 @@ func _ready() -> void:
 	_link_layer.draw.connect(_draw_links)
 	_node_layer.draw.connect(_draw_nodes)
 	_fx_layer.draw.connect(_draw_effects)
-	# Stage S13.5: a change of size (the month's report docking) glides the nodes to their
-	# new places.
-	resized.connect(func() -> void:
-		if nodes.has("centre") and nodes["centre"]["pos"] != Vector2.ZERO:
-			_relayout_smoothly()
-		else:
-			layout())
+	# Stage S14.1: only the window changes the board's size; it is laid out again at once.
+	resized.connect(layout)
 	_leave = Timer.new()
 	_leave.one_shot = true
 	_leave.timeout.connect(func() -> void: set_hover(""))
@@ -177,6 +186,8 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 	hidden_levers = PackedStringArray(web.get("hide", []))
 	groups = web.get("groups", [])
 	budget_row = str(web.get("balance", "budget_balance"))
+	approval_good = float(web.get("approval_good", 0.38))
+	approval_bad = float(web.get("approval_bad", 0.28))
 	var player := {}
 	for entry in levers:
 		player[str(entry["name"])] = entry
@@ -255,6 +266,7 @@ func build(entries: Dictionary, play: Dictionary, levers: Array, label_of: Calla
 	hover = ""
 	if lever_of.is_valid():
 		_sync(lever_of, pending)
+	_order_nodes()  # also for a board with no size yet (no display)
 	layout()
 
 
@@ -415,7 +427,7 @@ func _automatic(entries: Dictionary, play: Dictionary, levers: Array, rows: Dict
 func _add(key: String, kind: String, label: String, icon: String, tier: int, area: String, levers: PackedStringArray,
 		row: String, name: String, better := "") -> void:
 	var entry: Dictionary = _entries.get(name, {})
-	var fallback := {"policy": "policy", "indicator": "indicator", "group": "group", "centre": "vote", "flag": "indicator"}
+	var fallback := {"policy": "policy", "indicator": "indicator", "group": "group", "centre": "vote"}
 	nodes[key] = {"key": key, "kind": kind, "label": label, "tier": clampi(tier, 1, 3), "area": area, "levers": levers,
 		"row": row, "name": name, "better": better, "doc": str(entry.get("doc", "")),
 		"icon": Palette.icon(icon if icon != "" else fallback.get(kind, "policy")), "pos": Vector2.ZERO, "r": 10.0,
@@ -528,12 +540,35 @@ class Ring:
 		var p := at(f) - c
 		return fposmod(atan2(p.y, p.x) + PI / 2.0, TAU)
 
+	## Stage S14.1: the point `d` pixels outside the ring (inside for a negative `d`) at a
+	## fraction of the way round, on the ellipse of the same centre that far wider and taller.
+	func offset_at(f: float, d: float) -> Vector2:
+		f = fposmod(f, 1.0)
+		var i := clampi(s.bsearch(f), 1, N)
+		var k := (f - s[i - 1]) / maxf(s[i] - s[i - 1], 1e-12)
+		var u := lerpf(t[i - 1], t[i], k)
+		return c + Vector2((rx + d) * cos(u), (ry + d) * sin(u))
 
-## Places every node for the board's current size. The board is laid out to fill the
-## window at zoom 1; pan and zoom move the view, never the layout.
+	## The points from fraction f0 to f1 (clockwise), `d` pixels outside, about every `step`
+	## pixels.
+	func path(f0: float, f1: float, d: float, step := 5.0) -> PackedVector2Array:
+		var count := maxi(2, int(ceil((f1 - f0) * length() / step)) + 1)
+		var out := PackedVector2Array()
+		for i in count:
+			out.append(offset_at(lerpf(f0, f1, float(i) / (count - 1)), d))
+		return out
+
+	## True when a point lies inside the ellipse `d` pixels outside the ring.
+	func encloses(p: Vector2, d: float) -> bool:
+		var q := p - c
+		return pow(q.x / (rx + d), 2.0) + pow(q.y / (ry + d), 2.0) < 1.0
+
+
+## Places every node for the board's current size: the board fills the room it is given.
 func layout() -> void:
-	if nodes.is_empty() or size.x < 10.0 or size.y < 10.0:
+	if demo or nodes.is_empty() or size.x < 10.0 or size.y < 10.0:
 		return
+	_widths.clear()
 	_unit = clampf(minf(size.x / 1.55, size.y) / 800.0, 0.72, 2.2)
 	var u := _unit
 	_c = size / 2.0 + Vector2(0, 6.0 * u)
@@ -566,30 +601,25 @@ func layout() -> void:
 		i_need.append(m)
 		a["rows"] = 1
 	var start := outer.fraction(TAU - PI * 0.16) if areas.size() > 2 else 0.0
-	var shares := []
-	for i in areas.size():
-		shares.append(maxf(p_need[i], i_need[i] * outer.length() / middle.length()))
-	for attempt in 6:
-		var total := 0.0
-		for s in shares:
-			total += s
-		var f := start
-		var short := false
-		for i in areas.size():
-			var share: float = shares[i] / total
-			var span := _span(middle, outer.angle(f), outer.angle(f + share)) * middle.length()
-			var rows := 1 if i_need[i] <= span else 2
-			areas[i]["rows"] = rows
-			var wanted: float = i_need[i] / rows
-			if wanted > span * 1.001:
-				shares[i] *= wanted / span
-				short = true
-			f += share
-		if not short:
-			break
+	var shares := _allocate(p_need, i_need, start, outer, middle)
 	var total_share := 0.0
 	for s in shares:
 		total_share += s
+	# Stage S14.1: labels at the top and bottom of the rim sit side by side and want more of
+	# its length than those down the sides, which stack: the areas there take more room (the
+	# nodes' size still follows the plain need).
+	var f0 := start
+	var weighted := []
+	for i in areas.size():
+		var share: float = shares[i] / total_share
+		weighted.append(p_need[i] * (1.0 + 0.0 * absf(cos(outer.angle(f0 + share / 2.0)))))
+		f0 += share
+	shares = _allocate(weighted, i_need, start, outer, middle)
+	var weighted_total := 0.0
+	for s in shares:
+		weighted_total += s
+	for i in shares.size():
+		shares[i] *= total_share / weighted_total
 	# Stage S13.6: a board with more nodes than its rings hold draws them smaller, never
 	# overlapping (down to two thirds of their size).
 	_node_scale = clampf(outer.length() / total_share, 0.66, 1.0)
@@ -635,18 +665,48 @@ func layout() -> void:
 	var group_keys := keys_of_unordered("group")  # the scenario's order (dictionaries keep it)
 	var centre_r := clampf(minf(inner.ry, middle.ry) * 0.62, 70.0 * u, 128.0 * u)
 	if not group_keys.is_empty():
-		centre_r = clampf(middle.ry * 0.34, 60.0 * u, 96.0 * u)
+		centre_r = clampf(middle.ry * 0.31, maxf(58.0 * u, 64.0), 90.0 * u)
 	nodes["centre"]["pos"] = _c
 	nodes["centre"]["r"] = centre_r
 	_group_ring = null
+	_families.clear()
 	if not group_keys.is_empty():
-		_place_groups(group_keys, centre_r, middle)
-	_guides = [_outline(outer), _outline(middle)] + ([_outline(_group_ring)] if _group_ring != null else [])
+		_place_groups(group_keys, centre_r, inner)
+	_guides = [_outline(outer), _outline(middle)]
 	_order_nodes()
-	set_flags(_flags, false)
 	_place_labels()
 	if _link_key != "":
 		_tessellate()
+	queue_layers()
+
+
+## Each area's share of the outer ring (in its length's terms): its policies' need, or more
+## for its indicators to stand over the same angle in one row or two (each area's "rows" set).
+## A few passes settle it, since an angle covers less of the middle ring at the top and bottom
+## than at the sides.
+func _allocate(p_need: Array, i_need: Array, start: float, outer: Ring, middle: Ring) -> Array:
+	var shares := []
+	for i in areas.size():
+		shares.append(maxf(p_need[i], i_need[i] * outer.length() / middle.length()))
+	for attempt in 6:
+		var total := 0.0
+		for s in shares:
+			total += s
+		var f := start
+		var short := false
+		for i in areas.size():
+			var share: float = shares[i] / total
+			var span := _span(middle, outer.angle(f), outer.angle(f + share)) * middle.length()
+			var rows := 1 if i_need[i] <= span else 2
+			areas[i]["rows"] = rows
+			var wanted: float = i_need[i] / rows
+			if wanted > span * 1.001:
+				shares[i] *= wanted / span
+				short = true
+			f += share
+		if not short:
+			break
+	return shares
 
 
 ## How far round a ring the polar angles from rom to 	o (clockwise) reach, as a fraction.
@@ -664,83 +724,131 @@ func _place_row(keys: Array, ring: Ring, f0: float, f1: float) -> void:
 	for k in n:
 		var node: Dictionary = nodes[keys[k]]
 		node["pos"] = ring.at(f0 + (f1 - f0) * (float(k) + 0.5) / float(n))
-		node["r"] = RADIUS[node["tier"]] * _unit * _node_scale
+		node["r"] = RADIUS[node["tier"]] * _unit * _node_scale * clampf(0.75 + 0.2 * _unit, 0.9, 1.0)  # stage S14.1: a little smaller on a small screen
 
 
-## Stage S13.4: the groups on an ellipse round the centre, in their families with a gap
-## between families, the first family centred at the top, each taking room for its size.
-## Stage S13.6: more groups than the ring holds widen it towards the indicators (never onto
-## one), and a ring that cannot clear them narrows; if the groups still do not fit (their
-## padding may close to half first), they are drawn smaller.
-func _place_groups(keys: Array, centre_r: float, middle: Ring) -> void:
-	_group_scale = 1.0
-	for attempt in 3:
-		var room := []  # each group's [gap before it, room it takes]
-		var total := 0.0
-		var widest := 0.0
-		var last := ""
-		for key in keys:
-			var n: Dictionary = nodes[key]
-			n["r"] = group_radius(n)
-			widest = maxf(widest, n["r"])
-			var gap := FAMILY_GAP * _unit if last != "" and n["family"] != last else 0.0
-			last = n["family"]
-			room.append([gap, 2.0 * n["r"] + 30.0 * _unit])
-			total += gap + 2.0 * n["r"] + 30.0 * _unit
-		total += FAMILY_GAP * _unit  # between the last family and the first
-		var tight := total - 15.0 * _unit * keys.size()
-		var span := maxf(middle.ry - centre_r, 1.0)
-		var lowest := (widest + 8.0 * _unit) / span
-		var k := GROUP_RING.y
-		_spread_groups(keys, room, total, _group_ring_at(k, centre_r, middle))
-		while _groups_collide(keys) and k - 0.02 >= lowest:
-			k -= 0.02
-			_spread_groups(keys, room, total, _group_ring_at(k, centre_r, middle))
-		while _group_ring.length() < tight and k + 0.02 <= 0.9:
-			_spread_groups(keys, room, total, _group_ring_at(k + 0.02, centre_r, middle))
-			if _groups_collide(keys):
-				_spread_groups(keys, room, total, _group_ring_at(k, centre_r, middle))
-				break
-			k += 0.02
-		if _group_ring.length() >= tight or attempt == 2:
-			return
-		_group_scale *= maxf(_group_ring.length() / tight, 0.8)
-
-
-func _group_ring_at(k: float, centre_r: float, middle: Ring) -> Ring:
-	return Ring.new(_c, centre_r + (middle.rx - centre_r) * k * GROUP_RING.x / GROUP_RING.y, centre_r + (middle.ry - centre_r) * k)
-
-
-## True when a group touches an indicator.
-func _groups_collide(keys: Array) -> bool:
-	for g in keys:
-		for i in keys_of_unordered("indicator"):
-			if (nodes[g]["pos"] as Vector2).distance_to(nodes[i]["pos"]) < nodes[g]["r"] + nodes[i]["r"] + 6.0 * _unit:
-				return true
-	return false
-
-
-func _spread_groups(keys: Array, room: Array, total: float, ring: Ring) -> void:
-	_group_ring = ring
+## Stage S14.1: the groups as one ring round the centre medallion. The ring is as tall as the
+## medallion and the families' names inside it need, and as wide as the indicators allow (up
+## to RING_ASPECT times its height). Each family takes room for its number of groups, apart
+## from the next by FAMILY_GAP; inside it each group's arc is its share of the family, never
+## shorter than its pictogram needs. The first family is centred at the top.
+func _place_groups(keys: Array, centre_r: float, inner: Ring) -> void:
+	var u := _unit
+	var band := RING_BAND * u
+	_group_band = band
+	var reach := band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 4.0) * u  # from the middle line to the arc's edge
+	var ry := centre_r + band / 2.0 + 24.0 * u
+	# As wide as no indicator is touched.
+	var widest := ry * RING_ASPECT
+	for key in keys_of_unordered("indicator"):
+		var q: Vector2 = nodes[key]["pos"] - _c
+		var r: float = nodes[key]["r"] + reach + 6.0 * u
+		var k := q.y / (ry + r)
+		if absf(q.y) < ry:  # beside the ring; one above or below it is the height's to clear
+			widest = minf(widest, absf(q.x) / sqrt(1.0 - k * k) - r)
+	var rx := maxf(widest, ry)
+	_group_ring = Ring.new(_c, rx, ry)
+	var length := _group_ring.length()
+	var families: Array = []  # [name, [keys]]
+	for key in keys:
+		var family := str(nodes[key]["family"])
+		if families.is_empty() or families[-1][0] != family:
+			families.append([family, []])
+		families[-1][1].append(key)
+	var gaps := families.size() * FAMILY_GAP * u + (keys.size() - families.size()) * SEGMENT_GAP * u
+	var usable := maxf(length - gaps, 1.0)
+	var least := minf(band * 1.15, usable / keys.size())
 	var f := 0.0
-	for i in range(1, keys.size()):
-		if nodes[keys[i]]["family"] != nodes[keys[0]]["family"]:
+	for i in families.size():
+		var members: Array = families[i][1]
+		var room := usable * members.size() / keys.size()
+		var lengths := share_lengths(members.map(func(k): return maxf(float(nodes[k].get("share_value", -1.0)), 0.0)), room, least)
+		var span := room + (members.size() - 1) * SEGMENT_GAP * u
+		if i == 0:
+			f = -span / 2.0 / length
+		var start := f
+		for j in members.size():
+			var n: Dictionary = nodes[members[j]]
+			n["f0"] = f
+			n["f1"] = f + lengths[j] / length
+			n["seg_len"] = lengths[j]
+			n["pos"] = _group_ring.at((n["f0"] + n["f1"]) / 2.0)
+			n["r"] = band * 0.45
+			n["band_poly"] = _band_polygon(n["f0"], n["f1"], band / 2.0)
+			n["track"] = _group_ring.path(n["f0"], n["f1"], band / 2.0 + (ARC_OFFSET + ARC_WIDTH / 2.0) * u, 3.0)
+			f = n["f1"] + SEGMENT_GAP * u / length
+		f -= SEGMENT_GAP * u / length
+		# The family's name, once, inside the ring, centred on its groups.
+		var mid := (start + f) / 2.0
+		var text_ring := Ring.new(_c, rx - band / 2.0 - 10.0 * u, ry - band / 2.0 - 10.0 * u)
+		var angle := _group_ring.angle(mid)
+		_curved_text(str(families[i][0]).to_upper(), text_ring, text_ring.fraction(angle), (f - start) * length * 0.95,
+			int(roundf(clampf(12.0 * u, 12.0, 17.0))), _families)
+		f += FAMILY_GAP * u / length
+
+
+## Stage S14.1: lengths in proportion to `shares` that add up to `room`, none under `least`
+## (those below it take it, the rest share what is left by share); equal when no share is
+## known.
+static func share_lengths(shares: Array, room: float, least: float) -> Array:
+	var count := shares.size()
+	var total := 0.0
+	for s in shares:
+		total += float(s)
+	if total <= 0.0:
+		var even := []
+		even.resize(count)
+		even.fill(room / count)
+		return even
+	var fixed := {}
+	var out := []
+	out.resize(count)
+	for attempt in count + 1:
+		var left := room - least * fixed.size()
+		var weight := 0.0
+		for i in count:
+			if not fixed.has(i):
+				weight += float(shares[i])
+		var changed := false
+		for i in count:
+			out[i] = least if fixed.has(i) else (left * float(shares[i]) / weight if weight > 0.0 else left / (count - fixed.size()))
+			if not fixed.has(i) and out[i] < least:
+				fixed[i] = true
+				changed = true
+		if not changed:
 			break
-		f -= (room[i - 1][1] + room[i][1]) / 4.0
+	return out
+
+
+## The band of a group's arc, `half` pixels either side of the ring's middle line.
+func _band_polygon(f0: float, f1: float, half: float) -> PackedVector2Array:
+	var outside := _group_ring.path(f0, f1, half, 4.0)
+	var inside := _group_ring.path(f0, f1, -half, 4.0)
+	inside.reverse()
+	return outside + inside
+
+
+## Stage S14.1: for the board check: what is wrong with the group ring, as text: a group's arc
+## running into the next, shorter than its pictogram needs, or out of the families' order.
+func ring_problems() -> PackedStringArray:
+	var out := PackedStringArray()
+	var keys := keys_of("group")
+	if keys.is_empty():
+		return out
+	var seen: Array = []
 	for i in keys.size():
-		if i > 0:
-			f += (room[i][0] + (room[i - 1][1] + room[i][1]) / 2.0)
-		nodes[keys[i]]["pos"] = ring.at(f / total)
-
-
-## A group's radius: its area follows its share of the electorate (stage S13.5: eight in ten,
-## the motorists, gives a node of radius GROUP_MAX), never smaller than 14 pixels at a unit
-## scale of 1. Quantised, so a month's small change in a share leaves the board as it was.
-func group_radius(n: Dictionary) -> float:
-	var share: float = n.get("share_value", -1.0)
-	if share < 0.0:
-		share = 0.12
-	return snappedf(14.0 + (GROUP_MAX - 14.0) * sqrt(clampf(share / 0.8, 0.0, 1.0)), 1.0) * _unit * _group_scale
+		var n: Dictionary = nodes[keys[i]]
+		if seen.is_empty() or seen[-1] != n["family"]:
+			if seen.has(n["family"]):
+				out.append("%s out of its family" % keys[i])
+			seen.append(n["family"])
+		if float(n["seg_len"]) < _group_band * 0.9:
+			out.append("%s is %.0f px long" % [keys[i], n["seg_len"]])
+		var next: Dictionary = nodes[keys[(i + 1) % keys.size()]]
+		var next_f0: float = float(next["f0"]) + (1.0 if i == keys.size() - 1 else 0.0)
+		if float(n["f1"]) > next_f0 + 1e-9:
+			out.append("%s runs into %s" % [keys[i], keys[(i + 1) % keys.size()]])
+	return out
 
 
 func _outline(ring: Ring) -> PackedVector2Array:
@@ -759,12 +867,10 @@ func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
 	var f_mid := ring.fraction(middle)
 	var per := 1.0 / ring.length()
-	var top := cos(middle) > -0.05  # angle from the top: the upper half reads clockwise
 	var room := _span(ring, middle - share * 0.5, middle + share * 0.5) * 0.92
 	if width * per > room:
 		text = ""  # an area too narrow for its name keeps only its arc
 		width = 0.0
-	var x := -width / 2.0
 	var fa := ring.fraction(middle - share * 0.44)
 	var fb := ring.fraction(middle + share * 0.44)
 	if fb < fa:
@@ -776,85 +882,157 @@ func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
 		if piece[1] - piece[0] <= per:
 			continue
 		var arc := PackedVector2Array()
-		for i in 31:
-			arc.append(ring.at(lerpf(piece[0], piece[1], i / 30.0)))
+		for i in 61:
+			arc.append(ring.at(lerpf(piece[0], piece[1], i / 60.0)))
 		_arcs.append(arc)
 		_arc_ends.append(piece[2])  # which end of the area's arc gets a tick: 0 its start, 1 its end
+	_curved_text(text, ring, f_mid, INF, size_px, _rim)
+
+
+## Stage S14.1: letters set along a ring, centred at the fraction `f_mid` of the way round,
+## upright everywhere (clockwise over the top half, anticlockwise along the bottom), each
+## [glyph, position, angle, width, size] appended to `out`; nothing when wider than `room`
+## pixels. Returns the width set.
+func _curved_text(text: String, ring: Ring, f_mid: float, room: float, size_px: int, out: Array) -> float:
+	var font := Palette.display(600, 2)
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+	if width > room:
+		return 0.0
+	var per := 1.0 / ring.length()
+	var top := cos(ring.angle(f_mid)) > -0.05
+	var x := -width / 2.0
 	for ch in text:
 		var w := font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
 		var along := (x + w / 2.0) * per
 		var f := f_mid + along if top else f_mid - along
 		var p := ring.at(f)
 		var q := ring.at(f + per * (1.0 if top else -1.0))
-		var rot := (q - p).angle()
-		_rim.append([ch, p, rot, w, size_px])
+		out.append([ch, p, (q - p).angle(), w, size_px])
 		x += w
+	return width
 
 
 func _order_nodes() -> void:
 	order = PackedStringArray()
-	for kind in ["centre", "group", "indicator", "policy", "introduce", "flag"]:
+	for kind in ["centre", "group", "indicator", "policy", "introduce"]:
 		for key in nodes:
 			if nodes[key]["kind"] == kind:
 				order.append(key)
 
 
 ## Stage S13.4: a label for every node that has room for one at rest, the largest nodes
-## first. Policies label towards the centre (outward is the rim); indicators and groups
-## outward from the centre, then below; each tries a wide label, then one on two lines,
-## then the other places round the node, and takes the first that clears every node, flag,
-## the rim and the labels already placed. A node with no room shows its label on hover and
-## when zoomed in. A group's label carries its approval on a line of its own.
+## first. Policies label towards the centre (outward is the rim); indicators outward from the
+## centre, then below; each tries a wide label, then one on two lines, then the other places
+## round the node, and takes the first that clears every node, the group ring, the rim and
+## the labels already placed. Stage S14.1: the groups come last, each just outside its arc,
+## and only the larger ones (the rest show theirs when pointed at). A group's label carries
+## its approval on a line of its own.
 func _place_labels() -> void:
 	if size.x < 10.0 or size.y < 10.0:
 		return
 	var placed: Array = []
 	var font := Palette.display(500)
-	var keys: Array = Array(order).filter(func(k): return not nodes[k]["kind"] in ["centre", "flag"])
+	var keys: Array = Array(order).filter(func(k): return nodes[k]["kind"] != "centre")
 	keys.sort_custom(func(a, b): return _label_rank(a) > _label_rank(b))
 	for key in nodes:
 		nodes[key]["label_rect"] = Rect2()
 		nodes[key]["rest"] = false
+	var by_key := {}  # key -> its label's rect at rest
+	var failed: Array = []
 	for key in keys:
-		var node: Dictionary = nodes[key]
-		var size_px := node_label_size(node)
-		var best := Rect2()
-		var first := Rect2()
-		var extra := (size_px + 2.0) if node["kind"] == "group" else 0.0  # the approval line
-		# Stage S13.6: a second pass tries every way round the node, and a narrower label.
-		var widths := [130.0, 84.0] if node["tier"] == 3 else [112.0, 76.0]
-		var passes := [[widths, false], [widths + [widths[1] * 0.72], true]]
-		for attempt in passes:
-			if best.size != Vector2.ZERO:
+		var found := _try_label(key, placed, font)
+		if found[0].size != Vector2.ZERO:
+			by_key[key] = found[0]
+			placed.append(found[0])
+		else:
+			nodes[key]["label_rect"] = found[1]
+			if nodes[key]["kind"] != "group":
+				failed.append(key)
+	# Stage S14.1: a node left without a label takes its place first among its neighbours,
+	# which then find theirs again; kept only if every one of them still finds one.
+	for key in failed:
+		var p: Vector2 = nodes[key]["pos"]
+		var near: Array = by_key.keys().filter(func(k): return nodes[k]["kind"] != "group" and (by_key[k] as Rect2).get_center().distance_to(p) < 230.0 * _unit)
+		near.sort_custom(func(x, y): return _label_rank(x) > _label_rank(y))
+		var trial := {}
+		for k in by_key:
+			if not near.has(k):
+				trial[k] = by_key[k]
+		var lines_before := {}
+		for k in near + [key]:
+			lines_before[k] = nodes[k].get("lines")
+		var ok := true
+		for k in [key] + near:
+			var found := _try_label(k, trial.values(), font)
+			if found[0].size == Vector2.ZERO:
+				ok = false
 				break
-			var found := _find_label(node, key, placed, attempt[0], attempt[1], font, size_px, extra)
-			best = found[0]
-			if first.size == Vector2.ZERO:
-				first = found[1]
-		node["rest"] = best.size != Vector2.ZERO
-		if best.size == Vector2.ZERO:
-			best = first
-		node["label_rect"] = best
-		if node["rest"]:
-			placed.append(best)
+			trial[k] = found[0]
+		if ok:
+			by_key = trial
+		else:
+			for k in lines_before:
+				nodes[k]["lines"] = lines_before[k]
+	for key in by_key:
+		nodes[key]["label_rect"] = by_key[key]
+		nodes[key]["rest"] = true
+
+
+## A node's label at rest among those `placed`: [rect or empty, the rect to use when pointed at].
+func _try_label(key: String, placed: Array, font: Font) -> Array:
+	var node: Dictionary = nodes[key]
+	var size_px := node_label_size(node)
+	if node["kind"] == "group":
+		return _group_label(node, key, placed, font, size_px)
+	var best := Rect2()
+	var first := Rect2()
+	# Stage S13.6: a second pass tries every way round the node, and a narrower label.
+	var widths := [130.0, 84.0] if node["tier"] == 3 else [112.0, 76.0]
+	var passes := [[widths, false], [widths + [widths[1] * 0.72], true]]
+	for attempt in passes:
+		if best.size != Vector2.ZERO:
+			break
+		var found := _find_label(node, key, placed, attempt[0], attempt[1], font, size_px)
+		best = found[0]
+		if first.size == Vector2.ZERO:
+			first = found[1]
+	return [best, first]
+
+
+## Stage S14.1: a group's label just outside its approval arc, along the ring's outward
+## normal at the middle of its arc: [rect at rest or empty, rect to use when pointed at].
+## Only a group whose arc is among the longer ones is labelled at rest.
+func _group_label(node: Dictionary, key: String, placed: Array, font: Font, size_px: int) -> Array:
+	var lines := wrap_label(str(node["label"]), font, size_px, 96.0 * _unit)
+	var w := 0.0
+	for line in lines:
+		w = maxf(w, _text_w(font, line, size_px))
+	w = maxf(w, _text_w(Palette.text(600), "100.0%", size_px))
+	var h := (lines.size() + 1) * (size_px + 2.0)
+	node["lines"] = lines
+	var mid := (float(node["f0"]) + float(node["f1"])) / 2.0
+	var p := _group_ring.offset_at(mid, _group_band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 4.0) * _unit)
+	var normal := p - _c
+	normal = Vector2(normal.x / pow(_group_ring.rx, 2.0), normal.y / pow(_group_ring.ry, 2.0)).normalized()
+	var reach := absf(normal.x) * w / 2.0 + absf(normal.y) * h / 2.0
+	var rect := Rect2(p + normal * (reach + 2.0) - Vector2(w, h) / 2.0, Vector2(w, h))
+	var big := float(node["seg_len"]) >= _group_band * 1.9
+	return [rect if big and _clear(rect, key, placed) else Rect2(), rect]
 
 
 ## Stage S13.6: the first clear place for a node's label at these widths: [rect, the
 ## first place tried]; `round_about` adds every way round the node, nearest the preferred
 ## way first. Sets the node's "lines" to those of the place found (or first tried).
-func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, round_about: bool, font: Font, size_px: int,
-		extra: float) -> Array:
+func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, round_about: bool, font: Font, size_px: int) -> Array:
 	var first := Rect2()
 	for width in widths:
 		var lines := wrap_label(str(node["label"]), font, size_px, width * _unit)
 		var w := 0.0
 		for line in lines:
-			w = maxf(w, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x)
-		if extra > 0.0:
-			w = maxf(w, Palette.text(600).get_string_size("100%", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x)
-		var h := lines.size() * (size_px + 2.0) + extra
+			w = maxf(w, _text_w(font, line, size_px))
+		var h := lines.size() * (size_px + 2.0)
 		var p: Vector2 = node["pos"]
-		var r: float = node["r"] + {"policy": 9.0, "group": 6.0}.get(node["kind"], 4.0) * _unit
+		var r: float = node["r"] + {"policy": 9.0}.get(node["kind"], 4.0) * _unit
 		var out := p - _c
 		out = Vector2(out.x / maxf(size.x, 1.0), out.y / maxf(size.y, 1.0)).normalized()
 		var below := Vector2(0, r + h / 2.0)
@@ -873,38 +1051,56 @@ func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, ro
 				turns.append(k * TAU / 16.0)
 			turns.sort_custom(func(x, y): return absf(angle_difference(x, prefer)) < absf(angle_difference(y, prefer)))
 			candidates = turns.map(func(t): return Vector2.from_angle(t) * (r + 2.0) + Vector2(cos(t) * w, sin(t) * h) / 2.0)
-			# and, failing those, a little further off.
+			# and, failing those, a little further off (stage S14.1: never nearer another node
+			# than its own, so it cannot be read as another's).
 			for far in [10.0, 18.0]:
 				candidates += turns.map(func(t): return Vector2.from_angle(t) * (r + far * _unit) + Vector2(cos(t) * w, sin(t) * h) / 2.0)
-		for offset in candidates:
-			var rect := Rect2(p + offset - Vector2(w, h) / 2.0, Vector2(w, h))
+		var near_count := 16 if round_about else candidates.size()
+		for i in candidates.size():
+			var rect := Rect2(p + candidates[i] - Vector2(w, h) / 2.0, Vector2(w, h))
 			if first.size == Vector2.ZERO:
 				first = rect
 				node["lines"] = lines
+			if i >= near_count and not _nearest_is(rect, key):
+				continue
 			if _clear(rect, key, placed):
 				node["lines"] = lines
 				return [rect, first]
 	return [Rect2(), first]
 
 
-## Which labels claim their room first: the largest nodes, groups before indicators before
-## policies of the same size.
+## Stage S14.1: true when no other node (but a group) is nearer a label than its own.
+func _nearest_is(rect: Rect2, own: String) -> bool:
+	var mine := _rect_gap(rect, nodes[own]["pos"], nodes[own]["r"])
+	for key in nodes:
+		if key != own and nodes[key]["kind"] != "group" and _rect_gap(rect, nodes[key]["pos"], nodes[key]["r"]) < mine:
+			return false
+	return true
+
+
+static func _rect_gap(rect: Rect2, c: Vector2, r: float) -> float:
+	var q := Vector2(clampf(c.x, rect.position.x, rect.end.x), clampf(c.y, rect.position.y, rect.end.y))
+	return q.distance_to(c) - r
+
+
+## Which labels claim their room first: the largest nodes, indicators before policies of the
+## same size; the groups last, the longest arcs first.
 func _label_rank(key: String) -> float:
 	var n: Dictionary = nodes[key]
-	return float(n["tier"]) * 10.0 + {"group": 2.0, "indicator": 1.0}.get(n["kind"], 0.0) + float(n["r"]) / 1000.0
+	if n["kind"] == "group":
+		return -100.0 + float(n.get("seg_len", 0.0)) / 1000.0
+	return float(n["tier"]) * 10.0 + {"indicator": 1.0}.get(n["kind"], 0.0) + float(n["r"]) / 1000.0
 
 
 func _clear(rect: Rect2, own: String, placed: Array) -> bool:
 	if not Rect2(Vector2.ZERO, size).grow(-4.0).encloses(rect):
 		return false
+	if _ring_touches(rect):
+		return false
 	for key in nodes:
 		if key == own:
 			continue
 		var n: Dictionary = nodes[key]
-		if n["kind"] == "flag":
-			if (n["hit"] as Rect2).grow(4.0).intersects(rect):
-				return false
-			continue
 		if _rect_circle(rect, n["pos"], n["r"] + 3.0 * _unit):
 			return false
 	for r in placed:
@@ -914,11 +1110,20 @@ func _clear(rect: Rect2, own: String, placed: Array) -> bool:
 		var gp: Vector2 = g[1]
 		if rect.grow(6.0).has_point(gp):
 			return false
-	for arc in _arcs:
-		for p in arc:
-			if rect.grow(3.0).has_point(p):
-				return false
 	return true
+
+
+## Stage S14.1: true when a rectangle reaches into the group ring (its band, its approval
+## arcs and the families' names inside it).
+func _ring_touches(rect: Rect2) -> bool:
+	if _group_ring == null:
+		return false
+	var d := _group_band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 2.0) * _unit
+	for i in 5:
+		for j in 5:
+			if _group_ring.encloses(rect.position + rect.size * Vector2(i / 4.0, j / 4.0), d):
+				return true
+	return false
 
 
 static func _rect_circle(rect: Rect2, c: Vector2, r: float) -> bool:
@@ -932,10 +1137,19 @@ func label_size() -> int:
 
 ## Stage S13.4: two sizes of label, the larger for the largest nodes.
 func node_label_size(n: Dictionary) -> int:
-	# Stage S13.6: a crowded rim's smaller nodes take smaller labels too (never under 11 pixels).
-	var crowd := _node_scale if n["kind"] in ["policy", "indicator", "introduce"] else _group_scale
+	# Stage S13.6: a crowded rim's smaller nodes take smaller labels too (stage S14.1: never
+	# under 12 pixels).
+	var crowd := _node_scale if n["kind"] in ["policy", "indicator", "introduce"] else 1.0
 	var full := label_size() if n["tier"] == 3 else maxi(12, int(roundf(label_size() * 0.86)))
-	return maxi(11, int(roundf(full * lerpf(1.0, crowd, 0.6))))
+	return maxi(12, int(roundf(full * lerpf(1.0, crowd, 0.6))))
+
+
+## Stage S14.1: a string's width, measured once.
+func _text_w(font: Font, text: String, size_px: int) -> float:
+	var k := "%d/%d/%s" % [font.get_instance_id(), size_px, text]
+	if not _widths.has(k):
+		_widths[k] = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+	return _widths[k]
 
 
 ## Splits a label into at most two lines of at most `width` pixels, never cutting a word.
@@ -955,9 +1169,10 @@ static func wrap_label(text: String, font: Font, size_px: int, width: float) -> 
 	return best
 
 
-## For the board check: pairs of nodes (or labels shown at rest) that overlap, as text.
+## For the board check: pairs of nodes (or labels shown at rest) that overlap, as text;
+## stage S14.1: and labels in the group ring, and the ring's own faults.
 func overlaps() -> PackedStringArray:
-	var out := PackedStringArray()
+	var out := ring_problems()
 	var keys := order
 	for i in keys.size():
 		var a: Dictionary = nodes[keys[i]]
@@ -968,64 +1183,26 @@ func overlaps() -> PackedStringArray:
 		if a.get("rest", false):
 			if not Rect2(Vector2.ZERO, size).encloses(a["label_rect"]):
 				out.append("label of %s off the board" % keys[i])
+			if a["kind"] != "group" and _ring_touches(a["label_rect"]):
+				out.append("label of %s in the group ring" % keys[i])
 			for j in keys.size():
 				if j == i:
 					continue
 				var b: Dictionary = nodes[keys[j]]
-				if b["kind"] == "flag":
-					if (b["hit"] as Rect2).intersects(a["label_rect"]):
-						out.append("label of %s and %s" % [keys[i], keys[j]])
-				elif _rect_circle(a["label_rect"], b["pos"], b["r"]):
+				if _rect_circle(a["label_rect"], b["pos"], b["r"]):
 					out.append("label of %s and %s" % [keys[i], keys[j]])
 				if b.get("rest", false) and j > i and (a["label_rect"] as Rect2).intersects(b["label_rect"]):
 					out.append("labels of %s and %s" % [keys[i], keys[j]])
-		if a["kind"] == "flag":
-			for j in keys.size():
-				var b: Dictionary = nodes[keys[j]]
-				if b["kind"] != "flag" and _rect_circle(a["hit"], b["pos"], b["r"]):
-					out.append("flag %s and %s" % [keys[i], keys[j]])
-				elif b["kind"] == "flag" and j > i and (a["hit"] as Rect2).intersects(b["hit"]):
-					out.append("flags %s and %s" % [keys[i], keys[j]])
-			continue
+		if a["kind"] != "group" and a["kind"] != "centre" and _group_ring != null:
+			if _group_ring.encloses(a["pos"], _group_band / 2.0 + (ARC_OFFSET + ARC_WIDTH) * _unit + a["r"]):
+				out.append("%s in the group ring" % keys[i])
 		var r: float = a["r"]
 		if not Rect2(Vector2.ZERO, size).grow(-2.0).encloses(Rect2(a["pos"] - Vector2(r, r), Vector2(r, r) * 2.0)):
 			out.append("%s off the board" % keys[i])
 	return out
 
 
-# ---------------------------------------------------------------------------- view
-
-func to_screen(p: Vector2) -> Vector2:
-	return _c + (p - _c) * zoom + pan
-
-
-func to_layout(s: Vector2) -> Vector2:
-	return _c + (s - pan - _c) / zoom
-
-
-## Back to the whole board.
-func fit() -> void:
-	var from_zoom := zoom
-	var from_pan := pan
-	var tween := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_method(func(k: float) -> void:
-		zoom = lerpf(from_zoom, 1.0, k)
-		pan = from_pan.lerp(Vector2.ZERO, k)
-		queue_layers(), 0.0, 1.0, 0.22)
-
-
-func zoom_at(screen: Vector2, factor: float) -> void:
-	var before := to_layout(screen)
-	zoom = clampf(zoom * factor, ZOOM_MIN, ZOOM_MAX)
-	pan += screen - to_screen(before)
-	_clamp_pan()
-	queue_layers()
-
-
-func _clamp_pan() -> void:
-	var limit := size * 0.5 * maxf(zoom, 1.0)
-	pan = pan.clamp(-limit, limit)
-
+# ---------------------------------------------------------------------------- input
 
 func queue_layers() -> void:
 	for layer in [_base, _link_layer, _node_layer, _fx_layer]:
@@ -1033,79 +1210,59 @@ func queue_layers() -> void:
 			layer.queue_redraw()
 
 
-func node_at(screen: Vector2) -> String:
+## The node under a point of the board ("" for none). Stage S14.1: a group is its arc: the
+## band and its approval arc, between its ends.
+func node_at(point: Vector2) -> String:
 	var best := ""
 	var best_d := INF
 	for key in order:
 		var n: Dictionary = nodes[key]
-		var d := to_screen(n["pos"]).distance_to(screen)
-		# Stage S13.6: one hit shape, unchanged by the hover lift, a little wider for the
-		# node pointed at now, so its edge never flickers in and out.
-		var r: float = n["r"] * zoom + (10.0 if key == hover else 4.0)
-		if n["kind"] == "flag":
-			if (n["hit"] as Rect2).has_point(to_layout(screen)):
+		if n["kind"] == "group":
+			if _on_arc(n, point):
 				return key
 			continue
+		var d := (n["pos"] as Vector2).distance_to(point)
+		# Stage S13.6: one hit shape, unchanged by the hover lift, a little wider for the
+		# node pointed at now, so its edge never flickers in and out.
+		var r: float = n["r"] + (10.0 if key == hover else 4.0)
 		if d <= r and d < best_d:
 			best = key
 			best_d = d
 	return best
 
 
+func _on_arc(n: Dictionary, point: Vector2) -> bool:
+	if _group_ring == null:
+		return false
+	var q := point - _c
+	var f := _group_ring.fraction(fposmod(atan2(q.y, q.x) + PI / 2.0, TAU))
+	var f0 := float(n["f0"])
+	var f1 := float(n["f1"])
+	var slack := 2.0 / _group_ring.length()
+	if not (fposmod(f - f0 + slack, 1.0) <= f1 - f0 + 2.0 * slack):
+		return false
+	var on := _group_ring.at(f)
+	var d := q.length() - (on - _c).length()
+	return d >= -_group_band / 2.0 - 2.0 and d <= _group_band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 3.0) * _unit
+
+
+## Stage S14.1: the board cannot be moved: the pointer points and clicks, the wheel and a
+## drag do nothing.
 func _gui_input(event: InputEvent) -> void:
-	if not input_enabled:
+	if not input_enabled or demo:
 		return
 	if event is InputEventMouseMotion:
-		if _pressing and (event.position - _press).length() > 5.0:
-			_dragging = true
-		if _dragging:
-			pan += event.relative
-			_clamp_pan()
-			queue_layers()
-		else:
-			_point(node_at(event.position))
+		_point(node_at(event.position))
 	elif event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			zoom_at(event.position, 1.12)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			zoom_at(event.position, 1.0 / 1.12)
-		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				_press = event.position
-				_pressing = true
-				_dragging = false
-				grab_focus()
-			else:
-				var was_drag := _dragging
-				_pressing = false
-				_dragging = false
-				if not was_drag:
-					var key := node_at(event.position)
-					if key != "":
-						node_pressed.emit(key)
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			var key := node_at(event.position)
+			if key != "":
+				node_pressed.emit(key)
 		accept_event()
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if not input_enabled or not is_visible_in_tree() or not event.pressed:
-		return
-	var step := 60.0
-	var moves := {KEY_LEFT: Vector2(step, 0), KEY_RIGHT: Vector2(-step, 0), KEY_UP: Vector2(0, step), KEY_DOWN: Vector2(0, -step)}
-	if moves.has(event.keycode):
-		pan += moves[event.keycode]
-		_clamp_pan()
-		queue_layers()
-		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_EQUAL, KEY_PLUS, KEY_KP_ADD]:
-		zoom_at(size / 2.0, 1.15)
-	elif event.keycode in [KEY_MINUS, KEY_KP_SUBTRACT]:
-		zoom_at(size / 2.0, 1.0 / 1.15)
-	elif event.keycode == KEY_HOME:
-		fit()
-
-
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_MOUSE_EXIT and not _dragging:
+	if what == NOTIFICATION_MOUSE_EXIT:
 		set_hover("")
 
 
@@ -1145,6 +1302,7 @@ func select(key: String) -> void:
 ## links are updated in place; links read from the formulas give way once, fading, to
 ## measured ones; measured links already shown are kept until the pointer moves on (the
 ## table's other levers shift each row's scale, which would reshuffle them while looked at).
+## Stage S14.1: nothing is redrawn when no link is shown.
 func effects_changed() -> void:
 	_reach.clear()
 	_scales.clear()
@@ -1153,19 +1311,21 @@ func effects_changed() -> void:
 		return
 	var fresh := links_for(key)
 	if _same_links(fresh, _links):
+		var moved := false
 		for i in fresh.size():
+			moved = moved or absf(float(_links[i]["strength"]) - float(fresh[i]["strength"])) > 0.02
 			_links[i]["strength"] = fresh[i]["strength"]
-		_link_layer.queue_redraw()
+		if moved:
+			_link_layer.queue_redraw()
 		return
 	if _links.any(func(l): return l["measured"]):
 		return
-	_links = fresh
-	_tessellate()
+	_set_links(fresh)
 	link_sets += 1
 	_link_fade = 0.0
 	var tween := create_tween()
 	tween.tween_property(self, "_link_fade", 1.0, 0.25)
-	set_process(true)
+	_wake()
 	queue_layers()
 
 
@@ -1182,14 +1342,35 @@ func focus_key() -> String:
 	return hover if hover != "" else selected
 
 
+## The node pointed at stands a little larger (stage S14.1: at once, one redraw).
 func _animate_lift(key: String, to: float) -> void:
-	if _lift_tweens.has(key) and (_lift_tweens[key] as Tween).is_valid():
-		(_lift_tweens[key] as Tween).kill()
-	var tween := create_tween()
-	tween.tween_method(func(v: float) -> void:
-		_lift[key] = v
-		_node_layer.queue_redraw(), _lift.get(key, 0.0), to, 0.09)
-	_lift_tweens[key] = tween
+	if to > 0.0:
+		_lift[key] = to
+	else:
+		_lift.erase(key)
+
+
+## The links shown, and the keys they touch.
+func _set_links(links: Array) -> void:
+	_links = links
+	_linked.clear()
+	for link in _links:
+		_linked[link["from"]] = true
+		_linked[link["to"]] = true
+		link["tone"] = link_tone(link)
+	_tessellate()
+
+
+## Stage S14.1: a link's colour by what it does to what it reaches: "better" when good for it
+## (by its `better`; for a group, approval up), "worse" when bad, "steady" when neither can be
+## said, "plain" for a link read from the formulas, not measured.
+func link_tone(link: Dictionary) -> String:
+	if not link["measured"]:
+		return "plain"
+	var better := str(nodes.get(link["to"], {}).get("better", ""))
+	if better == "" or float(link["sign"]) == 0.0:
+		return "steady"
+	return "better" if (float(link["sign"]) > 0.0) == (better == "high") else "worse"
 
 
 func _focus_changed() -> void:
@@ -1197,40 +1378,54 @@ func _focus_changed() -> void:
 	if key == _link_key:
 		return
 	_link_key = key
-	_links = links_for(key)
+	_set_links(links_for(key))
 	link_sets += 1
 	_link_fade = 1.0
-	_tessellate()
 	if _tween_links != null and _tween_links.is_valid():
 		_tween_links.kill()
 	_draw_in = 0.0
 	_tween_links = create_tween()
 	_tween_links.tween_property(self, "_draw_in", 1.0, 0.15)
-	if _tween_dim != null and _tween_dim.is_valid():
-		_tween_dim.kill()
-	_tween_dim = create_tween()
+	# Stage S14.1: the board dims at once, in one redraw of its nodes (a fade would redraw
+	# them every frame it lasts, and they are the costliest layer); the links still draw in.
 	var dims: bool = key != "" and str(nodes.get(key, {}).get("kind", "")) in ["policy", "indicator", "group"]
-	_tween_dim.tween_property(self, "_dim", 1.0 if dims else 0.0, 0.12)
-	set_process(true)
+	_dim = 1.0 if dims else 0.0
+	_wake()
 	queue_layers()
 
 
+func _wake() -> void:
+	set_process(true)
+	_animating = true
+
+
+## Stage S14.1: layers are redrawn only while something on them moves: a link drawing in or
+## fading, the board dimming round a node, a node lifting, a pulse; and the links' flow while
+## the pointer is on a node (not while a popup holds them, when they stand still). One more
+## frame after the last movement draws them at rest.
 func _process(delta: float) -> void:
-	_flow += delta
-	var busy := not _links.is_empty() or _dim > 0.0
+	var links_moving := _draw_in < 1.0 or _link_fade < 1.0 or (not _links.is_empty() and hover != "" and input_enabled)
+	var nodes_moving := false  # stage S14.1: the node layer redraws on a change, never by the frame
+	if links_moving:
+		_flow += delta
 	if not _pulses.is_empty():
 		for key in _pulses.keys():
 			_pulses[key] += delta
-			if _pulses[key] > 1.6:
+			if _pulses[key] > 1.0:
 				_pulses.erase(key)
 		_fx_layer.queue_redraw()
-		busy = true
-	if not _links.is_empty():
+	var moving := links_moving or nodes_moving or not _pulses.is_empty()
+	if links_moving or (_animating and not moving):
 		_link_layer.queue_redraw()
-	if _draw_in < 1.0 or (_dim > 0.0 and _dim < 1.0):
+	if nodes_moving or (_animating and not moving):
 		_node_layer.queue_redraw()
-	if not busy:
+	if not moving:
+		if _animating:
+			_fx_layer.queue_redraw()
+		_animating = false
 		set_process(false)
+	else:
+		_animating = true
 
 
 # ---------------------------------------------------------------------------- links
@@ -1244,6 +1439,11 @@ func links_for(key: String) -> Array:
 	var node: Dictionary = nodes[key]
 	var out: Array = []
 	var targets := _targets()
+	var by_row := {}  # stage S14.1: a row's node, looked up once
+	for t in targets:
+		var r := str(nodes[t]["row"]).trim_prefix("-")
+		if not by_row.has(r):
+			by_row[r] = t
 	if node.get("ghost", false):
 		return out  # stage S13.5: not in force yet; its popup's "In a year" says what it would do
 	if node["kind"] == "policy":
@@ -1255,7 +1455,7 @@ func links_for(key: String) -> Array:
 		for lever in (node["levers"] as PackedStringArray).slice(0, 1):
 			if effects.has(lever):
 				for row in effects[lever]:
-					var target := _target_of_row(row, targets)
+					var target: String = by_row.get(row, "")
 					if target == "":
 						continue
 					var raw := float(effects[lever][row])
@@ -1277,7 +1477,7 @@ func links_for(key: String) -> Array:
 		var chosen: Array = ranked.filter(func(t): return nodes[t]["kind"] == "indicator").slice(0, MAX_LINKS)
 		chosen.append_array(ranked.filter(func(t): return nodes[t]["kind"] == "group").slice(0, MAX_GROUP_LINKS))
 		# The budget balance is always shown for a policy that moves it.
-		var balance := _target_of_row(str(budget_row), targets)
+		var balance: String = by_row.get(str(budget_row), "")
 		if balance != "" and best.has(balance) and not chosen.has(balance):
 			chosen.append(balance)
 		for t in chosen:
@@ -1417,10 +1617,12 @@ func _curve(a: Dictionary, b: Dictionary, control: Vector2) -> PackedVector2Arra
 
 ## Each node's state from the game: `value_of(row)` and `before_of(row)` read result rows
 ## (a "-" in front negates), `lever_of(name)` a lever's setting and `start_of(name)` where it
-## began, `pending` the changes waiting. Nodes that moved notably pulse.
+## began, `pending` the changes waiting. Nodes that moved notably pulse. Stage S14.1: a
+## group's "state" is its approval's "good", "mixed" or "bad", or "none".
 func refresh(value_of: Callable, before_of: Callable, lever_of: Callable, start_of: Callable, pending: Dictionary, pulse := false) -> void:
 	# Stage S13.5: policies come onto the board and leave it as bills pass.
 	var relayout := _sync(lever_of, pending)
+	var regroup := false
 	for key in nodes:
 		var n: Dictionary = nodes[key]
 		if n["kind"] == "introduce":
@@ -1460,24 +1662,39 @@ func refresh(value_of: Callable, before_of: Callable, lever_of: Callable, start_
 				n["change"] = fmt.change(entry, d) if fmt != null else ""
 				if pulse and notable:
 					_pulses[key] = 0.0
+			if n["kind"] == "indicator":
+				n["state"] = indicator_state(str(n["better"]))
 			if n["kind"] == "group":
-				# Stage S13.4: the gauge shows approval; a group whose approval is nought for a
+				# Stage S13.4: the arc shows approval; a group whose approval is nought for a
 				# reason the scenario gives (no governing candidate stands) shows a dash.
 				n["fraction"] = clampf(float(now), 0.0, 1.0) if now != null else -1.0
 				if now != null and absf(float(now)) < 0.0005 and str(n.get("note", "")) != "":
 					n["value"] = "–"
 					n["change"] = ""
 					n["trend"] = 0
+					n["fraction"] = -1.0
+				var f: float = n["fraction"]
+				n["state"] = "none" if f < 0.0 else ("good" if f >= approval_good else ("bad" if f < approval_bad else "mixed"))
+				# Stage S14.1: the arcs take their lengths from the shares once they are first
+				# known, and keep them, so the ring never shifts from month to month.
 				var share: Variant = value_of.call(str(n.get("share", ""))) if str(n.get("share", "")) != "" else null
-				if share != null:
-					var old_r := group_radius(n)
+				if share != null and float(n["share_value"]) < 0.0:
 					n["share_value"] = float(share)
-					relayout = relayout or group_radius(n) != old_r
+					regroup = true
 	if not _pulses.is_empty():
-		set_process(true)
-	if relayout:
-		_relayout_smoothly()  # a group grew or shrank a size
+		_wake()
+	if regroup:
+		layout()
+	elif relayout:
+		_relayout_smoothly()  # policies came onto the board or left it
 	queue_layers()
+
+
+## Stage S14.1: an indicator's colour is what kind of thing it measures: "better" (green)
+## for a good thing (`better = "high"`), "worse" (red) for a bad thing ("low"), "steady"
+## (blue) for the rest. How it has moved is the trend badge's to say.
+static func indicator_state(better: String) -> String:
+	return {"high": "better", "low": "worse"}.get(better, "steady")
 
 
 ## Stage S13.6: lays the board out again with the nodes gliding to their new places (the
@@ -1501,7 +1718,7 @@ func _relayout_smoothly() -> void:
 				nodes[key]["r"] = lerpf(before[key][1], after[key][1], k)
 		if _link_key != "":
 			_tessellate()
-		queue_layers(), 0.0, 1.0, 0.45)
+		queue_layers(), 0.0, 1.0, 0.3)
 
 
 ## Where a setting sits in its range, 0 to 1, for the gauge. Spending lines have ranges far
@@ -1520,140 +1737,116 @@ func _gauge(entry: Dictionary, v: Variant, start_value: Variant) -> float:
 	return clampf((float(v) - lo) / (hi - lo), 0.0, 1.0)
 
 
-## The situations in force and the decisions taken, as flags beside the centre: each
-## {key, text, tone ("good", "bad", "plain", "ask"), doc}.
-func set_flags(flags: Array, relabel := true) -> void:
-	var same := flags == _flags
-	_flags = flags
-	for key in nodes.keys():
-		if nodes[key]["kind"] == "flag":
-			nodes.erase(key)
-	var font := Palette.text(500)
-	var size_px := int(roundf(clampf(14.0 * _unit, 14.0, 20.0)))
-	var centre_node: Dictionary = nodes.get("centre", {})
-	if centre_node.is_empty():
-		return
-	# Stacked beside the centre, in the open paper inside the indicator ring: the first
-	# column to its left (right-aligned to it), a second to its right. Stage S13.4: with
-	# groups round the centre, in the window's corners instead, outside the rim, the first in
-	# the top left, then top right, bottom left, bottom right.
-	var cornered := not keys_of_unordered("group").is_empty()
-	var h := size_px + 12.0 * _unit
-	var step := h + 8.0 * _unit
-	var per_column := 5
-	for i in flags.size():
-		var f: Dictionary = flags[i]
-		var w := font.get_string_size(str(f["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x + 34.0 * _unit
-		var column := i / per_column
-		var count := mini(per_column, flags.size() - column * per_column)
-		var y: float = _c.y - (count * step - 8.0 * _unit) / 2.0 + (i % per_column) * step
-		var gap: float = centre_node["r"] + 26.0 * _unit
-		var x: float = _c.x - gap - w if column % 2 == 0 else _c.x + gap
-		if cornered:
-			var corner := i % 4
-			var slot := i / 4
-			var margin := 10.0 * _unit
-			x = margin if corner % 2 == 0 else size.x - margin - w
-			y = margin + slot * step if corner < 2 else size.y - margin - h - slot * step
-		var key := "flag:" + str(f["key"])
-		_add(key, "flag", str(f["text"]), "", 1, "", PackedStringArray(), str(f.get("row", "")), str(f.get("name", "")))
-		nodes[key]["tone"] = str(f.get("tone", "plain"))
-		nodes[key]["value"] = str(f["text"]) + str(f.get("since", ""))
-		nodes[key]["doc"] = str(f.get("doc", ""))
-		nodes[key]["hit"] = Rect2(x, y, w, h)
-		nodes[key]["pos"] = (nodes[key]["hit"] as Rect2).get_center()
-		nodes[key]["r"] = 0.0
-	_order_nodes()
-	# Labels make room for flags in the corners, so new flags place them again.
-	if cornered and relabel and not same:
-		_place_labels()
-	queue_layers()
-
-
-func flag_text(key: String) -> String:
-	return str(nodes.get("flag:" + key, {}).get("value", ""))
-
-
 # ---------------------------------------------------------------------------- drawing
 
 func _alpha(key: String) -> float:
 	var focus := focus_key()
 	if focus == "" or focus == "centre" or _dim <= 0.0:
 		return 1.0
-	if key == focus:
+	if key == focus or _linked.has(key):
 		return 1.0
-	for link in _links:
-		if link["from"] == key or link["to"] == key:
-			return 1.0
 	return lerpf(1.0, 0.26, _dim)
+
+
+## Stage S14.1: the colour of a state: an indicator's, a group's approval, a link's tone.
+static func state_colour(state: String) -> Color:
+	match state:
+		"better", "good":
+			return Palette.BETTER
+		"worse", "bad":
+			return Palette.WORSE
+		"mixed":
+			return Palette.MIXED
+		"none":
+			return Palette.NO_FIGURE
+		"plain":
+			return Color(Palette.INK, 0.55)
+	return Palette.STEADY
 
 
 func _draw_base() -> void:
 	# Faint dotted guides for the two rings, as on a printed chart.
 	for points in _guides:
-		var pts := PackedVector2Array()
-		for p in points:
-			pts.append(to_screen(p))
-		for i in range(0, pts.size() - 1, 2):
-			_base.draw_line(pts[i], pts[i + 1], Color(Palette.INK, 0.13), 1.0)
+		for i in range(0, points.size() - 1, 2):
+			_base.draw_line(points[i], points[i + 1], Color(Palette.INK, 0.13), 1.0)
 	# Dotted spokes between the areas, from the rim to the middle ring.
 	for spoke in _spokes:
-		var a := to_screen(spoke[0])
-		var b := to_screen(spoke[1])
+		var a: Vector2 = spoke[0]
+		var b: Vector2 = spoke[1]
 		var n := int(a.distance_to(b) / 9.0)
 		for k in n:
 			if k % 2 == 0:
 				_base.draw_line(a.lerp(b, float(k) / n), a.lerp(b, float(k + 1) / n), Color(Palette.INK, 0.16), 1.0)
-	# Each area's arc along the rim, with ticks at its ends; its name set along it.
+	# Each area's arc along the rim, with ticks at its ends; its name set along it. Stage
+	# S14.1: the arc breaks behind a label that crosses it, as it does behind the name.
+	var labels: Array = []
+	for key in order:
+		if nodes[key].get("rest", false):
+			labels.append((nodes[key]["label_rect"] as Rect2).grow(4.0))
 	for k in _arcs.size():
-		var pts := PackedVector2Array()
-		for p in _arcs[k]:
-			pts.append(to_screen(p))
+		var pts: PackedVector2Array = _arcs[k]
 		if pts.size() > 1:
-			_base.draw_polyline(pts, Color(Palette.INK, 0.55), 1.5, true)
-			for end in [0 if _arc_ends[k] == 0 else pts.size() - 1]:
-				var n := (pts[end] - to_screen(_c)).normalized()
-				_base.draw_line(pts[end] - n * 4.0, pts[end] + n * 4.0, Color(Palette.INK, 0.55), 1.5)
+			var run := PackedVector2Array()
+			for p in pts:
+				if labels.any(func(r): return (r as Rect2).has_point(p)):
+					if run.size() > 1:
+						_base.draw_polyline(run, Color(Palette.INK, 0.55), 1.5, true)
+					run = PackedVector2Array()
+				else:
+					run.append(p)
+			if run.size() > 1:
+				_base.draw_polyline(run, Color(Palette.INK, 0.55), 1.5, true)
+			var end := 0 if _arc_ends[k] == 0 else pts.size() - 1
+			var n := (pts[end] - _c).normalized()
+			_base.draw_line(pts[end] - n * 4.0, pts[end] + n * 4.0, Color(Palette.INK, 0.55), 1.5)
 	var font := Palette.display(600, 2)
-	for g in _rim:
-		var p := to_screen(g[1])
-		_base.draw_set_transform(p, g[2], Vector2.ONE * sqrt(zoom))
-		_base.draw_string(font, Vector2(-g[3] / 2.0, g[4] * 0.36), g[0], HORIZONTAL_ALIGNMENT_LEFT, -1, g[4], Palette.INK)
+	for list in [_rim, _families]:
+		for g in list:
+			_base.draw_set_transform(g[1], g[2], Vector2.ONE)
+			_base.draw_string(font, Vector2(-g[3] / 2.0, g[4] * 0.36), g[0], HORIZONTAL_ALIGNMENT_LEFT, -1, g[4],
+				Palette.INK if list == _rim else Palette.MUTED)
 	_base.draw_set_transform(Vector2.ZERO)
 
 
 func _draw_links() -> void:
+	var flowing := hover != "" and input_enabled
 	for link in _links:
 		var points: PackedVector2Array = link["points"]
-		var pts := PackedVector2Array()
 		var count := maxi(2, int(ceil(points.size() * _draw_in)))
-		for i in count:
-			pts.append(to_screen(points[mini(i, points.size() - 1)]))
-		var colour := Color(Palette.INK, 0.55)
-		if link["measured"]:
-			colour = Palette.BLUE if link["sign"] >= 0.0 else Palette.BRICK
+		var pts := points.slice(0, count) if count < points.size() else points
+		var colour := state_colour(str(link.get("tone", "plain")))
 		colour.a *= _link_fade
-		var width := (1.5 + 4.0 * float(link["strength"])) * sqrt(zoom) * _unit
-		# A faint full line under flowing dashes; the dashes run faster for a stronger link.
+		var width := (1.5 + 4.0 * float(link["strength"])) * _unit
+		# A faint full line under dashes; while pointed at, the dashes run, faster for a
+		# stronger link (stage S14.1: still while a popup holds them).
 		_link_layer.draw_polyline(pts, Color(colour, 0.28 * _link_fade), width, true)
-		_dashes(pts, colour, width, 14.0 * _unit, 9.0 * _unit, _flow * (30.0 + 50.0 * float(link["strength"])) * _unit)
-		if _draw_in >= 1.0:
+		_dashes(pts, colour, width, 14.0 * _unit, 9.0 * _unit, _flow * (30.0 + 50.0 * float(link["strength"])) * _unit if flowing else 0.0)
+		if _draw_in >= 1.0 and pts.size() >= 3:
 			var tip := pts[pts.size() - 1]
 			var dir := (tip - pts[pts.size() - 3]).normalized()
-			var side := dir.orthogonal()
-			var head := (8.0 + width * 1.4)
-			_link_layer.draw_colored_polygon(PackedVector2Array([tip, tip - dir * head + side * head * 0.55, tip - dir * head - side * head * 0.55]), colour)
+			_arrowhead(_link_layer, tip, dir, width, colour)
 			if link["measured"]:
-				# The direction as a glyph as well as a colour, on the link mid-way: a square tag
-				# with a plus or a minus, unlike the round rise and fall badges on the nodes.
-				var mid := pts[pts.size() / 2]
-				var s := 7.0 * _unit
-				var tag := Rect2(mid - Vector2(s, s), Vector2(s, s) * 2.0)
-				_link_layer.draw_rect(tag, Color(Palette.CARD, _link_fade))
-				_link_layer.draw_rect(tag, colour, false, 2.0 * _unit)
-				_link_layer.draw_line(mid - Vector2(s * 0.55, 0), mid + Vector2(s * 0.55, 0), colour, 2.2 * _unit)
-				if link["sign"] >= 0.0:
-					_link_layer.draw_line(mid - Vector2(0, s * 0.55), mid + Vector2(0, s * 0.55), colour, 2.2 * _unit)
+				_sign_tag(_link_layer, tip - dir * (8.0 + width * 1.4 + 11.0 * _unit), float(link["sign"]) >= 0.0, colour, _link_fade)
+
+
+## The head of a link's arrow at `tip`, pointing along `dir`.
+func _arrowhead(canvas: CanvasItem, tip: Vector2, dir: Vector2, width: float, colour: Color) -> void:
+	var side := dir.orthogonal()
+	var head := 8.0 + width * 1.4
+	canvas.draw_colored_polygon(PackedVector2Array([tip, tip - dir * head + side * head * 0.55, tip - dir * head - side * head * 0.55]), colour)
+
+
+## Stage S14.1: which way a link moves what it reaches, as a glyph by its arrowhead: a small
+## square of card with a plus (it rises) or a minus (it falls), so colour says good or bad
+## and never also the direction.
+func _sign_tag(canvas: CanvasItem, at: Vector2, rise: bool, colour: Color, alpha := 1.0) -> void:
+	var s := 7.0 * _unit
+	var tag := Rect2(at - Vector2(s, s), Vector2(s, s) * 2.0)
+	canvas.draw_rect(tag, Color(Palette.CARD, alpha))
+	canvas.draw_rect(tag, colour, false, 2.0 * _unit)
+	canvas.draw_line(at - Vector2(s * 0.55, 0), at + Vector2(s * 0.55, 0), colour, 2.2 * _unit)
+	if rise:
+		canvas.draw_line(at - Vector2(0, s * 0.55), at + Vector2(0, s * 0.55), colour, 2.2 * _unit)
 
 
 func _dashes(pts: PackedVector2Array, colour: Color, width: float, dash: float, gap: float, phase: float) -> void:
@@ -1689,15 +1882,13 @@ func _draw_nodes() -> void:
 				_draw_group(n, a)
 			"centre":
 				_draw_centre(n)
-			"flag":
-				_draw_flag(n)
 	# Labels after every node, so no disc covers one.
 	for key in order:
 		_draw_label(nodes[key])
 
 
 func _radius(n: Dictionary) -> float:
-	return n["r"] * zoom * (1.0 + 0.06 * _lift.get(n["key"], 0.0)) * _appear.get(n["key"], 1.0)
+	return n["r"] * (1.0 + 0.06 * _lift.get(n["key"], 0.0)) * _appear.get(n["key"], 1.0)
 
 
 func _icon(texture: Texture2D, c: Vector2, half: float, colour: Color) -> void:
@@ -1705,7 +1896,7 @@ func _icon(texture: Texture2D, c: Vector2, half: float, colour: Color) -> void:
 
 
 func _draw_policy(n: Dictionary, a: float) -> void:
-	var c := to_screen(n["pos"])
+	var c: Vector2 = n["pos"]
 	var r := _radius(n)
 	var ink := Color(Palette.INK, a)
 	var waiting: bool = n.get("waiting", 0) > 0
@@ -1727,7 +1918,7 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
 	_icon(n["icon"], c, r * 0.6, ink)
 	# The gauge: where the setting sits in its range, round the outside from the lower left.
-	var gr := r + 6.0 * _unit * zoom ** 0.5
+	var gr := r + 6.0 * _unit
 	var from := PI * 0.75
 	var sweep := PI * 1.5
 	_node_layer.draw_arc(c, gr, from, from + sweep, 40, Color(Palette.INK, 0.2 * a), 3.0 * _unit, true)
@@ -1749,7 +1940,7 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 ## Stage S13.5: an area's "introduce a policy" node: a plus on card stock in the policies'
 ## style, with the number of policies there are to choose from on a small ochre badge.
 func _draw_introduce(n: Dictionary, a: float) -> void:
-	var c := to_screen(n["pos"])
+	var c: Vector2 = n["pos"]
 	var r := _radius(n)
 	var ink := Color(Palette.INK, a)
 	_node_layer.draw_circle(c + Vector2(2, 2) * _unit, r, Color(Palette.SHADOW, 0.5 * a))
@@ -1769,54 +1960,64 @@ func _draw_introduce(n: Dictionary, a: float) -> void:
 		_node_layer.draw_circle(m, s, Color(Palette.OCHRE, a))
 		_node_layer.draw_arc(m, s, 0, TAU, 16, ink, 1.2, true)
 		var font := Palette.text(600)
-		var px := int(s * 1.3)
+		var px := maxi(12, int(s * 1.3))
 		var t := str(count)
-		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		var tw := _text_w(font, t, px)
 		_node_layer.draw_string(font, m + Vector2(-tw / 2.0, px * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, px, ink)
 
 
+## An indicator: a ring on paper, its pictogram inside. Stage S14.1: the ring is green for a
+## good thing, red for a bad thing, blue for the rest.
 func _draw_indicator(n: Dictionary, a: float) -> void:
-	var c := to_screen(n["pos"])
+	var c: Vector2 = n["pos"]
 	var r := _radius(n)
 	_node_layer.draw_circle(c, r, Color(Palette.PAPER.lerp(Palette.CARD, 0.6), a))
-	var band := maxf(3.0, r * 0.2)
-	_node_layer.draw_arc(c, r - band / 2.0, 0, TAU, 48, Color(Palette.INK, a), band, true)
+	var band := maxf(3.0, r * 0.22)
+	_node_layer.draw_arc(c, r - band / 2.0, 0, TAU, 48, Color(state_colour(str(n.get("state", "steady"))), a), band, true)
 	if n["key"] == selected:
 		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
 	_icon(n["icon"], c, r * 0.5, Color(Palette.INK, a))
 	_badge(n, c, r, a)
 
 
+## Stage S14.1: a group as its arc of the ring: card stock edged in ink with a hard shadow,
+## its pictogram in the middle; just outside it, its approval arc: a faint track the arc's
+## length, filled from its start in proportion to approval, in green, mustard or red; grey
+## along its length where there is no figure.
 func _draw_group(n: Dictionary, a: float) -> void:
-	var c := to_screen(n["pos"])
-	var r := _radius(n)
-	var shield := PackedVector2Array()
-	for p in [Vector2(-1, -0.9), Vector2(1, -0.9), Vector2(1, 0.1), Vector2(0.55, 0.7), Vector2(0, 1.0), Vector2(-0.55, 0.7), Vector2(-1, 0.1)]:
-		shield.append(c + p * r)
+	if not n.has("band_poly"):
+		return
+	var poly: PackedVector2Array = n["band_poly"]
 	var shadow := PackedVector2Array()
-	for p in shield:
-		shadow.append(p + Vector2(3, 3) * _unit)
-	_node_layer.draw_colored_polygon(shadow, Color(Palette.SHADOW, 0.9 * a))
-	_node_layer.draw_colored_polygon(shield, Color(Palette.CARD, a))
-	shield.append(shield[0])
-	_node_layer.draw_polyline(shield, Color(Palette.INK, a), 2.0 * _unit, true)
+	for p in poly:
+		shadow.append(p + Vector2(2, 2) * _unit)
+	_node_layer.draw_colored_polygon(shadow, Color(Palette.SHADOW, 0.85 * a))
+	var lit: bool = n["key"] == hover or n["key"] == selected
+	_node_layer.draw_colored_polygon(poly, Color(Palette.CARD if not lit else Color("#fbf3dc"), a))
+	var edge := poly.duplicate()
+	edge.append(poly[0])
+	_node_layer.draw_polyline(edge, Color(Palette.INK, a), maxf(1.5, 1.5 * _unit), true)
 	if n["key"] == selected:
-		_node_layer.draw_polyline(shield, Color(Palette.OCHRE, a), 4.0 * _unit, true)
-	_icon(n["icon"], c + Vector2(0, -r * 0.08), r * 0.55, Color(Palette.INK, a))
-	# Stage S13.4: approval as a gauge round the shield, from the lower left, a full turn
-	# being everyone; none for a group the governing party does not stand for.
-	var gr := r * 1.12 + 5.0 * _unit * zoom ** 0.5
-	var from := PI * 0.75
-	var sweep := PI * 1.5
-	_node_layer.draw_arc(c, gr, from, from + sweep, 40, Color(Palette.INK, 0.2 * a), 3.0 * _unit, true)
-	var f: float = n.get("fraction", -1.0)
+		_node_layer.draw_polyline(edge, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+	elif n["key"] == hover:
+		_node_layer.draw_polyline(edge, Color(Palette.INK, a), 2.5 * _unit, true)
+	var half := minf(_group_band * 0.36, float(n["seg_len"]) * 0.4)
+	_icon(n["icon"], n["pos"], half, Color(Palette.INK, a))
+	var track: PackedVector2Array = n["track"]
+	var state := str(n.get("state", "none"))
+	var width := ARC_WIDTH * _unit
+	if state == "none":
+		_node_layer.draw_polyline(track, Color(Palette.NO_FIGURE, a), width, true)
+		return
+	_node_layer.draw_polyline(track, Color(Palette.INK, 0.14 * a), width, true)
+	var f := clampf(float(n["fraction"]), 0.0, 1.0)
 	if f > 0.0:
-		_node_layer.draw_arc(c, gr, from, from + sweep * maxf(f, 0.02), 40, Color(Palette.SAGE, a), 3.0 * _unit, true)
-	_badge(n, c, r, a)
+		var upto := maxi(2, int(roundf((track.size() - 1) * f)) + 1)
+		_node_layer.draw_polyline(track.slice(0, upto), Color(state_colour(state), a), width, true)
 
 
 ## A node's rise or fall last month: a solid triangle on a small round badge at its upper
-## right, sage or brick where the board says which way is better, ink where it does not.
+## right, green or red where the board says which way is better, ink where it does not.
 func _badge(n: Dictionary, c: Vector2, r: float, a: float) -> void:
 	var trend: int = n["trend"]
 	if trend == 0:
@@ -1835,8 +2036,8 @@ func _badge(n: Dictionary, c: Vector2, r: float, a: float) -> void:
 
 
 func _draw_centre(n: Dictionary) -> void:
-	var c := to_screen(n["pos"])
-	var r: float = n["r"] * zoom * (1.0 + 0.03 * _lift.get("centre", 0.0))
+	var c: Vector2 = n["pos"]
+	var r: float = n["r"] * (1.0 + 0.03 * _lift.get("centre", 0.0))
 	_node_layer.draw_circle(c + Vector2(5, 5) * _unit, r, Palette.SHADOW)
 	_node_layer.draw_circle(c, r, Palette.CARD)
 	_node_layer.draw_arc(c, r, 0, TAU, 72, Palette.INK, 3.0 * _unit, true)
@@ -1845,83 +2046,64 @@ func _draw_centre(n: Dictionary) -> void:
 	var caps := Palette.display(600, 2)
 	var body := Palette.text(500)
 	var lines: Array = [
-		[caps, centre.get("title", "APPROVAL"), int(maxf(13.0, r * 0.12)), Palette.MUTED, 0.0],
-		[display, centre.get("figure", "–"), int(r * 0.4), Palette.INK, 0.0],
-		[body, centre.get("change", ""), int(maxf(14.0, r * 0.125)), centre.get("change_colour", Palette.MUTED), 0.0],
-		[body, centre.get("election", ""), int(maxf(14.0, r * 0.125)), Palette.INK, 0.0],
-		[body, centre.get("capital", ""), int(maxf(14.0, r * 0.125)), centre.get("capital_colour", Palette.INK), 0.0],
+		[caps, centre.get("title", "APPROVAL"), int(maxf(13.0, r * 0.12)), Palette.MUTED],
+		[display, centre.get("figure", "–"), int(r * 0.4), Palette.INK],
+		[body, centre.get("change", ""), int(maxf(14.0, r * 0.125)), centre.get("change_colour", Palette.MUTED)],
+		[body, centre.get("election", ""), int(maxf(14.0, r * 0.125)), Palette.INK],
+		[body, centre.get("capital", ""), int(maxf(14.0, r * 0.125)), centre.get("capital_colour", Palette.INK)],
 	]
+	# Stage S14.1: a line too wide for a small medallion even at 12 pixels goes on two.
+	var fitted: Array = []
+	for line in lines:
+		var words := str(line[1])
+		if words.contains(" ") and _text_w(line[0], words, maxi(12, int(line[2] * 0.85))) > r * 1.35:
+			var cut := -1  # the space nearest the middle
+			for i in words.length():
+				if words[i] == " " and (cut < 0 or absi(i - words.length() / 2) < absi(cut - words.length() / 2)):
+					cut = i
+			fitted.append([line[0], words.left(cut), line[2], line[3]])
+			fitted.append([line[0], words.substr(cut + 1), line[2], line[3]])
+		else:
+			fitted.append(line)
+	lines = fitted
+	var leading := 1.18 if lines.size() <= 5 else 1.08  # a split line: closer set, to stay inside
 	var total := 0.0
 	for line in lines:
 		if str(line[1]) != "":
-			total += line[2] * 1.18
+			total += line[2] * leading
 	var y := c.y - total / 2.0
 	for line in lines:
 		if str(line[1]) == "":
 			continue
 		var f: Font = line[0]
 		var size_px: int = line[2]
-		var w := f.get_string_size(str(line[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
-		if w > r * 1.6:  # stage S13.4: a smaller medallion; a line too wide for it is set smaller
-			size_px = int(size_px * r * 1.6 / w)
-			w = f.get_string_size(str(line[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
-		y += size_px * 1.18
+		var w := _text_w(f, str(line[1]), size_px)
+		# Stage S13.4: a line too wide for the medallion is set smaller; stage S14.1: as wide
+		# as the medallion is where the line stands, and never under 12 pixels.
+		var dy := absf(y + size_px * 0.6 - c.y)
+		var room := 2.0 * sqrt(maxf(pow(r - 14.0 * _unit, 2.0) - dy * dy, 1.0))  # inside the inner ring, with a margin
+		if w > room:
+			size_px = maxi(12, int(size_px * room / w))
+			w = _text_w(f, str(line[1]), size_px)
+		y += size_px * leading
 		_node_layer.draw_string(f, Vector2(c.x - w / 2.0, y - size_px * 0.22), str(line[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, line[3])
 
 
-func _draw_flag(n: Dictionary) -> void:
-	var hit: Rect2 = n["hit"]
-	var rect := Rect2(to_screen(hit.position), hit.size * zoom)
-	var tone := str(n.get("tone", "plain"))
-	var colour: Color = {"good": Palette.SAGE, "bad": Palette.BRICK, "ask": Palette.OCHRE}.get(tone, Palette.CARD_DEEP)
-	var ink := Palette.CARD if tone in ["good", "bad"] else Palette.INK
-	# A pennant: a staff on the left, the cloth notched on the right.
-	var notch := rect.size.y * 0.3
-	var cloth := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), Vector2(rect.end.x - notch, rect.get_center().y),
-		Vector2(rect.end.x, rect.end.y), Vector2(rect.position.x, rect.end.y)])
-	var shadow := PackedVector2Array()
-	for p in cloth:
-		shadow.append(p + Vector2(3, 3) * _unit)
-	_node_layer.draw_colored_polygon(shadow, Palette.SHADOW)
-	_node_layer.draw_colored_polygon(cloth, colour)
-	cloth.append(cloth[0])
-	_node_layer.draw_polyline(cloth, Palette.INK, 1.5 * _unit, true)
-	if n["key"] == hover:
-		_node_layer.draw_polyline(cloth, Palette.INK, 3.0 * _unit, true)
-	var size_px := int(roundf(clampf(14.0 * _unit, 14.0, 20.0) * sqrt(zoom)))
-	var font := Palette.text(600 if tone == "ask" else 500)
-	_node_layer.draw_string(font, Vector2(rect.position.x + 10.0 * _unit, rect.get_center().y + size_px * 0.36), str(n["label"]),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, ink)
-	if n["key"] == hover and str(n.get("value", "")) != str(n["label"]):
-		# Pointed at: the whole of it (since when) on a tag above the flag.
-		var body := Palette.text(500)
-		var words := str(n["value"])
-		var w := body.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
-		var box := Rect2(rect.get_center().x - w / 2.0 - 8.0, rect.position.y - size_px - 18.0, w + 16.0, size_px + 12.0)
-		_node_layer.draw_rect(Rect2(box.position + Vector2(3, 3), box.size), Palette.SHADOW)
-		_node_layer.draw_rect(box, Palette.CARD)
-		_node_layer.draw_rect(box, Palette.INK, false, 1.5)
-		_node_layer.draw_string(body, Vector2(box.position.x + 8.0, box.end.y - 7.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, Palette.INK)
-
-
 func _draw_label(n: Dictionary) -> void:
-	if n["kind"] in ["centre", "flag"] or (n["label_rect"] as Rect2).size == Vector2.ZERO:
+	if n["kind"] == "centre" or (n["label_rect"] as Rect2).size == Vector2.ZERO:
 		return
 	var key: String = n["key"]
 	var focus := focus_key()
-	var linked := false
-	for link in _links:
-		if link["from"] == key or link["to"] == key:
-			linked = true
-	var tier: int = n["tier"]
-	var shown: bool = n.get("rest", false) or zoom >= (1.45 if tier >= 2 else 1.9) or key == hover or key == selected or linked
+	# Stage S14.1: a group linked to the node pointed at is lit on its arc; its name shows only
+	# at rest or when pointed at itself, never over a neighbour's.
+	var shown: bool = n.get("rest", false) or key == hover or key == selected or (_linked.has(key) and n["kind"] != "group")
 	if not shown:
 		return
 	var a := _alpha(key)
 	var font := Palette.display(500)
-	var size_px := int(roundf(node_label_size(n) * clampf(sqrt(zoom), 1.0, 1.35)))
+	var size_px := node_label_size(n)
 	var rect: Rect2 = n["label_rect"]
-	var centre_at := to_screen(rect.get_center())
+	var centre_at := rect.get_center()
 	var lines: PackedStringArray = n.get("lines", PackedStringArray([n["label"]]))
 	var detail := ""
 	if key == focus and str(n.get("value", "")) != "":
@@ -1934,24 +2116,29 @@ func _draw_label(n: Dictionary) -> void:
 		# The focused node's label sits on a tag of card stock, with its value under it.
 		var w := 0.0
 		for line in lines:
-			w = maxf(w, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x)
-		var dsize := int(size_px * 0.95)
+			w = maxf(w, _text_w(font, line, size_px))
+		var dsize := maxi(12, int(size_px * 0.95))
 		var body := Palette.text(500)
 		if detail != "":
-			w = maxf(w, body.get_string_size(detail, HORIZONTAL_ALIGNMENT_LEFT, -1, dsize).x)
+			w = maxf(w, _text_w(body, detail, dsize))
 		var box := Rect2(centre_at.x - w / 2.0 - 8.0, y - 5.0, w + 16.0, h + (dsize + 4.0 if detail != "" else 0.0) + 10.0)
+		# Kept on the board.
+		box.position = box.position.clamp(Vector2(4, 4), (size - box.size - Vector2(4, 4)).max(Vector2(4, 4)))
+		var shift := box.position - Vector2(centre_at.x - w / 2.0 - 8.0, y - 5.0)
+		centre_at += shift
+		y += shift.y
 		_node_layer.draw_rect(Rect2(box.position + Vector2(3, 3), box.size), Palette.SHADOW)
 		_node_layer.draw_rect(box, Palette.CARD)
 		_node_layer.draw_rect(box, Palette.INK, false, 1.5)
 		if detail != "":
-			var dw := body.get_string_size(detail, HORIZONTAL_ALIGNMENT_LEFT, -1, dsize).x
+			var dw := _text_w(body, detail, dsize)
 			_node_layer.draw_string(body, Vector2(centre_at.x - dw / 2.0, y + h + dsize * 0.95), detail, HORIZONTAL_ALIGNMENT_LEFT, -1, dsize, Palette.MUTED)
 	var texts: Array = Array(lines).map(func(line): return [line, font, Palette.INK])
 	if figure != "":
 		texts.append([figure, Palette.text(600), Palette.INK])
 	for item in texts:
 		var f: Font = item[1]
-		var w := f.get_string_size(item[0], HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+		var w := _text_w(f, item[0], size_px)
 		y += size_px + 2.0
 		var at := Vector2(centre_at.x - w / 2.0, y - size_px * 0.25)
 		if key != focus:
@@ -1966,8 +2153,8 @@ func _draw_effects() -> void:
 		var n: Dictionary = nodes[key]
 		var t: float = _pulses[key]
 		for k in 2:
-			var phase := t - k * 0.35
+			var phase := (t - k * 0.25) / 0.75
 			if phase < 0.0 or phase > 1.0:
 				continue
-			var r: float = n["r"] * zoom + (6.0 + 22.0 * phase) * _unit
-			_fx_layer.draw_arc(to_screen(n["pos"]), r, 0, TAU, 48, Color(Palette.OCHRE, (1.0 - phase) * 0.8), 2.5 * _unit, true)
+			var r: float = n["r"] + (6.0 + 18.0 * phase) * _unit
+			_fx_layer.draw_arc(n["pos"], r, 0, TAU, 48, Color(Palette.OCHRE, (1.0 - phase) * 0.8), 2.5 * _unit, true)

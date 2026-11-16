@@ -5,7 +5,8 @@ extends SceneTree
 ## are shown for a group, each in it (its flag asked for as a column); a household's account
 ## adds up to its net income; a basic rate of 21% shows, in "In a year", high incomes'
 ## approval falling by more than low incomes'; pointing at Income tax shows the budget
-## balance and unemployment going up. Then models/valmora, which has no groups, gets a board
+## balance and unemployment going up (stage S14.1: green and red, as every link is by whether
+## it is good for what it reaches). Then models/valmora, which has no groups, gets a board
 ## with an empty middle.
 
 var main: Control
@@ -105,6 +106,15 @@ func _initialize() -> void:
 	var group_links: Array = signs.keys().filter(func(k): return str(k).begins_with("group:"))
 	if group_links.is_empty():
 		return _fail("pointing at Income tax shows no group")
+	# Stage S14.1: a link's colour says whether it is good for what it reaches: the balance
+	# up is good, unemployment up bad, a group's approval down bad.
+	for link in board._links:
+		var better := str(board.nodes[link["to"]]["better"])
+		var want := "steady" if better == "" else ("better" if (float(link["sign"]) > 0.0) == (better == "high") else "worse")
+		if str(link["tone"]) != want:
+			return _fail("the link to %s (sign %s, better %s) is %s" % [link["to"], link["sign"], better, link["tone"]])
+	if board._links.filter(func(l): return l["to"] == "indicator:budget_balance")[0]["tone"] != "better" 			or board._links.filter(func(l): return l["to"] == "indicator:unemployment_rate")[0]["tone"] != "worse":
+		return _fail("Income tax's links to the balance and unemployment are not green and red")
 	main.hover("")
 	# A model without groups: an empty middle, nothing overlapping.
 	board.size = Vector2(1440, 900 - main.BAR_HEIGHT)
@@ -125,7 +135,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

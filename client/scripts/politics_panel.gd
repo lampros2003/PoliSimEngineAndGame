@@ -29,7 +29,7 @@ var _grid: GridContainer
 var _rows: Array = []  # per bloc: {cells: [name, polls, change, seats, projected]}
 var _seats := PackedFloat64Array()
 var _governing := PackedFloat64Array()
-var _groups_title: Label
+var _groups_fold: Control
 var _groups: GridContainer
 var _group_rows: Array = []  # {key, row, share, note, cells: [share, bar, approval, change]}
 
@@ -63,19 +63,21 @@ func _ready() -> void:
 	_grid = GridContainer.new()
 	_grid.columns = 5
 	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 9)
+	_grid.add_theme_constant_override("v_separation", 5)
 	Palette.rule_rows(_grid)
-	box.add_child(_grid)
-	_groups_title = Palette.caps("The country by group")
-	_groups_title.visible = false
-	box.add_child(_groups_title)
+	# Stage S14.1: the parties and the groups open one at a time, so the sheet fits the screen.
+	var folds := VBoxContainer.new()
+	folds.add_theme_constant_override("separation", 8)
+	box.add_child(folds)
+	folds.add_child(Palette.fold("The parties", _grid, true))
 	_groups = GridContainer.new()
 	_groups.name = "groups"
 	_groups.columns = 5
 	_groups.add_theme_constant_override("h_separation", 14)
-	_groups.add_theme_constant_override("v_separation", 7)
+	_groups.add_theme_constant_override("v_separation", 4)
 	Palette.rule_rows(_groups)
-	box.add_child(_groups)
+	_groups_fold = Palette.fold("The country by group", _groups)
+	folds.add_child(_groups_fold)
 
 
 func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.FONT_SIZE) -> Label:
@@ -88,6 +90,8 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 	if right:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		label.custom_minimum_size = Vector2(90, 0)
+	else:
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
 
@@ -108,7 +112,7 @@ func build_groups(board: Control) -> void:
 		child.queue_free()
 	_group_rows.clear()
 	var keys: PackedStringArray = board.keys_of("group")
-	_groups_title.visible = not keys.is_empty()
+	_groups_fold.visible = not keys.is_empty()
 	if keys.is_empty():
 		return
 	for heading in ["", "Share of adults", "Backing the government", "", "Last month"]:
@@ -118,7 +122,7 @@ func build_groups(board: Control) -> void:
 		var name := Button.new()
 		name.name = "group_" + key.trim_prefix("group:")
 		name.text = str(node["label"])
-		name.theme_type_variation = "Link"
+		name.theme_type_variation = "LinkRow"
 		name.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		name.custom_minimum_size = Vector2(190, 0)
 		name.pressed.connect(func() -> void: group_pressed.emit(key, name.get_global_rect()))

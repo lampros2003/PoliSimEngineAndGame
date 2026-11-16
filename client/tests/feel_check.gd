@@ -7,9 +7,12 @@ extends SceneTree
 ## for want of political capital and one passed appear in the month's report, with the
 ## figures that moved most, and Space ran that month; the links of a node held under the
 ## pointer while the effects table arrives change at most once (from the formulas' to the
-## measured); B, P, Esc and H do their jobs, and Space does nothing in a focused field; a
+## measured); B, P, Esc and K do their jobs, and Space does nothing in a focused field; a
 ## game from the start screen opens with its first month played and every figure filled;
-## the sound helper asks for its sounds and makes no player headless.
+## the sound helper asks for its sounds and makes no player headless. Stage S14.1: the refusal
+## is told once, in the report, not also in a notice; the report floats over the board, whose
+## size it leaves alone, and the date opens it again; K opens the key, drawn by the board's own
+## code; Esc closes the report.
 
 const Format := preload("res://scripts/format.gd")
 const Sound := preload("res://scripts/sound.gd")
@@ -98,9 +101,25 @@ func _initialize() -> void:
 	var moves := Array(lines).filter(func(l): return l.contains("▲") or l.contains("▼"))
 	if not main.report.visible or refused.is_empty() or passed.is_empty() or moves.size() < 3:
 		return _fail("the month's report: %s" % [lines])
-	if not main.notice_text().contains("Not enough political capital"):
-		return _fail("the refusal notice is gone: %s" % main.notice_text())
-	if not Sound.asked.has("month") or not Sound.asked.has("bill") or not Sound.asked.has("notice"):
+	if main.notice_text().contains("refused") or main.notice_text().contains("political capital"):
+		return _fail("the refusal is told twice: %s" % main.notice_text())
+	# The report floats: the board keeps its size and its nodes their places while it is open.
+	var board_size: Vector2 = board.size
+	var spot: Vector2 = board.nodes["centre"]["pos"]
+	main.report.dismiss()
+	await _settle()
+	if board.size != board_size or board.nodes["centre"]["pos"] != spot:
+		return _fail("the board changed with the report: %s to %s" % [board_size, board.size])
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	main._date.gui_input.emit(click)
+	if not main.report.visible:
+		return _fail("the date did not open the report again")
+	_key(KEY_ESCAPE)
+	if main.report.visible:
+		return _fail("Esc did not close the report")
+	if not Sound.asked.has("bill") or not Sound.asked.has("notice"):
 		return _fail("sounds asked for: %s" % [Sound.asked])
 	# A node held under the pointer while the effects table arrives: one change at most.
 	main.hover("policy:income_tax")
@@ -130,13 +149,14 @@ func _initialize() -> void:
 	_key(KEY_ESCAPE)
 	if main.popup_kind() != "":
 		return _fail("Esc did not close the popup")
-	board.zoom = 2.0
-	_key(KEY_H)
+	_key(KEY_K)
 	await _settle()
-	for i in 30:
-		await process_frame
-	if not is_equal_approx(board.zoom, 1.0):
-		return _fail("H did not show the whole board (zoom %s)" % board.zoom)
+	var page: Node = main.find_child("key_page", true, false)
+	if page == null or not main._key_sheet.visible or page.find_children("*", "Control", true, false).filter(func(c): return c.get("demo") == true).size() < 4:
+		return _fail("K did not open the key with the board's own drawings")
+	_key(KEY_ESCAPE)
+	if main._key_sheet.visible:
+		return _fail("Esc did not close the key")
 	main.open_node("policy:vat")
 	await _settle()
 	var field: LineEdit = main.policy_card().find_child("lever_vat_rate", true, false)
@@ -177,7 +197,7 @@ func _initialize() -> void:
 			return _fail("%s is blank after the opening month" % key)
 	if Sound.players() != 0:
 		return _fail("a sound player was made in a headless run")
-	print("feel: the awaiting state at step 0 everywhere; no negative noughts; the guide only on a first game, its %d steps on real things; Space ran a month whose report lists %d lines (%s); links held steady under the pointer (%d change); B, P, Esc, H and a focused field behave; a start-screen game opens with its first month played; %d sounds asked for, none played headless" % [
+	print("feel: the awaiting state at step 0 everywhere; no negative noughts; the guide only on a first game, its %d steps on real things; Space ran a month whose report lists %d lines (%s); links held steady under the pointer (%d change); the report floats and is told once; B, P, Esc, K and a focused field behave; a start-screen game opens with its first month played; %d sounds asked for, none played headless" % [
 		titles.size(), lines.size(), " / ".join(lines.slice(0, 3)), changes, Sound.asked.size()])
 	while main.effects_running:
 		await process_frame
@@ -219,7 +239,7 @@ func _fail(message: String) -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

@@ -23,7 +23,9 @@ const PAD_BOTTOM := 34.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	custom_minimum_size = Vector2(320, 220)
+	# Stage S14.1: the size its popup gives it, or this.
+	if custom_minimum_size == Vector2.ZERO:
+		custom_minimum_size = Vector2(320, 220)
 
 
 func set_data(new_steps: PackedInt64Array, new_markers: Array) -> void:
@@ -40,7 +42,9 @@ func has_row(row: String) -> bool:
 
 
 func _plot_rect() -> Rect2:
-	return Rect2(PAD_LEFT, PAD_TOP, maxf(10.0, size.x - PAD_LEFT - PAD_RIGHT), maxf(10.0, size.y - PAD_TOP - PAD_BOTTOM))
+	# Stage S14.1: one line needs no legend (the popup's title names it), so no room for one.
+	var top := PAD_TOP if series.size() > 1 else 14.0
+	return Rect2(PAD_LEFT, top, maxf(10.0, size.x - PAD_LEFT - PAD_RIGHT), maxf(10.0, size.y - top - PAD_BOTTOM))
 
 
 func _range() -> Vector2:
@@ -144,9 +148,9 @@ func _draw() -> void:
 				_polyline(points, s["color"])
 				points = PackedVector2Array()
 		_polyline(points, s["color"])
-	# Legend.
+	# Legend, for two lines.
 	var x := PAD_LEFT
-	for s in series:
+	for s in (series if series.size() > 1 else []):
 		var text: String = s["label"] + ("  ×" if series.size() > 1 and s != series[0] else "")
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x
 		draw_rect(Rect2(x, 14, 12, 12), s["color"])

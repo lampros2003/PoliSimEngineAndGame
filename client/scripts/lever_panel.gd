@@ -6,8 +6,7 @@ extends VBoxContainer
 ## Commons vote it would get; what the waiting change would do in a year; and the lever's
 ## history with the player's changes marked.
 ##
-## Stage S13.4: the controls come first, with "In a year" beside them when the window is
-## wide (under them when not); the year's bars are sage or brick where the scenario says
+## Stage S13.4: the controls come first; the year's bars are sage or brick where the scenario says
 ## which way is better, and the groups most affected follow the indicators. Fields read as
 ## people write numbers: £12,570, 21%, 21.5%, £12.38bn.
 ##
@@ -32,15 +31,17 @@ signal follow(name: String)
 ## repeal asked for.
 signal draft_changed(name: String, raw: String)
 signal repeal_pressed(name: String)
+## Stage S14.1: "More" opened or closed (the popup fits itself again).
+signal more_toggled
 
-## The popup's width with two columns, and the window width from which it has them.
-const WIDE := 1120.0
-const WIDE_FROM := 1360.0  # stage S13.6: from 1366x768 up
+## Stage S13.6: the window width from which popups had two columns (stage S14.1: none do;
+## kept for callers).
+const WIDE_FROM := 1360.0
 
 var fmt: RefCounted
 var key := ""  # the board's policy key
 var levers: PackedStringArray = []
-## True for two columns (set before build).
+## Stage S14.1: unused; a policy's popup is always one column.
 var wide := false
 var hint: Label
 var capital_note: Label
@@ -66,9 +67,9 @@ var put_button: Button
 var repeal_button: Button
 var repeal_note: Label
 var _controls: VBoxContainer
-var _body: BoxContainer
-var _left_scroll: ScrollContainer
-var _left_box: VBoxContainer
+var _holder: VBoxContainer  # where the next lever's row goes: the main controls or "More"
+var _more: VBoxContainer
+var _history: VBoxContainer
 var _year: VBoxContainer
 var _year_title: Label
 var _year_note: Label
@@ -176,14 +177,22 @@ func _money_unit(entry: Dictionary) -> float:
 	return 1.0
 
 
-## The popup's width for this content.
+## The popup's width for this content. Stage S14.1: one column, never wider than 640 pixels.
 func popup_width() -> float:
-	return WIDE if wide else 640.0
+	return 640.0
+
+
+## Stage S14.1: the levers a policy opens with: its first, and any rate among its first three
+## (Income tax's three rates, not its thresholds); the rest wait under "More".
+func _is_main(index: int, entry: Dictionary) -> bool:
+	return index == 0 or (index < 3 and fmt.is_rate(entry))
 
 
 ## `node` is the board's policy node; `entries` the levers' catalogue entries in order;
 ## `start_of(name)` where a lever began (the slider spans up to twice that for a lever
-## whose range is far wider than play).
+## whose range is far wider than play). Stage S14.1: one column: the main control(s), the
+## cost and the vote they would get, "More" for the other levers, then the history, which
+## "In a year" replaces once a control has moved.
 func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callable) -> void:
 	key = str(node.get("key", ""))
 	add_theme_constant_override("separation", 12)
@@ -208,34 +217,38 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	titles.add_child(title)
 	if entries.size() == 1 and str(entries[0].get("doc", "")) != "":
 		add_child(_muted(_sentence(str(entries[0]["doc"]))))
-	# The controls, and beside them (or under them) what the change would do in a year.
-	var body: BoxContainer = HBoxContainer.new() if wide else VBoxContainer.new()
-	body.add_theme_constant_override("separation", 36 if wide else 12)
-	add_child(body)
-	_body = body
 	_controls = VBoxContainer.new()
-	_controls.add_theme_constant_override("separation", 12)
-	_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_controls.custom_minimum_size.x = 470.0 if wide else 0.0
-	# Stage S13.6: two columns, the controls (and the history under them) scrolling on their
-	# own when there are many, so "In a year" beside them never scrolls out of sight.
-	var column: Control = _controls
-	if wide:
-		_left_scroll = ScrollContainer.new()
-		_left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		_left_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_left_scroll.custom_minimum_size.x = 490.0
-		_left_box = VBoxContainer.new()
-		_left_box.add_theme_constant_override("separation", 12)
-		_left_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_left_scroll.add_child(_left_box)
-		_left_box.add_child(_controls)
-		_controls.custom_minimum_size.x = 470.0
-		column = _left_scroll
-	body.add_child(column)
-	for entry in entries:
-		_lever_row(entry, start_of.call(str(entry["name"])))
-		levers.append(str(entry["name"]))
+	_controls.add_theme_constant_override("separation", 8)
+	add_child(_controls)
+	var rest := []
+	for i in entries.size():
+		if _is_main(i, entries[i]):
+			_holder = _controls
+			_lever_row(entries[i], start_of.call(str(entries[i]["name"])))
+		else:
+			rest.append(entries[i])
+		levers.append(str(entries[i]["name"]))
+	if not rest.is_empty():
+		var more := Button.new()
+		more.name = "more"
+		more.theme_type_variation = "Link"
+		more.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var words := "More: %s" % ", ".join(rest.map(func(e): return str(e.get("label", e["name"])).to_lower()))
+		more.text = "▸ " + (words if words.length() <= 70 else "More: %d further settings" % rest.size())
+		_controls.add_child(more)
+		_more = VBoxContainer.new()
+		_more.name = "more_controls"
+		_more.add_theme_constant_override("separation", 12)
+		_more.visible = false
+		_controls.add_child(_more)
+		var shown_words := more.text.trim_prefix("▸ ")
+		more.pressed.connect(func() -> void:
+			_more.visible = not _more.visible
+			more.text = ("▾ " if _more.visible else "▸ ") + shown_words
+			more_toggled.emit())
+		for entry in rest:
+			_holder = _more
+			_lever_row(entry, start_of.call(str(entry["name"])))
 	hint = _muted("Changes are bills: the Commons votes on them next month." if legislature else "Changes take effect from next month.")
 	if introducing:
 		hint.text = "Pick a setting to see what it would do in a year and how the Commons would vote; then put it to the Commons." if legislature \
@@ -260,6 +273,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 		repeal_button = Button.new()
 		repeal_button.name = "repeal"
 		repeal_button.text = "Repeal"
+		repeal_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		var first := levers[0]
 		repeal_button.pressed.connect(func() -> void: repeal_pressed.emit(first))
 		row.add_child(repeal_button)
@@ -273,14 +287,14 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	capital_note.visible = false
 	_controls.add_child(capital_note)
 	_year = VBoxContainer.new()
+	_year.name = "in_a_year"
 	_year.add_theme_constant_override("separation", 6)
-	_year.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_year.custom_minimum_size.x = 500.0 if wide else 0.0
-	body.add_child(_year)
+	_year.visible = false
+	add_child(_year)
 	_year_title = Palette.caps("In a year")
 	_year.add_child(_year_title)
-	_year_note = _muted("Move a control to see what the change would do in a year.")
-	_year_note.custom_minimum_size.x = 0.0
+	_year_note = _muted("")
+	_year_note.visible = false
 	_year.add_child(_year_note)
 	_year_rows = _table()
 	_year.add_child(_year_rows)
@@ -289,35 +303,33 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	_year.add_child(_group_title)
 	_group_rows = _table()
 	_year.add_child(_group_rows)
-	_year.visible = wide
 	_chart_lever = levers[0] if not levers.is_empty() else ""
-	var holder: Control = _left_box if wide else self
 	# Stage S13.5: a policy not in force has no history to show, and a level policy's names
 	# do not fit a chart's axis (its setting and its changes are told above).
 	if introducing or (_chart_lever != "" and _rows[_chart_lever]["entry"].has("levels")):
 		return
-	holder.add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
+	_history = VBoxContainer.new()
+	_history.add_theme_constant_override("separation", 6)
+	add_child(_history)
+	_history.add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
 	chart = Chart.new()
 	chart.fmt = fmt
-	chart.custom_minimum_size = Vector2(0, 190)
-	holder.add_child(chart)
+	chart.custom_minimum_size = Vector2(0, 160)
+	_history.add_child(chart)
 
 
-## Stage S13.6: in two columns, the controls' column takes the room the popup has (`room`,
-## its scrolling height), so a policy of many levers scrolls its controls, not the popup.
-func fit_height(room: float) -> void:
-	if _left_scroll == null:
-		return
-	var inner := _left_box.get_combined_minimum_size().y
-	var fixed := get_combined_minimum_size().y - _body.get_combined_minimum_size().y
-	_left_scroll.custom_minimum_size.y = clampf(room - fixed - 6.0, minf(260.0, inner), inner)
+## Stage S14.1: "In a year" stands where the history was, once a control has moved.
+func _show_year_part(on: bool) -> void:
+	_year.visible = on
+	if _history != null:
+		_history.visible = not on
 
 
 func _table() -> GridContainer:
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 6)
+	grid.add_theme_constant_override("v_separation", 2)
 	return grid
 
 
@@ -473,7 +485,7 @@ func _finish_row(name: String, entry: Dictionary, box: VBoxContainer, spin: Fiel
 	vote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vote.visible = false
 	box.add_child(vote)
-	_controls.add_child(box)
+	_holder.add_child(box)
 	_rows[name] = {"entry": entry, "spin": spin, "slider": slider, "steps": steps, "now": now, "pending": pending, "cancel": cancel, "vote": vote}
 
 
@@ -560,8 +572,14 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 			row["pending"].text = ""
 			row["cancel"].visible = false
 			row["vote"].visible = false
+		# Stage S14.1: no empty line under a control with nothing waiting.
+		row["pending"].get_parent().visible = row["pending"].text != ""
 	if introducing:
 		return
+	var any := false
+	for name in _rows:
+		any = any or pending.has(name)
+	hint.visible = not any
 	capital_note.visible = capital >= 0.0
 	if capital >= 0.0:
 		var total := 0.0
@@ -619,10 +637,11 @@ func show_repeal(cost: float, preview: Dictionary, left := -1.0) -> void:
 ## "budget") and the six other rows that move most; and, under them, the five groups
 ## (kind "group") whose approval moves most.
 func show_year(rows: Dictionary, shown: Array, working := false, heading := "") -> void:
-	_year.visible = true
+	_show_year_part(true)
 	_year_note.visible = false
 	for grid in [_year_rows, _group_rows]:
 		for child in grid.get_children():
+			grid.remove_child(child)  # at once, so the popup fits itself to what is left
 			child.queue_free()
 	_group_title.visible = false
 	if working:
@@ -647,8 +666,7 @@ func show_year(rows: Dictionary, shown: Array, working := false, heading := "") 
 		var weight := pow(float(item[4]) if item.size() > 4 else 2.0, 2.0)
 		items.append([item, d, size * weight, size])
 	if items.is_empty():
-		_year.visible = wide
-		_year_note.visible = wide
+		_show_year_part(false)
 		return
 	var kind := func(it: Array) -> String: return str(it[0][3]) if it[0].size() > 3 else ""
 	# The first row (the budget balance) stays first; the rest, the largest moves.
@@ -679,7 +697,7 @@ func _fill(grid: GridContainer, items: Array, groups: bool) -> void:
 		var item: Array = it[0]
 		var name := Button.new()
 		name.text = str(item[1])
-		name.theme_type_variation = "Link"
+		name.theme_type_variation = "LinkRow"
 		name.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		name.custom_minimum_size = Vector2(170, 0)
 		var target := str(item[6]) if item.size() > 6 else str(item[2].get("name", ""))
@@ -702,10 +720,10 @@ func _fill(grid: GridContainer, items: Array, groups: bool) -> void:
 
 
 func hide_year() -> void:
-	_year.visible = wide
-	_year_note.visible = wide
+	_show_year_part(false)
 	for grid in [_year_rows, _group_rows]:
 		for child in grid.get_children():
+			grid.remove_child(child)  # at once, so the popup fits itself to what is left
 			child.queue_free()
 	_group_title.visible = false
 	_year_title.text = "IN A YEAR"

@@ -8,7 +8,7 @@ extends SceneTree
 ## popup first (and --then=N plays N more months), --dilemma=1 leaves the question on screen, --effects=1 waits for the measured
 ## effects table first (for hover links). Stage S13.4: --node=group:KEY opens a group's
 ## popup, and --household=N then opens its Nth household's account. Stage S13.6: --report=1
-## shows the month's report, --guide=N the guide's Nth step. Stage S13.5: --introduce and
+## shows the month's report, --guide=N the guide's Nth step. Stage S14.1: --key=1 the key. Stage S13.5: --introduce and
 ## --draft (below). For a person to look at; needs a
 ## display. Godot's --resolution WxH before --path sets the window size.
 
@@ -92,6 +92,9 @@ func _initialize() -> void:
 	# Stage S13.6: --report=1 shows the last month's report, --guide=N the guide's Nth step.
 	if args.has("report"):
 		main.report.reopen()
+	# Stage S14.1: --key=1 shows the key.
+	if args.has("key"):
+		main.show_key()
 	if args.has("guide"):
 		main.show_guide(false)
 		for i in int(args["guide"]) - 1:
@@ -110,7 +113,7 @@ func _initialize() -> void:
 func _settle() -> void:
 	for i in 4:
 		await process_frame
-	while main.game.is_busy():
+	while main.game.is_busy() or main.advance_queued():
 		await process_frame
 	for i in 4:
 		await process_frame

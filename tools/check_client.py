@@ -190,6 +190,16 @@ def main() -> int:
             print("res://tests/feel_check.gd failed", file=sys.stderr)
             return 1
         print(run.stdout.strip().splitlines()[-1])
+        # Stage S14.1: the speed budget (docs/S14-PLAN.md, "Speed"), measured and asserted.
+        run = subprocess.run(
+            [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/perf_check.gd",
+             "--", "--scenario=models/uk/scenarios/2025.toml"],
+            capture_output=True, encoding="utf-8", timeout=900)
+        if run.returncode != 0 or "SCRIPT ERROR" in run.stderr:
+            print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+            print("res://tests/perf_check.gd failed", file=sys.stderr)
+            return 1
+        print(run.stdout.strip().splitlines()[-1])
         # The UK's budget screen, as the player reads it, against the 2024 public finances.
         dump, breakdowns = folder / "uk_budget.csv", folder / "uk_breakdowns.tsv"
         uk = subprocess.run(
