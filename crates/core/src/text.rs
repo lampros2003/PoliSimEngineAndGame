@@ -30,8 +30,8 @@
 //! option.settle = { label = "Accorder la hausse", doc = "…" }
 //! ```
 //!
-//! Text is not part of the run: it is outside the model hash, and the oracle never reads
-//! it. What a text file leaves out keeps the model's own words.
+//! Text is not part of the run: it is outside the model hash and the state hash. What a
+//! text file leaves out keeps the model's own words.
 
 use std::path::{Path, PathBuf};
 

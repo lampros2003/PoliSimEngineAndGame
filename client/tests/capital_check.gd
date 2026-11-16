@@ -1,6 +1,6 @@
 extends SceneTree
 ## Stage S12.5: political capital through the interface (models/uk/scenarios/2025.toml).
-## After a month the capital shows on the top bar; typing a basic rate of
+## After a month the capital shows at the centre of the board; typing a basic rate of
 ## 22% shows what the bill costs (5 + 60 x 2 x 0.02 = 7.4: stage S13.7 weighs the main tax
 ## rates 2); two big bills in one month (a 50% basic rate and a 35% VAT, 41 each, with about
 ## 47 to 54 to spend) leave the second refused, and the player is told.

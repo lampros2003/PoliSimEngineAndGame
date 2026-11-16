@@ -87,7 +87,9 @@ issues_at_election = "issue_at_election"
 #                                  first lever sets its gauge; size 1 to 3 is importance
 #   indicators = [{ row, icon, size, better }]
 #                                  a national result row; `better` is "high" or "low" where
-#                                  that is clear, and tints its rises and falls
+#                                  that is clear: it sets the node's colour (high green, a
+#                                  good thing; low red, a bad thing; none blue) and tints
+#                                  its rises and falls
 #
 # Stage S13.5: real policies, a growing board, estimated groups.
 #   a policy's `levels = ["...", ...]`  the names of a level policy's settings, in order from

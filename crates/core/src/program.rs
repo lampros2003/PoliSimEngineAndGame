@@ -543,7 +543,8 @@ pub struct Compiled {
 
 /// `exp(x)` by the fixed algorithm of docs/spec/02-formula-language-v0.md, so that every
 /// machine gives the same bits: only rounded `+`, `-`, `*` (no fused multiply-add) and an
-/// exact scaling by a power of two. A port of the oracle's `exp_fixed`.
+/// exact scaling by a power of two. Ported from the retired Python reference; the recorded
+/// hashes pin its bits.
 pub fn exp_fixed(x: f64) -> f64 {
     const C: [f64; 13] = [
         2.08767569878681e-09,
@@ -582,7 +583,8 @@ pub fn exp_fixed(x: f64) -> f64 {
 
 /// The natural logarithm by the fixed algorithm of docs/spec/02-formula-language-v0.md
 /// (stage S10.6): only rounded `+`, `-`, `*`, `/` (no fused multiply-add) and an exact split
-/// of `x` into a fraction and a power of two. A port of the oracle's `ln_fixed`.
+/// of `x` into a fraction and a power of two. Ported from the retired Python reference;
+/// the recorded hashes pin its bits.
 pub fn ln_fixed(x: f64) -> f64 {
     const LG: [f64; 7] = [
         0.6666666666666735,
@@ -635,7 +637,7 @@ pub fn sqrt_fixed(x: f64) -> f64 {
 /// `x` to the power `y` (stage S10.6), by docs/spec/02: for a whole `y` of at most 1,024 in
 /// size, by repeated squaring (so `pow(5, 2)` is 25 and a negative `x` is allowed);
 /// otherwise `exp(y * ln(x))` by the fixed algorithms, with cases for zero, infinity and
-/// not-a-number. A port of the oracle's `pow_fixed`.
+/// not-a-number. Ported from the retired Python reference; the recorded hashes pin its bits.
 pub fn pow_fixed(x: f64, y: f64) -> f64 {
     if y.is_nan() {
         return f64::NAN;

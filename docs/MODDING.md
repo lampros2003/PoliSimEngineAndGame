@@ -31,7 +31,10 @@ The mod's own file, `wealth_tax.toml`, is written like any model file. Every nam
 starts with your mod's id, so that mods never collide.
 
 A **lever** the player sets, which stands on the board as a policy in an area named after
-its group. `leaning = "left"`
+its group (an area of that name if the scenario has one, else a new one at the end of the
+rim). A mod cannot place nodes on the board otherwise: where indicators and groups stand,
+and their colours, are the scenario's `[play.web]` table
+([`docs/spec/05-game-client.md`](spec/05-game-client.md)). `leaning = "left"`
 makes raising it a bill the House of Commons votes on, as a move to the left:
 
 ```toml
@@ -148,8 +151,9 @@ effect = { net_sales = "round({base} * 0.9)" }
 already has, with `{base}` for the formula as it was, for `months` months from the answer
 (or for good without `months`); `again_after = 24` would put the question again two years
 after an answer, if `start` still holds. The game stops and asks when the dilemma opens,
-and the answer shows under the headline. Everything a dilemma does is an ordinary formula,
-so **Why** next to government purchases shows the strike's effect. The format, with every
+and the answer shows as a pennant on the strip under the top bar while it lasts. Everything
+a dilemma does is an ordinary formula, so **Why it moved last month** in government
+purchases' popup shows the strike's effect. The format, with every
 rule, is in [`docs/spec/06-model-format-1.md`](spec/06-model-format-1.md#dilemmas-stage-s91);
 `models/valmora/scenarios/dock_strike.toml` opens Valmora with the mod.
 

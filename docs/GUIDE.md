@@ -27,54 +27,72 @@ guide again**, brings it back, and **Menu**, then **Help**, repeats the essentia
 ## The board
 
 The whole game is one screen, the board. It is a map of cause and effect, laid out as an
-ellipse that reads from the outside in, from what you control to the people it reaches.
+ellipse that reads from the outside in, from what you control to the people it reaches. It
+is the screen itself: it cannot be dragged or zoomed, it fills the window under the top bar
+and the strip beneath it, and only resizing the window, or a policy coming into force or
+being repealed, lays it out again. Nothing docks beside it; the month's
+report, the notices and the popups float over it.
 
-| Ring | What stands there |
+| Place | What stands there |
 |---|---|
 | Outer rim | **Policies**, as discs, in arcs by area: Economy, Tax, Welfare, Health, Education, Law and order, Transport, Environment and energy, Housing, Foreign and trade. The area's name is set along the rim |
-| Middle | **Indicators**, as rings: the figures your policies move, in the sector of their area (in two rows where the sector is crowded). They run from GDP and unemployment to crime, school results and electric car sales |
-| Inner band | **Groups** of voters, as shields: the young, pensioners, low incomes, parents, Scotland, motorists and so on, 23 in six families (ages, incomes, work, families, places, ways of life). A group is drawn larger the bigger its share of the electorate |
-| Centre | The government: its approval (your party's poll rating), the months to the election and your political capital. Click it to open Parliament |
-| Corners | **Flags** for the situations in force (a recession, a record waiting list), each with the month it began, and for questions put to you and your answers while they last (beside the centre, on a board without groups) |
+| Middle | **Indicators**, as rings: the figures your policies move, in the sector of their area (in two rows where the sector is crowded). They run from GDP and unemployment to crime, school results, homelessness and electric car sales |
+| Group ring | **Groups** of voters: one circle of arcs round the centre, one arc a group, 23 in six families (ages, incomes, work, families, places, ways of life), the families apart and named once inside the circle. Within its family, an arc is as long as the group's share of the electorate, and never too short for its pictogram |
+| Centre | The government: its approval (your party's poll rating) and its change, the months to the election and your political capital. Click it to open Parliament |
+| The strip under the top bar | **Situations** in force (a recession, a record waiting list) as pennants, and questions put to you and your answers while they last |
 
 Size says importance: nodes come in three sizes, and the biggest are the ones that matter
-most (income tax, GDP, the NHS). A node is named where its label fits; point at any node
-to see its name and value, or zoom in.
+most (income tax, GDP, the NHS). Every policy and indicator is named at rest from a window
+of 1366 by 768 up. A group's name shows when you point at it, with its approval and last
+month's change; point at any node to see its value.
 
-Each node carries a little of its state:
+Colour says what a thing is, and does not change in play:
 
-- A policy's **gauge** is a pale arc round its edge, filled to where its setting sits in its
+- An **indicator**'s ring is green for a good thing, the more the better (output, pay,
+  productivity, homes built), red for a bad thing, the less the better (unemployment, crime,
+  poverty, homelessness, the gilt yield), and blue for a figure that is neither (Bank Rate,
+  the mortgage rate). A small triangle on a badge says it rose or fell last month: green
+  when that was for the better, red when for the worse, ink when neither can be said. Nodes
+  that moved noticeably pulse after each month.
+- A **group**'s approval is a gauge just outside its arc: the share of its likely voters
+  who back the governing blocs, filled from the start of the arc and full at 60% (approvals
+  sit between about 20% and 50%, so a gauge to 100% would make them all look alike). It is
+  green from 38%, red under 28% and mustard between. Northern Ireland, where the governing
+  party does not stand, is grey with a dash.
+- A **policy**'s gauge is a pale arc round its edge, filled to where its setting sits in its
   range (for a policy of several controls, the first, such as the basic rate for Income
-  tax). An ochre mark and a short line on the gauge show a change waiting for a vote.
-- A group's gauge shows its **approval**: the share of its likely voters who back the
-  governing blocs. A group the governing party does not stand for, Northern Ireland, shows
-  a dash.
-- An indicator or a group shows a small triangle when it rose or fell last month, in sage
-  where that is good and brick where it is bad, in ink where nobody can say. Nodes that
-  moved noticeably pulse after each month.
-- A policy whose bill to introduce it is waiting stands as a **ghost**, with a dashed edge,
+  tax). An ochre mark and a short line on the gauge show a change waiting for a vote. A
+  policy whose bill to introduce it is waiting stands as a **ghost**, with a dashed edge,
   until the vote.
+- A **situation**'s pennant is green if it is good (strong growth) and red if it is bad
+  (a recession); an answer you gave is blue while it lasts, and a question waiting for you is
+  ochre.
 
 **Pointing** at a node dims the rest and draws its links. A policy's links run to the
 indicators and groups it moves most; an indicator's or a group's run back from the policies
-that move it most. An arrow is blue where the effect is a rise and brick where it is a fall;
-a thicker, faster-flowing line is a stronger effect. The links are not drawn from a
-diagram: each policy is nudged by one step, the model is run twelve months ahead, and the
-links are what moved. That table takes some seconds after each month and while it arrives
-the links are drawn plain, from the model's formulas, and then turn to the measured ones.
-Only the strongest are drawn: up to seven indicators and three groups for a policy, and
-always the budget balance if the policy moves it.
+that move it most. A link is green where the effect is good for what it reaches (for a
+group, approval up), red where it is bad, and blue where neither can be said; a + or − by
+the arrowhead says whether it rises or falls, and a thicker, faster-flowing line is a
+stronger effect. The links are not drawn from a diagram: each policy is nudged by one step,
+the model is run twelve months ahead, and the links are what moved. That table is measured
+again after each month, starting with the policy under the pointer; meanwhile the last
+month's links stay, and a node not yet measured says "measuring its effects" and has its
+links drawn grey, from the model's formulas, until the measured ones replace them. A loaded
+game has its links at once, from the table kept in the save. Only the strongest are drawn:
+up to seven indicators and three groups for a policy, and always the budget balance if the
+policy moves it.
 
-Drag to move the board and turn the wheel to zoom. **Home** or **H**, or **Menu**, then
-**See the whole board**, fits it back to the window.
+**The key** ("?" on the top bar, or K, or **Menu**, then **The key**) is one page on what
+every shape, colour and arc means, drawn by the board's own code.
 
 ## Opening a policy
 
 Click a policy to open its popup. It names the policy and its area, says what it is, and
-gives a control for each thing you can set: a slider and a field for a number, or a row of
-named steps for a policy that works in levels (sentencing runs from Lenient to Tough). Rates
-are typed in percent, money in pounds (or with `m` or `bn` for millions and billions), an
-age or a year as a whole number. Menu, **Amounts a year**, chooses whether money flows are
+opens with its main control (Income tax opens with its three rates): a slider and a field
+for a number, or a row of named steps for a policy that works in levels (sentencing runs
+from Lenient to Tough). Further controls, such as thresholds and allowances, wait under
+**More**. Rates are typed in percent, money in pounds (or with `m` or `bn` for millions and
+billions), an age or a year as a whole number. Menu, **Amounts a year**, chooses whether money flows are
 shown a year or a month.
 
 A change is a **bill**. It waits, in ochre, and the House of Commons votes on it at the
@@ -91,19 +109,19 @@ lines (the NHS, schools, social care, police, pensions and benefits, public inve
 point on the basic rate costs 6.2 and a quarter off the NHS 27.5. You start with 40 and earn
 1.5 a month, up to 5 more the higher your own party's poll rating (nothing extra at 20% or
 below, all of it at 40%; in a coalition only your party's rating counts) and 2 more in the
-first year of a parliament, up to 100: about 4 a month at 30%. Your capital is shown
-at the centre of the board and, on a wide window, in the top bar. The popup says what the
-bill costs and what the bills already waiting will cost; a bill that costs more than is
-left when its turn comes is not put to the Commons, and the game tells you.
+first year of a parliament, up to 100: about 4 a month at 30%. Your capital is shown at the
+centre of the board. The popup says what the bill costs and what the bills already waiting
+will cost; a bill that costs more than is left when its turn comes is not put to the
+Commons, and the game tells you in the month's report.
 
-Beside the controls (under them on a narrow window) the popup shows **In a year**: the game
-is run twelve months ahead with your waiting change and without it, and the table lists the
-difference. It starts with the budget balance, then up to three lines of the budget and up
-to six indicators, whichever move most for their size, then the five groups whose approval
-it moves most. Bars are sage where the change is for the better and brick where it is for
-the worse. Click any row to open that indicator or group. The forecast takes a moment and
-says so while it works. Under the controls, a chart shows the policy's history with your
-changes marked.
+Under the controls a chart shows the policy's history with your changes marked. Once you
+move a control, **In a year** takes its place: the game is run twelve months ahead with
+your waiting change and without it, and the table lists the difference. It starts with the
+budget balance, then up to three lines of the budget and up to six indicators, whichever
+move most for their size, then the five groups whose approval it moves most. Bars are
+sage where the change is for the better and brick where it is for the worse. Click any row
+to open that indicator or group. The forecast takes about half a second; while it works
+the last figures stay, greyed, marked "measuring".
 
 ## Introducing and repealing
 
@@ -141,7 +159,7 @@ the policies that move it, each opening its own popup. The explanation is availa
 second month of a game.
 
 The figures on the top bar open the same popups, and so does every line of the Budget and
-every situation flag.
+every situation's pennant.
 
 ## The people
 
@@ -164,7 +182,7 @@ estimated from published shares by age and income, and their popup says so.
 **Budget** in the top bar opens a sheet with every payment into the government (revenue) and
 out of it (spending), this month and last. Click a line for its popup.
 
-**Parliament**, from the top bar, the centre of the board or the capital figure, opens the
+**Parliament**, from the top bar or the centre of the board, opens the
 House of Commons as rows of seats by bloc, the polls for the nine blocs with their change on
 last month and the seats each would win if an election were held now, the month of the next
 general election, the issues voters weigh beyond the economy (health, education, policing,
@@ -184,34 +202,62 @@ election. Half a point of output more barely registers; each point more costs mo
 last, most among pensioners, home owners and high incomes, and borrowing well below where it
 started earns a little ("Lenders' confidence").
 
-Lenders mind too. The **Gilt yield** indicator in Economy is what new government borrowing
-costs: it rises when borrowing runs above its level at the start of the game and falls when
-it runs below, and the interest on the debt follows it over the years. The longer and the
-further borrowing runs above where it started, the likelier lenders are to refuse the gilts:
-a small chance each month a point of output above, near certain within a year at three.
-Then you must choose between an emergency budget, a much higher yield, or asking the Bank of
-England to print the money. Since stage S14.5 the Bank of England also sets **Bank Rate**
-each month against inflation and unemployment, and the **Mortgage rate** follows it and the
-gilt yield as fixed deals end: dearer mortgages cost home owners, and voters feel it.
+## Interest rates, lenders and slumps
+
+You do not set interest rates; the Bank of England does, and you live with them.
+
+- **Bank Rate** (Economy, blue) starts at 4.75%. Each month it moves a sixth of the way
+  towards what a rule asks: higher when inflation runs above 2%, lower when unemployment
+  runs above its natural rate, never below 0.1% or above 15%. A borrowed boom brings dearer
+  money; a tight budget brings cheaper.
+- **The gilt yield** (Economy, red) is what new government borrowing costs. It moves half
+  as much as Bank Rate, and on top of that lenders ask a premium when borrowing runs above
+  its level at the start of the game, and give a little back when it runs below. The
+  interest on the debt follows it over the years.
+- **The mortgage rate** (Housing, blue) starts at 3.8%. New mortgages follow Bank Rate and
+  the gilt yield half and half, and the rate on all mortgages follows them over about two
+  and a half years, as fixed deals end. Households pay the change on £1.65 trillion of
+  mortgages, by age and income, out of their real income, and their votes show it; firms
+  pay Bank Rate's change on their loans, and invest less when borrowing is dear.
+- **The lenders' crisis** comes by chance. Nothing at the start's borrowing; then a chance
+  each month that rises with borrowing above the start: about 2% at a point of output above
+  it, 10% at two and 22% at three, so near certain within a year at three. Then you must
+  choose between an emergency budget, paying what lenders ask, or asking the Bank of England
+  to buy the gilts with new money.
+- **Slumps last.** Firms and the state shed staff slowly when they want fewer (about 8% of
+  the gap a month) and hire faster when they want more. Long unemployment raises the
+  natural rate for a time and slows hiring, and pay falls more slowly than it rises, so a
+  deep slump of your own making can outlast the policy that caused it by years.
+- **Homelessness** (Housing, red) is the households in temporary accommodation in England,
+  126,040 in September 2024. Rent controls, more homes built and the social housing
+  programme bring it down; working-age poverty, unemployment and dearer mortgages push it
+  up, over about a year.
+- **Productivity** (Economy, green) is output per job against its trend, 2024 = 100. It
+  follows business and public investment, school results and healthy life over about five
+  years, and pay and exports follow it. It moves slowly: within a point of 100 over a term.
 
 ## Advancing time and the month's report
 
 **Next month**, **3 months** and **Year** in the top bar run the game on. A run of several
 months stops at a month in which a question is put to you.
 
-After each advance a **report** slides in at the right of the board, under the top bar: the
-bills passed, voted down or refused for want of capital, the four figures that moved most
-against their own usual movement, and any situation that began or ended. Click a line to
-open its popup. The report goes by itself after nine seconds (not while the pointer is on
-it) or on a click, and a click on the date in the top bar brings it back.
+When the months you played have something to tell (a bill passed, voted down or refused for
+want of capital, a policy come into force, a situation begun or ended, an election, a
+question answered), the **month's report** opens as a window over the board, under the
+date: those, and the four figures that moved most against their own usual movement. Several
+months played at once give one report. Click a line to open its popup. The report stays
+until you close it (Close, Esc, a line clicked, or the next month); a click on the date in
+the top bar brings it back. An ordinary month opens no report: one line under the date says
+what moved most, and goes after three seconds. Other notices (a game saved, a change
+refused) use the same line; a problem stays there, in red, until clicked.
 
 ### Questions put to you
 
 Sometimes the government must decide: a strike, a crisis. A dialog puts the question with
 two or more answers, each saying what it does. No month runs until you answer; you can
-close the dialog to look at the board first, and the flag **Decide** in the corner (or the
-month buttons) asks again. Your answer takes effect the next month, for good or for the
-months it says, and shows as a flag while it lasts. The UK has fifteen: the public sector
+close the dialog to look at the board first, and the ochre pennant **Decide** on the strip
+under the top bar (or the month buttons) asks again. Your answer takes effect the next
+month, for good or for the months it says, and shows as a pennant while it lasts. The UK has fifteen: the public sector
 pay round in July 2025, an NHS winter crisis once the waiting list breaks its record, the
 allies' defence summit, full prisons, a climate warning, and chances (a steelworks closing,
 a chip maker choosing a site, an energy price shock, floods, a failing water company or
@@ -226,15 +272,13 @@ come in the same months each time.
 |---|---|
 | Space or Enter | Next month (not while a question waits, and not in a field you are typing in) |
 | B, P | Open or close the Budget, Parliament |
-| Esc | Close the popup, then the sheet; skip the guide |
-| H or Home | Close the popup and fit the whole board |
-| Arrow keys | Move the board |
-| + and - | Zoom |
+| K | Open or close the key |
+| Esc | Close the popup, then the month's report, then the sheet; skip the guide |
 
 ## Settings
 
-**Menu** holds Save, Load, Reload model, **Amounts a year**, See the whole board,
-**Size of the screen**, **Sound**, **Volume**, Show the guide again and Help.
+**Menu** holds Save, Load, Reload model, **Amounts a year**, **Size of the screen**,
+**Sound**, **Volume**, Show the guide again, The key and Help.
 
 - **Size of the screen** is Automatic (chosen from the window's height) or 100% to 200%.
   The board is designed for windows from 1366 by 768 up.

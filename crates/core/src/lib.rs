@@ -1,8 +1,9 @@
 //! PoliSim simulation engine.
 //!
 //! Loads a model written in model-file format 0, compiles its formulas to bytecode and
-//! steps it. The behaviour is defined by docs/spec/ and by the Python oracle in
-//! `oracle/`; this crate is correct when its state hash equals the oracle's on every step.
+//! steps it. The behaviour is defined by docs/spec/; this crate is its only implementation
+//! (the Python reference it was checked against was retired in stage S14.2), and the
+//! recorded state hashes (`models/*/golden/`, `conformance/`) pin it on every step.
 //!
 //! ```no_run
 //! use std::sync::Arc;

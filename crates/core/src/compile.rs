@@ -1,7 +1,7 @@
 //! Type and unit checking, and translation of a syntax tree into bytecode.
 //!
-//! This is a port of the oracle's `_Builder` (oracle/polisim_oracle/expr.py). It must
-//! accept and reject exactly the same formulas; conformance/cases.tsv holds it to that.
+//! Ported from the retired Python reference's formula builder. docs/spec/02 defines which
+//! formulas are accepted and rejected; conformance/cases.tsv pins it to that.
 
 use std::collections::BTreeSet;
 
@@ -959,7 +959,7 @@ impl<'a> Builder<'a> {
         Ok(Built { ty: Ty::Int, unit: x.unit, reg: d })
     }
 
-    /// Stage S11.1: `curve(x, table)`; mirrors the oracle's `_fn_curve`.
+    /// Stage S11.1: `curve(x, table)`, as docs/spec/02 defines it.
     fn curve(&mut self, args: &[Node], ctx: Option<usize>) -> Check<Built> {
         arg_count("curve", args, 2)?;
         let x = self.build(&args[0], ctx)?;

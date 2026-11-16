@@ -1,7 +1,7 @@
 //! Model-file format 0: loading and structural validation.
 //!
-//! A port of oracle/polisim_oracle/model.py. Formulas are compiled later, by the
-//! simulation.
+//! Ported from the retired Python reference's loader; docs/spec/01 and 06 define it.
+//! Formulas are compiled later, by the simulation.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -250,7 +250,8 @@ impl Entity {
     }
 
     pub fn column(&self, name: &str) -> Option<&TextColumn> {
-        // The last of two columns with one name wins, as in the oracle's dictionary.
+        // The last of two columns with one name wins (as it did in the retired Python
+        // reference; the recorded hashes depend on it).
         self.header.iter().rposition(|h| h == name).map(|i| &self.raw[i])
     }
 }
@@ -797,7 +798,7 @@ fn read_entity(root: &Path, name: &str, spec: &Toml) -> Result<(Entity, Vec<u8>,
     Ok((entity, bytes, relative_name(data)))
 }
 
-/// A relative path as the oracle hashes it: forward slashes, no `.` components.
+/// A relative path as the model hash records it: forward slashes, no `.` components.
 /// Stage S7.1: whether an element's declaration reads a data file of its own.
 fn uses_data(spec: &Value) -> bool {
     let Value::Table(spec) = spec else { return false };
@@ -1799,8 +1800,7 @@ pub fn load_model_with_mods(path: &Path, mod_dirs: &[PathBuf]) -> Result<Model> 
 const LAG_KEYS: [&str; 6] = ["of", "steps", "initial", "label", "doc", "phase"];
 
 /// Stage S10.5: each lag becomes a chain of `steps` states and a var, computed in the first
-/// phase, holding the value `of` had `steps` steps before. Mirrors the oracle's
-/// `_expand_lags`.
+/// phase, holding the value `of` had `steps` steps before (docs/spec/06, lags).
 fn expand_lags(merged: &mut [Toml]) -> Result<()> {
     let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
     let (first_phase, last_phase) = match merged[0].get("phases") {
@@ -1912,7 +1912,7 @@ fn is_option_name(name: &str) -> bool {
 
 /// Stage S9.1: a var computing `formula`, an element's formula before a dilemma's effects:
 /// of the element's type, unit, dimensions, entity and phase (a national flow's: money, its
-/// instrument's unit a step). Mirrors the oracle's `_carrier`.
+/// instrument's unit a step). Ported from the retired Python reference.
 fn carrier(merged: &[Toml], kind: &str, element: &Toml, formula: &str, dilemma: &str, what: &str) -> Result<Toml> {
     let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
     let mut out = Toml::new();
@@ -1951,8 +1951,8 @@ fn carrier(merged: &[Toml], kind: &str, element: &Toml, formula: &str, dilemma: 
 
 /// Stage S9.1: each dilemma becomes a lever for the answer given this month, vars for the
 /// answer in force and its age, and states for the answer, the months since and whether the
-/// dilemma is open; each answer's effects then wrap the formulas they name. Mirrors the
-/// oracle's `_expand_dilemmas`.
+/// dilemma is open; each answer's effects then wrap the formulas they name (docs/spec/06,
+/// dilemmas).
 fn expand_dilemmas(merged: &mut [Toml]) -> Result<Vec<DilemmaInfo>> {
     let section = |name: &str| SECTIONS.iter().position(|s| *s == name).unwrap();
     let (first_phase, last_phase) = match merged[0].get("phases") {
@@ -2401,7 +2401,8 @@ fn check_weights(entities: &[Entity], sectors: &[Sector], loader: &Loader, phase
 }
 
 /// A formula written in a TOML file. Text is used as is; a bare number or true/false is
-/// turned into the text the oracle would see.
+/// turned into text (a boolean in Python's spelling, `pyfmt`), unchanged since the retired
+/// Python reference so that the recorded hashes hold.
 fn formula_text(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
@@ -2424,7 +2425,7 @@ pub struct Scenario {
     /// in one step the last entry wins.
     pub commands: Vec<(u64, String, Value)>,
     /// Columns an interactive session shows after each step (`[play] watch`). Not part
-    /// of the run: the oracle ignores it.
+    /// of the run or the model hash.
     pub watch: Vec<String>,
     /// The whole `[play]` table: presentation settings for a game client (country name,
     /// start date, which sector is the government). Not part of the run.
@@ -2466,7 +2467,7 @@ pub fn load_scenario_with_mods(path: &Path, extra_mods: &[PathBuf]) -> Result<Sc
                 return model_err("each [[command]] needs 'step' and 'set'");
             };
             if step < 0 {
-                continue; // can never be reached; the oracle keeps it and never applies it
+                continue; // can never be reached, so it is never applied
             }
             for (lever, value) in set {
                 commands.push((step as u64, lever.clone(), value.clone()));
@@ -2511,7 +2512,7 @@ mod tests {
 
     #[test]
     fn money_is_scaled_from_the_number_as_typed() {
-        // The same cases are in oracle/tests/test_language.py.
+        // Moved here from the retired Python reference's tests (tests/README.md lists it).
         let cases: [(f64, i64); 7] = [
             (2301745961.03, 230174596103),
             (0.29, 29),

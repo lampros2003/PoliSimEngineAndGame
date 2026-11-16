@@ -1,4 +1,4 @@
-# The game client (stages S2 to S13)
+# The game client (stages S2 to S14)
 
 How the Godot client, the engine and the model files fit together. The client is written
 for no particular model: everything on screen comes from the model's catalogue and the
@@ -16,13 +16,15 @@ Related: [engine contract](00-engine-contract.md), [model format](01-model-forma
 | `crates/core/src/session.rs` | Rust | A game: run, history, policy changes, pending changes, saved games, forks for looking ahead |
 | `crates/godot/` | Rust | The `PoliSim` class Godot sees; runs the session on its own thread |
 | `client/scripts/main.gd` | GDScript | The screen: the top bar, the board, popups, sheets, the month's report, keys, settings, and the methods the scripted checks call |
-| `client/scripts/web.gd` | GDScript | The board: layout, nodes, links, gauges, flags, the automatic board |
+| `client/scripts/web.gd` | GDScript | The board: layout, nodes, the group ring, links, gauges, the automatic board |
+| `client/scripts/strip.gd` | GDScript | Stage S14.1: the strip under the top bar: the notice line and the situations' pennants |
+| `client/scripts/key_page.gd` | GDScript | Stage S14.1: the key, drawn by the board's own code |
 | `client/scripts/popup.gd` | GDScript | The one popup, which grows from a node and has Back |
 | `client/scripts/lever_panel.gd` | GDScript | A policy's popup: controls, cost, vote, "In a year", history |
 | `client/scripts/introduce_list.gd` | GDScript | An area's list of policies not in force |
 | `client/scripts/indicator_card.gd` | GDScript | An indicator's popup (also a budget line's, a top-bar figure's, a situation's) |
 | `client/scripts/group_card.gd` | GDScript | A group's popup and a household's account |
-| `client/scripts/sheet.gd` | GDScript | A sheet laid over the board: the Budget, Parliament, a question, election night, help |
+| `client/scripts/sheet.gd` | GDScript | A sheet laid over the board: the Budget, Parliament, a question, election night, help, the key |
 | `client/scripts/budget_panel.gd`, `politics_panel.gd` | GDScript | The contents of the Budget and Parliament sheets |
 | `client/scripts/month_report.gd` | GDScript | The month's report |
 | `client/scripts/guide.gd` | GDScript | The first-minutes guide |
@@ -58,80 +60,131 @@ again" repeats it. It is never shown for a `--scenario` game or without a displa
 
 ## The screen
 
-The window holds the top bar and the board, and over them at most one popup and one sheet,
-the month's report and the guide. Nothing else.
+The window holds the top bar, the strip under it (34 pixels, always there) and the board
+below them, and over them at most one popup and one sheet, the month's report and the
+guide. Nothing else. Only the window's size changes the board's: the report, the notices
+and the popups float over it (stage S14.1).
 
 **The top bar.** From left to right: the country (with the mods in play) and the month; a
 button for each of the first six values of `[play] headline` (or of `watch` when there is
 no `headline`), showing the value and its change on last month, which opens that value's
-popup; the political capital, when the model has it and the bar is at least 1,560 pixels
-wide (it opens Parliament; on a narrower bar the capital shows at the centre only); a
-status line; **Next month**, **3 months** and **Year**; **Budget** and **Parliament**,
-which keep only their pictograms on a narrow bar; and **Menu**. Pressing the month shows
-the month's report again. A `headline` name with a leading `-` is shown negated. A figure's
-label is `[play] labels[key]`, else the catalogue's.
+popup; a status line; **Next month**, **3 months** and **Year** ("+3" and "+12" on a bar
+under 1,560 pixels); **Budget** and **Parliament**, which keep only their pictograms on such
+a bar; "?", which opens the key; and **Menu**. Pressing the month opens the last month's
+report again (or closes it). A `headline` name with a leading `-` is shown negated. A
+figure's label is `[play] labels[key]`, else the catalogue's. Approval and political
+capital are shown once, at the centre of the board (stage S14.1); the top bar has no
+capital figure.
+
+**The strip** (`strip.gd`). At its left, under the date, one line: a notice (6 s), an
+ordinary month's news (3 s) or a problem (in red, until clicked; a click on a notice of
+several lines opens the whole of it). At its right, the flags in force as pennants: each
+situation, a question waiting ("Decide: <label>", ochre) and each answer while it lasts
+([Situations](#situations), [Dilemmas](#dilemmas)). Pointing at a pennant says since when
+and gives its `doc`; a click opens it. The pennants are rebuilt only when they change.
 
 **The menu.** Save, Load, Reload model; "Amounts a year" (a check item: flows at an annual
-rate or per step); "See the whole board"; "Size of the screen" (Automatic, 100%, 125%, 150%,
-175%, 200%); Sound (a check item) and Volume (25%, 50%, 75%, 100%); "Show the guide again";
-Help. The screen size is `ui/scale` in `user://settings.cfg` (0 for automatic: the window's
-height over 960 pixels, rounded to a quarter and held between 1 and 2, applied as the
-window's content scale); sound and volume are kept there too. Help is a sheet with the
-essentials and the credits for icons, type and sounds.
+rate or per step); "Size of the screen" (Automatic, 100%, 125%, 150%, 175%, 200%); Sound (a
+check item) and Volume (25%, 50%, 75%, 100%); "Show the guide again"; "The key"; Help. The
+screen size is `ui/scale` in `user://settings.cfg` (0 for automatic: the window's height
+over 960 pixels, rounded to a quarter and held between 1 and 2, applied as the window's
+content scale); sound and volume are kept there too. Help is a sheet with the essentials
+and the credits for icons, type and sounds.
+
+**The key** (`key_page.gd`, stage S14.1). A sheet, opened by "?", K or the menu: one row
+each for policies, indicators, groups of voters, links and situations, each with a sample
+drawn by the board's own code (small boards in demo mode, `web.gd`, and the strip's
+pennants), so it cannot drift from the board; the groups' row states the scenario's
+`approval_good` and `approval_bad` and the gauge's full mark.
 
 **Keys.** Handled by `main.gd` unless a text field has the focus or the guide is open:
 Space, Enter or Keypad Enter, next month (not while a question waits); B and P, open or
-close the Budget and Parliament; H or Home, close the popup and fit the board; Esc, close
-the popup, else the topmost closable sheet. Handled by the board while no popup or sheet
-covers it: the arrow keys move the board, `+` and `-` zoom, Home fits it.
+close the Budget and Parliament; K, open or close the key; Esc, close the popup, else the
+month's report, else the topmost closable sheet. No key moves the board.
 
-**The month buttons** are off while the game is busy and after the player has lost; while a
-dilemma waits, pressing one asks the dilemma. Advancing closes the popup and the report,
-and records what the report will compare with.
+**The month buttons** are off while the game is busy, while a dilemma waits (their tooltip
+then says to answer it first) and after the player has lost. Advancing asks the engine at
+once, then closes the popup, the report and the notice line, and records what the report
+will compare with. A month asked for
+while the engine is finishing something else is queued and runs as soon as it is free,
+never dropped.
 
 ## The board
 
-Stage S13.2. `web.gd` is one `Control` filling the window below the top bar, drawn in
-three layers (the rings and area names; the links; the nodes and their effects) so that
-pointing redraws only what moved. The layout is authored and stable: nodes are placed by
-rule from the scenario's `[play.web]`, never by simulation, and pan and zoom move the view,
-not the layout. Zoom runs from 0.6 to 3 times; dragging pans (a press that moves under five
-pixels is a click); the wheel zooms about the pointer.
+Stage S13.2. `web.gd` is one `Control` filling the window below the top bar and the strip,
+drawn in layers (the rings, area names and families' names; the links; the nodes and their
+effects) so that pointing redraws only what moved, and a layer is redrawn only while
+something on it moves (stage S14.1): a link drawing in or fading, a node lifting, a pulse,
+the links' flow while the pointer is on a node. With a popup open and nothing happening,
+nothing is redrawn. The layout is authored and stable: nodes are placed by rule from the
+scenario's `[play.web]`, never by simulation.
 
-**Rings.** Concentric ellipses, wider than tall, fitted to the window.
+**Fixed** (stage S14.1). The board is the screen. It cannot be dragged or zoomed: a drag
+and the wheel do nothing, and no key moves it. It fills the room it is given and nothing
+docks beside it. It is laid out again only when the window's size changes, when the
+groups' shares are first known, and when a policy comes onto the board or leaves it (the
+nodes then glide to their new places over 0.3 s). Sizes scale with a unit,
+the smaller of the width over 1.55 and the height, over 800 pixels, held between 0.72 and
+2.2.
+
+**Rings.** Concentric ellipses, wider than tall, fitted to the window, and a circle for the
+groups.
 
 | Place | Nodes |
 |---|---|
-| Outer ring | Policies, in an arc for each area, in the order `[[play.web.areas]]` lists them, with the area's name set along the rim outside. An area's share of the ring is what its policies need, or what its indicators need on the middle ring over the same angle, whichever is more |
-| Middle ring | The indicators of each area, in that area's sector; a sector too narrow for them in one row puts every second one in a second row on an inner ring, between the first row's nodes |
-| Group band | Interest groups, on a ring round the centre, a small gap between families |
-| Centre | One medallion |
+| Outer ring | Policies, in an arc for each area, in the order `[[play.web.areas]]` lists them, with the area's name set along the rim outside. An area's share of the ring is what its policies need, or what its indicators need on the middle ring over the same angle, whichever is more. Where the first area begins is tried at five places round the rim (stage S14.5) and the first that labels every policy and indicator at rest is kept, else the one that labels most |
+| Middle ring | The indicators of each area, in that area's sector; down the sides, a sector too narrow for them in one row puts every second one in a second row on an inner ring, between the first row's nodes; above and below the group ring an area takes more of the rim instead |
+| Group ring | Stage S14.4: one circle round the centre, as large as the indicators allow. Each group is an arc of it ([below](#the-group-ring)) |
+| Centre | One medallion, filling what is inside the group ring (radius 58 to 120 pixels at a unit of 1) |
 
 A board with more nodes than its rings hold draws them smaller, to two thirds of their
-size at least, and never overlapping. Labels are placed at rest where they fit and clear of
-other nodes, labels and flags; the largest nodes have the larger type.
+size at least, and never overlapping.
+
+**Labels.** Every node that has room for one gets a label at rest, the largest nodes first
+(indicators before policies of the same size, the groups last). Policies label towards the
+centre, indicators outward, then below; each tries a wide label, then one on two lines,
+then the other places round the node, and takes the first that clears every node, the
+group ring, the rim's area names and the labels already placed; up to three rounds of
+repair then place a failed label first among its neighbours, kept only if all still fit.
+The largest nodes have the larger type. The groups' names, each just outside its arc, are
+shown at rest only when every one of them fits, else none (a group pointed at shows its
+own).
+
+<a id="the-group-ring"></a>**The group ring** (stages S14.1 and S14.4). Each family takes
+room for its number of groups, apart from the next by a gap of 16 pixels (3 between two
+groups of a family); the first family is centred at the top, and each family's name is set
+once along the inside of the circle. Within its family, each group's arc is as long as its
+share of the electorate (`share`, taken once, when first known, so the ring never shifts
+from month to month), and never shorter than its pictogram needs. The band is 34 pixels
+thick at a unit of 1 (about 42 at 1920x1080). Just outside each arc, 3 pixels off, runs its
+approval as a gauge 7 pixels thick (9 at 1920x1080): a pale track filled from the arc's
+start in proportion to approval, full at 60% (`APPROVAL_FULL`), green from
+`approval_good`, red under `approval_bad`, mustard between, grey with no figure. A group
+is pointed at and clicked anywhere on its band and gauge.
 
 **Node kinds.**
 
 | Kind | Shape | Size | Gauge and marks |
 |---|---|---|---|
-| `policy` | Disc with a pictogram | Three tiers, from `size`: radius 17, 22 or 29 pixels | A gauge arc over three quarters of a circle from the lower left: where the first lever's value sits between its minimum and maximum (when the maximum is more than four times the starting value, and the minimum is nought, the top is twice the starting value). A short ochre line on the gauge marks the change waiting, and an ochre dot on the node says one is waiting on any of its levers. A policy to be introduced, its bill waiting, is a ghost: dashed edge, faint pictogram, no gauge |
-| `indicator` | Ring with a pictogram | The same three tiers | A triangle for last month's rise or fall, sage or brick where `better` says which is good and ink where it does not; a pulse after a month in which it moved by at least 0.1 points (a rate) or 0.5% |
-| `group` | Shield with a pictogram | From the group's share of the electorate: radius 14 to 25 pixels, growing as the square root of the share over 0.8, in whole pixels | A gauge of its approval, and the same triangle. A group with a `note` and an approval of nought shows a dash |
+| `policy` | Disc with a pictogram | Three tiers, from `size`: radius 17, 22 or 29 pixels at a unit of 1 | A gauge arc over three quarters of a circle from the lower left: where the first lever's value sits between its minimum and maximum (when the maximum is more than four times the starting value, and the minimum is nought, the top is twice the starting value). A short ochre line on the gauge marks the change waiting, and an ochre dot on the node says one is waiting on any of its levers. A policy to be introduced, its bill waiting, is a ghost: dashed edge, faint pictogram, no gauge |
+| `indicator` | Ring with a pictogram | The same three tiers | Its colour says what kind of thing it measures and never changes in play (stage S14.1): green for a good thing (`better = "high"`), red for a bad thing (`"low"`), blue for the rest. A triangle on a small badge for last month's rise or fall, green or red where `better` says which is good and ink where it does not; a pulse after a month in which it moved by at least 0.1 points (a rate) or 0.5% |
+| `group` | An arc of the group ring with a pictogram | The arc's length, as above | The approval gauge. A group with a `note` and an approval of nought shows a dash and a grey gauge |
 | `introduce` | Dashed disc with a plus | One tier | The number of policies to choose from, on a small badge |
-| `centre` | Large medallion | | The government's approval, its change, the months to the election, and the political capital with what bills waiting would spend |
-| `flag` | A tab | | A situation in force, a question waiting ("Decide: ..."), or an answer while it lasts |
+| `centre` | Large medallion | | The government's approval, its change, the months to the election, and the political capital with what bills waiting would spend; a line too wide goes on two |
 
-The centre's approval is `[play.politics] support` (else the first headline value). Flags
-stand in the window's corners (top left, top right, bottom left, bottom right in turn) when
-the board has groups, and in columns beside the centre when it has none. A situation's flag
-says "since <month>" and is tinted by its tone; it opens the situation's popup. A question's
-flag asks it.
+The centre's approval is `[play.politics] support` (else the first headline value).
+Situations, questions and answers are not on the board: they are pennants on the strip
+([The screen](#the-screen)).
 
 **Links.** Only the node under the pointer (else the selected node) has links drawn; the
-rest of the board dims, and the links draw in over about 0.15 s. A link has a direction
-(an arrow from cause to effect), a sign (blue for a rise, brick for a fall) and a strength
-(the line's width and the flow of its dashes).
+rest of the board dims at once, in one redraw, and the links draw in over about 0.15 s.
+Leaving a node waits 0.15 s, so crossing a gap does not blink the links. A link has a
+direction (an arrow from cause to effect), a tone, a sign and a strength (the line's width
+and the flow of its dashes). Its tone says whether the effect is good for what it reaches
+(stage S14.1): green when it moves the target the way its `better` wants (for a group,
+approval up), red when the other way, blue when the target has no `better`, and grey for a
+link read from the formulas, not measured. A small square of card by the arrowhead holds +
+(the target rises) or - (it falls), so colour never carries the direction.
 
 - A policy's links go to indicators and groups. For the policy's first lever, the client
   takes each row's change from the effects table (below), divides it by that row's scale,
@@ -143,26 +196,41 @@ rest of the board dims, and the links draw in over about 0.15 s. A link has a di
   "raising this". Until the table has arrived, or for a target it does not cover, the links
   go to the nodes the policy's levers reach through the model's formulas without passing
   another node on the board (a search over each catalogue entry's `inputs` and
-  `lagged_inputs`), drawn in neutral colour at one strength. A ghost has no links.
+  `lagged_inputs`), drawn grey at one strength. A ghost has no links. This search is the
+  board's own (`reaches`), not the bridge's `reach`: it stops at the first node shown along
+  each route, which `reach` does not.
 - An indicator's or a group's links come from the policies that move it most, the same
   table read the other way, seven at most.
 - While the table arrives for a node held under the pointer, its links change at most once,
   from the formulas' to the measured; measured links already shown stay until the pointer
   moves on.
 
-**The effects table.** After a game opens and after each month, once the screen has been
-idle for 1.5 s, the client calls `request_effects(levers, 12)` for every lever of a board
-policy ([Looking ahead](#looking-ahead-stage-s131)). For each lever it keeps, for each row,
-the change as a share of the as-is value (ten times the change in the rate, for a rate),
-signed as for a rise when the table had to nudge the lever down. A month discards it.
+**The effects table.** After a game opens and 0.3 s after each month (later if the engine
+is busy), the client calls `request_effects_first(first, levers, 12)`
+([Looking ahead](#looking-ahead-stage-s131)) for every lever of a board policy not yet
+measured this month, `first` being the levers of the policy open in a popup, else of the
+policy under the pointer. A pointer resting 0.25 s on a policy not yet measured while the
+table runs asks again with that policy first. For each lever the client keeps, for each
+row, the change as a share of the as-is value (ten times the change in the rate, for a
+rate), signed as for a rise when the table had to nudge the lever down. The last table's
+values stay in use until the new month's replace them lever by lever; a table the bridge
+restarts by itself after a lever change is taken as it comes. While the table runs, a
+node pointed at whose links are not all measured says "measuring its effects…". A loaded
+game gets the table kept in its save straight after `loaded`, so nothing is asked for
+until the next month.
 
-**Pointing and selecting.** Pointing sets the hover, which the links follow; a click on a
-node opens its popup and selects the node while the popup is open. The pointer leaving the
-board, or a popup or sheet opening over it, clears the hover.
+**Pointing and selecting.** Pointing sets the hover, which the links follow, and lifts the
+node; a click on a node opens its popup and selects the node while the popup is open. The
+pointer leaving the board, or a popup or sheet opening over it, clears the hover. The
+focused node's label sits on a tag with its value and change under it.
 
 **What a node says.** After each month the client sets every node's value, change and trend
 and pulses those that moved notably. A policy's value is its lever's value as the policy's
-`levels`, `unit` and `per` read it; one whose repeal waits says so.
+`levels`, `unit` and `per` read it; one whose repeal waits says so. A group's state is its
+approval's `good`, `mixed`, `bad` or `none`. Stage S14.1: an engine event refreshes only
+what it changed: a month refreshes the screen (during a run of months only the date
+follows each month, the rest once the run ends); the effects table, a forecast, an
+explanation or households touch only their own panel.
 
 **The automatic board.** A scenario with no `[play.web]` gets a board made from the model:
 one area for each lever `group`, in the order the model names them (levers with none go to
@@ -175,15 +243,19 @@ be introduced.
 
 ## Popups
 
-`popup.gd` shows one popup at a time: a card that grows from the node, top-bar figure or
-budget line that was clicked, closes faster than it opens, and dims the board, which then
-ignores the pointer. Esc or a click outside closes it. Following something inside it (a
-cause, a policy, a group) replaces its content and offers **Back**. `main.popup_kind()`
-names the kind open: `policy`, `indicator`, `group`, `household` or `introduce`.
+`popup.gd` shows one popup at a time: a card 640 pixels wide, one column, sized to what it
+holds, that grows from the node, top-bar figure or budget line that was clicked, closes
+faster than it opens, and dims the board, which then ignores the pointer. Esc or a click
+outside closes it. Following something inside it (a cause, a policy, a group) replaces its
+content and offers **Back**; a section opened inside asks it to fit again. At 1920x1080 no
+popup needs a scroll bar. `main.popup_kind()` names the kind open: `policy`, `indicator`,
+`group`, `household` or `introduce`.
 
 **Policy** (`lever_panel.gd`). The area, the policy's name, and its lever's `doc` when it has
-one lever. One control for each lever, with its setting now and any change waiting (ochre,
-with **Undo**):
+one lever. It opens with its main controls (stage S14.1): its first lever, and any rate
+among its first three (Income tax's three rates, not its thresholds); the rest wait under
+**More** ("More: " and their names, or "More: N further settings"). One control for each
+lever, with its setting now and any change waiting (ochre, with **Undo**):
 
 - A number is a slider with an exact field. Rates are typed in percent; money in major
   units, or in millions (`m`) or billions (`bn`) when the top of the range is at least ten
@@ -201,20 +273,22 @@ would get ("The Commons would pass this ..." or "would vote this down", with the
 with a note when the capital left after the bills before it does not cover its cost.
 Without a legislature the popup says that changes take effect from next month.
 
-*In a year.* Beside the controls when the window is at least 1,360 pixels wide, else under
-them (the controls then scroll on their own when there are many). With a change waiting in
-the policy's levers, 0.3 s after the last edit the client calls `request_forecast` over 12
-months with the policy's levers at their present settings. "As is" is then the game with
-all the changes waiting, and "changed" the game with this policy's change taken out, so
-the table reads as what the change adds. While it runs the heading says so; afterwards it
-names the setting ("at £2,500 a car", "repealed"). The rows are the budget balance first;
+*In a year.* Under the controls stands the policy's history chart, with the player's changes
+marked; once a control has moved, "In a year" takes its place (stage S14.1). With a change
+waiting in the policy's levers, 0.05 s after the last edit (stage S14.4; a newer forecast
+stops an older one in the bridge) the client calls `request_forecast` over 12 months with
+the policy's levers at their present settings. "As is" is then the game with all the
+changes waiting, and "changed" the game with this policy's change taken out, so the table
+reads as what the change adds. While it runs the last figures stay, greyed, under a small
+"measuring" mark; afterwards the heading names the setting ("at £2,500 a car",
+"repealed"). The rows are the budget balance first;
 then up to three lines of the Budget and up to six indicators on the board, taken in the
 order of how far each moves for its size (a rate against at least two points, else a share
 of its value) weighted by the square of its tier; then, under "The groups it moves most",
 the five groups whose approval moves most, in points. A bar is sage where the board's
 `better` calls the change good and brick where bad, ink where it says nothing. Each name
-opens that indicator's or group's popup. The policy's history chart, with the player's
-changes marked, follows the controls; a policy not in force and one with `levels` show none.
+opens that indicator's or group's popup. A policy not in force and one with `levels` have
+no history chart.
 
 *Introducing and repealing* (stage S13.5). A policy is in force when its first lever is not
 at its `off` setting. A policy with an `off` and one lever, not in force, is available: off
@@ -273,28 +347,35 @@ click outside when `closable`. Opening one closes the popup and any other sheet.
   approval and change, a row opening the group's popup. In a month with an election a sheet
   gives the results (votes, seats, change) and the new government. When the player's bloc
   is out of government the game is over: time stops, and a saved game can still be loaded.
-- A question (a dilemma), election night and Help are sheets too.
+- A question (a dilemma), election night, Help and the key are sheets too.
 
-**The month's report** (`month_report.gd`). After the months of an advance have run, a card
-docks at the right under the top bar, and the board is fitted to the room left of it. It has
-up to three sections: *Bills*, each change put to the Commons since the advance began, in
-words such as "Fuel duty to 62.95p a litre", "Electric car grant introduced at £2,500 a car"
-or "Electric car grant repealed", marked passed, voted down (with the count) or refused
-(with the capital it needed); *Moved most*, up to four board indicators and groups, ranked
-by the change against the value's own mean monthly move over the two years before, tinted
-by `better`; and *Situations* that began or ended. A line opens its node's popup. The card
-goes after nine seconds, but not while the pointer is on it, or on a click. Nothing is
+**The month's report** (`month_report.gd`). After the months of an advance have run, the
+report is filled; several months played at once give one report, headed with the first
+and last month. It has up to five sections: *Bills*, each change put to the Commons since
+the advance began, in words such as "Fuel duty to 62.95p a litre", "Electric car grant
+introduced at £2,500 a car" or "Electric car grant repealed", marked passed, voted down
+(with the count) or refused (with the capital it needed), with a note when one was voted
+down or refused; *Situations* that began or ended; *Election*, a general election in those
+months, whose line opens Parliament; *Decisions*, the answers given; and *Moved most*, up
+to four board indicators and groups, ranked by the change against the value's own mean
+monthly move before, tinted by `better`. Stage S14.1: it is a window 460 pixels wide over
+the board, at its top left under the date, never beside it, and the board keeps its size.
+It opens by itself only when there are bills, situations, an election or decisions to tell;
+otherwise the strip's line says "<month>: " and the two largest moves (or "a quiet month")
+for 3 s. It stays until closed (Close, Esc, a line clicked, the next month asked for) and
+the date opens it again. A line opens its node's popup (a value off the board, its own
+popup). A refusal or a defeat is told once, in the report, not also in a notice. Nothing is
 shown after the base month when no bill was put.
 
 ## Situations
 
 Stage S7.3. The model's situations ([model format 1](06-model-format-1.md#situations-stage-s73))
-that are on are shown as flags on the board, each with the month it began (from the
-history) and its `doc` as a tooltip, tinted red, or green for a good one; a flag opens the
-situation's popup. After each
-step the player is told which situations began, with their `doc`, and which are over,
-added to any other message of that step. Nothing is announced for a game just opened,
-loaded or reloaded.
+that are on are shown as pennants on the strip under the top bar (stage S14.1; before, flags
+on the board), each with the month it began (from the history) and its `doc` as a tooltip:
+green for a good one, red for a bad one (a situation is one or the other; blue is for an
+answer in force, ochre for a question waiting); a pennant opens the
+situation's popup. The situations that began or ended in the months played are listed in
+the month's report. Nothing is announced for a game just opened, loaded or reloaded.
 
 ## Dilemmas
 
@@ -306,8 +387,8 @@ button for each answer. Choosing one sets the dilemma's lever to the answer's nu
 the next month. No month runs while a dilemma waits: the month buttons are off, and a run
 of several months (a quarter, a year) stops at the month the dilemma opens, which the
 bridge enforces on its own thread (`Session::unanswered_dilemmas`). The player may close
-the dialog to look around; the flag "Decide: <label>" asks again.
-Once answered, a flag shows the answer, "from next month" until it applies, then
+the dialog to look around; the ochre pennant "Decide: <label>" on the strip asks again.
+Once answered, a blue pennant shows the answer, "from next month" until it applies, then
 "until <month>" for an answer that lasts some months, or the answer alone for one that lasts
 for good. A dilemma's lever is not a policy on the board (its catalogue entry has `player`
 false and `dilemma` set). `polisim play` asks a dilemma the same way, as numbered answers
@@ -342,13 +423,14 @@ itself ([model format](01-model-format-v0.md)).
 
 ## The scenario's `[play.web]` table
 
-Stages S13.2 to S13.5. Read by the client only: the engine ignores it, so no model hash
+Stages S13.2 to S14.1. Read by the client only: the engine ignores it, so no model hash
 changes with the layout. Names are catalogue names (levers, values) or result-row names as
 noted; an item whose name the model lacks is skipped.
 
 | Key | Meaning | Default |
 |---|---|---|
 | `hide` | Levers the player does not hold on the board (the UK hides Scotland's own income tax rates) | none |
+| `approval_good`, `approval_bad` | Stage S14.1: the approval (a fraction) from which a group's gauge is green, and below which it is red; mustard between | 0.38, 0.28 |
 | `balance` | The result row a policy's links always include when it moves it | `budget_balance` |
 | `group_share` | The value over the group dimension that gives each group's share, from which a group's place in the dimension is found | `group_share` |
 | `groups` | A list of interest groups, each a table (below) | none: no groups |
@@ -358,8 +440,9 @@ noted; an item whose name the model lacks is skipped.
 | `[[play.web.areas]]` | One table for each policy area, in order round the board (below) | none |
 
 A **group** has `key`, `label`, `icon`, `row` (the national result row of its approval),
-`share` (the row of its share of the electorate, which sizes it) and `family` (groups of one
-family stand together on the board), and optionally `households` (the per-record true/false
+`share` (the row of its share of the electorate, which sets its arc's length within its
+family) and `family` (groups of one family stand together on the ring, in the order the
+list gives, a gap between families), and optionally `households` (the per-record true/false
 value that picks its households), `note` (said in place of an approval of nought) and
 `estimate` (where an estimated group's membership comes from, said in place of households).
 A group whose `row` the model lacks is dropped. An `icon`, here and everywhere, is the name
@@ -387,9 +470,12 @@ stage S13.5:
 | `per` | What an amount is for: `"a car"` reads "£2,500 a car" |
 
 An **indicator** has `row` (a national result row, a leading `-` showing it negated),
-`icon`, `size` (default 2) and `better` (`"high"` or `"low"`, which tints its rises and
-falls and the bars of "In a year"; empty where neither is clear); it may carry `unit` as a
-policy does. An indicator whose `row` the model lacks is dropped.
+`icon`, `size` (default 2) and `better` (`"high"` or `"low"`; empty where neither is
+clear). Stage S14.1: `better` decides the indicator's colour on the board, which never
+changes in play: `"high"` a good thing (green), `"low"` a bad thing (red), none neither
+(blue); it also decides the tone of the links that reach the indicator, the tint of its
+trend badge, its lines in the month's report and the bars of "In a year". It may carry
+`unit` as a policy does. An indicator whose `row` the model lacks is dropped.
 
 A lever that no policy places and that is not hidden gets a policy of its own (the middle
 tier, with the generic pictogram) in the area named by its `group`, added at the end of the
@@ -397,8 +483,9 @@ board if no area has that name ("Other" for a lever with no group), so a mod's l
 the board.
 
 The UK scenario (`models/uk/scenarios/2025.toml`) has ten areas, 43 policies (38 in force
-at the start), 33 indicators and 23 groups in six families; its comment block documents the
-table in place.
+at the start), 38 indicators (Bank Rate, the mortgage rate, homelessness and productivity
+since stage S14.5) and 23 groups in six families; its comment block documents the table in
+place.
 
 ## Explaining a change
 
@@ -439,8 +526,9 @@ A saved game is the engine save (save format 1) plus the commands still to come,
 policy changes made (with their votes, from version 2), the full history of every result and the last two steps' values,
 dimensioned values' cells included, in one file (`crates/core/src/session.rs` documents the
 layout). Version 1 added the cells; a version 0 file still loads, and its breakdowns by
-dimension fill from the next month. Loading continues exactly
-and brings the charts back.
+dimension fill from the next month. Version 5 (stage S14.3) adds the last complete effects
+table, which older saves load without. Loading continues exactly and brings the charts
+and the board's links back.
 
 Stage S7.0: a game saved with other model files (an older version of the model, or one the
 player has edited) still loads. The game carries on with the current model, carrying every
@@ -521,8 +609,8 @@ lever takes the other value. `step` is the signed move in stored units (money in
 units; 1 or -1 for true/false). Levers the player cannot set (`player = false`, dilemmas,
 what bills spent) come back with an `error` saying why.
 
-**Staleness.** The table is computed off the worker, two levers at a time, so the next
-month never waits for it. A month, a load, a reload or a new table makes it stale: the
+**Staleness.** The table is computed off the worker (stage S13.1: two levers at a time;
+since S14.3 on every core but one, below), so the next month never waits for it. A month, a load, a reload or a new table makes it stale: the
 computation stops at the next lever and nothing more of it reaches `poll()`. On the UK
 model a 12-month forecast takes about 0.3 s and a 12-month table of every lever about 8 s.
 
@@ -553,41 +641,45 @@ With **political capital** (format 1, stage S12.4) the catalogue gives `capital`
 `capital_spent` (the state and the lever, "" without capital). The bridge's
 `bill_cost(lever, value)` applies the engine's formula to the lever's current value (-1
 when the change would be no bill), and `changes()` gives each change's `cost` (-1 for none)
-and `refused`; saved games keep both (session file version 4). The client shows the capital
-at the centre of the board and, on a wide window, in the top bar; shows each waiting
-change's cost in its popup; and reports a bill refused for want of capital.
+and `refused`; saved games keep both (from session file version 4; the current version is
+5, which adds the effects table). The client shows the capital at the centre of the board
+only (stage S14.1); shows each waiting change's cost in its popup; and reports a bill
+refused for want of capital in the month's report.
 
 ## How the client is tested
 
-`tools/check_client.py` runs twenty scripted sessions in Godot without a display. The first
-two compare state hashes with the command-line runner's; the others check what the screen
-shows against the model, the runner or published figures. `board_check.gd`,
-`capital_check.gd`, `forecast_check.gd`, `people_check.gd`, `policies_check.gd`, `full_term.gd` and
-`feel_check.gd` also fail on any script error. The checks reach the screen through the
-methods of `main.gd` listed after the table, as a player would.
+`tools/check_client.py` runs twenty-two scripts in twenty-four sessions in Godot without a
+display (it needs the bridge copied into `client/bin` by `tools/build_client.py`, after
+`cargo build --release --workspace` has compiled it, and the release runner). The first two
+compare state hashes with the command-line runner's; the others check what the screen shows
+against the model, the runner or published figures. `board_check.gd`, `capital_check.gd`,
+`forecast_check.gd`, `people_check.gd`, `policies_check.gd`, `full_term.gd`,
+`feel_check.gd` and `perf_check.gd` also fail on any script error. The checks reach the
+screen through the methods of `main.gd` listed after the table, as a player would.
 
 | Script | Checks |
 |---|---|
 | `tests/scripted_run.gd` | 60 months through the bridge with lever changes: the same state hash as the runner on every step |
 | `tests/ui_run.gd` | The same through the interface's controls (typed values, button presses), with a save, an unchanged reload and a load along the way |
 | `tests/reload_run.gd` | A typo in a model file is reported and the game carries on; a real change takes effect the next month |
-| `tests/situations_check.gd` | Stage S7.3: in `2025.toml`, no situation after a quiet first month; then, with health spending cut by about a third, a recession: announced, and shown as a flag with the month it began |
-| `tests/dilemma_check.gd` | Stage S9.1: Valmora with the dock strike mod: a year's run stops at the third month and asks; no month runs until answered; the answer shows as a flag and raises the government's purchases by a fifth; then the same in French |
+| `tests/situations_check.gd` | Stage S7.3: in `2025.toml`, no situation after a quiet first month; then, with health spending cut by about a third, a recession: told once, in the month's report, which opens for it, and shown as a pennant on the strip with the month it began |
+| `tests/dilemma_check.gd` | Stage S9.1: Valmora with the dock strike mod: a year's run stops at the third month and asks; no month runs until answered; the answer shows as a pennant and raises the government's purchases by a fifth; then the same in French |
 | `tests/lag_check.gd` | Stage S10.5: Valmora with the year-on-year mod: the catalogue marks the lag and its twelve states; the board's search links the lag to output as one lagged input; after fourteen months the lag holds the second month's output; its popup's "why it moved" follows it to output's popup |
 | `tests/language_check.gd` | Stage S7.4: from the start screen, French is not offered for the UK; Valmora in French has a French Budget and policy popups, and so does a game saved and loaded |
 | `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/wealth_tax`) for the UK only; with it ticked, the game starts with the mod's lever on the board, its name in the title bar, and, once the rate is set, a wealth tax line in the Budget |
 | `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working Budget, an automatic board with two policies, two headline figures, and a lever change that reaches the Budget |
 | `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month Parliament shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
-| `tests/web_walk.gd` | Stage S6.1, through the board: the shortest chain of the model's own connections from the basic rate to the government's poll rating, walked back from the rating's popup by following each cause, each step opening that value's popup, and Back |
+| `tests/web_walk.gd` | Stage S6.1, through the board: the shortest chain of the model's own connections from the basic rate to the government's poll rating (stage S14.4: from the bridge's `path`), walked back from the rating's popup by following each cause, each step opening that value's popup, and Back |
 | `tests/bill_vote.gd` | Stage S5.4: in the UK's hung-parliament test scenario the player's coalition raises the basic rate through its popup and is voted down 324 to 326: the rate keeps its value, the change is recorded as defeated, the player is told, and the chart marks nothing |
-| `tests/capital_check.gd` | Stage S12.5: after a month the capital shows; a basic rate of 22% costs 6.2; two big bills in one month leave the second refused, and the player is told |
-| `tests/board_check.gd` | Stage S13.2: the UK board is built from `[play.web]` with exact counts (the policies in force, those not in force kept off it and counted on their areas' `introduce` nodes, the indicators, and 23 groups in six families, each family together, the estimated groups last); every lever is on the board or available to introduce; no two nodes, no label shown at rest and no four flags overlap at 1366x768, 1920x1080 and 2560x1440; every node is labelled at rest at the two larger sizes, and at least 90% at the smallest; every node kind opens the right popup (the centre opens Parliament); a basic rate typed in Income tax's popup waits with its cost; pointing at a policy shows links, none passing under the centre; the Budget's lines open popups. Then `models/mini` gets an automatic board |
-| `tests/forecast_check.gd` | Stage S13.3: after a month a basic rate of 21% shows, under "In a year", income tax up and household income down, and the Commons vote line says it would pass; once the effects table has arrived, Income tax's links are measured and point the way the table has the rate move them; a VAT rise typed after an expensive income tax bill says there is not enough capital |
-| `tests/people_check.gd` | Stage S13.4: after three months a group's popup shows the model's approval and drivers; Northern Ireland shows a dash; eight households are shown for a group, each in it, and a household's account adds up to its net income; a basic rate of 21% lowers high incomes' approval by more than low incomes' in "In a year"; pointing at Income tax links the budget balance and unemployment, both up. Valmora, which has no groups, gets a board with an empty middle |
-| `tests/policies_check.gd` | Stage S13.5: each area's list holds exactly its policies not in force; the new indicators have figures; the electric car grant introduced at £2,500 shows the electric share up and the balance down, puts a ghost on the board and spends capital, is in force after the month and in the report, and leaves the board when repealed; a level policy offers its named levels and stores the level chosen; the drinking age reads in years and raising it lowers the young's approval in a year; a higher fuel duty shows motorists against and receipts up, and pointing at it links motorists; an unaffordable introduction is refused, its ghost goes and the notice says why; an estimated group's popup says so and shows no households |
-| `tests/full_term.gd` | Stage S13.6: all sixty months of the UK's term played through `main.gd`'s methods with nineteen decisions (taxes, spending, three introductions, level policies, a repeal), every question answered, each kind of popup and both sheets opened; no month fails; each bill's fate is what the report and the notices said, a third bill in one month is refused for capital, and capital adds up and never goes below zero; the election comes in July 2029 and its result is announced; a game saved in month 24 and loaded gives the same state hashes to month 36 |
-| `tests/feel_check.gd` | Stage S13.6: at step 0 every figure shows the awaiting state, and every popup kind and both sheets open with no "nan"; no change too small to show reads as a signed nought; the guide is wanted on a first game from the start screen, never with `--scenario` or headless, and its steps point at real things; a bill refused for want of capital and one passed appear in the report with the figures that moved most, and Space ran that month; the links of a node held under the pointer while the table arrives change at most once; B, P, Esc and H do their jobs, and Space does nothing in a focused field; a game from the start screen opens with its first month played; the sound helper asks for its sounds and makes no player headless |
+| `tests/capital_check.gd` | Stage S12.5: after a month the capital shows (at the centre since S14.1); a basic rate of 22% costs 7.4; two big bills in one month leave the second refused, and the player is told |
+| `tests/board_check.gd` | Stage S13.2: the UK board is built from `[play.web]` with exact counts (the policies in force, those not in force kept off it and counted on their areas' `introduce` nodes, the indicators, and 23 groups in six families in order, the estimated groups' "Ways of life" last); every lever is on the board or available to introduce. At 1366x768, 1920x1080 and 2560x1440 (the board's size being the window less the top bar and the strip): no two nodes and no labels shown at rest overlap, no node or label is off the board, no node or label but a group's own lies in the group ring or on the rim's area names, and the ring has no faults (an arc running into the next, shorter than its pictogram needs, or out of its family's order; `ring_problems()`); the ring is a circle; every policy and indicator is labelled at rest; the groups' names are at rest all or none. A drag and the wheel move no node; every indicator's colour follows its `better`; every node kind opens the right popup (the centre opens Parliament); a basic rate typed in Income tax's popup waits with its cost; pointing at a policy shows links, none passing under the centre; the Budget's lines open popups. Then `models/mini` gets an automatic board |
+| `tests/forecast_check.gd` | Stage S13.3: after a month a basic rate of 21% shows, under "In a year", income tax and the budget balance up, and the Commons vote line says it would pass; once the effects table has arrived, Income tax's links are measured and point the way the table has the rate move them; a VAT rise typed after an expensive income tax bill says there is not enough capital |
+| `tests/people_check.gd` | Stage S13.4: after three months a group's popup shows the model's approval and drivers; Northern Ireland shows a dash; eight households are shown for a group, each in it, and a household's account adds up to its net income; a basic rate of 21% lowers high incomes' approval by more than low incomes' in "In a year"; pointing at Income tax links the budget balance and unemployment, both up (green and red by what is good for each). Valmora, which has no groups, gets a board with an empty middle |
+| `tests/policies_check.gd` | Stage S13.5: each area's list holds exactly its policies not in force; the new indicators have figures; the electric car grant introduced at £2,500 shows the electric share up and the balance down, puts a ghost on the board and spends capital, is in force after the month and in the report, and leaves the board when repealed; a level policy offers its named levels and stores the level chosen; the drinking age reads in years and raising it lowers the young's approval in a year; a higher fuel duty shows motorists against and receipts up, and pointing at it links motorists; an unaffordable introduction is refused, its ghost goes and the report says why; an estimated group's popup says so and shows no households |
+| `tests/full_term.gd` | Stage S13.6: all sixty months of the UK's term played through `main.gd`'s methods with nineteen decisions (taxes, spending, three introductions, level policies, a repeal), every question answered, each kind of popup and both sheets opened; no month fails; each bill's fate is what the report said, a third bill in one month is refused for capital, and capital adds up and never goes below zero; the report after every month (open for a month with bills, else its line under the date); the election comes in July 2029 and its result is announced; a game saved in month 24 and loaded gives the same state hashes to month 36 |
+| `tests/feel_check.gd` | Stage S13.6, at 1366x768: at step 0 every figure shows the awaiting state, and every popup kind and both sheets open with no "nan"; no change too small to show reads as a signed nought; the guide is wanted on a first game from the start screen, never with `--scenario` or headless, and its five steps point at real things; Space and Enter run months; a bill refused for want of capital and one passed appear in the report with the figures that moved most, and the refusal is not also in a notice. Stage S14.1: the report floats (the board keeps its size and the centre its place), the date opens it again, it does not cover the centre, Esc closes it, and the next month asked for closes it at once and runs; the links of a node held under the pointer while the table arrives change at most once; B, P, K (the key, with at least four of the board's own drawings) and Esc do their jobs, and Space does nothing in a focused field. Stage S14.4: a game saved and loaded has measured links on the first hover, from the table in its save, and asks for no table. A game from the start screen opens with its first month played; the sound helper asks for its sounds and makes no player headless |
+| `tests/perf_check.gd` | Stage S14.1, the speed budget, at 1920x1080 on the UK after a month; it prints every figure and fails if one is over: a click to a popup fully open 120 ms and its close 80 ms (medians of five over two policies, two indicators and a group, measured again once if over); board redraws in an idle second with a popup open 0; "Next month" to the date and board showing it 150 ms (median of three, while the last table is measured); twelve months 1 s; pointing at a policy straight after to measured links 16 ms (one frame); and (stage S14.4) a basic rate typed to "In a year" filled 600 ms (median of three) |
 | `tests/budget_dump.gd` | The UK's Budget after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%), and no input marked `player = false` among a policy's controls. Then every breakdown, as shown in the popups of the figures they break down, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 
 **What `main.gd` offers the checks.** Actions: `open_node(key)` (a board key, an
@@ -597,16 +689,23 @@ origin)`, `open_overlay("budget" | "parliament")`, `close_overlay()`, `close_pop
 `hover(key)`, `introduce_policy(key, value)` (opens the popup of a policy not in force, picks
 the setting and presses **Put to the Commons**; returns the bill's text, or "" if none was
 put), `repeal_policy(key)`, `open_introduce(area)`, `advance(months)`, `answer_dilemma(name,
-answer)`, `menu_action(action)`, `set_ui_scale(choice)`, `set_volume(volume)`,
-`show_guide(remember)` and `show_per_year(on)`. Readers: `popup_kind()`, `policy_card()`,
-`group_card()`, `indicator_card()`, `introduce_list()`, `current_trace()`, `overlay_open()`,
-`board_levers()`, `available_policies(area)`, `latest_value(row)`, `previous_value(row)`,
-`flag_text(key)`, `capital_text()`, `title_text()`, `notice_text()`, `notice_visible()`,
-`dilemma_title()`, `unanswered_dilemmas()`, `can_advance()`, `awaiting()`, `guide_steps()`,
-`guide_seen()` and `situation_onset(row)`; and the cards' own fields (for the policy card,
-`year_shown`, `year_groups` and `draft`; for the group card, `records`, `drivers_shown` and
-`approval_text`). The board's `nodes`, `available`, `effects`, `links_for(key)`,
-`linked(key)` and `overlaps()` are read directly.
+answer)`, `ask_dilemma()`, `menu_action(action)`, `set_ui_scale(choice)`,
+`set_volume(volume)`, `show_guide(remember)`, `show_key()`, `show_per_year(on)`,
+`save_game()`, `load_game()`, `start(path)` and `start_from_screen(path, mods, resume)`.
+Readers: `popup_kind()`, `policy_card()`, `group_card()`, `indicator_card()`,
+`introduce_list()`, `current_trace()`, `overlay_open()`, `board_levers()`,
+`available_policies(area)`, `latest_value(row)`, `previous_value(row)`, `flag_text(key)`,
+`capital_text()`, `title_text()`, `notice_text()`, `notice_visible()`, `dilemma_title()`,
+`unanswered_dilemmas()`, `can_advance()`, `advance_queued()`, `awaiting()`,
+`guide_steps()`, `guide_seen()`, `should_guide(from_start_screen, headless, seen)` and
+`situation_onset(row)`; the fields `effects_running` and `effects_requests` (stage S14.4:
+the table asked for, and how many times); the month's report's `lines_shown`, `visible`,
+`reopen()` and `dismiss()`; and the cards' own fields (for the policy card, `year_shown`,
+`year_groups`, `measuring` and `draft`; for the group card, `records`, `drivers_shown` and
+`approval_text`). The board's `nodes`, `order`, `available`, `effects`, `link_sets`,
+`links_for(key)`, `linked(key)`, `keys_of(kind)`, `layout()` and `overlaps()` are read
+directly, and board_check and feel_check also read a few of its private fields (the group
+ring, the links shown).
 
 `tests/screens.gd` saves screenshots of a scripted Valmora session
 (`--scenario=models/valmora/scenarios/term.toml`, `--shots=DIR`). `tests/look.gd` saves one
@@ -630,4 +729,5 @@ options, after `--`:
 | `--household=N` | With a group node, open its Nth household's account |
 | `--dilemma=1` | Leave the question on screen |
 | `--report=1` | Show the month's report |
+| `--key=1` | Show the key |
 | `--guide=N` | Show the guide's Nth step |

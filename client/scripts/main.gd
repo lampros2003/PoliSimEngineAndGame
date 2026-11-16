@@ -1493,7 +1493,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if guide != null and guide.visible:
 		return
 	# Stage S13.6: Space or Enter for next month (a focused field keeps its keys; not while
-	# a question waits); B the Budget, P Parliament, H or Home the whole board.
+	# a question waits); B the Budget, P Parliament, K the key.
 	if event is InputEventKey and event.pressed and not event.echo and started \
 			and not (event.ctrl_pressed or event.alt_pressed or event.meta_pressed) \
 			and not get_viewport().gui_get_focus_owner() is LineEdit:

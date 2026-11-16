@@ -1,8 +1,10 @@
-//! Text forms that match the oracle's output byte for byte.
+//! Python-style text forms, part of the file formats.
 //!
-//! The runner's CSV is compared with the Python oracle's as plain text, so reals are
-//! written the way Python's `repr` writes them: the shortest digits that read back to
-//! the same value, in positional notation unless the exponent is below -4 or at least 16.
+//! The runner's CSV, `polisim serve`'s JSON, the hex of hashes and parts of the model hash
+//! were first written to match the retired Python reference byte for byte, and the recorded
+//! files and the Python tools still read them so. Reals are written the way Python's `repr`
+//! writes them: the shortest digits that read back to the same value, in positional
+//! notation unless the exponent is below -4 or at least 16.
 
 /// Python's `repr(float)`.
 pub fn float_repr(x: f64) -> String {

@@ -9,10 +9,11 @@ You govern the United Kingdom from January 2025: a monthly stock-flow model of t
 economy and public finances calibrated to 2024, 20,000 synthetic households under the
 2024-25 tax and benefit rules, 600 types of voter choosing between nine blocs, 650
 constituencies, a House of Commons that votes on your policy changes, and a general
-election in July 2029. The Godot client has one screen, the board: your policies round the
-rim, the indicators they move inside them, 23 groups of voters round the centre with how
-many of each back you, and the government's approval, the election and your political
-capital at the centre. Clicking a node opens a popup: what a policy would do in a year
+election in July 2029. The Godot client has one screen, the board, fixed to the window:
+your policies round the rim, the indicators they move inside them (green a good thing, red a
+bad one, blue neither), 23 groups of voters as one ring of arcs round the centre, each with
+a gauge of how many of them back you, and the government's approval, the election and your
+political capital at the centre. Clicking a node opens a popup: what a policy would do in a year
 and how the Commons would vote on it, why an indicator moved, a group's households. The
 Budget and Parliament open as sheets. Mods add to the model; saved games survive changes
 to it. `docs/GUIDE.md` is the player's guide; `docs/MODDING.md` shows how to make
@@ -35,9 +36,9 @@ a mod.
 | `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |
 | `models/cohort/`, `models/raking/` | Test models for format 1: a population by region, sex and age; weights raked to targets |
 | `conformance/` | Frozen fixtures the engine's Rust tests read: formulas with their results, shared cases, random whole models with their hashes |
-| `tools/` | Synthetic data generators, the UK pipeline (`tools/uk/`), `engine.py` (drives `polisim serve` from Python) and `record_goldens.py` (records or checks every model's state hashes) |
+| `tools/` | Synthetic data generators, the UK pipeline (`tools/uk/`, with `hindcast.py` and `strategies.py`, which plays the balance report's strategies), `engine.py` (drives `polisim serve` from Python), `record_goldens.py` (records or checks every model's state hashes), and `build_client.py` and `check_client.py` (copy the bridge into the client; run the client's scripted checks) |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
-| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S13-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
+| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S14-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
@@ -45,15 +46,20 @@ a mod.
 
 **The game client.** On Windows, download `PoliSim-windows` from the latest CI run of the
 branch (Actions tab), unpack it and run `PoliSim.bat`. `docs/GUIDE.md` explains the board and what to try.
-To run it from the repository instead, with Godot 4.7.2 installed:
+To run it from the repository instead, with Godot 4.7.2 installed (close the game first: it
+locks the bridge's library):
 
 ```bash
-cargo build --release -p polisim-godot
+cargo build --release --workspace
 ```
 
 ```bash
 python tools/build_client.py --godot godot
 ```
+
+The first command compiles the bridge (`polisim-godot`) with the runner; `build_client.py`
+only copies the compiled library into `client/bin` and refreshes Godot's import cache, so
+after any change to the engine run both again.
 
 ```bash
 godot --path client
@@ -81,14 +87,16 @@ The engine's tests: recorded hashes, the conformance corpus, save and resume.
 cargo test --release --workspace
 ```
 
-The behaviour tests, on the engine (Python 3.11 or later and nothing else, after
-`cargo build --release`; a few minutes):
+The behaviour tests, on the engine (Python 3.11 or later and nothing else; they drive the
+release runner, `target/release/polisim`, so build it first with
+`cargo build --release --workspace`; about a minute):
 
 ```bash
 python -m unittest discover -s tests
 ```
 
-The recorded state hashes and the UK hindcast, checked against the committed files:
+The recorded state hashes and the UK hindcast, checked against the committed files (also on
+the release runner):
 
 ```bash
 python tools/record_goldens.py --check
@@ -96,6 +104,20 @@ python tools/record_goldens.py --check
 
 ```bash
 python tools/uk/hindcast.py --check
+```
+
+The client's scripted checks, headless, after `tools/build_client.py` (on Windows, use the
+console Godot executable; `docs/spec/05-game-client.md` lists what each checks, including
+the speed budget in `client/tests/perf_check.gd`):
+
+```bash
+python tools/check_client.py --godot godot
+```
+
+The UK's strategies for the balance report (`docs/S13-BALANCE.md`), played on the engine:
+
+```bash
+python tools/uk/strategies.py
 ```
 
 The engine is the only implementation and `docs/spec/` the specification. Until stage S14.2
@@ -159,6 +181,6 @@ households, 600 voter types, 650 seats) now takes 17 to 20 ms a month on four th
 | The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
 | The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
 
-Stage S12 (`docs/S12-PLAN.md`) added political capital that bills cost, an engine rule checked against the oracle. Stage S13 (`docs/S13-PLAN.md`) replaced the S12 pages with the board and added looking ahead in the engine and bridge, 23 interest groups with approvals and sample households, and 19 real-life policies with six new indicators; S13.1 to S13.5 are done and S13.6 (sound, guidance, the guide and the specification) is under way.
+Stage S12 (`docs/S12-PLAN.md`) added political capital that bills cost, an engine rule then checked against the Python reference. Stage S13 (`docs/S13-PLAN.md`) replaced the S12 pages with the board and added looking ahead in the engine and bridge, 23 interest groups with approvals and sample households, and 19 real-life policies with six new indicators. Stage S14 (`docs/S14-PLAN.md`), after the first playtest, fixed the board to the window with the groups as one ring and colours by what a thing is, retired the Python reference, made the bridge and the client responsive within a speed budget, and added interest rates, mortgages, slumps that last, the lenders' crisis by chance, homelessness and productivity to the UK.
 
 Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.6 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions, the population by region, sex and age, and 15 industries). The status is in `docs/S3-PLAN.md`.

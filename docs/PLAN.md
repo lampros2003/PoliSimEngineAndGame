@@ -44,11 +44,14 @@ Earlier decisions (the 22-question ballot) are in
 - **Every milestone ends with something the owner can run** on Windows, downloaded from
   the pull request's CI run, plus a short note saying what to try.
 - **CI is the gate.** A milestone is not done until CI is green on Windows and Linux:
-  formatting, lints, the oracle's tests, the engine's tests, random scenarios through both
-  implementations, and from S2 on a scripted test of the client.
-- **The oracle stays the definition.** Any change to simulation behaviour goes into the
-  contract and the oracle first, then the engine. Features that only observe a run (the
-  trace view, charts, history) live in the engine alone and must not change a state hash.
+  formatting, lints, the engine's tests, the behaviour tests in `tests/`, the recorded
+  hashes, the hindcast check, and from S2 on a scripted test of the client. (Until stage
+  S14.2 it also ran the Python reference's tests and random scenarios through both
+  implementations.)
+- **The specification is the definition.** Since stage S14.2 the engine is the only
+  implementation: any change to simulation behaviour goes into the contract (`docs/spec/`)
+  first, then the engine, and re-records the hashes on purpose. Features that only observe a
+  run (the trace view, charts, history) must not change a state hash.
 - **Benchmarks before optimisation.** Nothing is tuned without a measurement that says it
   matters.
 - **This file is the memory.** Cloud sessions start with nothing but the repository, so

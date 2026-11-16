@@ -788,7 +788,7 @@ pub fn marginal_amount(x: i64, lows: &[i64], rates: &[f64]) -> Check<i64> {
 }
 
 /// Stage S11.1: a curve through the points (xs[k], ys[k]), xs strictly ascending (checked by
-/// the caller), as the oracle's `curve_value`.
+/// the caller), as docs/spec/02 defines it.
 pub fn curve_value(x: f64, xs: &[f64], ys: &[f64]) -> f64 {
     let last = xs.len() - 1;
     if x.is_nan() {

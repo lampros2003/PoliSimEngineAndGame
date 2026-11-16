@@ -1,4 +1,4 @@
-//! The step loop (engine contract, section 3). A port of oracle/polisim_oracle/sim.py.
+//! The step loop (engine contract, section 3). Ported from the retired Python reference.
 //!
 //! One step:
 //!   1. apply the commands scheduled for this step (lever changes);
@@ -1532,7 +1532,8 @@ impl Simulation {
         }
 
         // Identities. They hold by construction; they are checked because this route to
-        // the totals is not the oracle's.
+        // the totals is not the contract's plain one (it was not the retired Python
+        // reference's either), and a slip in it would otherwise go unseen.
         let mut totals = Vec::with_capacity(accounts.len());
         for (k, &sym) in accounts.iter().enumerate() {
             let name = &m.symbols[sym].name;
