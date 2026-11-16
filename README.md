@@ -11,11 +11,14 @@ economy and public finances calibrated to 2024, 20,000 synthetic households unde
 constituencies, a House of Commons that votes on your policy changes, and a general
 election in July 2029. The Godot client has one screen, the board, fixed to the window:
 your policies round the rim, the indicators they move inside them (green a good thing, red a
-bad one, blue neither), 23 groups of voters as one ring of arcs round the centre, each with
-a gauge of how many of them back you, and the government's approval, the election and your
-political capital at the centre. Clicking a node opens a popup: what a policy would do in a year
-and how the Commons would vote on it, why an indicator moved, a group's households. The
-Budget and Parliament open as sheets. Mods add to the model; saved games survive changes
+bad one, blue neither), 26 groups of voters in seven families (among them six groups of
+belief that answer to where the government stands) as one ring of arcs round the centre,
+each with a gauge of how many of them back you, and the government's approval, the election
+and your political capital at the centre. Clicking a node opens a popup: what a policy would
+do in a year and how the Commons would vote on it, why an indicator moved, a group's
+households. The Budget, Parliament (with the government's four stances as scales) and Add
+policy (the policies not in force, with who would cheer and who would boo) open as sheets,
+and a search on the top bar finds any policy, statistic, group or situation. Mods add to the model; saved games survive changes
 to it. `docs/GUIDE.md` is the player's guide; `docs/MODDING.md` shows how to make
 a mod.
 
@@ -29,16 +32,16 @@ a mod.
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |
 | `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, pictograms, type and sounds, and its scripted tests |
 | `tests/` | The behaviour tests (Python, standard library only), run on the engine through `polisim serve`; `tests/README.md` says where each test of the retired Python reference implementation went |
-| `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and 19 real-life policies, 6 indicators and 23 interest groups (`models/uk/POLICIES.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
+| `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and the policies, statistics and interest groups added since (`models/uk/POLICIES.md`, `models/uk/STATISTICS.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
 | `mods/` | Mods the game ships with: `wealth_tax`, the example in `docs/MODDING.md` |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
 | `models/valmora/` | The same economy scaled to an invented country, where the client was first built |
 | `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |
 | `models/cohort/`, `models/raking/` | Test models for format 1: a population by region, sex and age; weights raked to targets |
 | `conformance/` | Frozen fixtures the engine's Rust tests read: formulas with their results, shared cases, random whole models with their hashes |
-| `tools/` | Synthetic data generators, the UK pipeline (`tools/uk/`, with `hindcast.py` and `strategies.py`, which plays the balance report's strategies), `engine.py` (drives `polisim serve` from Python), `record_goldens.py` (records or checks every model's state hashes), and `build_client.py` and `check_client.py` (copy the bridge into the client; run the client's scripted checks) |
+| `tools/` | Synthetic data generators, the UK pipeline (`tools/uk/`, with `hindcast.py`, `strategies.py`, which plays the balance report's strategies, `beliefs.py`, which writes the stances, and `audit.py`, the statistics audit), `engine.py` (drives `polisim serve` from Python), `record_goldens.py` (records or checks every model's state hashes), and `build_client.py` and `check_client.py` (copy the bridge into the client; run the client's scripted checks) |
 | `bench/s0/` | Stage S0 micro-benchmarks and their recorded results |
-| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S14-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
+| `docs/PLAN.md`, `docs/S3-PLAN.md` to `docs/S15-PLAN.md` | The working plan and each stage's plan: what is built, how it is checked, and what the owner needs to do |
 | `docs/data/` | Licence status of the data sources for the first real country |
 | `reports/`, `research_notes/` | The architecture research report and the notes it was written from |
 
@@ -181,6 +184,6 @@ households, 600 voter types, 650 seats) now takes 17 to 20 ms a month on four th
 | The owner plays a full term on Windows unaided | **Not done**: the owner cannot test at present |
 | The owner can explain one chain of cause and effect with the trace view | **Not done**: same reason |
 
-Stage S12 (`docs/S12-PLAN.md`) added political capital that bills cost, an engine rule then checked against the Python reference. Stage S13 (`docs/S13-PLAN.md`) replaced the S12 pages with the board and added looking ahead in the engine and bridge, 23 interest groups with approvals and sample households, and 19 real-life policies with six new indicators. Stage S14 (`docs/S14-PLAN.md`), after the first playtest, fixed the board to the window with the groups as one ring and colours by what a thing is, retired the Python reference, made the bridge and the client responsive within a speed budget, and added interest rates, mortgages, slumps that last, the lenders' crisis by chance, homelessness and productivity to the UK.
+Stage S12 (`docs/S12-PLAN.md`) added political capital that bills cost, an engine rule then checked against the Python reference. Stage S13 (`docs/S13-PLAN.md`) replaced the S12 pages with the board and added looking ahead in the engine and bridge, 23 interest groups with approvals and sample households, and 19 real-life policies with six new indicators. Stage S14 (`docs/S14-PLAN.md`), after the first playtest, fixed the board to the window with the groups as one ring and colours by what a thing is, retired the Python reference, made the bridge and the client responsive within a speed budget, and added interest rates, mortgages, slumps that last, the lenders' crisis by chance, homelessness and productivity to the UK. Stage S15 (`docs/S15-PLAN.md`), after the second playtest, replaced the "New policy" bubbles with an Add policy sheet, added search and tied each situation to the statistic that sets it off, rebuilt the ring as 26 groups in seven families with six groups of belief and four stances shown in Parliament (the regions moved to Parliament), and added twelve policies and twelve statistics while nine statistics left the board.
 
 Stage S3, the United Kingdom's national books, is under way: milestones S3.0 to S3.6 are done (data pipeline, UK model v0, playable UK, 2005-2024 hindcast, model format 1 with dimensions, the population by region, sex and age, and 15 industries). The status is in `docs/S3-PLAN.md`.

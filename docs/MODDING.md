@@ -33,8 +33,13 @@ starts with your mod's id, so that mods never collide.
 A **lever** the player sets, which stands on the board as a policy in an area named after
 its group (an area of that name if the scenario has one, else a new one at the end of the
 rim). A mod cannot place nodes on the board otherwise: where indicators and groups stand,
-and their colours, are the scenario's `[play.web]` table
-([`docs/spec/05-game-client.md`](spec/05-game-client.md)). `leaning = "left"`
+their colours, which statistic a situation belongs to, the search's extra words and
+Parliament's stances are the scenario's `[play.web]` table
+([`docs/spec/05-game-client.md`](spec/05-game-client.md)). A mod's lever is a policy in
+force, never one on the Add policy sheet: the sheet offers only the scenario's policies with
+an `off` setting. Since stage S15 the UK has a wealth tax of its own (`net_wealth_tax`, on
+the Add policy sheet under Tax); this mod is a separate example and does not touch it.
+`leaning = "left"`
 makes raising it a bill the House of Commons votes on, as a move to the left:
 
 ```toml
