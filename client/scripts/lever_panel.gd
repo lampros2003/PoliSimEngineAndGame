@@ -55,6 +55,8 @@ var year_shown: Array = []
 var year_groups: Array = []
 var year_all_groups: Array = []  # every group's change, shown or not
 var year_heading := ""
+## Stage S14.4: true while a forecast is being worked out (the last figures shown greyed).
+var measuring := false
 ## Stage S13.5 (set before build): true to introduce the policy, and its `off` setting as
 ## the engine stores it (null for a policy that cannot be repealed).
 var introducing := false
@@ -638,15 +640,26 @@ func show_repeal(cost: float, preview: Dictionary, left := -1.0) -> void:
 ## (kind "group") whose approval moves most.
 func show_year(rows: Dictionary, shown: Array, working := false, heading := "") -> void:
 	_show_year_part(true)
+	if working:
+		# Stage S14.4: the last figures stay, greyed, under a small "measuring" mark, until the
+		# new ones replace them; nothing jumps or goes blank while the engine works.
+		measuring = true
+		var any := _year_rows.get_child_count() > 0
+		_year_title.text = (year_heading if any and year_heading != "" else "IN A YEAR") + "  ·  MEASURING…"
+		_year_note.text = "Working out what it would do in a year…"
+		_year_note.visible = not any
+		for grid in [_year_rows, _group_rows, _group_title]:
+			grid.modulate.a = 0.4
+		return
+	measuring = false
+	for grid in [_year_rows, _group_rows, _group_title]:
+		grid.modulate.a = 1.0
 	_year_note.visible = false
 	for grid in [_year_rows, _group_rows]:
 		for child in grid.get_children():
 			grid.remove_child(child)  # at once, so the popup fits itself to what is left
 			child.queue_free()
 	_group_title.visible = false
-	if working:
-		_year_title.text = "IN A YEAR: WORKING IT OUT…"
-		return
 	# Stage S13.5: the heading says the setting in the policy's own words ("at £2,500 a car").
 	_year_title.text = ("IN A YEAR, " + heading if heading != "" else "IN A YEAR, WITH THE CHANGE").to_upper()
 	year_heading = _year_title.text

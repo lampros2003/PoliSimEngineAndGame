@@ -12,7 +12,9 @@ extends SceneTree
 ## the sound helper asks for its sounds and makes no player headless. Stage S14.1: the refusal
 ## is told once, in the report, not also in a notice; the report floats over the board, whose
 ## size it leaves alone, and the date opens it again; K opens the key, drawn by the board's own
-## code; Esc closes the report.
+## code; Esc closes the report. Stage S14.4: a loaded game has its links on the first hover,
+## from the table saved with it, and asks for no other; the report never covers the centre and
+## is gone the moment the next month is asked for.
 
 const Format := preload("res://scripts/format.gd")
 const Sound := preload("res://scripts/sound.gd")
@@ -94,7 +96,7 @@ func _initialize() -> void:
 	await _settle()
 	if main.game.steps_done() != 2:
 		return _fail("Enter did not run the month (%d steps)" % main.game.steps_done())
-	var lines: PackedStringArray = main.report.lines_shown
+	var lines: PackedStringArray = main.report.lines_shown.duplicate()
 	# The capital pays for the first bill in line, and not then for the second.
 	var refused := Array(lines).filter(func(l): return l.contains(": refused, it needed"))
 	var passed := Array(lines).filter(func(l): return l.ends_with(": passed"))
@@ -116,6 +118,9 @@ func _initialize() -> void:
 	main._date.gui_input.emit(click)
 	if not main.report.visible:
 		return _fail("the date did not open the report again")
+	var centre_rect := Rect2(board.position + board.nodes["centre"]["pos"] - Vector2.ONE * board.nodes["centre"]["r"], Vector2.ONE * 2.0 * board.nodes["centre"]["r"])
+	if main.report.get_rect().intersects(centre_rect):
+		return _fail("the report covers the centre: %s and %s" % [main.report.get_rect(), centre_rect])
 	_key(KEY_ESCAPE)
 	if main.report.visible:
 		return _fail("Esc did not close the report")
@@ -134,6 +139,24 @@ func _initialize() -> void:
 	if changes > 1 or board._links.is_empty() or not measured:
 		return _fail("pointing at Income tax while effects arrived: %d link sets, measured %s" % [changes, measured])
 	main.hover("")
+	# Stage S14.4: a game saved with its effects table, loaded: the table comes with it, so the
+	# links are there on the first hover and nothing is asked for again.
+	var saved_to: String = main.save_path
+	main.save_path = ProjectSettings.globalize_path("user://feel_check.psave")
+	main.save_game()
+	await _settle()
+	var asked: int = main.effects_requests
+	main.load_game()
+	await _settle()
+	for i in 30:
+		await process_frame
+	main.hover("policy:income_tax")
+	var loaded_links: bool = not board._links.is_empty() and board._links.all(func(l): return l["measured"])
+	main.hover("")
+	DirAccess.remove_absolute(main.save_path)
+	main.save_path = saved_to
+	if not loaded_links or main.effects_requests != asked:
+		return _fail("a loaded game: measured links on the first hover %s, the table asked for %d more times" % [loaded_links, main.effects_requests - asked])
 	# Keys.
 	_key(KEY_B)
 	if main.overlay_open() != "budget":
@@ -182,6 +205,15 @@ func _initialize() -> void:
 	_key(KEY_ESCAPE)
 	if main.guide.visible:
 		return _fail("Esc did not skip the guide")
+	# The next month closes the report at once, and is asked for at once.
+	main.report.reopen()
+	var asked_at: int = main.game.steps_done()
+	main.advance(1)
+	if main.report.visible or not (main.game.is_busy() or main.advance_queued()):
+		return _fail("Next month with the report open: report %s, month asked %s" % [main.report.visible, main.game.is_busy()])
+	await _settle()
+	if main.game.steps_done() != asked_at + 1:
+		return _fail("the month after the report did not run")
 	# A new game from the start screen: its opening month played, every figure filled.
 	main.start_from_screen(main.find_file("models/uk/scenarios/2025.toml"), PackedStringArray(), false)
 	await _settle()

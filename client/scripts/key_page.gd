@@ -21,8 +21,8 @@ func build(board: Web) -> void:
 	add_child(grid)
 	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; a plus lists those not in force.")
 	_row(grid, _indicators(), "Indicators", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
-	_row(grid, _groups(board), "Groups of voters", "One ring round the centre, in families. An arc is as long as the group's share of its family. Outside it, its approval, filled as far as it goes: green from %d%%, mustard between, red under %d%%; grey with no figure." % [
-		roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0)])
+	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in families. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure." % [
+		roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0)])
 	_row(grid, _links(), "Links", "Point at a node for what it moves, or what moves it, in a year. Green: good for what it reaches; red: bad; blue: neither can be said; grey: not yet measured. Thicker is stronger; + it rises, − it falls.")
 	_row(grid, _flags(), "Situations", "On the strip under the top bar: green good, red bad, blue neither; ochre, a question waiting for your answer. Click one to open it.")
 	var last := Label.new()
@@ -88,7 +88,7 @@ func _groups(board: Web) -> Control:
 	var web := _board([], 92.0)
 	web._unit = 1.0
 	web._group_band = Web.RING_BAND
-	web._group_ring = Web.Ring.new(Vector2(SAMPLE.x / 2.0, 250.0), 240.0, 220.0)
+	web._group_ring = Web.Ring.new(Vector2(SAMPLE.x / 2.0, 250.0), 230.0, 230.0)
 	var ring: Web.Ring = web._group_ring
 	var length := ring.length()
 	var specs := [["group-young", "good", board.approval_good + 0.08], ["group-parents", "mixed", (board.approval_good + board.approval_bad) / 2.0],

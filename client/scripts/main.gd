@@ -114,6 +114,7 @@ var _status: Label
 var strip: Strip
 var _key_sheet: Sheet
 var _forecast_timer: Timer
+var _hover_timer: Timer
 var _effects_timer: Timer
 var _scale_choice := 0.0  # 0 for automatic
 ## Stage S14.1: a month's events arrived and the screen is not yet refreshed for them (while
@@ -320,7 +321,8 @@ func _build_layout() -> void:
 		_update_input())
 	_forecast_timer = Timer.new()
 	_forecast_timer.one_shot = true
-	_forecast_timer.wait_time = 0.3
+	# Stage S14.4: a newer forecast cancels an older one in the bridge, so a short pause will do.
+	_forecast_timer.wait_time = 0.05
 	_forecast_timer.timeout.connect(_request_forecast)
 	add_child(_forecast_timer)
 	# Stage S14.1: the effects table is asked for a moment after a month is shown (was 1.5 s).
@@ -358,7 +360,14 @@ func _build_layout() -> void:
 		if guide.remember:
 			_save_setting("guide", "seen", true))
 	add_child(guide)
+	_hover_timer = Timer.new()
+	_hover_timer.one_shot = true
+	_hover_timer.wait_time = 0.25
+	_hover_timer.timeout.connect(_hover_first)
+	add_child(_hover_timer)
 	board.hover_changed.connect(func(key: String) -> void:
+		if key.begins_with("policy:"):
+			_hover_timer.start()
 		if key != "":
 			Sound.play("tick"))
 	# Every button and slider shows the pointing hand, wherever it is made.
@@ -1654,7 +1663,8 @@ func _year_rows() -> Array:
 	return out
 
 ## Stage S13.3 contract: the effects table (each lever nudged a step, a year on), asked
-## for after a game opens and after each month, once the screen is idle.
+## for after a game opens and after each month. Stage S14.4: the board keeps showing the last
+## table's links while the new one comes in, lever by lever.
 func _want_effects() -> void:
 	if not game.has_method("request_effects"):
 		return
@@ -1663,18 +1673,60 @@ func _want_effects() -> void:
 
 ## True from asking for the effects table until its last lever is in (or it went stale).
 var effects_running := false
+## Stage S14.4: the levers measured since this month began (or the game was loaded), and how
+## many times the table was asked for (for the checks: a loaded table is never asked again).
+var _measured := {}
+var effects_requests := 0
 
 
 func _request_effects() -> void:
 	if not started or game.is_busy() or failed:
 		_effects_timer.start()
 		return
-	effects_running = game.call("request_effects", board_levers(), 12)
+	_ask_effects(_focus_levers())
+
+
+## Asks for the levers not yet measured this month, those of `first` first (stage S14.3's
+## request_effects_first).
+func _ask_effects(first: PackedStringArray) -> void:
+	var levers := PackedStringArray()
+	for lever in board_levers():
+		if not _measured.has(lever):
+			levers.append(lever)
+	if levers.is_empty():
+		return  # all in (a loaded game's saved table, say): nothing to ask
+	effects_requests += 1
+	effects_running = game.request_effects_first(first, levers, 12)
+	board.measuring = effects_running
+
+
+## The levers of the policy under the pointer or open in a popup, to be measured first.
+func _focus_levers() -> PackedStringArray:
+	var key := board.focus_key()
+	var card := policy_card()
+	if card != null:
+		return card.levers
+	if key.begins_with("policy:") and board.nodes.has(key):
+		return board.nodes[key]["levers"]
+	return PackedStringArray()
+
+
+## Stage S14.4: the pointer rests on a policy not yet measured while the table runs: it is
+## measured next (the rest of the table follows).
+func _hover_first() -> void:
+	var first := _focus_levers()
+	if effects_running and not first.is_empty() and not _measured.has(first[0]):
+		_ask_effects(first)
+
 
 ## An effects event: each row's change, as a share of where it would be otherwise (for a
 ## rate, ten times the change in points), signed.
 func _take_effects(event: Dictionary) -> void:
 	var lever := str(event.get("lever", ""))
+	if lever != "":
+		_measured[lever] = true
+		effects_running = true  # stage S14.4: a table the bridge restarted itself (a lever set)
+		board.measuring = true
 	if str(event.get("error", "")) != "" or lever == "":
 		return
 	# The table nudges a lever down when up would pass its top: signs are put as for a rise.
@@ -2102,6 +2154,7 @@ func _process(_delta: float) -> void:
 		match str(event.get("kind", event.get("type", ""))):
 			"stepped":
 				_stepped_waiting = true
+				_measured.clear()  # the new month's table is to come; the last one's links stay shown
 				effects_running = false
 				_announce_election()
 				ask_dilemma.call_deferred()
@@ -2145,6 +2198,8 @@ func _process(_delta: float) -> void:
 					popup.relayout()
 			"effects_done":
 				effects_running = false
+				board.measuring = false
+				board.queue_layers()
 			"saved":
 				if event["error"] != "":
 					_show_message("[b]Could not save[/b]: " + event["error"], true)
@@ -2152,6 +2207,7 @@ func _process(_delta: float) -> void:
 					_show_message("Game saved.")
 			"loaded":
 				whole = true
+				_measured.clear()  # stage S14.4: a saved table's effects follow at once
 				if event["error"] != "":
 					_show_message("[b]Could not load[/b]: " + event["error"], true)
 				else:
@@ -2173,6 +2229,7 @@ func _process(_delta: float) -> void:
 					_stepped_waiting = true
 			"reloaded":
 				whole = true
+				_measured.clear()
 				if event["error"] != "":
 					_show_message("[b]The model files have a problem; the game carries on with the previous model.[/b]\n%s" % event["error"], true)
 				else:

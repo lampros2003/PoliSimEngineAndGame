@@ -1,7 +1,7 @@
 extends SceneTree
 ## Stage S6.1, through the board (stage S13.2). Opens the UK scenario and plays a month;
 ## finds the shortest chain of the model's own connections from the basic rate of income
-## tax to the government's poll rating (the board's reach search); then walks it back from
+## tax to the government's poll rating (stage S14.4: the bridge's `path`); then walks it back from
 ## the poll rating's popup, following each cause in turn as the "why it moved" list lets a
 ## player, and checks each step opens that value's popup and Back returns.
 
@@ -43,22 +43,12 @@ func _initialize() -> void:
 	quit(0)
 
 
-## Breadth first over "what depends on it".
-func _path(web, from: String, to: String) -> PackedStringArray:
-	var came := {from: ""}
-	var queue := [from]
-	while not queue.is_empty():
-		var at: String = queue.pop_front()
-		if at == to:
-			var out := PackedStringArray([to])
-			while came[out[0]] != "":
-				out.insert(0, came[out[0]])
-			return out
-		for next in web.consumers_of(at):
-			if not came.has(next):
-				came[next] = at
-				queue.append(next)
-	return PackedStringArray()
+## Stage S14.4: the bridge's own shortest chain (`path`, from the catalogue).
+func _path(_web, from: String, to: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for step in main.game.path(from, to):
+		out.append(str(step["name"]))
+	return out
 
 
 func _fail(message: String) -> void:

@@ -19,7 +19,8 @@ extends SceneTree
 ## groups are arcs of one ring, in family order, none running into the next or too short for
 ## its pictogram, at the three sizes; every policy and indicator labelled at rest at all three
 ## (the groups only where they fit); nothing in the ring; a drag and a wheel move no node; an
-## indicator's colour follows its `better`.
+## indicator's colour follows its `better`. Stage S14.4: the group ring a circle, its names
+## all at rest or none; no label on the rim's names.
 
 var main: Control
 
@@ -100,6 +101,11 @@ func _initialize() -> void:
 			elif kind != "centre":
 				labels += 1
 				labelled += 1 if board.nodes[key]["rest"] else 0
+		# Stage S14.4: the groups' ring is a circle; its names all at rest or none.
+		if not is_equal_approx(board._group_ring.rx, board._group_ring.ry):
+			return _fail("at %dx%d the group ring is not a circle" % [view.x, view.y])
+		if groups_labelled != 0 and groups_labelled != board.keys_of("group").size():
+			return _fail("at %dx%d %d of the groups are labelled at rest" % [view.x, view.y, groups_labelled])
 		if labelled != labels:
 			var missing := Array(board.order).filter(func(k): return not board.nodes[k]["kind"] in ["centre", "group"] and not board.nodes[k]["rest"])
 			return _fail("at %dx%d only %d of %d nodes are labelled at rest: not %s" % [view.x, view.y, labelled, labels, missing])

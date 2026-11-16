@@ -42,13 +42,13 @@ const MAX_GROUP_LINKS := 3
 ## Stage S14.1: the group ring, in pixels at a unit scale of 1: the band's thickness, the gap
 ## between two families and between two groups of a family, and the approval arc's offset
 ## from the band and thickness.
-const RING_BAND := 26.0
-const FAMILY_GAP := 18.0
+const RING_BAND := 34.0
+const FAMILY_GAP := 16.0
 const SEGMENT_GAP := 3.0
-const ARC_OFFSET := 4.0
-const ARC_WIDTH := 6.0
-## The ring's widest shape: its width over its height.
-const RING_ASPECT := 1.75
+const ARC_OFFSET := 3.0
+const ARC_WIDTH := 7.0
+## Stage S14.4: approval that fills a group's arc: the arc is a gauge from nought to this.
+const APPROVAL_FULL := 0.6
 
 var fmt: RefCounted
 ## key -> node: {key, kind ("policy", "indicator", "group", "flag", "centre"), label, icon,
@@ -81,6 +81,9 @@ var approval_good := 0.38
 var approval_bad := 0.28
 ## Stage S14.1: a board drawn for the key (main.gd): its nodes are set by hand, never laid out.
 var demo := false
+## Stage S14.4: true while the effects table comes in (main.gd sets it): a node whose links are
+## not yet measured says so when pointed at.
+var measuring := false
 
 var _entries := {}
 var _consumers := {}
@@ -574,7 +577,7 @@ func layout() -> void:
 	_c = size / 2.0 + Vector2(0, 6.0 * u)
 	var rim_room := 34.0 * u  # the area names outside the policies
 	var outer := Ring.new(_c, size.x / 2.0 - rim_room - RADIUS[3] * u - 14.0 * u, size.y / 2.0 - rim_room - RADIUS[3] * u - 6.0 * u)
-	var gap := (RADIUS[3] * 2.0 + 44.0) * u  # between the policy ring and the indicator ring
+	var gap := (RADIUS[3] * 2.0 + 44.0 + 12.0 * clampf(1.6 - _unit, 0.0, 1.0)) * u  # between the policy ring and the indicator ring (stage S14.4: a little more on a small screen, for the labels)
 	var middle := Ring.new(_c, outer.rx - gap * 1.1, outer.ry - gap)
 	# Stage S13.4: a closer back row when groups need the room inside it.
 	var stagger := (RADIUS[3] * (2.0 if keys_of_unordered("group").is_empty() else 1.5) + 10.0) * u
@@ -664,14 +667,15 @@ func layout() -> void:
 	# the medallion is smaller, so the groups have a band of their own.
 	var group_keys := keys_of_unordered("group")  # the scenario's order (dictionaries keep it)
 	var centre_r := clampf(minf(inner.ry, middle.ry) * 0.62, 70.0 * u, 128.0 * u)
-	if not group_keys.is_empty():
-		centre_r = clampf(middle.ry * 0.31, maxf(58.0 * u, 64.0), 90.0 * u)
-	nodes["centre"]["pos"] = _c
-	nodes["centre"]["r"] = centre_r
 	_group_ring = null
 	_families.clear()
 	if not group_keys.is_empty():
-		_place_groups(group_keys, centre_r, inner)
+		# Stage S14.4: the ring first, as large as the indicators allow; the medallion fills
+		# what is inside it, leaving room for the families' names.
+		_place_groups(group_keys)
+		centre_r = clampf(_group_ring.rx - _group_band / 2.0 - 30.0 * u, maxf(58.0 * u, 64.0), 120.0 * u)
+	nodes["centre"]["pos"] = _c
+	nodes["centre"]["r"] = centre_r
 	_guides = [_outline(outer), _outline(middle)]
 	_order_nodes()
 	_place_labels()
@@ -697,7 +701,10 @@ func _allocate(p_need: Array, i_need: Array, start: float, outer: Ring, middle: 
 		for i in areas.size():
 			var share: float = shares[i] / total
 			var span := _span(middle, outer.angle(f), outer.angle(f + share)) * middle.length()
-			var rows := 1 if i_need[i] <= span else 2
+			# Stage S14.4: a second row only down the sides; above and below the group ring
+			# there is height for one, so an area there takes more of the rim instead.
+			var side := absf(sin(outer.angle(f + share / 2.0))) > 0.8 or groups.is_empty()
+			var rows := 1 if i_need[i] <= span or not side else 2
 			areas[i]["rows"] = rows
 			var wanted: float = i_need[i] / rows
 			if wanted > span * 1.001:
@@ -727,28 +734,16 @@ func _place_row(keys: Array, ring: Ring, f0: float, f1: float) -> void:
 		node["r"] = RADIUS[node["tier"]] * _unit * _node_scale * clampf(0.75 + 0.2 * _unit, 0.9, 1.0)  # stage S14.1: a little smaller on a small screen
 
 
-## Stage S14.1: the groups as one ring round the centre medallion. The ring is as tall as the
-## medallion and the families' names inside it need, and as wide as the indicators allow (up
-## to RING_ASPECT times its height). Each family takes room for its number of groups, apart
-## from the next by FAMILY_GAP; inside it each group's arc is its share of the family, never
-## shorter than its pictogram needs. The first family is centred at the top.
-func _place_groups(keys: Array, centre_r: float, inner: Ring) -> void:
+## Stage S14.4: the groups as one circle round the centre medallion, as large as the
+## indicators allow (never smaller than its arcs need). Each family takes room for its
+## number of groups, apart from the next by FAMILY_GAP; inside it each group's arc is its
+## share of the family, never shorter than its pictogram needs. The first family is centred
+## at the top; the families' names are set once, inside the circle.
+func _place_groups(keys: Array) -> void:
 	var u := _unit
 	var band := RING_BAND * u
 	_group_band = band
-	var reach := band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 4.0) * u  # from the middle line to the arc's edge
-	var ry := centre_r + band / 2.0 + 24.0 * u
-	# As wide as no indicator is touched.
-	var widest := ry * RING_ASPECT
-	for key in keys_of_unordered("indicator"):
-		var q: Vector2 = nodes[key]["pos"] - _c
-		var r: float = nodes[key]["r"] + reach + 6.0 * u
-		var k := q.y / (ry + r)
-		if absf(q.y) < ry:  # beside the ring; one above or below it is the height's to clear
-			widest = minf(widest, absf(q.x) / sqrt(1.0 - k * k) - r)
-	var rx := maxf(widest, ry)
-	_group_ring = Ring.new(_c, rx, ry)
-	var length := _group_ring.length()
+	var reach := ring_reach()  # from the middle line to the approval arc's outer edge
 	var families: Array = []  # [name, [keys]]
 	for key in keys:
 		var family := str(nodes[key]["family"])
@@ -756,8 +751,16 @@ func _place_groups(keys: Array, centre_r: float, inner: Ring) -> void:
 			families.append([family, []])
 		families[-1][1].append(key)
 	var gaps := families.size() * FAMILY_GAP * u + (keys.size() - families.size()) * SEGMENT_GAP * u
+	var need := (keys.size() * band * 1.15 + gaps) / TAU
+	var radius := INF
+	for key in keys_of_unordered("indicator"):
+		radius = minf(radius, (nodes[key]["pos"] - _c).length() - nodes[key]["r"] - reach - 8.0 * u)
+	radius = maxf(minf(radius, minf(size.x, size.y) * 0.45), need)
+	_group_ring = Ring.new(_c, radius, radius)
+	var length := _group_ring.length()
 	var usable := maxf(length - gaps, 1.0)
 	var least := minf(band * 1.15, usable / keys.size())
+	var text_ring := Ring.new(_c, radius - band / 2.0 - 11.0 * u, radius - band / 2.0 - 11.0 * u)
 	var f := 0.0
 	for i in families.size():
 		var members: Array = families[i][1]
@@ -778,13 +781,15 @@ func _place_groups(keys: Array, centre_r: float, inner: Ring) -> void:
 			n["track"] = _group_ring.path(n["f0"], n["f1"], band / 2.0 + (ARC_OFFSET + ARC_WIDTH / 2.0) * u, 3.0)
 			f = n["f1"] + SEGMENT_GAP * u / length
 		f -= SEGMENT_GAP * u / length
-		# The family's name, once, inside the ring, centred on its groups.
 		var mid := (start + f) / 2.0
-		var text_ring := Ring.new(_c, rx - band / 2.0 - 10.0 * u, ry - band / 2.0 - 10.0 * u)
-		var angle := _group_ring.angle(mid)
-		_curved_text(str(families[i][0]).to_upper(), text_ring, text_ring.fraction(angle), (f - start) * length * 0.95,
+		_curved_text(str(families[i][0]).to_upper(), text_ring, text_ring.fraction(_group_ring.angle(mid)), (f - start) * text_ring.length() * 0.95,
 			int(roundf(clampf(12.0 * u, 12.0, 17.0))), _families)
 		f += FAMILY_GAP * u / length
+
+
+## How far the group ring reaches out from its middle line: the band and the approval arc.
+func ring_reach() -> float:
+	return RING_BAND * _unit / 2.0 + (ARC_OFFSET + ARC_WIDTH) * _unit
 
 
 ## Stage S14.1: lengths in proportion to `shares` that add up to `room`, none under `least`
@@ -924,15 +929,14 @@ func _order_nodes() -> void:
 ## first. Policies label towards the centre (outward is the rim); indicators outward from the
 ## centre, then below; each tries a wide label, then one on two lines, then the other places
 ## round the node, and takes the first that clears every node, the group ring, the rim and
-## the labels already placed. Stage S14.1: the groups come last, each just outside its arc,
-## and only the larger ones (the rest show theirs when pointed at). A group's label carries
-## its approval on a line of its own.
+## the labels already placed. Stage S14.4: then the groups, each just outside its arc: all
+## of them when every one fits, else none (each shows its own when pointed at).
 func _place_labels() -> void:
 	if size.x < 10.0 or size.y < 10.0:
 		return
 	var placed: Array = []
 	var font := Palette.display(500)
-	var keys: Array = Array(order).filter(func(k): return nodes[k]["kind"] != "centre")
+	var keys: Array = Array(order).filter(func(k): return not nodes[k]["kind"] in ["centre", "group"])
 	keys.sort_custom(func(a, b): return _label_rank(a) > _label_rank(b))
 	for key in nodes:
 		nodes[key]["label_rect"] = Rect2()
@@ -976,14 +980,21 @@ func _place_labels() -> void:
 	for key in by_key:
 		nodes[key]["label_rect"] = by_key[key]
 		nodes[key]["rest"] = true
+	var rects := {}
+	var all_fit := true
+	for key in keys_of("group"):
+		var found := _group_label(nodes[key], key, placed + rects.values(), font)
+		nodes[key]["label_rect"] = found[1]
+		all_fit = all_fit and found[0].size != Vector2.ZERO
+		rects[key] = found[1]
+	for key in rects:
+		nodes[key]["rest"] = all_fit
 
 
 ## A node's label at rest among those `placed`: [rect or empty, the rect to use when pointed at].
 func _try_label(key: String, placed: Array, font: Font) -> Array:
 	var node: Dictionary = nodes[key]
 	var size_px := node_label_size(node)
-	if node["kind"] == "group":
-		return _group_label(node, key, placed, font, size_px)
 	var best := Rect2()
 	var first := Rect2()
 	# Stage S13.6: a second pass tries every way round the node, and a narrower label.
@@ -999,25 +1010,20 @@ func _try_label(key: String, placed: Array, font: Font) -> Array:
 	return [best, first]
 
 
-## Stage S14.1: a group's label just outside its approval arc, along the ring's outward
-## normal at the middle of its arc: [rect at rest or empty, rect to use when pointed at].
-## Only a group whose arc is among the longer ones is labelled at rest.
-func _group_label(node: Dictionary, key: String, placed: Array, font: Font, size_px: int) -> Array:
-	var lines := wrap_label(str(node["label"]), font, size_px, 96.0 * _unit)
-	var w := 0.0
-	for line in lines:
-		w = maxf(w, _text_w(font, line, size_px))
-	w = maxf(w, _text_w(Palette.text(600), "100.0%", size_px))
-	var h := (lines.size() + 1) * (size_px + 2.0)
-	node["lines"] = lines
+## Stage S14.4: a group's short name on one line just outside its approval arc, along the
+## ring's outward normal at the middle of its arc, in the smallest labels' size: [rect if
+## clear of everything in `placed`, else empty; the rect itself, for when pointed at].
+func _group_label(node: Dictionary, key: String, placed: Array, font: Font) -> Array:
+	var size_px := maxi(12, int(roundf(label_size() * 0.86)))
+	node["lines"] = PackedStringArray([str(node["label"])])
+	var w := _text_w(font, str(node["label"]), size_px)
+	var h := size_px + 4.0
 	var mid := (float(node["f0"]) + float(node["f1"])) / 2.0
-	var p := _group_ring.offset_at(mid, _group_band / 2.0 + (ARC_OFFSET + ARC_WIDTH + 4.0) * _unit)
-	var normal := p - _c
-	normal = Vector2(normal.x / pow(_group_ring.rx, 2.0), normal.y / pow(_group_ring.ry, 2.0)).normalized()
+	var p := _group_ring.offset_at(mid, ring_reach() + 3.0 * _unit)
+	var normal := (p - _c).normalized()
 	var reach := absf(normal.x) * w / 2.0 + absf(normal.y) * h / 2.0
-	var rect := Rect2(p + normal * (reach + 2.0) - Vector2(w, h) / 2.0, Vector2(w, h))
-	var big := float(node["seg_len"]) >= _group_band * 1.9
-	return [rect if big and _clear(rect, key, placed) else Rect2(), rect]
+	var rect := Rect2(p + normal * (reach + 1.0) - Vector2(w, h) / 2.0, Vector2(w, h))
+	return [rect if _clear(rect, key, placed) else Rect2(), rect]
 
 
 ## Stage S13.6: the first clear place for a node's label at these widths: [rect, the
@@ -1107,10 +1113,15 @@ func _clear(rect: Rect2, own: String, placed: Array) -> bool:
 		if (r as Rect2).grow(3.0).intersects(rect):
 			return false
 	for g in _rim:
-		var gp: Vector2 = g[1]
-		if rect.grow(6.0).has_point(gp):
+		if _glyph_box(g).intersects(rect.grow(2.0)):
 			return false
 	return true
+
+
+## Stage S14.4: the box a letter of the rim's area names takes (upright, a little generous).
+static func _glyph_box(g: Array) -> Rect2:
+	var half := Vector2(maxf(float(g[3]), float(g[4]) * 0.6) / 2.0 + 2.0, float(g[4]) / 2.0 + 2.0)
+	return Rect2((g[1] as Vector2) - half, half * 2.0)
 
 
 ## Stage S14.1: true when a rectangle reaches into the group ring (its band, its approval
@@ -1139,6 +1150,8 @@ func label_size() -> int:
 func node_label_size(n: Dictionary) -> int:
 	# Stage S13.6: a crowded rim's smaller nodes take smaller labels too (stage S14.1: never
 	# under 12 pixels).
+	if n["kind"] == "group":
+		return maxi(12, int(roundf(label_size() * 0.86)))  # stage S14.4: as the smallest labels
 	var crowd := _node_scale if n["kind"] in ["policy", "indicator", "introduce"] else 1.0
 	var full := label_size() if n["tier"] == 3 else maxi(12, int(roundf(label_size() * 0.86)))
 	return maxi(12, int(roundf(full * lerpf(1.0, crowd, 0.6))))
@@ -1185,6 +1198,11 @@ func overlaps() -> PackedStringArray:
 				out.append("label of %s off the board" % keys[i])
 			if a["kind"] != "group" and _ring_touches(a["label_rect"]):
 				out.append("label of %s in the group ring" % keys[i])
+			# Stage S14.4: no label on the rim's area names; the rim's arcs break behind labels.
+			for g in _rim:
+				if _glyph_box(g).intersects(a["label_rect"]):
+					out.append("label of %s on the rim's name" % keys[i])
+					break
 			for j in keys.size():
 				if j == i:
 					continue
@@ -1787,8 +1805,10 @@ func _draw_base() -> void:
 		var pts: PackedVector2Array = _arcs[k]
 		if pts.size() > 1:
 			var run := PackedVector2Array()
-			for p in pts:
-				if labels.any(func(r): return (r as Rect2).has_point(p)):
+			for j in pts.size():
+				var p: Vector2 = pts[j]
+				var halfway: Vector2 = (p + pts[j - 1]) / 2.0 if j > 0 else p
+				if labels.any(func(r): return (r as Rect2).has_point(p) or (r as Rect2).has_point(halfway)):
 					if run.size() > 1:
 						_base.draw_polyline(run, Color(Palette.INK, 0.55), 1.5, true)
 					run = PackedVector2Array()
@@ -2009,8 +2029,9 @@ func _draw_group(n: Dictionary, a: float) -> void:
 	if state == "none":
 		_node_layer.draw_polyline(track, Color(Palette.NO_FIGURE, a), width, true)
 		return
-	_node_layer.draw_polyline(track, Color(Palette.INK, 0.14 * a), width, true)
-	var f := clampf(float(n["fraction"]), 0.0, 1.0)
+	_node_layer.draw_polyline(track, Color(Palette.INK, 0.15 * a), width, true)
+	# Stage S14.4: a gauge from nought to APPROVAL_FULL, so 20% and 45% read apart at a glance.
+	var f := clampf(float(n["fraction"]) / APPROVAL_FULL, 0.0, 1.0)
 	if f > 0.0:
 		var upto := maxi(2, int(roundf((track.size() - 1) * f)) + 1)
 		_node_layer.draw_polyline(track.slice(0, upto), Color(state_colour(state), a), width, true)
@@ -2108,8 +2129,10 @@ func _draw_label(n: Dictionary) -> void:
 	var detail := ""
 	if key == focus and str(n.get("value", "")) != "":
 		detail = str(n["value"]) + (("  " + str(n["change"])) if str(n.get("change", "")) != "" else "")
-	# Stage S13.4: a group's approval on a line under its name.
-	var figure := str(n.get("value", "")) if n["kind"] == "group" and detail == "" else ""
+	if key == focus and measuring and n["kind"] in ["policy", "indicator", "group"] and (_links.is_empty() or _links.any(func(l): return not l["measured"])):
+		detail += ("  ·  " if detail != "" else "") + "measuring its effects…"
+	# Stage S14.4: a group's name alone at rest; its approval and change when pointed at.
+	var figure := ""
 	var h := lines.size() * (size_px + 2.0) + (size_px + 2.0 if figure != "" else 0.0)
 	var y := centre_at.y - h / 2.0
 	if key == focus:
