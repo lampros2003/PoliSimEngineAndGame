@@ -82,6 +82,6 @@ it by a noticeable amount in a year, and what it feeds).
 
 | # | Status |
 |---|---|
-| S15.1 | Under way |
+| S15.1 | Done. **Add policy** on the top bar (key A) opens one sheet (`client/scripts/add_policy.gd`): the areas down the side with how many each has to add, and for the chosen area each policy not in force with what it does, the smallest step's cost in capital, the vote the Commons would give, and the three groups it would raise and lower most (the effects table now also measures policies not in force). Choosing one opens its popup set to its first step. The "New policy" bubbles and `introduce_list.gd` are gone. **Search** (`search.gd`; "/" or Ctrl+F) finds policies, statistics, groups, situations and policies not in force by label, the scenario's optional `also` words, the model's name and its doc, from an index built once (2.4 ms a key); the chosen match's node wears an ochre ring and the rest dims. **Situations** belong to a statistic (`[play.web]` `situations = { name = "row" }`): its node wears a small pennant while the situation lasts, and the strip's pennant, the report's line and a search all light the node and open the situation's own popup with "Set off by". The checks read the scenario's groups, families and areas, and the ring holds thirty groups at 1366x768 by thinning its band (`tests/add_search_check.gd`) |
 | S15.2 | Under way |
 | S15.3 | Planned |

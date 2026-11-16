@@ -8,7 +8,9 @@ extends SceneTree
 ## popup first (and --then=N plays N more months), --dilemma=1 leaves the question on screen, --effects=1 waits for the measured
 ## effects table first (for hover links). Stage S13.4: --node=group:KEY opens a group's
 ## popup, and --household=N then opens its Nth household's account. Stage S13.6: --report=1
-## shows the month's report, --guide=N the guide's Nth step. Stage S14.1: --key=1 the key. Stage S13.5: --introduce and
+## shows the month's report, --guide=N the guide's Nth step. Stage S14.1: --key=1 the key.
+## Stage S15.1: --add=1|KEY the Add policy sheet, --search=WORDS (+ for a space) the search,
+## --situation=NAME a situation lit on its node. Stage S13.5: --introduce and
 ## --draft (below). For a person to look at; needs a
 ## display. Godot's --resolution WxH before --path sets the window size.
 
@@ -92,6 +94,14 @@ func _initialize() -> void:
 	# Stage S13.6: --report=1 shows the last month's report, --guide=N the guide's Nth step.
 	if args.has("report"):
 		main.report.reopen()
+	# Stage S15.1: --add=1 (or --add=KEY) the Add policy sheet; --search=WORDS the search
+	# with its results; --situation=NAME a situation's popup on its lit node.
+	if args.has("add"):
+		main.open_add_policy("" if str(args["add"]) == "1" else str(args["add"]))
+	if args.has("search"):
+		main.search_for(str(args["search"]).replace("+", " "))
+	if args.has("situation"):
+		main.open_situation(str(args["situation"]))
 	# Stage S14.1: --key=1 shows the key.
 	if args.has("key"):
 		main.show_key()

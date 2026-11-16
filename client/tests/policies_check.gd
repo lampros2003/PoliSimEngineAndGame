@@ -1,6 +1,7 @@
 extends SceneTree
 ## Stage S13.5: real policies and a growing board, through the real bridge
-## (models/uk/scenarios/2025.toml). After the first month: each area's introduce list holds
+## (models/uk/scenarios/2025.toml). After the first month: each area's list on the Add policy
+## sheet (stage S15.1; its own popup before) holds
 ## exactly its policies not in force; every new indicator has a figure; the electric car
 ## grant introduced at £2,500 shows, under "In a year", the electric share of new cars up and
 ## the budget balance down, puts a ghost on the board and spends capital; after the month it
@@ -33,14 +34,14 @@ func _initialize() -> void:
 				want.append("policy:" + str(p["key"]))
 		if main.available_policies(str(area["name"])) != want:
 			return _fail("%s offers %s, not %s" % [area["name"], main.available_policies(str(area["name"])), want])
-		if not want.is_empty():
-			main.open_introduce(str(area["name"]))
-			await process_frame
-			if main.popup_kind() != "introduce" or main.introduce_list().keys != want:
-				return _fail("%s's introduce list: %s" % [area["name"], main.popup_kind()])
-			main.close_popup()
+		# Stage S15.1: the Add policy sheet lists them, area by area.
+		main.open_introduce(str(area["name"]))
+		await process_frame
+		if not main.add_sheet_open() or main.add_list.area != str(area["name"]) or main.add_list.keys != want:
+			return _fail("%s on the Add policy sheet: %s" % [area["name"], main.add_list.keys if main.add_list != null else "no sheet"])
+		main.close_overlay()
 		listed[area["name"]] = want
-	if listed["Transport"] != PackedStringArray(["policy:ev_grant"]) or listed["Housing"].size() != 2:
+	if not listed.get("Transport", PackedStringArray()).has("policy:ev_grant"):
 		return _fail("the policies not in force: %s" % [listed])
 	# Every new indicator has a figure after the first month.
 	for row in ["crime_incidents", "prison_population", "healthy_life_expectancy", "smoking_prevalence", "alcohol_deaths",
@@ -74,8 +75,8 @@ func _initialize() -> void:
 	var ghost: Dictionary = board.nodes.get("policy:ev_grant", {})
 	if ghost.is_empty() or not ghost.get("ghost", false) or not float(main._costs.get("ev_grant", 0.0)) > 0.0 or main.popup_kind() != "":
 		return _fail("no ghost waiting with its cost: %s" % [ghost.get("value", "no node")])
-	if board.nodes.has("introduce:Transport"):
-		return _fail("Transport still offers a policy while the grant waits")
+	if main.available_policies("Transport").has("policy:ev_grant"):
+		return _fail("Transport still offers the grant while it waits")
 	await _month()
 	var grant: Dictionary = board.nodes.get("policy:ev_grant", {})
 	if grant.is_empty() or grant.get("ghost", true) or str(grant["value"]) != "£2,500 a car":

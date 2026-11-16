@@ -155,6 +155,11 @@ group_driver_labels = { income = "Their incomes", jobs = "Jobs where they live",
 # mustard between (the share of its likely voters who back the government).
 approval_good = 0.38
 approval_bad = 0.28
+# Stage S15.1: the statistic on the board that sets each situation off (the row its condition
+# reads, or the nearest on the board): its node wears the situation's flag, and the pennant,
+# the report's line and a search light it. The model may name these itself later; this is
+# read when it does not.
+situations = { recession = "output_growth", strong_growth = "output_growth", high_unemployment = "unemployment_rate", high_inflation = "consumer_inflation_annual", debt_above_output = "debt_to_gdp", budget_surplus = "budget_balance", health_strain = "waiting_list", schools_strain = "school_attainment", policing_strain = "crime_incidents", services_improving = "service_level_overall", emissions_above_path = "emissions", emissions_on_track = "emissions", waiting_list_record = "waiting_list", waiting_list_falling = "waiting_list", crime_wave = "crime_incidents", healthy_life_falling = "healthy_life_expectancy", housing_shortage = "homes_built", building_boom = "homes_built", migration_high = "net_migration_annual", migration_falling = "net_migration_annual", lenders_confidence = "gilt_yield_now", homelessness_rising = "homelessness" }
 
 [[play.web.areas]]
 name = "Economy"

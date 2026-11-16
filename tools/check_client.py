@@ -169,7 +169,8 @@ def main() -> int:
         # Stage S13.5: real policies, introduced and repealed. A full term played as a player would,
         # with a save and a load on the way; with no script error on the way.
         for script in ("res://tests/board_check.gd", "res://tests/capital_check.gd", "res://tests/forecast_check.gd",
-                       "res://tests/people_check.gd", "res://tests/policies_check.gd", "res://tests/full_term.gd"):
+                       "res://tests/people_check.gd", "res://tests/policies_check.gd", "res://tests/add_search_check.gd",
+                       "res://tests/full_term.gd"):
             run = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
                  "--", "--scenario=models/uk/scenarios/2025.toml"],

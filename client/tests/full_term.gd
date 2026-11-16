@@ -230,8 +230,9 @@ func _look_around(months: int) -> bool:
 		6:
 			main.open_introduce("Housing")
 			await _settle()
-			if not _expect("introduce", "Housing's list"):
-				return false
+			if not main.add_sheet_open():
+				return _bad("the Add policy sheet did not open at Housing")
+			main.close_overlay()
 		8:
 			main.open_node("policy:nhs")
 			await _settle()

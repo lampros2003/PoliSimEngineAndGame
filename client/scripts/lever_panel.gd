@@ -526,6 +526,17 @@ func _typed(name: String, value: float) -> void:
 	lever_changed.emit(name, raw)
 
 
+## Stage S15.1: a policy being introduced, set to `raw` (as a bill takes it) as if picked.
+func preset(name: String, raw: String) -> void:
+	if not introducing or not _rows.has(name):
+		return
+	var entry: Dictionary = _rows[name]["entry"]
+	draft[name] = [raw, float(raw) * (fmt.minor if entry.get("money", false) else 1)]
+	if put_button != null:
+		put_button.disabled = false
+	draft_changed.emit(name, raw)
+
+
 ## Shows current settings and changes waiting for next month.
 ## `costs`: each waiting change's cost in political capital (stage S12.5); `capital`: what
 ## there is to spend, or -1 for a model without it.

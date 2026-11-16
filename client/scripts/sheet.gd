@@ -134,7 +134,7 @@ func open() -> void:
 	visible = true
 	_place.call_deferred()
 	# Wrapped text settles its height a frame later: place the card again then.
-	get_tree().process_frame.connect(func() -> void: get_tree().process_frame.connect(_place, CONNECT_ONE_SHOT), CONNECT_ONE_SHOT)
+	_place_next_frame()
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	modulate.a = 0.0
@@ -158,9 +158,16 @@ func _place() -> void:
 	card.position = Vector2(roundf((view.x - box.x) / 2.0), roundf(top_margin + maxf(18.0, (view.y - top_margin - box.y) / 2.0)))
 
 
+## Places the card again a frame from now, once (stage S15.1: never twice for one frame).
+func _place_next_frame() -> void:
+	get_tree().process_frame.connect(func() -> void:
+		if not get_tree().process_frame.is_connected(_place):
+			get_tree().process_frame.connect(_place, CONNECT_ONE_SHOT), CONNECT_ONE_SHOT)
+
+
 func relayout() -> void:
 	_place.call_deferred()
-	get_tree().process_frame.connect(func() -> void: get_tree().process_frame.connect(_place, CONNECT_ONE_SHOT), CONNECT_ONE_SHOT)
+	_place_next_frame()
 
 
 func close() -> void:

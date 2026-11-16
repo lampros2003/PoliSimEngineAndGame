@@ -10,8 +10,10 @@ extends SceneTree
 ## 600 ms: the engine's own ~300 ms for a 12-month look ahead, up to ~450 ms here when the
 ## effects table (restarted by the lever change, on every core but one) runs beside it, the
 ## 50 ms pause before it is asked, and a few frames. The plan's 250 ms is below the engine's own.
+## Stage S15.1: a key typed into search (its matches, the list, the board dimmed) within 4 ms,
+## with no engine call.
 
-const BUDGET := {"open": 120.0, "close": 80.0, "month": 150.0, "year": 1000.0, "hover": 16.0, "idle_redraws": 0.0, "forecast": 600.0}
+const BUDGET := {"open": 120.0, "close": 80.0, "month": 150.0, "year": 1000.0, "hover": 16.0, "idle_redraws": 0.0, "forecast": 600.0, "keystroke": 4.0}
 
 var main: Control
 var _draws := {}
@@ -59,6 +61,18 @@ func _initialize() -> void:
 	var idle_detail := str(_draws)
 	main.close_popup()
 	await _settle()
+	# Stage S15.1: a key typed into search: its matches, the list and the board's dimming, in
+	# the same call (no engine call), averaged over a typed word and back.
+	var typed := "unemployment"
+	var keyed := Time.get_ticks_usec()
+	for n in range(1, typed.length() + 1):
+		main.search_for(typed.left(n))
+	for n in range(typed.length() - 1, -1, -1):
+		main.search_for(typed.left(n))
+	got["keystroke"] = (Time.get_ticks_usec() - keyed) / 1000.0 / (2.0 * typed.length())
+	main.search.clear_search()
+	main.search.release_focus()
+	await _frames(5)
 	# A month, three times: from "Next month" to the date and board showing it, while the
 	# table of the month before is still being measured.
 	var months := []

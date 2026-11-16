@@ -41,6 +41,8 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	row = row_key
 	_entries = entries
 	entry = the_entry
+	# Stage S15.1: a situation is in force or not: no chart of noughts and ones, no trace.
+	situation = str(entry.get("situation", "")) != ""
 	add_theme_constant_override("separation", 12)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 16)
@@ -75,6 +77,8 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	figures.add_child(_change)
 	if str(entry.get("doc", "")) != "":
 		add_child(_muted(LeverPanel._sentence(str(entry["doc"]))))
+	if situation:
+		return
 	if row != "":
 		var chart_head := HBoxContainer.new()
 		chart_head.add_child(Palette.caps("History"))
@@ -142,6 +146,8 @@ static func _entry_of_row(entries: Dictionary, r: String) -> String:
 
 
 func _kind_word() -> String:
+	if situation:
+		return "Situation"
 	match str(entry.get("kind", "")):
 		"flow":
 			return "Payment"
@@ -161,6 +167,33 @@ func _muted(words: String) -> Label:
 	return label
 
 
+## Stage S15.1: a situation's explanation: the statistic that sets it off, as it stands, a
+## link to its node's popup.
+func set_off_by(words: String, key: String) -> void:
+	var line := HBoxContainer.new()
+	line.name = "set_off_by"
+	line.add_theme_constant_override("separation", 8)
+	var caps := Palette.caps("Set off by")
+	caps.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(caps)
+	var link := Button.new()
+	link.text = words
+	link.theme_type_variation = "Link"
+	link.add_theme_font_size_override("font_size", Palette.FONT_SIZE)
+	link.pressed.connect(func() -> void: follow.emit(key))
+	line.add_child(link)
+	add_child(line)
+	move_child(line, 2)
+	set_off_text = words
+
+
+## For the checks: the "Set off by" line's words, or "".
+var set_off_text := ""
+## Stage S15.1: true for a situation's popup; `since` says from when (set by the screen).
+var situation := false
+var since := ""
+
+
 ## Last month's value and change; `value_of` and `before_of` read result rows.
 func refresh(value_of: Callable, before_of: Callable, better: String) -> void:
 	if row == "":
@@ -168,6 +201,12 @@ func refresh(value_of: Callable, before_of: Callable, better: String) -> void:
 		return
 	var now: Variant = value_of.call(row)
 	var was: Variant = before_of.call(row)
+	if situation:
+		_figure.text = "In force" if now == true else "Not in force"
+		_figure.add_theme_font_size_override("font_size", 34)
+		_change.text = since
+		_change.add_theme_color_override("font_color", Palette.MUTED)
+		return
 	_figure.text = fmt.value(entry, now, true, false)
 	# Stage S13.6: before the first month has run there is no figure yet, and it says so.
 	_change.text = AWAITING if now == null else "no change yet"

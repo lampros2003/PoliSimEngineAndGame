@@ -61,8 +61,8 @@ var areas: Array = []  # {name, icon, policies: [key], indicators: [key], from, 
 var hidden_levers: PackedStringArray = []  # levers the board leaves out
 var groups: Array = []  # [play.web] groups
 ## Stage S13.5: policies not in force (their lever at its `off` setting, no bill waiting to
-## bring them in): key -> node, kept off the board and offered by their area's "introduce"
-## node. A policy whose bill to introduce waits is on the board as a ghost.
+## bring them in): key -> node, kept off the board and offered by the Add policy sheet
+## (stage S15.1). A policy whose bill to introduce waits is on the board as a ghost.
 var available := {}
 var _appear := {}  # key -> 0..1, a policy just come into force growing onto the board
 ## Measured effects a year on, from the bridge: lever -> {row: signed strength}.
@@ -86,6 +86,13 @@ var demo := false
 ## Stage S14.4: true while the effects table comes in (main.gd sets it): a node whose links are
 ## not yet measured says so when pointed at.
 var measuring := false
+## Stage S15.1: search: while `searching`, nodes not in `matches` (key -> true) are dimmed.
+var searching := false
+var matches := {}
+## Stage S15.1: a node lit by search or a situation: a ring round it, easy to find anywhere.
+var lit := ""
+## Stage S15.1: situations on nodes: key -> [tone ("good", "bad", "plain")], a small flag each.
+var node_flags := {}
 
 var _entries := {}
 var _consumers := {}
@@ -320,8 +327,8 @@ func available_in(area: String) -> PackedStringArray:
 
 
 ## Stage S13.5: puts each policy on the board or off it: in force (its lever off its `off`
-## setting), a ghost (a bill to introduce it waiting) or available to introduce; each area
-## with policies to introduce gets its "introduce" node at the end of its arc. A ghost that
+## setting), a ghost (a bill to introduce it waiting) or available to introduce (stage S15.1:
+## offered by the Add policy sheet, not on the board). A ghost that
 ## comes into force grows onto the board. True when the board changed.
 func _sync(lever_of: Callable, pending: Dictionary) -> bool:
 	var changed := false
@@ -350,17 +357,6 @@ func _sync(lever_of: Callable, pending: Dictionary) -> bool:
 					available[key] = nodes[key]
 					nodes.erase(key)
 					changed = true
-		var intro := "introduce:" + str(a["name"])
-		if spare.is_empty():
-			if nodes.has(intro):
-				nodes.erase(intro)
-				changed = true
-		else:
-			if not nodes.has(intro):
-				_add(intro, "introduce", "New policy", "", 1, a["name"], PackedStringArray(), "", "")
-				changed = true
-			nodes[intro]["count"] = spare.size()
-			present.append(intro)
 		a["policies"] = present
 	if changed:
 		for key in [hover, selected, _link_key]:
@@ -771,11 +767,21 @@ func _place_groups(keys: Array) -> void:
 			families.append([family, []])
 		families[-1][1].append(key)
 	var gaps := families.size() * FAMILY_GAP * u + (keys.size() - families.size()) * SEGMENT_GAP * u
-	var need := (keys.size() * band * 1.15 + gaps) / TAU
-	var radius := INF
+	var free := INF  # the radius the indicators leave, to the ring's outer edge
 	for key in keys_of_unordered("indicator"):
-		radius = minf(radius, (nodes[key]["pos"] - _c).length() - nodes[key]["r"] - reach - 8.0 * u)
-	radius = maxf(minf(radius, minf(size.x, size.y) * 0.45), need)
+		free = minf(free, (nodes[key]["pos"] - _c).length() - nodes[key]["r"] - 8.0 * u)
+	free = minf(free, minf(size.x, size.y) * 0.45 + reach)
+	# Stage S15.1: more groups than the ring's free holds at full thickness (thirty on a small
+	# screen): the band thins until every arc still takes its pictogram, never under two thirds.
+	for attempt in 3:
+		var fits := (TAU * (free - ring_reach_for(band)) - gaps) / (keys.size() * 1.15)
+		if fits >= band or band <= RING_BAND * u * 0.67:
+			break
+		band = maxf(fits, RING_BAND * u * 0.67)
+	_group_band = band
+	reach = ring_reach_for(band)
+	var need := (keys.size() * band * 1.15 + gaps) / TAU
+	var radius := maxf(free - reach, need)
 	_group_ring = Ring.new(_c, radius, radius)
 	var length := _group_ring.length()
 	var usable := maxf(length - gaps, 1.0)
@@ -809,7 +815,11 @@ func _place_groups(keys: Array) -> void:
 
 ## How far the group ring reaches out from its middle line: the band and the approval arc.
 func ring_reach() -> float:
-	return RING_BAND * _unit / 2.0 + (ARC_OFFSET + ARC_WIDTH) * _unit
+	return ring_reach_for(_group_band if _group_band > 0.0 else RING_BAND * _unit)
+
+
+func ring_reach_for(band: float) -> float:
+	return band / 2.0 + (ARC_OFFSET + ARC_WIDTH) * _unit
 
 
 ## Stage S14.1: lengths in proportion to `shares` that add up to `room`, none under `least`
@@ -939,7 +949,7 @@ func _curved_text(text: String, ring: Ring, f_mid: float, room: float, size_px: 
 
 func _order_nodes() -> void:
 	order = PackedStringArray()
-	for kind in ["centre", "group", "indicator", "policy", "introduce"]:
+	for kind in ["centre", "group", "indicator", "policy"]:
 		for key in nodes:
 			if nodes[key]["kind"] == kind:
 				order.append(key)
@@ -1084,11 +1094,11 @@ func _find_label(node: Dictionary, key: String, placed: Array, widths: Array, ro
 		var lean := Vector2(w / 2.0 * signf(out.x), 0)
 		var outward: Vector2 = side if absf(out.x) > 0.8 else (below if out.y > 0.0 else above)
 		var candidates := [outward, below, above, side, -side, below + lean, above + lean, below - lean, above - lean]
-		if node["kind"] in ["policy", "introduce"]:
+		if node["kind"] in ["policy"]:
 			candidates = [-outward, below, above, -side, side, below - lean, above - lean]
 		if round_about:
 			# Every way round the node, a label touching it, nearest the preferred way first.
-			var prefer := (-out if node["kind"] in ["policy", "introduce"] else out).angle()
+			var prefer := (-out if node["kind"] in ["policy"] else out).angle()
 			var turns := []
 			for k in 16:
 				turns.append(k * TAU / 16.0)
@@ -1189,7 +1199,7 @@ func node_label_size(n: Dictionary) -> int:
 	# under 12 pixels).
 	if n["kind"] == "group":
 		return maxi(12, int(roundf(label_size() * 0.86)))  # stage S14.4: as the smallest labels
-	var crowd := _node_scale if n["kind"] in ["policy", "indicator", "introduce"] else 1.0
+	var crowd := _node_scale if n["kind"] in ["policy", "indicator"] else 1.0
 	var full := label_size() if n["tier"] == 3 else maxi(12, int(roundf(label_size() * 0.86)))
 	return maxi(12, int(roundf(full * lerpf(1.0, crowd, 0.6))))
 
@@ -1703,8 +1713,6 @@ func refresh(value_of: Callable, before_of: Callable, lever_of: Callable, start_
 	var regroup := false
 	for key in nodes:
 		var n: Dictionary = nodes[key]
-		if n["kind"] == "introduce":
-			n["value"] = "%d to choose from" % int(n.get("count", 0))
 		if n["kind"] == "policy":
 			var lever: String = n["levers"][0]
 			var entry: Dictionary = _entries.get(lever, {})
@@ -1818,6 +1826,8 @@ func _gauge(entry: Dictionary, v: Variant, start_value: Variant) -> float:
 # ---------------------------------------------------------------------------- drawing
 
 func _alpha(key: String) -> float:
+	if searching and not matches.has(key) and key != "centre":
+		return 0.22
 	var focus := focus_key()
 	if focus == "" or focus == "centre" or _dim <= 0.0:
 		return 1.0
@@ -1954,17 +1964,65 @@ func _draw_nodes() -> void:
 		match n["kind"]:
 			"policy":
 				_draw_policy(n, a)
-			"introduce":
-				_draw_introduce(n, a)
 			"indicator":
 				_draw_indicator(n, a)
 			"group":
 				_draw_group(n, a)
 			"centre":
 				_draw_centre(n)
+	# Stage S15.1: the lit node: a broad ochre ring and an ink hairline outside it, under the
+	# labels, so its own name still reads.
+	if lit != "" and nodes.has(lit):
+		var ln: Dictionary = nodes[lit]
+		var lr: float = (ln["r"] if ln["kind"] != "group" else _group_band * 0.75) + 7.0 * _unit
+		_node_layer.draw_arc(ln["pos"], lr, 0, TAU, 64, Palette.OCHRE, 5.0 * _unit, true)
+		_node_layer.draw_arc(ln["pos"], lr + 3.5 * _unit, 0, TAU, 64, Palette.INK, 1.5 * _unit, true)
+	# Stage S15.1: a small flag on each node a situation in force belongs to.
+	for key in node_flags:
+		if nodes.has(key):
+			_draw_node_flags(nodes[key], node_flags[key], _alpha(key))
 	# Labels after every node, so no disc covers one.
 	for key in order:
 		_draw_label(nodes[key])
+
+
+## Stage S15.1: a pennant per situation at a node's upper left, on a staff, in its tone.
+func _draw_node_flags(n: Dictionary, tones: Array, a: float) -> void:
+	var r: float = n["r"]
+	var s := maxf(7.0, r * 0.32) * clampf(_unit, 0.85, 1.6)
+	for i in tones.size():
+		var foot: Vector2 = n["pos"] + Vector2(-r * 0.62 - i * s * 1.3, -r * 0.62)
+		var top := foot + Vector2(0, -s * 2.0)
+		_node_layer.draw_line(foot, top, Color(Palette.INK, a), maxf(1.5, 1.4 * _unit))
+		var colour: Color = {"good": Palette.BETTER, "bad": Palette.WORSE}.get(str(tones[i]), Palette.STEADY)
+		var cloth := PackedVector2Array([top, top + Vector2(-s * 1.4, s * 0.1), top + Vector2(-s * 1.0, s * 0.5), top + Vector2(-s * 1.4, s * 0.9), top + Vector2(0, s)])
+		_node_layer.draw_colored_polygon(cloth, Color(colour, a))
+		cloth.append(top)
+		_node_layer.draw_polyline(cloth, Color(Palette.INK, a), maxf(1.0, _unit), true)
+
+
+## Stage S15.1: search: dims every node but `keys` (empty with `on` false: nothing dimmed).
+func set_search(keys: Array, on: bool) -> void:
+	var fresh := {}
+	for k in keys:
+		fresh[k] = true
+	if on == searching and fresh == matches:
+		return
+	matches = fresh
+	searching = on
+	_node_layer.queue_redraw()
+
+
+## Stage S15.1: lights a node ("" for none) with a ring and a short pulse.
+func light(key: String) -> void:
+	if key == lit:
+		return
+	lit = key
+	if key != "" and nodes.has(key):
+		_pulses[key] = 0.0
+		_wake()
+	_fx_layer.queue_redraw()
+	_node_layer.queue_redraw()
 
 
 func _radius(n: Dictionary) -> float:
@@ -2015,35 +2073,6 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 		var m := c + Vector2(r * 0.72, -r * 0.72)
 		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a))
 		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
-
-
-## Stage S13.5: an area's "introduce a policy" node: a plus on card stock in the policies'
-## style, with the number of policies there are to choose from on a small ochre badge.
-func _draw_introduce(n: Dictionary, a: float) -> void:
-	var c: Vector2 = n["pos"]
-	var r := _radius(n)
-	var ink := Color(Palette.INK, a)
-	_node_layer.draw_circle(c + Vector2(2, 2) * _unit, r, Color(Palette.SHADOW, 0.5 * a))
-	_node_layer.draw_circle(c, r, Color(Palette.PAPER.lerp(Palette.CARD, 0.5), a))
-	for k in 12:
-		_node_layer.draw_arc(c, r, TAU * k / 12.0, TAU * (k + 0.6) / 12.0, 6, ink, maxf(1.5, 1.5 * _unit), true)
-	if n["key"] == hover or n["key"] == selected:
-		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
-	var arm := r * 0.5
-	var w := maxf(3.0, r * 0.16)
-	_node_layer.draw_line(c - Vector2(arm, 0), c + Vector2(arm, 0), ink, w)
-	_node_layer.draw_line(c - Vector2(0, arm), c + Vector2(0, arm), ink, w)
-	var count := int(n.get("count", 0))
-	if count > 0:
-		var m := c + Vector2(r * 0.78, -r * 0.78)
-		var s := maxf(7.0, r * 0.42)
-		_node_layer.draw_circle(m, s, Color(Palette.OCHRE, a))
-		_node_layer.draw_arc(m, s, 0, TAU, 16, ink, 1.2, true)
-		var font := Palette.text(600)
-		var px := maxi(12, int(s * 1.3))
-		var t := str(count)
-		var tw := _text_w(font, t, px)
-		_node_layer.draw_string(font, m + Vector2(-tw / 2.0, px * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, px, ink)
 
 
 ## An indicator: a ring on paper, its pictogram inside. Stage S14.1: the ring is green for a
@@ -2177,7 +2206,7 @@ func _draw_label(n: Dictionary) -> void:
 	var focus := focus_key()
 	# Stage S14.1: a group linked to the node pointed at is lit on its arc; its name shows only
 	# at rest or when pointed at itself, never over a neighbour's.
-	var shown: bool = n.get("rest", false) or key == hover or key == selected or (_linked.has(key) and n["kind"] != "group")
+	var shown: bool = n.get("rest", false) or key == hover or key == selected or key == lit or (_linked.has(key) and n["kind"] != "group") 		or (searching and matches.has(key) and matches.size() <= 6)
 	if not shown:
 		return
 	var a := _alpha(key)

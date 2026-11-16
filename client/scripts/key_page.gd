@@ -19,7 +19,7 @@ func build(board: Web) -> void:
 	grid.add_theme_constant_override("v_separation", 14)
 	Palette.rule_rows(grid)
 	add_child(grid)
-	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; a plus lists those not in force.")
+	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; Add policy, on the top bar, lists those not in force.")
 	_row(grid, _indicators(), "Indicators", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
 	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in families. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure." % [
 		roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0)])
@@ -72,7 +72,6 @@ func _policies() -> Control:
 		_node("a", "policy", "income-tax", Vector2(34, 42), 22.0, {"fraction": 0.55}),
 		_node("b", "policy", "vat", Vector2(98, 42), 22.0, {"fraction": 0.4, "pending": 0.7, "waiting": 1}),
 		_node("c", "policy", "policy", Vector2(162, 42), 22.0, {"ghost": true}),
-		_node("d", "introduce", "", Vector2(222, 42), 17.0, {"count": 3}),
 	])
 
 

@@ -34,10 +34,11 @@ func _initialize() -> void:
 	if card.approval_text != main.fmt.value(main.rows["approval_young"], approval, true, false) or not card.approval_text.ends_with("%"):
 		return _fail("the young's popup shows %s, the model %s" % [card.approval_text, approval])
 	var drivers: Array = main._group_drivers()
-	if card.drivers_shown.size() != 6 or drivers.size() != 6:  # stage S13.8: the public finances is the sixth
+	# Stage S15.1: as many drivers as the scenario names (six since stage S13.8).
+	if card.drivers_shown.size() != drivers.size() or drivers.is_empty():
 		return _fail("drivers shown: %s" % [card.drivers_shown])
 	var moving := false
-	for i in 5:
+	for i in mini(5, drivers.size()):
 		var model: float = main.game.cells(drivers[i][1])["values"][card.index]
 		if card.drivers_shown[i][0] != drivers[i][0] or not is_equal_approx(card.drivers_shown[i][1], model):
 			return _fail("driver %s shows %s, the model %s" % [drivers[i][0], card.drivers_shown[i][1], model])
@@ -68,13 +69,15 @@ func _initialize() -> void:
 		return _fail("the account %s adds to %s, its net income %s" % [account.lines, total, account.net])
 	var net_text: String = main.fmt.money(account.net)
 	main.close_popup()
-	# Northern Ireland: no governing candidate, so a dash.
-	main.open_node("group:northern_ireland")
-	await process_frame
-	var ni = main.group_card()
-	if ni.approval_text != "–" or str(board.nodes["group:northern_ireland"]["value"]) != "–":
-		return _fail("Northern Ireland shows %s (board %s)" % [ni.approval_text, board.nodes["group:northern_ireland"]["value"]])
-	main.close_popup()
+	# Northern Ireland: no governing candidate, so a dash (stage S15.1: while the scenario has it
+	# on the ring; the regions are leaving it).
+	if board.nodes.has("group:northern_ireland"):
+		main.open_node("group:northern_ireland")
+		await process_frame
+		var ni = main.group_card()
+		if ni.approval_text != "–" or str(board.nodes["group:northern_ireland"]["value"]) != "–":
+			return _fail("Northern Ireland shows %s (board %s)" % [ni.approval_text, board.nodes["group:northern_ireland"]["value"]])
+		main.close_popup()
 	# Raising the basic rate: high incomes turn against it more than low incomes.
 	main.type_lever("basic_rate", 21.0)
 	await _settle()

@@ -12,7 +12,8 @@ extends Control
 ## indicator_card(), current_trace(), notice_text(), capital_text(), title_text(),
 ## flag_text(key), dilemma_title(), can_advance(), board_levers(). Stage S13.5: a growing
 ## board: available_policies(area), open_introduce(area), introduce_policy(key, value),
-## repeal_policy(key).
+## repeal_policy(key). Stage S15.1: open_add_policy(key), add_sheet(), search_for(words),
+## open_situation(name), situation_node(name).
 
 const Palette := preload("res://scripts/palette.gd")
 const Format := preload("res://scripts/format.gd")
@@ -28,7 +29,8 @@ const StartScreen := preload("res://scripts/start_screen.gd")
 const MonthReport := preload("res://scripts/month_report.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Sound := preload("res://scripts/sound.gd")
-const IntroduceList := preload("res://scripts/introduce_list.gd")
+const AddPolicy := preload("res://scripts/add_policy.gd")
+const Search := preload("res://scripts/search.gd")
 const Strip := preload("res://scripts/strip.gd")
 const KeyPage := preload("res://scripts/key_page.gd")
 
@@ -113,6 +115,12 @@ var _wide: Array[Button] = []
 var _status: Label
 var strip: Strip
 var _key_sheet: Sheet
+## Stage S15.1: the Add policy sheet (built each time it opens) and its content; search.
+var _add_sheet: Sheet
+var add_list: AddPolicy
+var search: Search
+## Stage S15.1: each situation's node on the board: situation name -> board key.
+var _situation_nodes := {}
 var _forecast_timer: Timer
 var _hover_timer: Timer
 var _effects_timer: Timer
@@ -295,6 +303,7 @@ func _build_layout() -> void:
 	strip.line_pressed.connect(func(full: String) -> void: _show_dialog("Notice", full))
 	add_child(strip)
 	_build_bar()
+	add_child(search.results)
 	_sheets = Control.new()
 	_sheets.name = "sheets"
 	_sheets.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -317,6 +326,8 @@ func _build_layout() -> void:
 	popup.top_margin = BAR_HEIGHT
 	add_child(popup)
 	popup.closed.connect(func() -> void:
+		if search.text.strip_edges() == "":
+			board.light("")
 		board.select("")
 		_update_input())
 	_forecast_timer = Timer.new()
@@ -337,6 +348,10 @@ func _build_layout() -> void:
 	report.line_pressed.connect(func(key: String) -> void:
 		if key.begins_with("entry:"):
 			open_indicator(key.trim_prefix("entry:"))
+		elif key.begins_with("situation:"):
+			open_situation(key.trim_prefix("situation:"))
+		elif key.begins_with("add:"):
+			open_add_policy(key.trim_prefix("add:"))
 		elif key == "election":
 			open_overlay("parliament")
 		else:
@@ -433,6 +448,22 @@ func _build_bar() -> void:
 	_capital.visible = false
 	row.add_child(_capital)
 	row.add_child(_rule())
+	# Stage S15.1: search and Add policy, kept with words on a narrow window too.
+	search = Search.new()
+	search.searched.connect(_searched)
+	search.pointed.connect(func(result: Dictionary) -> void: board.light(str(result.get("node", ""))))
+	search.picked.connect(_open_result)
+	row.add_child(search)
+	var add := Button.new()
+	add.name = "open_add_policy"
+	add.text = "Add policy"
+	add.icon = Palette.icon("policy")
+	add.theme_type_variation = "Quiet"
+	add.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	add.tooltip_text = "The policies not in force, by area (A)"
+	add.pressed.connect(func() -> void: open_add_policy())
+	row.add_child(add)
+	row.add_child(_rule())
 	_status = Label.new()
 	_status.theme_type_variation = "Muted"
 	_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -518,6 +549,17 @@ func _fit_bar() -> void:
 		button.text = "" if narrow else str(button.get_meta("words"))
 	_advance[1].text = "3 months" if not narrow else "+3"
 	_advance[2].text = "Year" if not narrow else "+12"
+	# Stage S15.1: search and Add policy stay; the headline figures give way from the right,
+	# as many as the bar needs (each still in the Budget or on the board).
+	search.custom_minimum_size.x = 190.0 if not narrow else 150.0
+	for chip in _chips.get_children():
+		(chip as Control).visible = true
+	var row: Control = _bar.get_child(0)
+	var chips := _chips.get_children()
+	var i := chips.size() - 1
+	while i > 0 and row.get_combined_minimum_size().x > _bar.size.x - 30.0:
+		(chips[i] as Control).visible = false
+		i -= 1
 
 
 func _rule() -> Control:
@@ -711,6 +753,8 @@ func _model_changed() -> void:
 			situations.append(entry)
 			_situations_on[entry["name"]] = game.latest(str(entry["row"])) == true
 	dilemmas = catalogue.get("dilemmas", [])
+	_map_situations()
+	_build_index()
 	_country.text = str(play.get("country", game.scenario_name())).to_upper()
 	_parliament_button.visible = not politics.settings.is_empty()
 
@@ -810,6 +854,14 @@ func _refresh(stepped := false) -> void:
 	_show_centre(capital)
 	board.refresh(latest_value, previous_value, func(l: String) -> Variant: return game.latest(l), _start_of, pending, stepped)
 	strip.set_flags(_flags())
+	# Stage S15.1: each situation in force flags its node.
+	var flags := {}
+	for entry in situations:
+		var name := str(entry["name"])
+		if _situations_on.get(name, false) and _situation_nodes.has(name):
+			var k: String = _situation_nodes[name]
+			flags[k] = Array(flags.get(k, [])) + ["good" if str(entry["situation"]) == "good" else "bad"]
+	board.node_flags = flags
 	_refresh_popup(pending, capital)
 	_set_controls(not failed and not lost)
 
@@ -945,7 +997,7 @@ func _set_controls(enabled: bool) -> void:
 ## "flag:<key>" or "centre" (Parliament).
 func open_node(key: String, from := Rect2()) -> void:
 	if board.available.has(key):
-		_open_to_introduce(key)
+		_open_to_introduce(key)  # its popup, to be introduced (the sheet's own choice presets it)
 		return
 	if not board.nodes.has(key):
 		return
@@ -954,11 +1006,6 @@ func open_node(key: String, from := Rect2()) -> void:
 	match str(node["kind"]):
 		"centre":
 			open_overlay("parliament")
-			return
-		"introduce":
-			board.select(key)
-			popup.open(func() -> Control: return _node_content(key), origin)
-			_after_open()
 			return
 	board.select(key)
 	popup.open(func() -> Control: return _node_content(key), origin)
@@ -1015,8 +1062,163 @@ func _open_flag(flag: Dictionary) -> void:
 	if str(flag.get("tone", "")) == "ask":
 		ask_dilemma()
 	elif str(flag.get("name", "")) != "":
-		var origin := Rect2(Vector2(get_viewport_rect().size.x - 200.0, BAR_HEIGHT + STRIP_HEIGHT), Vector2(1, 1))
-		open_indicator(str(flag["name"]), str(flag.get("row", "")), origin)
+		open_situation(str(flag["name"]))
+
+
+## Stage S15.1: a situation: its node lit, and its explanation beside the node, with what set
+## it off (a link to the node's own popup). Without a node, under the strip as before.
+func open_situation(name: String) -> void:
+	var entry: Dictionary = entries.get(name, {})
+	if entry.is_empty():
+		return
+	var key: String = _situation_nodes.get(name, "")
+	var origin := Rect2(Vector2(get_viewport_rect().size.x - 200.0, BAR_HEIGHT + STRIP_HEIGHT), Vector2(1, 1))
+	if key != "":
+		origin = _node_rect(key)
+		board.light(key)
+	popup.open(func() -> Control: return _entry_content(name, str(entry.get("row", ""))), origin)
+	_after_open()
+	var card := indicator_card()
+	if card != null:
+		var onset := situation_onset(str(entry.get("row", "")))
+		card.since = "since " + fmt.month_name(onset) if game.latest(str(entry.get("row", ""))) == true and onset >= 0 else ""
+		card.refresh(latest_value, previous_value, "")
+	if card != null and key != "":
+		var n: Dictionary = board.nodes[key]
+		card.set_off_by("%s %s" % [n["label"], n["value"]], key)
+
+
+## The board key of the node a situation belongs to, or "".
+func situation_node(name: String) -> String:
+	return _situation_nodes.get(name, "")
+
+
+## Stage S15.1: which node each situation belongs to: the catalogue's own field when it has
+## one, else [play.web] `situations`, else the first value its condition reads that is on the
+## board.
+func _map_situations() -> void:
+	_situation_nodes.clear()
+	var given: Dictionary = play.get("web", {}).get("situations", {})
+	var by_name := {}
+	for k in board.keys_of("indicator"):
+		by_name[str(board.nodes[k]["name"])] = k
+	for entry in situations:
+		var name := str(entry["name"])
+		var key := ""
+		for field in ["statistic", "set_off_by", "row_of"]:
+			if key == "" and str(entry.get(field, "")) != "":
+				key = _board_key_of(str(entry[field]), by_name)
+		if key == "" and given.has(name):
+			key = _board_key_of(str(given[name]), by_name)
+		if key == "":
+			for used in entry.get("inputs", PackedStringArray()):
+				if by_name.has(str(used)):
+					key = by_name[str(used)]
+					break
+		if key != "":
+			_situation_nodes[name] = key
+
+
+## A row or catalogue name as the key of its indicator on the board, or "".
+func _board_key_of(value: String, by_name: Dictionary) -> String:
+	if board.nodes.has("indicator:" + value):
+		return "indicator:" + value
+	return by_name.get(value, "")
+
+
+## Stage S15.1: the search index: everything on the board, the policies not in force and the
+## situations; each with the words it is found by.
+func _build_index() -> void:
+	var items := []
+	var also := _also_words()
+	for key in board.order:
+		var n: Dictionary = board.nodes[key]
+		var kind: String = {"policy": "policy", "indicator": "statistic", "group": "group"}.get(str(n["kind"]), "")
+		if kind == "":
+			continue
+		items.append(_index_item(key, kind, n, also, key))
+	for key in board.available:
+		items.append(_index_item(key, "add", board.available[key], also, ""))
+	for entry in situations:
+		var name := str(entry["name"])
+		var on_node: String = _situation_nodes.get(name, "")
+		items.append({"key": "situation:" + name, "kind": "situation", "label": str(entry.get("label", name)),
+			"icon": board.nodes[on_node]["icon"] if on_node != "" else Palette.icon("indicator"),
+			"node": _situation_nodes.get(name, ""), "words": [str(entry.get("label", name)), " ".join(also.get(name, [])), name.replace("_", " "), str(entry.get("doc", ""))]})
+	search.set_index(items)
+
+
+func _index_item(key: String, kind: String, n: Dictionary, also: Dictionary, node: String) -> Dictionary:
+	var words := PackedStringArray()
+	for lever in n.get("levers", PackedStringArray()):
+		words.append(str(lever).replace("_", " "))
+		words.append(str(entries.get(lever, {}).get("label", "")))
+	var name := str(n.get("name", ""))
+	words.append(name.replace("_", " "))
+	var other := PackedStringArray()
+	for k in [key, key.get_slice(":", 1), name, str(n.get("row", ""))]:
+		for w in also.get(k, []):
+			other.append(str(w))
+	return {"key": key, "kind": kind, "label": str(n["label"]), "icon": n["icon"], "node": node,
+		"words": [str(n["label"]), " ".join(other), " ".join(words), str(n.get("doc", ""))]}
+
+
+## Stage S15.1: `also = [...]` wherever a [play.web] entry gives it (an area's policies and
+## indicators, the groups), by its key, row and levers; and [play.web] `also` = { name =
+## [...] } for anything else (a situation, say).
+func _also_words() -> Dictionary:
+	var out := {}
+	var web: Dictionary = play.get("web", {})
+	var take := func(item: Dictionary) -> void:
+		if not item.has("also"):
+			return
+		for k in [item.get("key", ""), item.get("row", "")] + Array(item.get("levers", [])):
+			if str(k) != "":
+				out[str(k)] = Array(out.get(str(k), [])) + Array(item["also"])
+	for area in web.get("areas", []):
+		for list in [area.get("policies", []), area.get("indicators", [])]:
+			for item in list:
+				take.call(item)
+	for g in web.get("groups", []):
+		take.call(g)
+	var extra: Dictionary = web.get("also", {}) if web.get("also", {}) is Dictionary else {}
+	for k in extra:
+		out[str(k)] = Array(out.get(str(k), [])) + Array(extra[k])
+	return out
+
+
+## The search's matches: the board dims to their nodes (a situation's, its node).
+func _searched(found: Array) -> void:
+	var keys := []
+	for r in found:
+		if str(r.get("node", "")) != "":
+			keys.append(str(r["node"]))
+	board.set_search(keys, search.text.strip_edges() != "")
+	search.results.position = search.get_global_rect().position + Vector2(0, search.size.y + 6.0)
+	if found.is_empty():
+		board.light("")
+
+
+## A result chosen: its popup, a situation's explanation, or the Add policy sheet at it.
+func _open_result(result: Dictionary) -> void:
+	var key := str(result["key"])
+	search.results.visible = false
+	search.release_focus()
+	match str(result["kind"]):
+		"situation":
+			open_situation(key.trim_prefix("situation:"))
+		"add":
+			open_add_policy(key)
+		_:
+			board.light(key)
+			open_node(key)
+
+
+## For the checks: types into the search field, as a player would after "/".
+func search_for(words: String) -> Array:
+	search.grab_focus()
+	search.type_query(words)
+	return search.found
 
 
 ## Stage S14.1: the key, on a sheet of its own.
@@ -1037,8 +1239,6 @@ func show_key() -> void:
 
 func _node_content(key: String) -> Control:
 	var node: Dictionary = board.policy_node(key) if board.policy_node(key).size() > 0 else board.nodes[key]
-	if node["kind"] == "introduce":
-		return _introduce_content(str(node["area"]))
 	if node["kind"] == "policy":
 		var card := LeverPanel.new()
 		card.fmt = fmt
@@ -1091,6 +1291,8 @@ func _entry_content(name: String, row_key: String, key := "") -> Control:
 	var icon: Texture2D = node.get("icon", Palette.icon("indicator"))
 	card.build(name, row_key, entry, label, str(node.get("area", "")), icon, entries, play, _breakdowns_of(name), compare, movers)
 	card.follow.connect(func(target: String) -> void: _follow(target))
+	if card.trace == null:
+		return card  # stage S15.1: a situation's popup has no trace
 	card.trace.trail = PackedStringArray([name])
 	card.trace.show_waiting(name)
 	if str(entry.get("kind", "")) in ["var", "flow", "state", "account"]:
@@ -1110,40 +1312,105 @@ func _breakdowns_of(name: String) -> Array:
 	return out
 
 
-## Stage S13.5: an area's "introduce a policy" popup: its policies not in force, each with
-## the capital the smallest step in would cost.
-func _introduce_content(area: String) -> Control:
-	var list := IntroduceList.new()
-	list.name = "introduce_list"
-	var icon: Texture2D = Palette.icon("policy")
+## Stage S15.1: the Add policy sheet: every area with what it has to add, each policy with
+## its line, the smallest step's cost and vote, and who would cheer and boo; opened at `key`'s
+## area (a policy not in force) or the first area with something to add.
+func open_add_policy(key := "") -> void:
+	close_popup()
+	report.dismiss()
+	for sheet in [_budget_sheet, _parliament_sheet, _key_sheet]:
+		if sheet != null:
+			sheet.close()
+	if _add_sheet != null and is_instance_valid(_add_sheet):
+		_add_sheet.queue_free()
+	_add_sheet = _new_sheet("Add policy", 900.0)
+	_add_sheet.name = "add_policy_sheet"
+	add_list = AddPolicy.new()
+	add_list.name = "add_policy"
+	_add_sheet.body.add_child(add_list)
+	var areas := []
+	var by_area := {}
 	for a in board.areas:
-		if a["name"] == area and str(a.get("icon", "")) != "":
-			icon = Palette.icon(str(a["icon"]))
-	var items := []
-	for key in board.available_in(area):
-		var node: Dictionary = board.available[key]
-		var lever: String = node["levers"][0]
-		var cost: float = game.bill_cost(lever, _first_step(key))
-		var line := str(node.get("line", ""))
-		if line == "":
-			line = str(entries.get(lever, {}).get("doc", "")).get_slice(".", 0) + "."
-		items.append({"key": key, "label": node["label"], "icon": node["icon"], "line": line,
-			"cost": "from %.1f political capital" % cost if cost >= 0.0 else ""})
-	list.build(area, icon, items)
-	list.chosen.connect(_open_to_introduce)
-	return list
+		areas.append([str(a["name"]), Palette.icon(str(a.get("icon", "policy")))])
+		var list := []
+		for k in board.available_in(str(a["name"])):
+			list.append(_add_item(k))
+		by_area[str(a["name"])] = list
+	add_list.build(areas, by_area)
+	add_list.fit(get_viewport_rect().size.y - BAR_HEIGHT - 260.0)
+	add_list.chosen.connect(func(k: String) -> void:
+		_add_sheet.close()
+		_open_to_introduce(k, true))
+	_add_sheet.open()
+	if key != "":
+		add_list.show_policy(key)
+	_update_input()
 
 
-## Opens a policy not in force in its popup, ready to be introduced (from the area's list,
-## with Back to it, or straight from the board's introduce node).
-func _open_to_introduce(key: String) -> void:
+## Which sheet is open: true while the Add policy sheet is.
+func add_sheet_open() -> bool:
+	return _add_sheet != null and is_instance_valid(_add_sheet) and _add_sheet.visible
+
+
+## One policy not in force, as the sheet lists it.
+func _add_item(key: String) -> Dictionary:
+	var node: Dictionary = board.available[key]
+	var lever: String = node["levers"][0]
+	var raw := _first_step(key)
+	var cost: float = game.bill_cost(lever, raw)
+	var line := str(node.get("line", ""))
+	if line == "":
+		line = str(entries.get(lever, {}).get("doc", "")).get_slice(".", 0) + "."
+	var item := {"key": key, "label": node["label"], "icon": node["icon"], "line": line,
+		"cost": "%.1f political capital" % cost if cost >= 0.0 else ""}
+	var preview: Dictionary = game.vote_preview(lever, _raw_value(raw))
+	if preview.get("bill", false):
+		item["passes"] = bool(preview.get("passes", true)) and bool(preview.get("affordable", true))
+		var votes := int(preview.get("votes_for", 0))
+		item["vote"] = ("Would pass, %d to %d" if preview.get("passes", false) else "Would be voted down, %d to %d") % [votes, int(preview.get("seats", 0)) - votes]
+		if not preview.get("affordable", true):
+			item["vote"] += "; not enough capital"
+	# Who would cheer and who would boo: the groups the effects table has it move most, read
+	# for the first step in (the table nudges up; a policy whose first step is down reads the
+	# other way).
+	var table: Dictionary = board.effects.get(lever, {})
+	if table.is_empty():
+		item["pending"] = effects_running
+	else:
+		var off := float(node.get("off_stored", 0.0))
+		var stored := float(raw) * (fmt.minor if entries.get(lever, {}).get("money", false) else 1)
+		var way := 1.0 if stored >= off else -1.0
+		var moves := []
+		for g in board.keys_of("group"):
+			var row := str(board.nodes[g]["row"])
+			if table.has(row) and absf(float(table[row])) >= 0.0005:
+				moves.append([float(table[row]) * way, str(board.nodes[g]["label"])])
+		moves.sort_custom(func(x, y): return x[0] > y[0])
+		item["cheer"] = moves.filter(func(m): return m[0] > 0.0).slice(0, 3).map(func(m): return m[1])
+		var down := moves.filter(func(m): return m[0] < 0.0)
+		down.reverse()
+		item["boo"] = down.slice(0, 3).map(func(m): return m[1])
+	return item
+
+
+## A raw setting as typed (a string) as the bridge's previews take it.
+static func _raw_value(raw: String) -> Variant:
+	return int(raw) if raw.is_valid_int() else float(raw)
+
+
+## Opens a policy not in force in its popup, ready to be introduced; from the Add policy sheet
+## (`preset`), at the smallest step in, its cost, vote and year ahead shown.
+func _open_to_introduce(key: String, preset := false) -> void:
 	if not board.available.has(key):
 		return
+	var origin := Rect2(get_viewport_rect().size / 2.0, Vector2.ONE)
 	if popup.is_open():
 		popup.push(func() -> Control: return _node_content(key))
 	else:
-		var origin := _node_rect("introduce:" + str(board.available[key]["area"]))
 		popup.open(func() -> Control: return _node_content(key), origin)
+	var card := policy_card()
+	if preset and card != null and not card.levers.is_empty():
+		card.preset(card.levers[0], _first_step(key))
 	_after_open()
 
 
@@ -1188,9 +1455,10 @@ func available_policies(area: String) -> PackedStringArray:
 	return board.available_in(area)
 
 
-## Opens an area's introduce list.
+## Opens the Add policy sheet at an area (stage S15.1; the area's list was a popup before).
 func open_introduce(area: String) -> void:
-	open_node("introduce:" + area)
+	open_add_policy()
+	add_list.show_area(area)
 
 
 ## Introduces a policy not in force at `value` (in its lever's own terms, as type_lever
@@ -1383,8 +1651,7 @@ func close_popup() -> void:
 		popup.close()
 
 
-## "policy", "indicator", "group", "household", "introduce" (stage S13.5) or "" for the
-## popup open now.
+## "policy", "indicator", "group", "household" or "" for the popup open now.
 func popup_kind() -> String:
 	if popup == null or not popup.is_open():
 		return ""
@@ -1394,17 +1661,11 @@ func popup_kind() -> String:
 		return "group"
 	if popup.content is GroupCard.HouseholdAccount:
 		return "household"
-	if popup.content is IntroduceList:
-		return "introduce"
 	return "indicator"
 
 
 func group_card() -> GroupCard:
 	return popup.content as GroupCard if popup != null and popup.is_open() else null
-
-
-func introduce_list() -> IntroduceList:
-	return popup.content as IntroduceList if popup != null and popup.is_open() else null
 
 
 func policy_card() -> LeverPanel:
@@ -1456,7 +1717,7 @@ func open_overlay(which: String) -> void:
 	var sheet: Sheet = _budget_sheet if which == "budget" else _parliament_sheet
 	if which == "parliament" and politics.settings.is_empty():
 		return
-	for other in [_budget_sheet, _parliament_sheet, _key_sheet]:
+	for other in [_budget_sheet, _parliament_sheet, _key_sheet, _add_sheet if _add_sheet != null and is_instance_valid(_add_sheet) else null]:
 		if other != null and other != sheet:
 			other.close()
 	report.dismiss()
@@ -1468,6 +1729,8 @@ func open_overlay(which: String) -> void:
 func close_overlay() -> void:
 	for sheet in [_budget_sheet, _parliament_sheet]:
 		sheet.close()
+	if add_sheet_open():
+		_add_sheet.close()
 	_update_input()
 
 
@@ -1477,6 +1740,8 @@ func overlay_open() -> String:
 		return "budget"
 	if _parliament_sheet.visible:
 		return "parliament"
+	if add_sheet_open():
+		return "add_policy"  # stage S15.1
 	return ""
 
 
@@ -1494,6 +1759,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	# Stage S13.6: Space or Enter for next month (a focused field keeps its keys; not while
 	# a question waits); B the Budget, P Parliament, K the key.
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F and event.ctrl_pressed and started:
+		search.grab_focus()
+		search.select_all()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and started \
 			and not (event.ctrl_pressed or event.alt_pressed or event.meta_pressed) \
 			and not get_viewport().gui_get_focus_owner() is LineEdit:
@@ -1512,6 +1782,14 @@ func _unhandled_input(event: InputEvent) -> void:
 					close_overlay()
 				else:
 					open_overlay("parliament")
+			KEY_A:
+				if add_sheet_open():
+					_add_sheet.close()
+				else:
+					open_add_policy()
+			KEY_SLASH:
+				search.grab_focus()
+				search.select_all()
 			KEY_K:
 				if _key_sheet != null and _key_sheet.visible:
 					_key_sheet.close()
@@ -1690,7 +1968,11 @@ func _request_effects() -> void:
 ## request_effects_first).
 func _ask_effects(first: PackedStringArray) -> void:
 	var levers := PackedStringArray()
-	for lever in board_levers():
+	# Stage S15.1: the policies not in force too, for who would cheer and boo at them.
+	var all := board_levers()
+	for key in board.available:
+		all.append(board.available[key]["levers"][0])
+	for lever in all:
 		if not _measured.has(lever):
 			levers.append(lever)
 	if levers.is_empty():
@@ -2033,8 +2315,7 @@ func _build_report() -> void:
 		var what := _bill_words(lever, c["value"], was, passed and not c.get("refused", false))
 		# A line opens the policy's popup while it is on the board, else its area's list.
 		if not board.nodes.has(key):
-			key = "introduce:" + str(board.policy_node(key).get("area", "")) if key != "" else ""
-			key = key if board.nodes.has(key) else ""
+			key = "add:" + key if key != "" and board.available.has(key) else ""
 		if c.get("refused", false):
 			bills.append({"text": "%s: refused, it needed %.1f political capital" % [what, float(c["cost"])], "tone": "notice", "key": key})
 		elif not passed:
@@ -2075,10 +2356,9 @@ func _build_report() -> void:
 		var now: bool = _situations_on.get(name, false)
 		if now == bool(was_on.get(name, false)):
 			continue
-		var key := "flag:situation_" + name
 		sits.append({"text": "%s %s" % [str(entry.get("label", name)), "began" if now else "is over"],
 			"tone": ("good" if str(entry["situation"]) == "good" else "bad") if now else "plain",
-			"key": key if board.nodes.has(key) else "entry:" + name})
+			"key": "situation:" + name})
 	# Stage S14.1: an election in these months, which opens Parliament.
 	var elections := []
 	var settings: Dictionary = play.get("politics", {})
