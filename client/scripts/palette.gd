@@ -318,6 +318,7 @@ static func make_theme() -> Theme:
 	# Menus, tooltips, option buttons.
 	theme.set_stylebox("panel", "PopupMenu", card(6, 4))
 	theme.set_stylebox("hover", "PopupMenu", _flat(Color(OCHRE, 0.35), Color(0, 0, 0, 0), 0, 8, 4))
+	theme.set_constant("v_separation", "PopupMenu", 12)  # stage S16.1: rows of 32 px
 	theme.set_color("font_hover_color", "PopupMenu", INK)
 	theme.set_color("font_disabled_color", "PopupMenu", MUTED)
 	theme.set_color("font_separator_color", "PopupMenu", MUTED)
@@ -434,7 +435,7 @@ static func fold(title: String, body: Control, open := false) -> VBoxContainer:
 	box.add_child(body)
 	var show := func(on: bool) -> void:
 		body.visible = on
-		head.text = ("▾  " if on else "▸  ") + title.to_upper()
+		head.text = ("▼   " if on else "▶   ") + title.to_upper()
 	show.call(open)
 	box.set_meta("fold", show)
 	head.pressed.connect(func() -> void:

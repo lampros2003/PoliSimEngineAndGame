@@ -28,6 +28,7 @@ import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
 REGIONS = ["north_east", "north_west", "yorkshire", "east_midlands", "west_midlands", "east", "london", "south_east",
            "south_west", "wales", "scotland", "northern_ireland"]
 BLOCS = ["centre_left", "centre_right", "liberal", "populist_right", "green", "scottish_nationalist",
@@ -123,27 +124,9 @@ ESTIMATED = {
     # to 34, 7.1% at 65 and over (published); 35 to 64 and the income factors (routine and
     # manual workers smoke three times as often as managers and professionals) are estimates.
     "smokers": {"age": [0.081, 0.126, 0.115, 0.110, 0.071], "quintile": [1.6, 1.25, 1.0, 0.8, 0.6], "total": 0.106},
-    # Stage S15.2 (models/uk/politics/README.md, "Beliefs, work and places"). "work" is the
-    # factor for adults out of work and in work. Beliefs: the tails of British Social
-    # Attitudes' left-right and libertarian-authoritarian scales and the British Election
-    # Study's environment and national identity items. The totals and the shapes by age,
-    # income and region are judgements shaped like BSA 40 and 41's findings (the young and
-    # graduates more liberal and green, older voters more authoritarian and national, lower
-    # incomes more left on economics and more authoritarian); no table of these shares was
-    # opened. Socialists are the left fifth, capitalists the right sixth of the economic scale;
-    # liberals a quarter and conservatives three tenths at the two ends of the other.
-    "socialists": {"age": [1.3, 1.2, 1.0, 0.9, 0.75], "quintile": [1.3, 1.15, 1.0, 0.85, 0.7], "total": 0.20,
-                   "region": [1.15, 1.1, 1.0, 0.95, 0.95, 0.9, 1.15, 0.85, 0.9, 1.15, 1.15, 0.9]},
-    "capitalists": {"age": [0.8, 0.9, 1.0, 1.1, 1.2], "quintile": [0.5, 0.8, 1.0, 1.3, 1.6], "total": 0.15,
-                    "region": [0.85, 0.9, 0.95, 1.05, 1.0, 1.1, 1.0, 1.15, 1.05, 0.85, 0.85, 1.0]},
-    "liberals": {"age": [1.6, 1.3, 1.0, 0.8, 0.6], "quintile": [0.7, 0.85, 1.0, 1.15, 1.3], "total": 0.25,
-                 "region": [0.85, 0.95, 0.9, 0.9, 0.9, 0.95, 1.45, 1.0, 1.0, 0.95, 1.05, 0.9]},
-    "conservatives": {"age": [0.6, 0.75, 0.95, 1.15, 1.4], "quintile": [1.25, 1.15, 1.0, 0.9, 0.75], "total": 0.30,
-                      "region": [1.1, 1.05, 1.1, 1.1, 1.1, 1.05, 0.75, 1.0, 1.0, 1.0, 0.9, 1.1]},
-    "environmentalists": {"age": [1.6, 1.3, 1.0, 0.8, 0.7], "quintile": [0.7, 0.85, 1.0, 1.15, 1.3], "total": 0.12,
-                          "region": [0.85, 0.9, 0.85, 0.9, 0.9, 1.0, 1.35, 1.05, 1.15, 1.0, 1.05, 0.8]},
-    "patriots": {"age": [0.6, 0.7, 0.95, 1.2, 1.35], "quintile": [1.15, 1.1, 1.0, 0.9, 0.85], "total": 0.25,
-                 "region": [1.15, 1.1, 1.15, 1.15, 1.15, 1.1, 0.6, 1.05, 1.05, 0.8, 0.7, 0.9]},
+    # Stage S15.2: "work" is the factor for adults out of work and in work. Stage S16.2: the
+    # six belief groups come from published segments (tools/uk/segments.toml,
+    # segment_members below), not from tables here.
     # ONS, Public sector employment, UK: December 2024 (opened): 6.14 million, about 11.5% of
     # adults; only those in work. The shape by age and income is a judgement (public pay sits in
     # the middle of the distribution, few at 65 and over), and so is the region list (higher
@@ -364,6 +347,48 @@ def fit(voters: list[float], targets: list[list[float]], preset: str = "central"
     return alpha, worst
 
 
+def segment_members(voters: list[float], rounds: int = 200) -> dict[str, list[float]]:
+    """Stage S16.2: the six belief groups' membership by voter type, from More in Common's
+    seven segments (tools/uk/segments.toml). Each segment's share of a voter type starts as its
+    published size times its profile by age band, income fifth and region; the shares are then
+    raked so that they add to one in every voter type and each segment's national share is its
+    published size. A group is its stated mix of segments; patriots then follow YouGov's age
+    gradient, scaled back to the mix's national share. Capped at 0.98."""
+    import tomllib
+    table = tomllib.loads((HERE / "segments.toml").read_text(encoding="utf-8"))
+    segs, types = table["segments"], voter_types()
+    total = sum(voters)
+    share = {k: [v["size"] * v["age"][a] * v["quintile"][q] * v["region"][r] for r, a, q, _ in types]
+             for k, v in segs.items()}
+    for _ in range(rounds):  # raking: rows (voter types) add to one, columns to the sizes
+        for t in range(len(types)):
+            row = sum(share[k][t] for k in segs)
+            for k in segs:
+                share[k][t] /= row
+        for k, v in segs.items():
+            scale = v["size"] * total / sum(n * x for n, x in zip(voters, share[k]))
+            share[k] = [x * scale for x in share[k]]
+    out = {}
+    for group, mix in table["groups"].items():
+        member = [sum(w * share[k][t] for k, w in mix.items() if k in segs) for t in range(len(types))]
+        if "age" in mix:
+            target = sum(n * m for n, m in zip(voters, member))
+            member = [m * mix["age"][a] for m, (_, a, _, _) in zip(member, types)]
+            scale = target / sum(n * m for n, m in zip(voters, member))
+            member = [m * scale for m in member]
+        out[group] = [min(m, 0.98) for m in member]
+    return out
+
+
+def segment_shares() -> dict[str, float]:
+    """Each belief group's national share by the mapping's arithmetic: the sum of its segments'
+    published sizes times their stated weights."""
+    import tomllib
+    table = tomllib.loads((HERE / "segments.toml").read_text(encoding="utf-8"))
+    return {g: sum(w * table["segments"][k]["size"] for k, w in mix.items() if k in table["segments"])
+            for g, mix in table["groups"].items()}
+
+
 def estimated_members(voters: list[float]) -> dict[str, list[float]]:
     """Stage S13.5: each estimated group's share of each voter type's adults (ESTIMATED)."""
     types = voter_types()
@@ -379,6 +404,7 @@ def estimated_members(voters: list[float]) -> dict[str, list[float]]:
         scale = total * sum(voters) / sum(n * s for n, s in zip(voters, raw)) if "total" in table or "region" in table \
             else 1.0
         out[key] = [min(s * scale, 0.98) for s in raw]
+    out.update(segment_members(voters))
     out["renters"] = [1.0 - s for s in out["home_owners"]]
     out["town"] = [1.0 - s for s in out["countryside"]]
     return out

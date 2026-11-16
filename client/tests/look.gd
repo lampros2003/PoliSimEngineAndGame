@@ -107,6 +107,11 @@ func _initialize() -> void:
 			main._open_result(main.search.found[int(args["pick"])])
 	if args.has("situation"):
 		main.open_situation(str(args["situation"]))
+	# Stage S16.1: --menu=1 opens the menu; --notice=1 shows a problem notice.
+	if args.has("menu"):
+		main._menu.show_popup()
+	if args.has("notice"):
+		main._show_message("[b]Could not load[/b]: the save file is from a newer version of the game.", true)
 	# Stage S14.1: --key=1 shows the key.
 	if args.has("key"):
 		main.show_key()

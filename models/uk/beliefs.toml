@@ -578,7 +578,7 @@ expr = "0.3 * (farm_support - stance_base_farm_support) / stance_step_farm_suppo
 doc = "Utility a voter of a belief group gains for each clear move of policy toward its stance (a judgement, sized so a clear move of two policies shifts the group two to five points and the country under one)"
 type = "real"
 unit = "1"
-value = 0.2
+value = 0.25
 
 [param.public_pay_2024]
 doc = "The public pay bill in 2024, a month"

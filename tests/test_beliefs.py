@@ -55,8 +55,9 @@ class Groups(unittest.TestCase):
     def test_every_new_group_has_a_plausible_share(self):
         row = run(steps=1)[1][0]
         shares = {g: row[f"share_{g}"] for g in NEW_GROUPS}
-        self.assertAlmostEqual(shares["socialists"], 0.20, places=2)
-        self.assertAlmostEqual(shares["liberals"], 0.25, places=2)
+        # Stage S16.2: the belief groups from More in Common's segments (tools/uk/segments.toml).
+        self.assertAlmostEqual(shares["socialists"], 0.234, places=2)
+        self.assertAlmostEqual(shares["liberals"], 0.264, places=2)
         self.assertAlmostEqual(shares["public_sector"], 6.14e6 / 53.5e6, places=2)
         self.assertAlmostEqual(shares["trade_unionists"], 6.4e6 / 53.5e6, places=2)
         self.assertLess(shares["farmers"], 0.02)
@@ -84,6 +85,40 @@ class Groups(unittest.TestCase):
             self.assertIn(f"approval_{key}", run(steps=1)[1][0])
         for key in NEW_GROUPS:
             self.assertIn(key, ring)
+
+
+class Segments(unittest.TestCase):
+    """Stage S16.2: each belief group is a stated mix of More in Common's seven segments, whose
+    sizes are published; the groups' national shares are the mix's arithmetic."""
+
+    def test_the_six_groups_national_shares_equal_the_mappings_arithmetic(self):
+        sys.path.insert(0, str(ROOT / "tools" / "uk"))
+        import voters
+        table = tomllib.loads((ROOT / "tools" / "uk" / "segments.toml").read_text(encoding="utf-8"))
+        self.assertAlmostEqual(sum(v["size"] for v in table["segments"].values()), 1.0, places=12)
+        expected = {g: sum(w * table["segments"][k]["size"] for k, w in mix.items() if k in table["segments"])
+                    for g, mix in table["groups"].items()}
+        self.assertEqual(expected, voters.segment_shares())
+        # The membership written for the model (politics/estimated_groups.csv) holds them over
+        # the base year's adults, by voter type.
+        base = voters.base_voters(UK / "households" / "households.csv")
+        members = voters.segment_members(base)
+        for group, share in expected.items():
+            got = sum(n * m for n, m in zip(base, members[group])) / sum(base)
+            self.assertAlmostEqual(got, share, places=9, msg=group)
+        self.assertAlmostEqual(expected["socialists"], 0.12 + 0.4 * 0.21 + 0.15 * 0.20, places=12)
+        self.assertAlmostEqual(expected["patriots"], 0.8 * 0.20 + 0.8 * 0.08 + 0.4 * 0.20, places=12)
+
+    def test_patriots_rise_with_age_as_yougov_found(self):
+        sim, _ = run(steps=1)
+        voters, member, age = sim.column("voters"), sim.column("group_member"), sim.column("type_age")
+        groups = model().dims["group"].members
+        n, g = len(groups), groups.index("patriots")
+
+        def share(band):
+            ts = [t for t in range(len(voters)) if age[t] == band]
+            return sum(voters[t] * member[t * n + g] for t in ts) / sum(voters[t] for t in ts)
+        self.assertGreater(share(4), 2.0 * share(0))
 
 
 class Stances(unittest.TestCase):

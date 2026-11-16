@@ -130,9 +130,10 @@ lines (the NHS, schools, social care, police, pensions and benefits, public inve
 point on the basic rate costs 6.2 and a quarter off the NHS 27.5. You start with 40 and earn
 1.5 a month, up to 5 more the higher your own party's poll rating (nothing extra at 20% or
 below, all of it at 40%; in a coalition only your party's rating counts) and 2 more in the
-first year of a parliament, up to 100: about 4 a month at 30%. Your capital is shown at the
-centre of the board. The popup says what the bill costs and what the bills already waiting
-will cost; a bill that costs more than is left when its turn comes is not put to the
+first year of a parliament, up to 100: about 4 a month at 30%. Your capital is always on
+the top bar, beside your approval, with what the bills waiting will cost; it turns red when
+they cost more than there is. The centre of the board shows it too. The popup says what the
+bill costs and what it would leave; a bill that costs more than is left when its turn comes is not put to the
 Commons, and the game tells you in the month's report.
 
 Under the controls a chart shows the policy's history with your changes marked. Once you

@@ -56,7 +56,7 @@ NAMES = {"state": ("The state against the market", "positive toward the state, n
 
 # Utility a voter type gains, per clear move of a stance, times its membership over the group's
 # share of adults: (group, sign).
-BELIEF_EFFECT = 0.2
+BELIEF_EFFECT = 0.25
 SATURATION = 1.0  # a stance's pull approaches this many clear moves and no more
 REACTIONS = {"state": [("socialists", 1.0), ("capitalists", -1.0)],
              "order": [("conservatives", 1.0), ("liberals", -1.0)],

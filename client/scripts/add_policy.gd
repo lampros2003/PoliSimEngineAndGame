@@ -128,8 +128,10 @@ func show_area(name: String) -> void:
 	_note.visible = not list.is_empty()
 	if list.is_empty():
 		var none := Label.new()
-		none.text = "Every policy of this area is in force."
+		none.text = "Every policy of this area is in force. To end one that can be ended, open it on the board and choose Repeal."
 		none.theme_type_variation = "Muted"
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.custom_minimum_size.x = 520
 		_list.add_child(none)
 	for item in list:
 		keys.append(str(item["key"]))

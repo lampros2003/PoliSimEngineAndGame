@@ -62,8 +62,8 @@ func show_line(text: String, problem := false, stay := 4.0) -> void:
 	var plain := _plain(text)
 	_full = plain
 	line_text = plain
-	_line.text = plain.get_slice("\n", 0) + ("  ›" if plain.contains("\n") else "")
-	_line.tooltip_text = plain if plain.contains("\n") else ""
+	_line.text = plain.get_slice("\n", 0) + ("  ›" if plain.contains("\n") else ("   ✕" if problem and stay <= 0.0 else ""))
+	_line.tooltip_text = plain if plain.contains("\n") else ("Click to dismiss" if problem and stay <= 0.0 else "")
 	_line.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_line.add_theme_color_override("font_color", Palette.BAD if problem else Palette.INK)
 	_line.add_theme_font_override("font", Palette.text(600 if problem else 500))

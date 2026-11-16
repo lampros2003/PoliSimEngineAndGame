@@ -83,6 +83,8 @@ var _dilemma_asked := ""
 ## Stage S12.5: each waiting change's cost in political capital.
 var _costs := {}
 var _capital_text := ""
+## Stage S16.1: true while the bills waiting cost more political capital than there is.
+var _capital_short := false
 ## Stage S7.1: shown until a game starts, when the client starts without `--scenario`.
 var start_screen: StartScreen
 ## True once a game has started.
@@ -109,6 +111,7 @@ var _country: Label
 var _chips: HBoxContainer
 var _chip := {}  # key -> {button, value, change, entry, shown}
 var _capital: Button
+var _vital: HBoxContainer  # stage S16.1: approval and capital, kept on the bar always
 var _advance: Array[Button] = []
 var _menu: MenuButton
 var _parliament_button: Button
@@ -377,6 +380,10 @@ func _build_layout() -> void:
 		if guide.remember:
 			_save_setting("guide", "seen", true))
 	add_child(guide)
+	# Stage S16.1: the top bar over popups and sheets (their veils start under it), so the
+	# capital and approval on it stay readable whatever is open; the guide stays over all.
+	move_child(_bar, guide.get_index())
+	move_child(search.results, guide.get_index())
 	_hover_timer = Timer.new()
 	_hover_timer.one_shot = true
 	_hover_timer.wait_time = 0.25
@@ -437,18 +444,35 @@ func _build_bar() -> void:
 	_date.add_theme_font_size_override("font_size", 21)
 	where.add_child(_date)
 	row.add_child(_rule())
+	# Stage S16.1: approval and political capital first on the bar and the last to give way:
+	# the centre of the board is covered whenever a popup is open, and capital is what every
+	# decision is paid in.
+	_vital = HBoxContainer.new()
+	_vital.name = "vital"
+	_vital.add_theme_constant_override("separation", 0)
+	row.add_child(_vital)
+	_capital = _chip_button("Political capital")
+	_capital.name = "capital"
+	_capital.visible = false
+	_capital.pressed.connect(func() -> void: open_overlay("parliament"))
+	var line: HBoxContainer = _capital.get_meta("value").get_parent()
+	var coin := TextureRect.new()
+	coin.texture = Palette.icon("capital")
+	coin.custom_minimum_size = Vector2(22, 22)
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	coin.self_modulate = Palette.INK
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_child(coin)
+	line.move_child(coin, 0)
+	_vital.add_child(_capital)
+	row.add_child(_rule())
 	_chips = HBoxContainer.new()
 	_chips.add_theme_constant_override("separation", 0)
 	_chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_chips.clip_contents = true
 	row.add_child(_chips)
-	# Stage S12.5: the government's political capital, when the model has it.
-	# Stage S14.1: the political capital is at the centre of the board only (it was shown
-	# twice); this chip is kept off the bar.
-	_capital = _chip_button("Capital")
-	_capital.name = "capital"
-	_capital.visible = false
-	row.add_child(_capital)
 	row.add_child(_rule())
 	# Stage S15.1: search and Add policy, kept with words on a narrow window too.
 	search = Search.new()
@@ -476,7 +500,7 @@ func _build_bar() -> void:
 		button.name = "advance_%d" % spec[1]
 		button.theme_type_variation = "Primary" if spec[1] == 1 else "Quiet"
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		button.tooltip_text = "Run the next %s" % ["month", "three months", "twelve months"][[1, 3, 12].find(spec[1])]
+		button.tooltip_text = "Run the next %s" % ["month (Space)", "three months", "twelve months"][[1, 3, 12].find(spec[1])]
 		var count: int = spec[1]
 		button.pressed.connect(func() -> void: advance(count))
 		row.add_child(button)
@@ -491,7 +515,7 @@ func _build_bar() -> void:
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var which: String = spec[2]
 		button.pressed.connect(func() -> void: open_overlay(which))
-		button.tooltip_text = spec[0]
+		button.tooltip_text = "%s (%s)" % ["The Budget" if spec[2] == "budget" else spec[0], "B" if spec[2] == "budget" else "P"]
 		button.set_meta("words", spec[0])
 		row.add_child(button)
 		_wide.append(button)
@@ -508,12 +532,14 @@ func _build_bar() -> void:
 	_menu = MenuButton.new()
 	_menu.name = "menu"
 	_menu.text = "Menu"
+	_menu.tooltip_text = "Save, load, sound, the size of the screen, help"
 	_menu.flat = false
 	_menu.theme_type_variation = "Quiet"
 	_menu.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(_menu)
 	_parliament_button = row.get_node("open_parliament")
 	_bar.resized.connect(_fit_bar)
+	get_viewport().size_changed.connect(_fit_bar)
 	var menu := _menu.get_popup()
 	for item in [["Save", 0], ["Load", 1], ["Reload model", 2]]:
 		menu.add_item(item[0], item[1])
@@ -546,7 +572,10 @@ func _build_bar() -> void:
 ## On a narrow window the Budget and Parliament buttons show only their pictograms and the
 ## capital stays at the centre of the board, so the bar never overflows.
 func _fit_bar() -> void:
-	var narrow := _bar.size.x < 1560.0
+	# Stage S16.1: judged by the window, not the bar (which grows to what it holds, so a bar laid
+	# out wide could never find itself narrow again).
+	var width := get_viewport_rect().size.x if DisplayServer.get_name() != "headless" else _bar.size.x
+	var narrow := width < 1560.0
 	for button in _wide:
 		button.text = "" if narrow else str(button.get_meta("words"))
 	_advance[1].text = "3 months" if not narrow else "+3"
@@ -559,7 +588,7 @@ func _fit_bar() -> void:
 	var row: Control = _bar.get_child(0)
 	var chips := _chips.get_children()
 	var i := chips.size() - 1
-	while i > 0 and row.get_combined_minimum_size().x > _bar.size.x - 30.0:
+	while i >= 0 and row.get_combined_minimum_size().x > width - 30.0:
 		(chips[i] as Control).visible = false
 		i -= 1
 
@@ -720,7 +749,7 @@ func guide_steps() -> Array:
 			"text": "Inside them are the figures you will be judged by: jobs, prices, health, the budget. Point at one to see what moves it; click it to see why it moved."})
 	var group: String = first.call("group")
 	if group != "":
-		steps.append({"title": "The people", "target": func() -> Rect2: return _node_rect(group),
+		steps.append({"title": "The people", "target": func() -> Rect2: return _ring_rect(),
 			"text": "Round the middle are groups of voters in families, each arc's outer edge showing how many of them back you. Click one to see what moves them; some answer to where the government stands, which Parliament shows."})
 	steps.append({"title": "Next month", "target": func() -> Rect2: return _advance[0].get_global_rect(),
 		"text": "When you are ready, press Next month (or Space). Your changes take effect, and a short report says what happened."})
@@ -797,19 +826,26 @@ func _key_label(key: String) -> String:
 func _build_headline() -> void:
 	for child in _chips.get_children():
 		child.queue_free()
+	for child in _vital.get_children():
+		if child != _capital:
+			child.queue_free()
 	_chip.clear()
 	for key in _headline_keys():
 		var entry := _key_entry(key)
-		# Stage S14.1: the approval is the centre of the board, so not also on the top bar.
-		if entry.is_empty() or key == _approval_key():
+		if entry.is_empty():
 			continue
-		var chip := _chip_button(_key_label(key))
+		var chip := _chip_button("Approval" if key == _approval_key() else _key_label(key))
 		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		chip.name = "chip_" + key
 		chip.tooltip_text = str(entry.get("doc", ""))
 		var row_key: String = key
 		chip.pressed.connect(func() -> void: open_indicator(str(entry["name"]), row_key, chip.get_global_rect()))
-		_chips.add_child(chip)
+		# Stage S16.1: the approval stands with the capital, first on the bar.
+		if key == _approval_key():
+			_vital.add_child(chip)
+			_vital.move_child(chip, 0)
+		else:
+			_chips.add_child(chip)
 		_chip[key] = {"button": chip, "entry": entry, "shown": null}
 
 
@@ -926,6 +962,8 @@ func _show_chip(key: String, count: bool) -> void:
 		var d := float(now) - float(before)
 		var better := _better(key)
 		change.text = "▲" if d > 0.0 else "▼"
+		if key == _approval_key():  # stage S16.1: the approval says by how much
+			change.text += " " + fmt.change(entry, d)
 		change.add_theme_color_override("font_color", Palette.INK if better == "" else (Palette.GOOD if (d > 0.0) == (better == "high") else Palette.BAD))
 		chip["button"].tooltip_text = "%s\n%s on last month" % [str(entry.get("doc", "")), fmt.change(entry, d)]
 
@@ -944,6 +982,7 @@ func _show_capital() -> float:
 	var now: Variant = game.latest(str(entry.get("row", name))) if name != "" else null
 	if now == null:
 		_capital_text = ""
+		_capital.visible = false
 		return -1.0
 	var before: Variant = game.previous(str(entry.get("row", name)))
 	var text := "Political capital %.1f" % float(now)
@@ -957,10 +996,17 @@ func _show_capital() -> float:
 	_capital_text = text
 	var value: Label = _capital.get_meta("value")
 	var change: Label = _capital.get_meta("change")
+	_capital.visible = true
 	value.text = "%.1f" % float(now)
-	change.text = "%.1f waiting" % waiting if waiting > 0.0 else ""
-	change.add_theme_color_override("font_color", Palette.BAD if waiting > float(now) else Palette.PENDING)
-	_capital.tooltip_text = "%s\n%s" % [text, str(entry.get("doc", ""))]
+	# Stage S16.1: what the bills waiting will cost beside it; red, and saying so, when they
+	# cannot all be paid for.
+	var short := waiting > float(now) + 1e-9
+	change.text = ("bills waiting %.1f" % waiting) + (" · %.1f short" % (waiting - float(now)) if short else "") if waiting > 0.0 else ""
+	change.add_theme_color_override("font_color", Palette.BAD if short else Palette.PENDING)
+	value.add_theme_color_override("font_color", Palette.BAD if short else Palette.INK)
+	var why := "\nThe bills waiting cost %.1f more than there is: those that come last are refused." % (waiting - float(now)) if short else ""
+	_capital.tooltip_text = "%s%s\n%s" % [text, why, str(entry.get("doc", ""))]
+	_capital_short = short
 	return float(now)
 
 
@@ -994,7 +1040,7 @@ func _show_centre(capital: float) -> void:
 		var waiting := 0.0
 		for cost in _costs.values():
 			waiting += float(cost)
-		centre["capital"] = "Capital %.1f%s" % [capital, (", %.1f waiting" % waiting) if waiting > 0.0 else ""]
+		centre["capital"] = "Capital %.1f%s" % [capital, (" · bills waiting %.1f" % waiting) if waiting > 0.0 else ""]
 		centre["capital_colour"] = Palette.BAD if waiting > capital else (Palette.PENDING if waiting > 0.0 else Palette.INK)
 	board.centre = centre
 
@@ -1076,6 +1122,14 @@ func _node_rect(key: String) -> Rect2:
 	if label.size != Vector2.ZERO:
 		rect = rect.merge(Rect2(label.position + board.position, label.size).grow(10.0))
 	return rect
+
+
+## Stage S16.1: the whole ring of groups on screen (the guide points at all of it).
+func _ring_rect() -> Rect2:
+	if board._group_ring == null:
+		return _node_rect("centre")
+	var r: float = board._group_ring.rx + board.ring_reach()
+	return Rect2(board.position + board._c - Vector2(r, r), Vector2(r, r) * 2.0)
 
 
 ## Stage S14.1: a pennant on the strip: a question waiting is asked; a situation opens its
@@ -1408,7 +1462,7 @@ func _add_item(key: String) -> Dictionary:
 	if line == "":
 		line = str(entries.get(lever, {}).get("doc", "")).get_slice(".", 0) + "."
 	var item := {"key": key, "label": node["label"], "icon": node["icon"], "line": line,
-		"cost": "%.1f political capital" % cost if cost >= 0.0 else ""}
+		"cost": _cost_words(cost)}
 	var preview: Dictionary = game.vote_preview(lever, _raw_value(raw))
 	if preview.get("bill", false):
 		item["passes"] = bool(preview.get("passes", true)) and bool(preview.get("affordable", true))
@@ -1437,6 +1491,21 @@ func _add_item(key: String) -> Dictionary:
 		down.reverse()
 		item["boo"] = down.slice(0, 3).map(func(m): return m[1])
 	return item
+
+
+## Stage S16.1: a bill's cost on the Add policy sheet, with the capital it would leave:
+## "Costs 11.0 capital" over "56.7 of 67.7 left" (after the bills already waiting).
+func _cost_words(cost: float) -> String:
+	if cost < 0.0:
+		return ""
+	var capital := _show_capital()
+	if capital < 0.0:
+		return "Costs %.1f political capital" % cost
+	var waiting := 0.0
+	for c in _costs.values():
+		waiting += maxf(float(c), 0.0)
+	var left := capital - waiting - cost
+	return "Costs %.1f capital\n%.1f of %.1f left" % [cost, left, capital] if left >= 0.0 else "Costs %.1f capital\n%.1f more than there is" % [cost, -left]
 
 
 ## A raw setting as typed (a string) as the bridge's previews take it.
@@ -2199,6 +2268,8 @@ func _announce_election() -> void:
 	if settings.is_empty() or game.latest(str(settings.get("election", ""))) != true:
 		return
 	lost = _player_lost()
+	if lost:
+		strip.show_line("You lost the election: the game is over. Load a save from the menu to play on.", true, 0.0)
 	Sound.play("election")
 	_show_dialog("Election night" if not lost else "Election night: you have lost office",
 		politics.election_report(func(name: String) -> Dictionary: return game.cells(name), not lost))
@@ -2291,7 +2362,7 @@ func ask_dilemma() -> void:
 	var options: Array = d.get("options", [])
 	for i in options.size():
 		var answer := i + 1
-		sheet.add_action(str(options[i].get("label", options[i]["name"])), func() -> void: answer_dilemma(name, answer), i == 0)
+		sheet.add_action(str(options[i].get("label", options[i]["name"])), func() -> void: answer_dilemma(name, answer), false)
 	sheet.open()
 	Sound.play("question")
 	_update_input()

@@ -80,7 +80,7 @@ func _line(name: String, entry: Dictionary, sign: int) -> void:
 	_lines.append({"name": name, "row": row, "entry": entry, "cells": cells, "sign": sign, "button": label})
 
 func _total(key: String, title: String) -> void:
-	var total := _cell(title, Palette.TEXT, false, Palette.FONT_SIZE)
+	var total := _cell("  " + title if title != "" else title, Palette.TEXT, false, Palette.FONT_SIZE)
 	total.add_theme_font_override("font", Palette.text(600))
 	_grid.add_child(total)
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
@@ -102,7 +102,7 @@ func build(catalogue: Dictionary, entries: Dictionary, sector: String) -> void:
 	if found.is_empty():
 		_title.text = "Budget (no sector named %s in this model)" % sector
 		return
-	_title.text = "Budget of the %s, this month%s" % [str(found["label"]).to_lower(), " at an annual rate" if fmt.per_year else ""]
+	_title.text = "The %s's money this month%s" % [str(found["label"]).to_lower(), ", at an annual rate" if fmt.per_year else ""]
 	for heading in ["", "This month", "Last month", "Change"]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	# Only payments count: not purchases or sales of assets (marked financial in the

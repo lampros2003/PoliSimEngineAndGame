@@ -82,7 +82,7 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	titles.add_theme_constant_override("separation", 0)
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(titles)
-	titles.add_child(Palette.caps("Interest group"))
+	titles.add_child(Palette.caps("Group of voters"))
 	var title := Label.new()
 	title.text = str(node["label"])
 	title.theme_type_variation = "Title"
@@ -244,7 +244,7 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 func show_history(steps: PackedInt64Array, series_of: Callable, national: Array) -> void:
 	chart.series = [{"row": row, "label": "Approval", "values": series_of.call(row), "color": Palette.BLUE}]
 	if not national.is_empty():
-		chart.series.append({"row": national[0], "label": str(national[1]), "values": series_of.call(str(national[0])), "color": Palette.BRICK})
+		chart.series.append({"row": national[0], "label": str(national[1]), "values": series_of.call(str(national[0])), "color": Palette.BRICK, "removable": false})
 	chart.set_data(steps, [])
 
 

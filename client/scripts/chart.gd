@@ -61,7 +61,13 @@ func _range() -> Vector2:
 		var pad := absf(lo) * 0.05 if lo != 0.0 else 1.0  # a flat line, a little room round it
 		return Vector2(lo - pad, hi + pad)
 	var span := hi - lo
-	return Vector2(lo - span * 0.08, hi + span * 0.08)
+	var ticks := _nice_ticks(lo - span * 0.08, hi + span * 0.08)
+	if ticks.size() < 2:
+		return Vector2(lo - span * 0.08, hi + span * 0.08)
+	# Stage S16.1: out to the gridlines either side of the data, so every line sits between two
+	# labelled values.
+	var step := ticks[1] - ticks[0]
+	return Vector2(floorf(lo / step) * step, ceilf(hi / step) * step)
 
 
 static func _nice_ticks(lo: float, hi: float, wanted := 5) -> PackedFloat64Array:
@@ -151,7 +157,7 @@ func _draw() -> void:
 	# Legend, for two lines.
 	var x := PAD_LEFT
 	for s in (series if series.size() > 1 else []):
-		var text: String = s["label"] + ("  ×" if series.size() > 1 and s != series[0] else "")
+		var text: String = s["label"] + ("  ×" if series.size() > 1 and s != series[0] and s.get("removable", true) else "")
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x
 		draw_rect(Rect2(x, 14, 12, 12), s["color"])
 		draw_string(font, Vector2(x + 18, 25), text, HORIZONTAL_ALIGNMENT_LEFT, -1, small, Palette.TEXT)

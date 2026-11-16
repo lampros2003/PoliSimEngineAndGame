@@ -541,6 +541,9 @@ func preset(name: String, raw: String) -> void:
 ## `costs`: each waiting change's cost in political capital (stage S12.5); `capital`: what
 ## there is to spend, or -1 for a model without it.
 func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.0) -> void:
+	var waiting_total := 0.0
+	for c in costs.values():
+		waiting_total += maxf(float(c), 0.0)
 	for name in _rows:
 		var row: Dictionary = _rows[name]
 		var entry: Dictionary = row["entry"]
@@ -574,12 +577,12 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 			repeal_button.get_parent().visible = not repeal
 		if introducing:
 			row["pending"].text = "" if not draft.has(name) else "→ %s if the bill passes%s" % [fmt.value(entry, draft[name][1], false, false),
-				"" if draft_cost < 0.0 else " · costs %.1f political capital" % draft_cost]
+				"" if draft_cost < 0.0 else " · costs %.1f political capital%s" % [draft_cost, _left_words(capital, waiting_total + draft_cost)]]
 			row["cancel"].visible = false
 		elif pending.has(name):
 			var cost: float = costs.get(name, -1.0)
 			row["pending"].text = "→ %s from next month%s" % ["repealed" if repeal else fmt.value(entry, pending[name], false, false),
-				"" if cost < 0.0 else " · costs %.1f political capital" % cost]
+				"" if cost < 0.0 else " · costs %.1f political capital%s" % [cost, _left_words(capital, waiting_total)]]
 			row["cancel"].visible = true
 		else:
 			row["pending"].text = ""
@@ -587,22 +590,32 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 			row["vote"].visible = false
 		# Stage S14.1: no empty line under a control with nothing waiting.
 		row["pending"].get_parent().visible = row["pending"].text != ""
+	# Stage S16.1: the capital there is, and what the bills waiting (and this one) would leave.
+	capital_note.visible = capital >= 0.0
+	if capital >= 0.0:
+		var spend := waiting_total + (maxf(draft_cost, 0.0) if introducing and not draft.is_empty() else 0.0)
+		var short := spend > capital + 1e-9
+		if spend <= 0.0:
+			capital_note.text = "Political capital: %.1f to spend; a bill costs more the further it moves a policy." % capital
+		else:
+			capital_note.text = "Political capital %.1f; %s %.1f, %s" % [capital, "with this bill, the bills waiting cost" if introducing else "the bills waiting cost",
+				spend, ("leaving %.1f." % (capital - spend)) if not short else "%.1f more than there is: the bills that come last are refused." % (spend - capital)]
+		capital_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.MUTED)
 	if introducing:
 		return
 	var any := false
 	for name in _rows:
 		any = any or pending.has(name)
 	hint.visible = not any
-	capital_note.visible = capital >= 0.0
-	if capital >= 0.0:
-		var total := 0.0
-		for name in costs:
-			total += maxf(float(costs[name]), 0.0)
-		var short := total > capital
-		capital_note.text = ("Political capital: %.1f to spend; a bill costs more the further it moves a policy." % capital
-			if costs.is_empty() else "The bills waiting cost %.1f of the %.1f political capital there is.%s" % [total, capital,
-			" Not all of them can be put to the Commons: those that cost more than is left when their turn comes are refused." if short else ""])
-		capital_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.MUTED)
+
+
+## ", 54.1 of 67.7 left": what the capital would be after `spend`; "" without capital.
+static func _left_words(capital: float, spend: float) -> String:
+	if capital < 0.0:
+		return ""
+	if spend > capital + 1e-9:
+		return ", %.1f more than the %.1f there is" % [spend - capital, capital]
+	return ", %.1f of %.1f left" % [capital - spend, capital]
 
 
 ## The Commons vote a waiting change would get (the bridge's vote_preview), and whether the

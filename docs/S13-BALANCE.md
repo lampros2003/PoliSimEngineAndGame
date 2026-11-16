@@ -658,6 +658,36 @@ and law and order 336: the stances are worth -5 and +13 seats.
 - **Still wrong:** groups move by who is in which voter types, not by members alone, so small
   groups (farmers) and overlapping ones (unions with capitalists) move with their neighbours.
 
+## After S16.2
+
+Stage S16.2 (`docs/S16-PLAN.md`) rebuilt the six belief groups from More in Common's seven
+segments of the British public (2025) and YouGov's patriotism by age, as stated mixes of segments
+(`tools/uk/segments.toml`; `models/uk/politics/README.md`, "Beliefs from published segments").
+Their national shares moved from 20 / 15 / 25 / 30 / 12 / 25% (socialists, capitalists, liberals,
+conservatives, environmentalists, patriots) to 23.4 / 13.8 / 26.4 / 32.0 / 17.85 / 30.4%.
+`belief_effect` rose from 0.2 to 0.25: a clear move on order (tougher sentencing and a higher visa
+threshold) now moves conservatives +1.5 and liberals -1.3 (patriots +2.2), against +1.3 and -1.3.
+Nothing else changed.
+
+| Strategy | CL seats (S15.2) |
+|---|---|
+| (a) Nothing, first answers | 325 (325) |
+| (b) Nothing, second answers | 315 (315) |
+| (c) Crowd-pleaser | 308 (309) |
+| (d) Austerity | 334 (327) |
+| (e) Reformer | 337 (343) |
+| (f1) Basic rate 30% in Feb 2025 | 333 (335) |
+| (f2) Health cut by a quarter in Feb 2025 | 284 (284) |
+| (g) Wrecker | 62 (64) |
+| (h) Tax early, please late | 371 (372) |
+| (i) A socialist programme | 350 (349) |
+| (j) A law and order government | 358 (349) |
+
+Law and order gains the most: patriots (+5.1 against doing nothing) and conservatives (+3.7) are
+larger and older under the segments, and the stances are now worth 22 seats to it (336 with them
+off), against 13 at S15.2. It does not dominate: "tax early, please late" (371) and the socialist
+programme are still ahead of or close to it, and every strategy is within ten seats of S15.2.
+
 ## Month by month, by strategy
 
 Groups: the lowest and highest group approval in that month. Capital: held at the end of the month; earned, spent and wasted at the cap over the 12 months to that month. Growth is the annual rate of output growth that month.

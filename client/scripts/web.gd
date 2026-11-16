@@ -2242,7 +2242,9 @@ func _draw_label(n: Dictionary) -> void:
 	if n["kind"] == "centre" or (n["label_rect"] as Rect2).size == Vector2.ZERO:
 		return
 	var key: String = n["key"]
-	var focus := focus_key()
+	# Stage S16.1: the tag (value, change) for the node under the pointer only; a node whose
+	# popup is open keeps its plain label, never a tag half hidden by the popup.
+	var focus := hover
 	# Stage S14.1: a group linked to the node pointed at is lit on its arc; its name shows only
 	# at rest or when pointed at itself, never over a neighbour's.
 	var shown: bool = n.get("rest", false) or key == hover or key == selected or key == lit or (_linked.has(key) and n["kind"] != "group") 		or (searching and matches.has(key) and matches.size() <= 6)

@@ -78,8 +78,11 @@ is still too wide, the headline figures give way from the right, as many as it n
 is still on the board or in the Budget). Pressing the month opens the last month's report
 again (or closes it). A `headline` name with a leading `-` is shown negated. A
 figure's label is `[play] labels[key]`, else the catalogue's. Approval and political
-capital are shown once, at the centre of the board (stage S14.1); the top bar has no
-capital figure.
+capital lead the top bar (stage S16.1; S14.1 had taken them off as doubles of the centre,
+which the owner called a big error): capital with what the bills waiting will cost, red
+with "N short" when they cost more than there is. They are the last figures to give way on
+a narrow bar, and the bar is drawn above every popup's and sheet's veil. The centre of the
+board shows both as well.
 
 **The strip** (`strip.gd`). At its left, under the date, one line: a notice (6 s), an
 ordinary month's news (3 s) or a problem (in red, until clicked; a click on a notice of

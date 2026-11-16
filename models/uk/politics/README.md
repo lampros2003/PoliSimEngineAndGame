@@ -319,12 +319,12 @@ not):
 
 | Group | Share of adults | Source (opened or not) |
 |---|---|---|
-| Socialists | 20% | The left fifth of British Social Attitudes' left-right scale: a judgement shaped like BSA 40 and 41 (younger, lower incomes, Scotland, Wales, the North East, London); no table of shares opened |
-| Capitalists | 15% | The right sixth of that scale: older, richer, the South East: a judgement |
-| Liberals | 25% | The libertarian end of BSA's libertarian-authoritarian scale: younger, richer, London: a judgement |
-| Conservatives | 30% | Its authoritarian end: older, lower incomes, outside London: a judgement |
-| Environmentalists | 12% | The British Election Study's priority for the environment: younger, richer, London and the South West: a judgement |
-| Patriots | 25% | The British Election Study's national identity: older, England outside London: a judgement |
+| Socialists | 23.4% (20% before S16.2) | All of the Progressive Activists, two fifths of the Incrementalist Left, a sixth of the Rooted Patriots |
+| Capitalists | 13.8% (15%) | All of the Established Liberals, three fifths of the Traditional Conservatives |
+| Liberals | 26.4% (25%) | Four fifths of the Progressive Activists, half the Incrementalist Left, seven tenths of the Established Liberals |
+| Conservatives | 32.0% (30%) | All of the Traditional Conservatives, three fifths of the Rooted Patriots and of the Dissenting Disruptors |
+| Environmentalists | 17.85% (12%) | Nine tenths of the Progressive Activists, a quarter of the Incrementalist Left, a fifth of the Established Liberals |
+| Patriots | 30.4% (25%) | Four fifths of the Rooted Patriots and of the Traditional Conservatives, two fifths of the Dissenting Disruptors; then YouGov's age gradient |
 | Public sector workers | 11.5% | ONS, Public sector employment, UK, December 2024: 6.14 million (opened). Only those in work; the shape by age, income and region a judgement |
 | Trade unionists | 12% | DBT, Trade union membership, UK 1995 to 2024 (opened): 6.4 million, 22.0% of employees; the density by region is published and used; by pay, read across to income fifths |
 | Farmers | 0.85% | Defra, Agriculture in the UK 2024, chapter 2: 453,000 people on commercial holdings in June 2024 (search result read, page not opened); by region a judgement |
@@ -335,6 +335,26 @@ A voter type's membership of a group is a share of its adults, so a voter can be
 groups, and groups move by who is in which voter types. The seven regions and smokers leave
 the ring in `[play.web]` but stay in the model and in Parliament's table by place.
 
+**Beliefs from published segments (stage S16.2).** The six belief groups (the table above, their
+new shares first, stage S15.2's judgements in brackets) are mixes of More in Common's seven
+segments of the British public ("Shattered Britain", July 2025; https://www.moreincommon.org.uk/seven-segments/,
+opened, with each segment's page): Progressive Activists 12%, Incrementalist Left 21%, Established
+Liberals 9%, Sceptical Scrollers 10%, Rooted Patriots 20%, Traditional Conservatives 8%,
+Dissenting Disruptors 20%. The segment sizes and profiles are the publisher's; the pages describe
+the profiles in words (where members live, their work, their age), not figures, and the full
+report's PDF could not be read here, so the factors that turn those words into shapes by age,
+income and region are our reading of them. The mapping from segments to our six groups is our
+judgement. Both are data in `tools/uk/segments.toml`, which `voters.py` reads: each segment's share
+of a voter type is its size times its profile, raked so the segments add to one in every voter
+type and each to its published size nationally; a group is its stated mix, so its national share
+is the mix's arithmetic. Patriots then follow YouGov's "very patriotic" by age ("Patriotism in
+Britain reduces with each generation", 2015, opened: 32% of adults, 15% at 18 to 24, 49% at 60
+and over), scaled back to the mix's share; the 30.4% sits near YouGov's 32%, and the
+environmentalists' 17.85% near YouGov's 2024 tracker, where about 17% put the environment among
+the most important issues (from a search result, not opened). Sceptical Scrollers are in no belief
+group. British Social Attitudes 40 and 41 were looked for again and not opened (NatCen's site
+cannot be fetched from here).
+
 **Stances.** Four national rows, worked out each month (`tools/uk/beliefs.py`, written to
 `beliefs.toml`): `stance_state` (the state against the market), `stance_order` (liberty against
 order), `stance_green` and `stance_nation`. Every player policy is tagged with the stances it
@@ -344,19 +364,22 @@ of a level policy, and so on. Nil at the 2024 settings.
 
 **What the belief groups do.** Socialists and capitalists read the state stance, conservatives
 and liberals order, environmentalists and motorists green, patriots and liberals the nation.
-Each voter type gains `belief_effect` (0.2) times the stance's pull, which saturates at one
+Each voter type gains `belief_effect` (0.25 since stage S16.2; 0.2 before) times the stance's pull, which saturates at one
 clear move (s / (1 + |s|)), times its friends' membership over their share of adults, less its
 opponents' likewise. Membership over share has a mean of one over the electorate, so the
 electorate's mean reaction to any stance move is nil: a stance moves support from one side to
 the other and hands out no utility of its own. Votes can still move, since the two sides sit in
 different voter types, some winnable and some not: with the stances off (`belief_effect` 0) the
-law and order programme of `tools/uk/strategies.py` wins 13 fewer seats and the socialist one 5
-more. The saturation and the size were cut until no one-sided programme gains more than about 15
-seats from its stances. This is `belief_standing`, part of `government_standing`, and the group
-driver "Where the government stands". After a year, tougher sentencing with a £5,000 higher
-visa threshold moves conservatives +1.3 and liberals -1.3 against doing nothing, the country
-+0.2; five points on the basic rate with a tenth more for the NHS moves socialists +1.2 and
-capitalists -0.1 (both on top of what the policies themselves do to incomes and services).
+law and order programme of `tools/uk/strategies.py` wins 22 fewer seats and the socialist one 4
+more (stage S16.2; 13 and 5 at S15.2). The saturation and the size were set (stage S15.2) so no
+one-sided programme gains much from its stances; with the segments' membership stage S16.2 raised
+`belief_effect` from 0.2 to 0.25, the largest that keeps every strategy within ten seats of
+S15.2's. This is `belief_standing`, part of `government_standing`, and the group driver "Where
+the government stands". After a year, tougher sentencing with a £5,000 higher visa threshold
+moves conservatives +1.5, patriots +2.2 and liberals -1.3 against doing nothing, the country
++0.15 (S15.2: +1.3 and -1.3); five points on the basic rate with a tenth more for the NHS moves
+socialists +0.85 and capitalists -0.26 (both on top of what the policies themselves do to
+incomes and services).
 
 The belief shares are judgements. For stage S15.2 a published table of BSA's left-right and
 libertarian-authoritarian scale positions, or the BES's equivalents, was looked for again: the

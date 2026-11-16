@@ -1,0 +1,103 @@
+# The six belief groups from More in Common's seven segments of the British public (stage
+# S16.2, docs/S16-PLAN.md; models/uk/politics/README.md, "Beliefs from published segments").
+# Read by tools/uk/voters.py.
+#
+# The segments' sizes are the publisher's: More in Common, "Shattered Britain", July 2025,
+# https://www.moreincommon.org.uk/seven-segments/ (opened 2026-11-16). Each segment's page
+# (opened) describes where its members live, what they do and how old they tend to be in
+# words, not figures; the profile factors below turn those words into shapes by age band
+# (18-24, 25-34, 35-49, 50-64, 65+), household income fifth (poorest first) and region
+# (north_east, north_west, yorkshire, east_midlands, west_midlands, east, london, south_east,
+# south_west, wales, scotland, northern_ireland). The factors are our judgement of the pages'
+# words; the sizes are not. Within each voter type the segments are raked to add to one, and
+# each segment's national share to its published size.
+#
+# The mapping from segments to our six groups ([groups]: the share of each segment in the
+# group) is our judgement. Patriots also follow YouGov's "very patriotic" by age (2015,
+# opened: 32% of adults, 15% at 18 to 24, 49% at 60 and over).
+
+[segments.progressive_activists]
+size = 0.12
+words = "Globally minded, social justice, climate first; university campuses and cities (Hackney, Edinburgh South, Bristol Central); flatshares or living with parents"
+age = [1.8, 1.4, 1.0, 0.7, 0.5]
+quintile = [0.9, 1.0, 1.0, 1.05, 1.05]
+region = [0.8, 0.9, 0.9, 0.8, 0.8, 0.9, 1.6, 1.0, 1.1, 1.0, 1.2, 0.6]
+
+[segments.incrementalist_left]
+size = 0.21
+words = "Left of centre, averse to extremes, gradual reform; public sector jobs in schools and hospitals; cities and commuter towns (Reading, Milton Keynes, Edinburgh North, Hove, Coventry)"
+age = [0.9, 1.2, 1.2, 1.0, 0.7]
+quintile = [0.8, 1.0, 1.1, 1.1, 1.0]
+region = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0, 1.0, 1.0, 1.1, 0.8]
+
+[segments.established_liberals]
+size = 0.09
+words = "Prosperous and confident, the system broadly works, trust experts; professionals in affluent suburbs and commuter towns (Winchester, St Albans, Twickenham)"
+age = [0.6, 0.9, 1.1, 1.2, 1.0]
+quintile = [0.4, 0.6, 0.9, 1.3, 1.8]
+region = [0.7, 0.8, 0.8, 0.9, 0.9, 1.2, 1.1, 1.3, 1.1, 0.8, 0.9, 0.8]
+
+[segments.sceptical_scrollers]
+size = 0.10
+words = "Digitally native, lost faith in institutions, drawn to influencers; living with parents or renting in city centres (Birmingham Perry Barr, Glasgow South, Luton North); several jobs"
+age = [2.2, 1.6, 1.0, 0.6, 0.3]
+quintile = [1.3, 1.2, 1.0, 0.8, 0.7]
+region = [1.0, 1.0, 1.0, 1.0, 1.1, 1.0, 1.2, 0.9, 0.8, 0.9, 1.1, 0.9]
+
+[segments.rooted_patriots]
+size = 0.20
+words = "Patriotic, untethered, worried by community decline and migration, interventionist on economics, conservative on social issues; practical jobs, retired or caring for grandchildren, own their homes; villages, Red Wall and coastal towns (Scarborough, Merthyr Tydfil, Redcar, Hartlepool)"
+age = [0.5, 0.7, 0.9, 1.2, 1.4]
+quintile = [1.1, 1.15, 1.05, 0.9, 0.8]
+region = [1.3, 1.15, 1.2, 1.1, 1.1, 1.0, 0.5, 0.9, 1.0, 1.2, 0.9, 1.0]
+
+[segments.traditional_conservatives]
+size = 0.08
+words = "Respect authority and tradition, individual responsibility, sceptical of immigration and net zero; own their homes outright on a comfortable pension; rural areas and market towns (Hexham, Stratford-on-Avon, Richmond)"
+age = [0.2, 0.4, 0.8, 1.2, 2.0]
+quintile = [0.7, 0.9, 1.0, 1.1, 1.3]
+region = [1.0, 0.9, 1.0, 1.1, 1.0, 1.1, 0.5, 1.2, 1.2, 1.0, 0.9, 1.2]
+
+[segments.dissenting_disruptors]
+size = 0.20
+words = "Want radical change and strong leaders, distrust institutions, oppose multiculturalism; manual and service work, social housing; post-industrial towns (Blackpool, Clacton, Ashfield, Dudley, Wolverhampton)"
+age = [1.0, 1.1, 1.1, 1.0, 0.8]
+quintile = [1.5, 1.3, 1.0, 0.7, 0.5]
+region = [1.2, 1.2, 1.2, 1.2, 1.2, 1.0, 0.6, 0.9, 0.9, 1.1, 0.9, 0.9]
+
+# Share of each segment in each group (our judgement). A voter may be in several groups.
+[groups.socialists]
+why = "The left on economics: all of the Progressive Activists, two fifths of the Incrementalist Left, and the Rooted Patriots who are interventionist on economics (a sixth)"
+progressive_activists = 1.0
+incrementalist_left = 0.4
+rooted_patriots = 0.15
+
+[groups.capitalists]
+why = "The market's friends: the Established Liberals, who think the system works, and most Traditional Conservatives, who prize individual responsibility"
+established_liberals = 1.0
+traditional_conservatives = 0.6
+
+[groups.liberals]
+why = "Liberty before order: most Progressive Activists and Established Liberals and half the Incrementalist Left"
+progressive_activists = 0.8
+incrementalist_left = 0.5
+established_liberals = 0.7
+
+[groups.conservatives]
+why = "Order and tradition: the Traditional Conservatives, and most Rooted Patriots and Dissenting Disruptors (crime and disorder among their main worries)"
+traditional_conservatives = 1.0
+rooted_patriots = 0.6
+dissenting_disruptors = 0.6
+
+[groups.environmentalists]
+why = "Climate first: almost all Progressive Activists, a quarter of the Incrementalist Left and a fifth of the Established Liberals (about 18%, near YouGov's 17% who put the environment among the top issues in 2024)"
+progressive_activists = 0.9
+incrementalist_left = 0.25
+established_liberals = 0.2
+
+[groups.patriots]
+why = "The nation first: most Rooted Patriots and Traditional Conservatives and two fifths of the Dissenting Disruptors (about 30%, near YouGov's 32% very patriotic), then shaped by YouGov's age gradient"
+rooted_patriots = 0.8
+traditional_conservatives = 0.8
+dissenting_disruptors = 0.4
+age = [0.47, 0.75, 1.0, 1.3, 1.53]

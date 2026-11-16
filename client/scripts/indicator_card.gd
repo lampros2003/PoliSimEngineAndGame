@@ -157,7 +157,7 @@ func _kind_word() -> String:
 			return "Policy"
 		"account":
 			return "Account"
-	return "Indicator"
+	return "Statistic"
 
 
 func _muted(words: String) -> Label:
