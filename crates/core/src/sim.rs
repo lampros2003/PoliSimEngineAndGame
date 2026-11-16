@@ -1230,6 +1230,14 @@ impl Simulation {
 
     /// Runs one step and returns its results.
     pub fn step(&mut self) -> Result<Row> {
+        self.advance()?;
+        self.record()
+    }
+
+    /// Stage S14.3: runs one step without making its row or its state hash, for a look
+    /// ahead that reads only the last month. The state is exactly as after [`Simulation::step`];
+    /// [`Simulation::state_hash`] gives the same hash when it is asked for.
+    pub fn advance(&mut self) -> Result<()> {
         let index = self.step;
         match self.step_inner() {
             Ok(()) => {}
@@ -1241,7 +1249,7 @@ impl Simulation {
         if self.tracing {
             self.take_snapshot();
         }
-        self.record()
+        Ok(())
     }
 
     /// After a step fails part-way, puts every value back as it was at the end of the last
@@ -1553,6 +1561,12 @@ impl Simulation {
     }
 
     fn record(&self) -> Result<Row> {
+        Ok(Row { step: self.step - 1, values: self.row_values()?, hash: self.state_hash() })
+    }
+
+    /// Stage S14.3: the values of [`Row::values`] as they are now, without the state hash
+    /// (an error, as [`Simulation::step`] would give, when a total does not fit).
+    pub fn row_values(&self) -> Result<Vec<Val>> {
         let mut values = Vec::with_capacity(self.row_sources.len());
         for source in &self.row_sources {
             values.push(match *source {
@@ -1562,7 +1576,7 @@ impl Simulation {
                 RowSource::Defeated => Val::I(self.defeated),
             });
         }
-        Ok(Row { step: self.step - 1, hash: self.state_hash(), values })
+        Ok(values)
     }
 
     /// Current per-record values of a symbol.
@@ -1949,14 +1963,20 @@ fn plan(m: &Model, deps: &[Vec<usize>]) -> Result<Vec<Phase>> {
         }
         let mut order: Vec<usize> = Vec::with_capacity(members.len());
         let mut remaining = members.clone();
+        // Stage S14.3: membership by symbol, not by searching the lists.
+        let mut waiting = vec![false; m.symbols.len()];
+        for &id in &members {
+            waiting[id] = true;
+        }
         while !remaining.is_empty() {
-            let ready =
-                remaining.iter().position(|id| deps[*id].iter().all(|u| order.contains(u) || !members.contains(u)));
+            let ready = remaining.iter().position(|id| deps[*id].iter().all(|u| !waiting[*u]));
             let Some(position) = ready else {
                 let names: Vec<&str> = remaining.iter().map(|id| m.symbols[*id].name.as_str()).collect();
                 return model_err(format!("circular dependency in phase {}: {}", m.phases[p], names.join(", ")));
             };
-            order.push(remaining.remove(position)); // earliest declared among those that are ready
+            let id = remaining.remove(position); // earliest declared among those that are ready
+            waiting[id] = false;
+            order.push(id);
         }
         let mut level_of: HashMap<usize, usize> = HashMap::new();
         let mut levels: Vec<Vec<usize>> = Vec::new();

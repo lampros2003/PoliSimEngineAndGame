@@ -2,24 +2,27 @@
 //!
 //! GDScript sees one class, `PoliSim`. The game session runs on a worker thread owned by
 //! this library; the interface thread sends it requests and reads a mirror of the
-//! session's state that the worker refreshes after every request. No Godot object is
-//! ever touched off the main thread, and a slow step never blocks the window.
+//! session's state that the worker refreshes after every request (stage S14.3: with what
+//! changed only, so a request costs the same in the first month and the hundredth). No
+//! Godot object is ever touched off the main thread, and a slow step never blocks the
+//! window. Forecasts and the effects table run on threads of their own (stage S14.3), so
+//! the next month never waits for them.
 //!
 //! Units: values read back are as the engine stores them (money in minor units, such as
 //! pence). Lever settings are written as a person types them (money in major units).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use godot::prelude::*;
 use polisim_core::describe::Catalogue;
 use polisim_core::model::Kind;
 use polisim_core::session::{Change, Effect, Forecast, History, MIRRORED_CELLS, Outlook, Record};
-use polisim_core::{Chamber, Explanation, Migration, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
+use polisim_core::{Chamber, Explanation, Link, Migration, Model, Num, RawValue, Session, Ty, Val, check_lever, pyfmt};
 
 struct PoliSimExtension;
 
@@ -38,16 +41,70 @@ enum Request {
     Reload,
     /// Stage S13.1: lever changes (as typed), months, tag.
     Forecast(Vec<(String, RawValue)>, u64, String),
-    /// Stage S13.1: levers, months.
+    /// Stage S13.1: levers (stage S14.3: in the order they are to be done), months.
     Effects(Vec<String>, u64),
     /// Stage S13.1: entity, condition, count, columns, tag.
     Records(String, String, usize, Vec<String>, String),
 }
 
-/// Stage S13.1: how many levers of the effects table are computed at a time, off the
-/// worker. Two leave room for the game's own month (the engine uses every core within a
-/// step); a third gained about a tenth on the UK.
-const EFFECT_THREADS: usize = 2;
+/// Stage S14.3: how many levers of the effects table are computed at a time: every core
+/// but one (left for the game's own month and the interface), at most sixteen.
+fn effect_threads() -> usize {
+    std::thread::available_parallelism().map_or(2, |n| n.get()).saturating_sub(1).clamp(1, 16)
+}
+
+/// Stage S14.3: an effects table: generation, months, effects so far, complete.
+type Table = (u64, u64, Vec<Effect>, bool);
+
+/// Stage S14.3: what the threads that look ahead share with the worker and the interface.
+#[derive(Default)]
+struct Looks {
+    /// Bumped by a month, a load, a reload, a new game and closing: forecasts stop.
+    month: AtomicU64,
+    /// Bumped by those and by every lever change: what an "as is" branch starts from.
+    state: AtomicU64,
+    /// The newest forecast asked for; older ones stop.
+    forecast: AtomicU64,
+    /// Forecasts running: the effects table waits for them between months.
+    forecasting: AtomicUsize,
+    /// The last "as is" branch run: state, months, outlook. A forecast and the effects
+    /// table of the same game share it.
+    as_is: Mutex<Option<(u64, u64, Outlook)>>,
+    /// The last effects table: its generation, months, effects so far, and whether it is
+    /// complete (a save keeps a complete one of the game as it is).
+    table: Mutex<Option<Table>>,
+}
+
+impl Looks {
+    fn as_is(&self, state: u64, months: u64) -> Option<Outlook> {
+        let held = self.as_is.lock().ok()?;
+        held.as_ref().filter(|(s, m, _)| *s == state && *m == months).map(|(_, _, o)| o.clone())
+    }
+
+    fn keep_as_is(&self, state: u64, months: u64, outlook: &Outlook) {
+        if let Ok(mut held) = self.as_is.lock()
+            && self.state.load(Ordering::SeqCst) == state
+        {
+            *held = Some((state, months, outlook.clone()));
+        }
+    }
+}
+
+/// Stage S14.3: counts a forecast as running until it ends, even by a panic.
+struct Running(Arc<Looks>);
+
+impl Running {
+    fn start(looks: &Arc<Looks>) -> Running {
+        looks.forecasting.fetch_add(1, Ordering::SeqCst);
+        Running(Arc::clone(looks))
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.forecasting.fetch_sub(1, Ordering::SeqCst);
+    }
+}
 
 /// What the interface may read without asking the worker.
 #[derive(Clone, Default)]
@@ -73,8 +130,85 @@ struct ModelInfo {
     catalogue: Catalogue,
 }
 
+/// Stage S14.3: what a month changes in the mirror.
+struct MonthState {
+    latest: BTreeMap<String, Val>,
+    previous: BTreeMap<String, Val>,
+    cells: BTreeMap<String, (Vec<f64>, Vec<f64>)>,
+    capital_prices: Option<(f64, f64)>,
+    chamber: Option<Chamber>,
+}
+
+/// Stage S14.3: the mirror's change after a request: always the small parts; what a month
+/// changes only when a month has run (or the game was loaded or reloaded); the history and
+/// the changes either appended to the copy the interface keeps or, after a load or reload,
+/// in place of it.
+struct Update {
+    steps_done: u64,
+    pending: Vec<(String, Val)>,
+    failed: Option<String>,
+    month: Option<Box<MonthState>>,
+    reset: bool,
+    history: History,
+    changes: Vec<Change>,
+}
+
+impl View {
+    fn apply(&mut self, u: Update) {
+        self.steps_done = u.steps_done;
+        self.pending = u.pending;
+        self.failed = u.failed;
+        if let Some(m) = u.month {
+            let m = *m;
+            (self.latest, self.previous, self.cells) = (m.latest, m.previous, m.cells);
+            (self.capital_prices, self.chamber) = (m.capital_prices, m.chamber);
+        }
+        if u.reset {
+            self.history = u.history;
+            self.changes = u.changes;
+        } else {
+            self.history.append(u.history);
+            self.changes.extend(u.changes);
+        }
+    }
+}
+
+/// Stage S14.3: how much of the session the interface's mirror already has.
+struct Sent {
+    history: usize,
+    changes: usize,
+    steps_done: u64,
+}
+
+impl Sent {
+    fn of(session: &Session) -> Sent {
+        Sent {
+            history: session.history().steps.len(),
+            changes: session.changes().len(),
+            steps_done: session.steps_done(),
+        }
+    }
+
+    fn update(&mut self, session: &Session, failed: &Option<String>, reset: bool) -> Update {
+        let reset = reset || session.history().steps.len() < self.history || session.changes().len() < self.changes;
+        let (history, changes) = if reset { (0, 0) } else { (self.history, self.changes) };
+        let month = (reset || session.steps_done() != self.steps_done).then(|| Box::new(month_state(session)));
+        let update = Update {
+            steps_done: session.steps_done(),
+            pending: session.pending(),
+            failed: failed.clone(),
+            month,
+            reset,
+            history: if reset { session.history().clone() } else { session.history().tail(history) },
+            changes: session.changes()[changes..].to_vec(),
+        };
+        *self = Sent::of(session);
+        update
+    }
+}
+
 enum Reply {
-    View(Box<View>),
+    Update(Box<Update>),
     Model(Box<ModelInfo>),
     Event(EventData),
 }
@@ -123,7 +257,14 @@ enum EventData {
     },
 }
 
-fn view_of(session: &Session, failed: &Option<String>) -> View {
+/// The whole mirror, for a new game.
+fn view_of(session: &Session) -> View {
+    let mut view = View::default();
+    view.apply(Sent::of(session).update(session, &None, true));
+    view
+}
+
+fn month_state(session: &Session) -> MonthState {
     let catalogue = session.catalogue();
     let mut latest = BTreeMap::new();
     let mut previous = BTreeMap::new();
@@ -144,14 +285,9 @@ fn view_of(session: &Session, failed: &Option<String>) -> View {
             previous.insert(row.clone(), v);
         }
     }
-    View {
-        steps_done: session.steps_done(),
+    MonthState {
         latest,
         previous,
-        pending: session.pending(),
-        changes: session.changes().to_vec(),
-        history: session.history().clone(),
-        failed: failed.clone(),
         cells,
         capital_prices: session.capital_prices(),
         chamber: session.simulation().chamber(),
@@ -211,20 +347,25 @@ fn worker(
     replies: Sender<Reply>,
     outstanding: Arc<AtomicUsize>,
     generation: Arc<AtomicU64>,
+    looks: Arc<Looks>,
 ) {
     // Stage S7.4: a loaded game keeps the language the game was opened in.
     let language = session.language().to_string();
     let mut failed: Option<String> = None;
+    let mut sent = Sent::of(&session);
+    let mut work = Work { replies: replies.clone(), generation, looks, table: None, send_saved: false };
     for request in requests {
+        let mut reset = matches!(request, Request::Load(_) | Request::Reload);
         // Stage S10: a panic in the engine must not leave the game waiting for a thread that
         // has died. It is caught, the run is marked failed (loading a save or reloading the
         // model recovers), and the player is told.
         let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            handle(&mut session, request, &mut failed, &language, &replies, &generation)
+            handle(&mut session, request, &mut failed, &language, &mut work)
         }));
         let event = match handled {
             Ok(event) => event,
             Err(payload) => {
+                reset = true;
                 let what = payload
                     .downcast_ref::<&str>()
                     .map(|s| s.to_string())
@@ -235,9 +376,13 @@ fn worker(
                 Some(EventData::Failed(message))
             }
         };
-        let _ = replies.send(Reply::View(Box::new(view_of(&session, &failed))));
+        let _ = replies.send(Reply::Update(Box::new(sent.update(&session, &failed, reset))));
         if let Some(event) = event {
             let _ = replies.send(Reply::Event(event));
+        }
+        // Stage S14.3: a loaded game's saved effects table, after the `loaded` event.
+        if std::mem::take(&mut work.send_saved) {
+            work.saved_table(&session);
         }
         outstanding.fetch_sub(1, Ordering::SeqCst);
     }
@@ -249,14 +394,13 @@ fn handle(
     request: Request,
     failed: &mut Option<String>,
     language: &str,
-    replies: &Sender<Reply>,
-    generation: &Arc<AtomicU64>,
+    work: &mut Work,
 ) -> Option<EventData> {
     {
         match request {
             Request::Step(count) => {
                 // Stage S13.1: effects computed for the month before are stale.
-                generation.fetch_add(1, Ordering::SeqCst);
+                work.new_month();
                 let mut done = 0;
                 let mut error = None;
                 if let Some(message) = failed.as_ref() {
@@ -285,17 +429,18 @@ fn handle(
             Request::SetLever(name, raw) => {
                 // Already checked on the interface thread; a refusal here changes nothing.
                 let _ = session.set_lever(&name, raw);
-                None
+                work.lever_changed(session, &name)
             }
             Request::CancelLever(name) => {
                 session.cancel_lever(&name);
-                None
+                work.lever_changed(session, &name)
             }
             Request::Explain(name) => {
                 let result = session.explain(&name).map(Box::new).map_err(|e| e.to_string());
                 Some(EventData::Explained { name, result })
             }
             Request::Save(path) => {
+                work.keep_table(session);
                 let error = std::fs::write(&path, session.save()).err().map(|e| e.to_string());
                 Some(EventData::Saved { path: path.display().to_string(), error })
             }
@@ -310,8 +455,9 @@ fn handle(
                         }
                         *session = next;
                         *failed = None;
-                        generation.fetch_add(1, Ordering::SeqCst);
-                        let _ = replies.send(Reply::Model(Box::new(model_info(session))));
+                        work.new_month();
+                        let _ = work.replies.send(Reply::Model(Box::new(model_info(session))));
+                        work.send_saved = true;
                         Some(EventData::Loaded {
                             migration: session.migration().cloned(),
                             missing_mods: session.missing_mods().to_vec(),
@@ -325,61 +471,200 @@ fn handle(
             }
             Request::Reload => match session.reload() {
                 Ok(reset) => {
-                    generation.fetch_add(1, Ordering::SeqCst);
+                    work.new_month();
                     // A failed step was undone, so a corrected model carries on from the
                     // end of the last good month.
                     *failed = None;
-                    let _ = replies.send(Reply::Model(Box::new(model_info(session))));
+                    let _ = work.replies.send(Reply::Model(Box::new(model_info(session))));
                     Some(EventData::Reloaded { reset, error: None })
                 }
                 Err(e) => Some(EventData::Reloaded { reset: Vec::new(), error: Some(e.to_string()) }),
             },
-            Request::Forecast(changes, months, tag) => {
-                let result = session.forecast(&changes, months).map(Box::new).map_err(|e| e.to_string());
-                Some(EventData::Forecast { tag, months, result })
-            }
+            Request::Forecast(changes, months, tag) => work.forecast(session, &changes, months, tag),
             Request::Records(entity, where_row, count, columns, tag) => {
                 let result = session.records(&entity, &where_row, count, &columns).map_err(|e| e.to_string());
                 Some(EventData::Records { tag, result })
             }
-            Request::Effects(levers, months) => {
-                // Stage S13.1: a new table makes any earlier one stale. The worker only
-                // copies the game; the table is computed on a thread of its own, so the
-                // next month never waits for it.
-                let mine = generation.fetch_add(1, Ordering::SeqCst) + 1;
-                let fork = session.fork();
-                let (replies, generation) = (replies.clone(), Arc::clone(generation));
-                let spawned = std::thread::Builder::new().name("polisim-effects".to_string()).spawn(move || {
-                    let stale = || generation.load(Ordering::SeqCst) != mine;
-                    let sent = AtomicU64::new(0);
-                    let each = |effect: Effect| {
-                        if !stale() {
-                            sent.fetch_add(1, Ordering::SeqCst);
-                            let event = EventData::Effect { generation: mine, effect: Box::new(effect) };
-                            let _ = replies.send(Reply::Event(event));
-                        }
-                    };
-                    match fork {
-                        Ok(fork) => {
-                            // A panic in the engine ends the table early, not the game.
-                            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                                fork.effects(&levers, months, EFFECT_THREADS, &stale, &each)
-                            }));
-                        }
-                        Err(e) => {
-                            for lever in levers {
-                                each(Effect { lever, step: 0.0, forecast: Err(e.clone()) });
-                            }
-                        }
-                    }
-                    if !stale() {
-                        let count = sent.load(Ordering::SeqCst);
-                        let _ = replies.send(Reply::Event(EventData::EffectsDone { generation: mine, count }));
-                    }
-                });
-                spawned.err().map(|e| EventData::Failed(format!("cannot start the effects thread: {e}")))
-            }
+            Request::Effects(levers, months) => work.effects(session, levers, months),
         }
+    }
+}
+
+/// What the worker needs to start work on threads of its own.
+struct Work {
+    replies: Sender<Reply>,
+    /// Stage S13.1: bumped whenever effects already computed go stale.
+    generation: Arc<AtomicU64>,
+    looks: Arc<Looks>,
+    /// Stage S14.3: the effects table asked for since the last month, load or reload (its
+    /// levers in order, and months); a lever change starts it again.
+    table: Option<(Vec<String>, u64)>,
+    /// Stage S14.3: a game was just loaded: send its saved effects table, if it has one.
+    send_saved: bool,
+}
+
+impl Work {
+    /// A month, a load or a reload: everything looked ahead at is stale.
+    fn new_month(&mut self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.looks.month.fetch_add(1, Ordering::SeqCst);
+        self.looks.state.fetch_add(1, Ordering::SeqCst);
+        self.table = None;
+    }
+
+    /// Stage S14.3: a lever change alters the "as is" branch, so an effects table asked
+    /// for this month starts again, with that lever first.
+    fn lever_changed(&mut self, session: &Session, lever: &str) -> Option<EventData> {
+        self.looks.state.fetch_add(1, Ordering::SeqCst);
+        let Some((mut levers, months)) = self.table.take() else {
+            // No table asked for this month: one already made (a saved one) is stale.
+            self.generation.fetch_add(1, Ordering::SeqCst);
+            return None;
+        };
+        if let Some(k) = levers.iter().position(|l| l == lever) {
+            let first = levers.remove(k);
+            levers.insert(0, first);
+        }
+        self.effects(session, levers, months)
+    }
+
+    /// Stage S13.1: a new table makes any earlier one stale. The worker only copies the
+    /// game; the table is computed on threads of its own (stage S14.3: every core but one,
+    /// pausing between months while a forecast runs), so the next month never waits for it.
+    fn effects(&mut self, session: &Session, levers: Vec<String>, months: u64) -> Option<EventData> {
+        let mine = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.table = Some((levers.clone(), months));
+        let state = self.looks.state.load(Ordering::SeqCst);
+        let fork = session.fork();
+        if let Ok(mut table) = self.looks.table.lock() {
+            *table = Some((mine, months, Vec::new(), false));
+        }
+        let (replies, generation, looks) =
+            (self.replies.clone(), Arc::clone(&self.generation), Arc::clone(&self.looks));
+        let spawned = std::thread::Builder::new().name("polisim-effects".to_string()).spawn(move || {
+            let stale = || generation.load(Ordering::SeqCst) != mine;
+            let stop = || {
+                while looks.forecasting.load(Ordering::SeqCst) > 0 && !stale() {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+                stale()
+            };
+            let sent = AtomicU64::new(0);
+            let each = |effect: Effect| {
+                if !stale() {
+                    if let Ok(mut table) = looks.table.lock()
+                        && let Some((g, _, found, _)) = table.as_mut()
+                        && *g == mine
+                    {
+                        found.push(effect.clone());
+                    }
+                    sent.fetch_add(1, Ordering::SeqCst);
+                    let event = EventData::Effect { generation: mine, effect: Box::new(effect) };
+                    let _ = replies.send(Reply::Event(event));
+                }
+            };
+            let finished = match fork {
+                // A panic in the engine ends the table early, not the game.
+                Ok(fork) => std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let as_is = match looks.as_is(state, months) {
+                        Some(outlook) => Ok(outlook),
+                        None => match fork.run_until(&[], months, &stop) {
+                            Ok(None) => return,
+                            Ok(Some(outlook)) => {
+                                looks.keep_as_is(state, months, &outlook);
+                                Ok(outlook)
+                            }
+                            Err(e) => Err(e),
+                        },
+                    };
+                    fork.effects_from(&as_is, &levers, months, effect_threads(), &stop, &each);
+                }))
+                .is_ok(),
+                Err(e) => {
+                    for lever in levers {
+                        each(Effect { lever, step: 0.0, forecast: Err(e.clone()) });
+                    }
+                    true
+                }
+            };
+            if !stale() {
+                if let Ok(mut table) = looks.table.lock()
+                    && let Some((g, _, _, complete)) = table.as_mut()
+                    && *g == mine
+                {
+                    *complete = finished;
+                }
+                let count = sent.load(Ordering::SeqCst);
+                let _ = replies.send(Reply::Event(EventData::EffectsDone { generation: mine, count }));
+            }
+        });
+        spawned.err().map(|e| EventData::Failed(format!("cannot start the effects thread: {e}")))
+    }
+
+    /// Stage S14.3: a forecast on a thread of its own. The newest request wins: an older
+    /// one, or one for a game since stepped, loaded or reloaded, stops at the next month
+    /// and says nothing. It shares the "as is" branch with the effects table.
+    fn forecast(
+        &mut self,
+        session: &Session,
+        changes: &[(String, RawValue)],
+        months: u64,
+        tag: String,
+    ) -> Option<EventData> {
+        let looks = &self.looks;
+        let mine = looks.forecast.fetch_add(1, Ordering::SeqCst) + 1;
+        let (fork, changes) = match session.fork().and_then(|fork| session.checked(changes).map(|c| (fork, c))) {
+            Ok(ready) => ready,
+            Err(e) => return Some(EventData::Forecast { tag, months, result: Err(e.to_string()) }),
+        };
+        let (month, state) = (looks.month.load(Ordering::SeqCst), looks.state.load(Ordering::SeqCst));
+        let running = Running::start(looks);
+        let (replies, looks) = (self.replies.clone(), Arc::clone(looks));
+        let spawned = std::thread::Builder::new().name("polisim-forecast".to_string()).spawn(move || {
+            let _running = running;
+            let stale = || looks.forecast.load(Ordering::SeqCst) != mine || looks.month.load(Ordering::SeqCst) != month;
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let forecast = fork.forecast(looks.as_is(state, months), &changes, months, &stale);
+                if let Ok(Some(f)) = &forecast {
+                    looks.keep_as_is(state, months, &f.as_is);
+                }
+                forecast
+            }));
+            let result = match ran {
+                Ok(Ok(Some(forecast))) => Ok(Box::new(forecast)),
+                Ok(Ok(None)) => return,
+                Ok(Err(e)) => Err(e.to_string()),
+                Err(_) => Err("internal error in the engine while looking ahead".to_string()),
+            };
+            if !stale() {
+                let _ = replies.send(Reply::Event(EventData::Forecast { tag, months, result }));
+            }
+        });
+        spawned.err().map(|e| EventData::Failed(format!("cannot start the forecast thread: {e}")))
+    }
+
+    /// Stage S14.3: a save keeps the effects table when it is complete and of the game as
+    /// it is now.
+    fn keep_table(&self, session: &mut Session) {
+        let now = self.generation.load(Ordering::SeqCst);
+        let table = self.looks.table.lock().ok().and_then(|t| t.clone());
+        let table = table.filter(|(g, _, _, complete)| *g == now && *complete);
+        session.keep_effects(table.map(|(_, months, effects, _)| (months, effects)));
+    }
+
+    /// Stage S14.3: a loaded game's saved effects table, sent as if just computed.
+    fn saved_table(&mut self, session: &Session) {
+        let Some((months, effects)) = session.effects_kept() else { return };
+        let mine = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Ok(mut table) = self.looks.table.lock() {
+            *table = Some((mine, *months, effects.clone(), true));
+        }
+        for effect in effects {
+            let event = EventData::Effect { generation: mine, effect: Box::new(effect.clone()) };
+            let _ = self.replies.send(Reply::Event(event));
+        }
+        let count = effects.len() as u64;
+        let _ = self.replies.send(Reply::Event(EventData::EffectsDone { generation: mine, count }));
     }
 }
 
@@ -563,6 +848,19 @@ fn strings(items: &[String]) -> PackedStringArray {
     out
 }
 
+/// Stage S14.3: a route through the dependency graph, as {name, lagged} dictionaries.
+fn links(route: &[Link]) -> VarArray {
+    route
+        .iter()
+        .map(|l| {
+            let mut d = VarDictionary::new();
+            d.set("name", l.name.as_str());
+            d.set("lagged", l.lagged);
+            d.to_variant()
+        })
+        .collect()
+}
+
 fn explanation_dict(e: &Explanation) -> VarDictionary {
     let mut parts = VarArray::new();
     for p in &e.parts {
@@ -708,6 +1006,8 @@ pub struct PoliSim {
     outstanding: Arc<AtomicUsize>,
     /// Stage S13.1: bumped whenever effects already computed go stale.
     generation: Arc<AtomicU64>,
+    /// Stage S14.3: what the forecast and effects threads share; a new one for each game.
+    looks: Arc<Looks>,
     model: Option<Arc<Model>>,
     catalogue: Option<Catalogue>,
     play: VarDictionary,
@@ -725,6 +1025,7 @@ impl IRefCounted for PoliSim {
             thread: None,
             outstanding: Arc::new(AtomicUsize::new(0)),
             generation: Arc::new(AtomicU64::new(0)),
+            looks: Arc::new(Looks::default()),
             model: None,
             catalogue: None,
             play: VarDictionary::new(),
@@ -744,6 +1045,9 @@ impl Drop for PoliSim {
 impl PoliSim {
     fn close(&mut self) {
         self.requests = None; // ends the worker's loop
+        // Stage S14.3: forecasts and effects still running for this game stop.
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.looks.month.fetch_add(1, Ordering::SeqCst);
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
@@ -805,7 +1109,9 @@ impl PoliSim {
         let info = model_info(&session);
         self.model = Some(info.model);
         self.catalogue = Some(info.catalogue);
-        self.view = view_of(&session, &None);
+        self.view = view_of(&session);
+        self.looks = Arc::new(Looks::default());
+        let looks = Arc::clone(&self.looks);
         let (request_tx, request_rx) = channel();
         let (reply_tx, reply_rx) = channel();
         let outstanding = Arc::clone(&self.outstanding);
@@ -815,7 +1121,7 @@ impl PoliSim {
         let generation = Arc::clone(&self.generation);
         let spawned = std::thread::Builder::new()
             .name("polisim-simulation".to_string())
-            .spawn(move || worker(session, request_rx, reply_tx, outstanding, generation));
+            .spawn(move || worker(session, request_rx, reply_tx, outstanding, generation, looks));
         match spawned {
             Ok(handle) => {
                 self.thread = Some(handle);
@@ -839,32 +1145,18 @@ impl PoliSim {
     fn poll(&mut self) -> VarArray {
         let mut events = VarArray::new();
         let Some(replies) = &self.replies else { return events };
-        let mut pending_model = None;
-        let mut view = None;
         let mut out = Vec::new();
+        // Stage S14.3: updates are applied in the order sent, so all state is in place
+        // before any event is returned.
         while let Ok(reply) = replies.try_recv() {
             match reply {
-                Reply::View(v) => view = Some(*v),
-                Reply::Model(info) => pending_model = Some(*info),
-                Reply::Event(e) => {
-                    // Apply state before announcing the event that refers to it.
-                    if let Some(v) = view.take() {
-                        self.view = v;
-                    }
-                    if let Some(info) = pending_model.take() {
-                        self.model = Some(info.model);
-                        self.catalogue = Some(info.catalogue);
-                    }
-                    out.push(e);
+                Reply::Update(u) => self.view.apply(*u),
+                Reply::Model(info) => {
+                    self.model = Some(info.model);
+                    self.catalogue = Some(info.catalogue);
                 }
+                Reply::Event(e) => out.push(e),
             }
-        }
-        if let Some(v) = view {
-            self.view = v;
-        }
-        if let Some(info) = pending_model {
-            self.model = Some(info.model);
-            self.catalogue = Some(info.catalogue);
         }
         let now = self.generation.load(Ordering::SeqCst);
         for e in out {
@@ -977,8 +1269,41 @@ impl PoliSim {
     /// reload or a new table makes it stale: what is left of it is dropped.
     #[func]
     fn request_effects(&mut self, levers: PackedStringArray, months: i64) -> bool {
-        let levers = levers.as_slice().iter().map(|l| l.to_string()).collect();
-        self.send(Request::Effects(levers, months.max(0) as u64))
+        self.request_effects_first(PackedStringArray::new(), levers, months)
+    }
+
+    /// Stage S14.3: as `request_effects`, doing the levers in `first` (those also in
+    /// `levers`, in their order) before the rest; for the policy under the pointer.
+    #[func]
+    fn request_effects_first(&mut self, first: PackedStringArray, levers: PackedStringArray, months: i64) -> bool {
+        let levers: Vec<String> = levers.as_slice().iter().map(|l| l.to_string()).collect();
+        let mut order: Vec<String> =
+            first.as_slice().iter().map(|l| l.to_string()).filter(|l| levers.contains(l)).collect();
+        for lever in levers {
+            if !order.contains(&lever) {
+                order.push(lever);
+            }
+        }
+        self.send(Request::Effects(order, months.max(0) as u64))
+    }
+
+    /// Stage S14.3: every value a change in `from` reaches through the model's formulas,
+    /// nearest first, each as {name, lagged} (lagged: the route found passes a lag, so the
+    /// change shows there a month or more later). Empty for an unknown name. Answered at
+    /// once from the catalogue.
+    #[func]
+    fn reach(&self, from: GString) -> VarArray {
+        let Some(catalogue) = &self.catalogue else { return VarArray::new() };
+        links(&catalogue.reach(&from.to_string()))
+    }
+
+    /// Stage S14.3: a shortest chain of values from `from` to `to`, each reading the one
+    /// before it, both ends included, each as {name, lagged} (lagged: the link into it is
+    /// through a lag). Empty when `to` cannot be reached.
+    #[func]
+    fn path(&self, from: GString, to: GString) -> VarArray {
+        let Some(catalogue) = &self.catalogue else { return VarArray::new() };
+        links(&catalogue.path(&from.to_string(), &to.to_string()))
     }
 
     /// Stage S13.1: up to `count` records of `entity` for which `where_row` is true ("" for

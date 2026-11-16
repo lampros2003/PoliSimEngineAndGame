@@ -19,6 +19,12 @@
 //!              then per name, one f64 per step (NaN where the value did not exist)
 //! latest       u32 count; name text, value          (values of the last step)
 //! previous     u32 count; name text, value          (values of the step before)
+//! cells        version 1: latest then previous: u32 count; name text, u64 length, f64 each
+//! effects      version 5: u8 0 (none) or 1, then: months u64; u32 row count, row names;
+//!              u32 cell count, each name and u64 length; the shared "as is" outlook;
+//!              u32 lever count; per lever: lever text, step f64, then u8 0 and the changed
+//!              outlook, or u8 1, 2 or 3 (a model, formula or run error) and its text
+//! outlook      hash 32 bytes; one value per row name; then each cell, f64
 //! ```
 //!
 //! A raw value is a tag (0 whole number, 1 real, 2 true/false, 3 text) and its bytes; a
@@ -31,21 +37,21 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use toml::{Table as Toml, Value};
 
-use crate::describe::Catalogue;
+use crate::describe::{Catalogue, Link};
 use crate::error::{Error, Result, model_err, sim_err};
 use crate::explain::Explanation;
 use crate::model::{Kind, Model, Scenario, load_model_with_mods, load_scenario_with_mods};
 use crate::program::{Col, Ty, Val};
 use crate::save::Migration;
-use crate::sim::{Computed, Row, Simulation, VotePreview};
+use crate::sim::{Computed, Simulation, VotePreview};
 use crate::text::load_text;
 
 const MAGIC: &[u8; 8] = b"PSIMSESS";
 /// 0: before S4.5; 1 adds dimensioned values' cells (a version 0 game loads without them);
 /// 2 adds each policy change's vote in the legislature (S5.4; older games count every
 /// change as passed). 3 adds the mods chosen; 4 each change's cost in political capital and whether
-/// it was refused (S12.4).
-const SAVE_VERSION: u32 = 4;
+/// it was refused (S12.4); 5 the effects table kept (S14.3; older games load without one).
+const SAVE_VERSION: u32 = 5;
 
 /// A lever change that has taken effect.
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +106,47 @@ impl History {
             if column.len() == length {
                 column.push(f64::NAN);
             }
+        }
+    }
+
+    /// Stage S14.3: the steps from position `from` on, with every name (nothing when there
+    /// are none), for a copy kept elsewhere to [`History::append`].
+    pub fn tail(&self, from: usize) -> History {
+        if from >= self.steps.len() {
+            return History::default();
+        }
+        let mut tail = History {
+            names: self.names.clone(),
+            steps: self.steps[from..].to_vec(),
+            hashes: self.hashes[from..].to_vec(),
+            values: self.values.iter().map(|v| v[from..].to_vec()).collect(),
+            index: HashMap::new(),
+        };
+        tail.rebuild_index();
+        tail
+    }
+
+    /// Stage S14.3: adds a later [`History::tail`] of the same game, so that the copy equals
+    /// the whole history (names it did not have yet come with NaN for the steps before).
+    pub fn append(&mut self, tail: History) {
+        let length = self.steps.len();
+        let added = tail.steps.len();
+        self.steps.extend(tail.steps);
+        self.hashes.extend(tail.hashes);
+        for (name, values) in tail.names.into_iter().zip(tail.values) {
+            let index = match self.index.get(&name) {
+                Some(i) => *i,
+                None => {
+                    self.index.insert(name.clone(), self.names.len());
+                    self.names.push(name);
+                    self.values.push(vec![f64::NAN; length]);
+                    self.names.len() - 1
+                }
+            };
+            self.values[index].extend(values);
+        }
+        for column in &mut self.values {
+            column.resize(length + added, f64::NAN);
         }
     }
 
@@ -174,6 +221,13 @@ pub struct Fork {
     waiting: Vec<(String, Val)>,
 }
 
+/// Stage S14.3: another copy of the game to look ahead with, so two branches run at once.
+impl Clone for Fork {
+    fn clone(&self) -> Fork {
+        Fork { sim: self.sim.fork(), waiting: self.waiting.clone() }
+    }
+}
+
 fn reals(column: &Col) -> Vec<f64> {
     match column {
         Col::I(v) => v.iter().map(|x| *x as f64).collect(),
@@ -195,21 +249,72 @@ impl Fork {
     /// then `changes` (stored values; one to a lever already waiting replaces it) applied
     /// at the first step. A step that fails returns its error.
     pub fn run(&self, changes: &[(String, Val)], months: u64) -> Result<Outlook> {
+        Fork::go(self.sim.fork(), &self.waiting, changes, months, &|| false).map(|o| o.expect("never stopped"))
+    }
+
+    /// Stage S14.3: as [`Fork::run`], asking `stop` before each month; `None` once it says
+    /// so (a look ahead nobody wants any more ends within a month).
+    pub fn run_until(
+        &self,
+        changes: &[(String, Val)],
+        months: u64,
+        stop: &dyn Fn() -> bool,
+    ) -> Result<Option<Outlook>> {
+        Fork::go(self.sim.fork(), &self.waiting, changes, months, stop)
+    }
+
+    /// Stage S14.3: as [`Fork::run_until`], running the fork itself instead of a copy of it.
+    pub fn run_into(self, changes: &[(String, Val)], months: u64, stop: &dyn Fn() -> bool) -> Result<Option<Outlook>> {
+        Fork::go(self.sim, &self.waiting, changes, months, stop)
+    }
+
+    /// Stage S14.3: [`Session::forecast`] from this fork (`changes` as stored values): both
+    /// branches at once, each on a copy of the game of its own (this fork is one of them),
+    /// or only the changed one when the "as is" branch for these months is given. `None`
+    /// once `stop` says so.
+    pub fn forecast(
+        self,
+        as_is: Option<Outlook>,
+        changes: &[(String, Val)],
+        months: u64,
+        stop: &(dyn Fn() -> bool + Sync),
+    ) -> Result<Option<Forecast>> {
+        let (as_is, changed) = match as_is {
+            Some(as_is) => (Ok(Some(as_is)), self.run_into(changes, months, stop)),
+            None => {
+                let other = self.clone();
+                rayon::join(|| other.run_into(&[], months, stop), || self.run_into(changes, months, stop))
+            }
+        };
+        let (Some(as_is), Some(changed)) = (as_is?, changed?) else { return Ok(None) };
+        Ok(Some(Forecast { months, as_is, changed }))
+    }
+
+    fn go(
+        mut sim: Simulation,
+        waiting: &[(String, Val)],
+        changes: &[(String, Val)],
+        months: u64,
+        stop: &dyn Fn() -> bool,
+    ) -> Result<Option<Outlook>> {
         if months == 0 {
             return sim_err("a look ahead needs at least one month");
         }
-        let mut sim = self.sim.fork();
-        let mut now = self.waiting.clone();
+        let mut now = waiting.to_vec();
         for (lever, value) in changes {
             now.retain(|(l, _)| l != lever);
             now.push((lever.clone(), *value));
         }
         sim.put_levers(&now)?;
-        let mut row: Option<Row> = None;
         for _ in 0..months {
-            row = Some(sim.step()?);
+            if stop() {
+                return Ok(None);
+            }
+            sim.advance()?;
+            // Stage S14.3: the month's row is checked as a step checks it, and only the
+            // last month's state hash is made.
+            sim.row_values()?;
         }
-        let row = row.expect("at least one step");
         let model = sim.model();
         let cells = model
             .symbols
@@ -218,7 +323,8 @@ impl Fork {
             .filter(|d| model.dims[d.dims[0]].size() <= MIRRORED_CELLS)
             .filter_map(|d| sim.column(&d.name).map(|c| (d.name.clone(), reals(c))))
             .collect();
-        Ok(Outlook { hash: row.hash, rows: sim.row_names().iter().cloned().zip(row.values).collect(), cells })
+        let rows = sim.row_names().iter().cloned().zip(sim.row_values()?).collect();
+        Ok(Some(Outlook { hash: sim.state_hash(), rows, cells }))
     }
 
     /// One step up in a lever, from the value it has in the "as is" branch: for a real
@@ -283,8 +389,9 @@ impl Fork {
 
     /// The effects table: for each lever, one step up ([`Fork::nudge`]) against one shared
     /// "as is" branch, `months` ahead. Levers are taken in order, `threads` at a time, and
-    /// each result goes to `each` as it is ready (so not always in order). It stops early,
-    /// before the next lever, once `stop` says so.
+    /// each result goes to `each` as it is ready (so not always in order). It stops early
+    /// once `stop` says so (stage S14.3: asked before every month; a lever it stops is not
+    /// reported).
     pub fn effects(
         &self,
         levers: &[String],
@@ -293,26 +400,54 @@ impl Fork {
         stop: &(dyn Fn() -> bool + Sync),
         each: &(dyn Fn(Effect) + Sync),
     ) {
-        let as_is = self.run(&[], months);
+        let as_is = match self.run_until(&[], months, stop) {
+            Ok(None) => return,
+            Ok(Some(outlook)) => Ok(outlook),
+            Err(e) => Err(e),
+        };
+        self.effects_from(&as_is, levers, months, threads, stop, each);
+    }
+
+    /// Stage S14.3: as [`Fork::effects`], against an "as is" branch already run for these
+    /// months (one a forecast of the same game shares).
+    pub fn effects_from(
+        &self,
+        as_is: &Result<Outlook>,
+        levers: &[String],
+        months: u64,
+        threads: usize,
+        stop: &(dyn Fn() -> bool + Sync),
+        each: &(dyn Fn(Effect) + Sync),
+    ) {
         let next = AtomicUsize::new(0);
-        std::thread::scope(|scope| {
-            for _ in 0..threads.max(1) {
-                scope.spawn(|| {
-                    while !stop() {
-                        let Some(lever) = levers.get(next.fetch_add(1, Ordering::SeqCst)) else { break };
-                        let (step, forecast) = match (&as_is, self.nudge(lever)) {
-                            (Err(e), _) => (0.0, Err(e.clone())),
-                            (_, Err(e)) => (0.0, Err(e)),
-                            (Ok(base), Ok((value, step))) => {
-                                let changed = self.run(&[(lever.clone(), value)], months);
-                                (step, changed.map(|changed| Forecast { months, as_is: base.clone(), changed }))
-                            }
-                        };
-                        each(Effect { lever: lever.clone(), step, forecast });
-                    }
-                });
+        let work = || {
+            while !stop() {
+                let Some(lever) = levers.get(next.fetch_add(1, Ordering::SeqCst)) else { break };
+                let (step, forecast) = match (as_is, self.nudge(lever)) {
+                    (Err(e), _) => (0.0, Err(e.clone())),
+                    (_, Err(e)) => (0.0, Err(e)),
+                    (Ok(base), Ok((value, step))) => match self.run_until(&[(lever.clone(), value)], months, stop) {
+                        Ok(None) => break,
+                        Ok(Some(changed)) => (step, Ok(Forecast { months, as_is: base.clone(), changed })),
+                        Err(e) => (step, Err(e)),
+                    },
+                };
+                each(Effect { lever: lever.clone(), step, forecast });
             }
-        });
+        };
+        let threads = threads.max(1);
+        match rayon::ThreadPoolBuilder::new().num_threads(threads).build() {
+            Ok(pool) => pool.scope(|scope| {
+                for _ in 0..threads {
+                    scope.spawn(|_| work());
+                }
+            }),
+            Err(_) => std::thread::scope(|scope| {
+                for _ in 0..threads {
+                    scope.spawn(work);
+                }
+            }),
+        }
     }
 }
 
@@ -341,6 +476,9 @@ pub struct Session {
     /// scenario's `[play]` table as written, before any text was applied to it.
     language: String,
     play_written: Toml,
+    /// Stage S14.3: an effects table of the game as it is now (months, effects), kept in
+    /// its save; anything that changes the game drops it.
+    effects: Option<(u64, Vec<Effect>)>,
 }
 
 impl Session {
@@ -382,6 +520,7 @@ impl Session {
             missing_mods: Vec::new(),
             language: String::new(),
             play_written: Toml::new(),
+            effects: None,
         };
         session.play_written = session.scenario.play.clone();
         // Lever settings are known before any step.
@@ -464,6 +603,29 @@ impl Session {
         &self.sim
     }
 
+    /// Stage S14.3: keeps an effects table of the game as it is now (all its levers, in the
+    /// order computed, against one shared "as is" branch), to be written in its save; `None`
+    /// drops one kept. The caller vouches that it is of this game as it is: a month, a lever
+    /// change or a reload drops it.
+    pub fn keep_effects(&mut self, table: Option<(u64, Vec<Effect>)>) {
+        self.effects = table;
+    }
+
+    /// Stage S14.3: the effects table kept (months, effects), as a loaded game had it.
+    pub fn effects_kept(&self) -> Option<&(u64, Vec<Effect>)> {
+        self.effects.as_ref()
+    }
+
+    /// Stage S14.3: what a change in `from` reaches, nearest first (see [`Catalogue::reach`]).
+    pub fn reach(&self, from: &str) -> Vec<Link> {
+        self.catalogue.reach(from)
+    }
+
+    /// Stage S14.3: a shortest chain from `from` to `to` (see [`Catalogue::path`]).
+    pub fn path(&self, from: &str, to: &str) -> Vec<Link> {
+        self.catalogue.path(from, to)
+    }
+
     pub fn steps_done(&self) -> u64 {
         self.sim.steps_done()
     }
@@ -517,6 +679,7 @@ impl Session {
                 return Err(error);
             }
         };
+        self.effects = None;
         let named: Vec<(String, Val)> = self.sim.row_names().iter().cloned().zip(row.values.iter().copied()).collect();
         self.history.push(row.step, row.hash, &named);
         self.previous = std::mem::take(&mut self.latest);
@@ -549,6 +712,7 @@ impl Session {
         commands.retain(|(step, lever, _)| !(*step == next && lever == name));
         commands.push((next, name.to_string(), raw));
         self.sim.set_commands(commands);
+        self.effects = None;
         Ok(value)
     }
 
@@ -564,6 +728,7 @@ impl Session {
         let mut commands = self.sim.commands();
         commands.retain(|(step, lever, _)| !(*step == next && lever == name));
         self.sim.set_commands(commands);
+        self.effects = None;
     }
 
     /// Stage S9.1: the dilemmas open now with no answer scheduled for the next step, in
@@ -617,12 +782,13 @@ impl Session {
     /// uncharged (see [`Fork`]). The two branches run at the same time.
     pub fn forecast(&self, changes: &[(String, Value)], months: u64) -> Result<Forecast> {
         let fork = self.fork()?;
-        let changes = changes
-            .iter()
-            .map(|(lever, raw)| self.sim.check_lever(lever, raw).map(|v| (lever.clone(), v)))
-            .collect::<Result<Vec<_>>>()?;
-        let (as_is, changed) = rayon::join(|| fork.run(&[], months), || fork.run(&changes, months));
-        Ok(Forecast { months, as_is: as_is?, changed: changed? })
+        let changes = self.checked(changes)?;
+        fork.forecast(None, &changes, months, &|| false).map(|f| f.expect("never stopped"))
+    }
+
+    /// Stage S14.3: lever changes as a person types them, as they would be stored.
+    pub fn checked(&self, changes: &[(String, Value)]) -> Result<Vec<(String, Val)>> {
+        changes.iter().map(|(lever, raw)| self.sim.check_lever(lever, raw).map(|v| (lever.clone(), v))).collect()
     }
 
     /// Stage S13.1: what the legislature would do with a change of `lever` to `raw` (as a
@@ -704,6 +870,7 @@ impl Session {
         self.scenario.model = (*model).clone();
         self.model = model;
         self.sim = sim;
+        self.effects = None;
         // Stage S7.4: in the same language (its text may have changed too); if that text is
         // gone, the model's own words.
         if self.relabel().is_err() {
@@ -780,6 +947,14 @@ impl Session {
                     out.extend_from_slice(&v.to_bits().to_le_bytes());
                 }
             }
+        }
+        // Version 5: the effects table kept, if there is one that can be written.
+        match self.effects.as_ref().and_then(|(months, effects)| table_bytes(*months, effects)) {
+            Some(table) => {
+                out.push(1);
+                out.extend_from_slice(&table);
+            }
+            None => out.push(0),
         }
         out
     }
@@ -894,10 +1069,15 @@ impl Session {
                 session.previous_cells = map;
             }
         }
+        if version >= 5 && r.take(1)?[0] == 1 {
+            session.effects = Some(read_table(&mut r)?);
+        }
         if r.pos != bytes.len() {
             return Err(damaged());
         }
         if migration.is_some() {
+            // An effects table of other model files says nothing about this one.
+            session.effects = None;
             // Shown values the model no longer has go; levers show their carried setting.
             let known = |name: &String| model.sym_index.contains_key(name);
             session.latest.retain(|name, _| known(name));
@@ -919,6 +1099,117 @@ impl Session {
 
 fn damaged() -> Error {
     Error::Model("the saved game is damaged".to_string())
+}
+
+/// Stage S14.3: an effects table as a save keeps it (see the file layout above); `None`
+/// when it has no forecast or its forecasts do not share one "as is" branch and one shape.
+fn table_bytes(months: u64, effects: &[Effect]) -> Option<Vec<u8>> {
+    let base = effects.iter().find_map(|e| e.forecast.as_ref().ok().map(|f| &f.as_is))?;
+    let shaped = |o: &Outlook| {
+        o.rows.len() == base.rows.len()
+            && o.rows.iter().zip(&base.rows).all(|(a, b)| a.0 == b.0)
+            && o.cells.len() == base.cells.len()
+            && o.cells.iter().zip(&base.cells).all(|(a, b)| a.0 == b.0 && a.1.len() == b.1.len())
+    };
+    let shared = effects.iter().all(|e| match &e.forecast {
+        Ok(f) => f.months == months && f.as_is == *base && shaped(&f.changed),
+        Err(_) => true,
+    });
+    if !shared {
+        return None;
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(&months.to_le_bytes());
+    out.extend_from_slice(&(base.rows.len() as u32).to_le_bytes());
+    for (name, _) in &base.rows {
+        put_text(&mut out, name);
+    }
+    out.extend_from_slice(&(base.cells.len() as u32).to_le_bytes());
+    for (name, cells) in &base.cells {
+        put_text(&mut out, name);
+        out.extend_from_slice(&(cells.len() as u64).to_le_bytes());
+    }
+    put_outlook(&mut out, base);
+    out.extend_from_slice(&(effects.len() as u32).to_le_bytes());
+    for effect in effects {
+        put_text(&mut out, &effect.lever);
+        out.extend_from_slice(&effect.step.to_bits().to_le_bytes());
+        match &effect.forecast {
+            Ok(f) => {
+                out.push(0);
+                put_outlook(&mut out, &f.changed);
+            }
+            Err(e) => {
+                out.push(match e {
+                    Error::Model(_) => 1,
+                    Error::Formula(_) => 2,
+                    Error::Sim(_) => 3,
+                });
+                put_text(&mut out, e.message());
+            }
+        }
+    }
+    Some(out)
+}
+
+fn put_outlook(out: &mut Vec<u8>, outlook: &Outlook) {
+    out.extend_from_slice(&outlook.hash);
+    for (_, value) in &outlook.rows {
+        put_val(out, value);
+    }
+    for (_, cells) in &outlook.cells {
+        for v in cells {
+            out.extend_from_slice(&v.to_bits().to_le_bytes());
+        }
+    }
+}
+
+fn read_table(r: &mut Reader) -> Result<(u64, Vec<Effect>)> {
+    let months = r.u64()?;
+    let mut rows = Vec::new();
+    for _ in 0..r.u32()? {
+        rows.push(r.text()?);
+    }
+    let mut cells = Vec::new();
+    for _ in 0..r.u32()? {
+        let name = r.text()?;
+        let count = usize::try_from(r.u64()?).map_err(|_| damaged())?;
+        if count > r.bytes.len() {
+            return Err(damaged());
+        }
+        cells.push((name, count));
+    }
+    let outlook = |r: &mut Reader| -> Result<Outlook> {
+        let hash = r.take(32)?.try_into().expect("32 bytes");
+        let mut values = Vec::with_capacity(rows.len());
+        for name in &rows {
+            values.push((name.clone(), r.val()?));
+        }
+        let mut shown = Vec::with_capacity(cells.len());
+        for (name, count) in &cells {
+            let mut v = Vec::with_capacity(*count);
+            for _ in 0..*count {
+                v.push(f64::from_bits(r.u64()?));
+            }
+            shown.push((name.clone(), v));
+        }
+        Ok(Outlook { hash, rows: values, cells: shown })
+    };
+    let as_is = outlook(r)?;
+    let mut effects = Vec::new();
+    for _ in 0..r.u32()? {
+        let lever = r.text()?;
+        let step = f64::from_bits(r.u64()?);
+        let forecast = match r.take(1)?[0] {
+            0 => Ok(Forecast { months, as_is: as_is.clone(), changed: outlook(r)? }),
+            1 => Err(Error::Model(r.text()?)),
+            2 => Err(Error::Formula(r.text()?)),
+            3 => Err(Error::Sim(r.text()?)),
+            _ => return Err(damaged()),
+        };
+        effects.push(Effect { lever, step, forecast });
+    }
+    Ok((months, effects))
 }
 
 fn put_text(out: &mut Vec<u8>, text: &str) {

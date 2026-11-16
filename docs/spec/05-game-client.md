@@ -461,6 +461,14 @@ dictionaries with a `kind` key. Everything the screen reads (`latest`, `previous
 from a mirror the worker refreshes after each request, so reading never waits for the
 simulation. No Godot object is touched off the main thread.
 
+Stage S14.3: the worker sends the mirror only what changed: after a month, that month's
+results (appended to the history and the changes the mirror keeps) and the latest and
+previous values; after any other request, the changes waiting; after a load or a reload,
+everything. A request costs the same in the first month and the hundredth, and every
+reading returns what it did before. `is_busy()` counts the requests on the worker;
+forecasts and the effects table run on threads of their own and are not counted, so
+"Next month" never waits for them.
+
 Stage S7.1: `open_with_mods(scenario_path, mods)` opens a scenario with mods the player
 chose; `scenarios(base)` and `mods(folders)` list what the start screen offers, read
 without opening anything; `active_mods()` and `mod_notes()` describe the game in play; the
@@ -500,6 +508,9 @@ Events from these calls carry both `kind` and `type` (the same value).
 |---|---|
 | `request_forecast(changes, months, tag)` | A `forecast` event: `tag`, `months`, `rows` (every result row, as `latest()` names them, to `[as_is, changed]`), `cells` (every one-dimensional value of at most 64 cells to `{as_is, changed}`, each a `PackedFloat64Array`) and `error` ("" when it ran). "As is" is the game with the changes already waiting; "changed" adds `changes` (lever name to value as typed), replacing any waiting change to the same lever |
 | `request_effects(levers, months)` | One `effects` event per lever, in the order they finish: `lever`, `step`, `rows`, `cells` and `error`, each against one shared "as is" branch; then `effects_done` with `count` |
+| `request_effects_first(first, levers, months)` | Stage S14.3: as `request_effects`, starting with the levers of `first` that are also in `levers` (the policy under the pointer), then the rest in order |
+| `reach(from)` | Stage S14.3: at once, from the catalogue: every value a change in `from` reaches through the model's formulas, nearest first, as `{name, lagged}` (`lagged`: the route found passes a lag or `prev()`, so the change shows there a month or more later). Readers are found from each entry's `inputs` and then `lagged_inputs`, in catalogue order. Empty for an unknown name |
+| `path(from, to)` | Stage S14.3: at once: a shortest chain from `from` to `to`, both ends included, each reading the one before it, as `{name, lagged}` (`lagged`: the link into it is through a lag). Empty when `to` cannot be reached |
 | `vote_preview(lever, value)` | At once, from the mirror: `bill`, `votes_for`, `seats`, `passes` (the vote would carry), `cost` (-1 without political capital or when the change is no bill) and `affordable` (the capital less what the bills already waiting would spend before it, in the order they were made, covers the cost). Empty when the lever or value is not valid |
 | `request_records(entity, where_row, count, columns, tag)` | A `records` event: `tag`, `records` (each `id`, `weight` and the latest value of each of `columns`) and `error`. Up to `count` records for which `where_row` is true (a per-record true/false value, or a formula of the entity's values; "" for all), every k-th of those that match, so the same request gives the same records. Unknown names give an error naming them |
 
@@ -514,6 +525,19 @@ what bills spent) come back with an `error` saying why.
 month never waits for it. A month, a load, a reload or a new table makes it stale: the
 computation stops at the next lever and nothing more of it reaches `poll()`. On the UK
 model a 12-month forecast takes about 0.3 s and a 12-month table of every lever about 8 s.
+
+**Stage S14.3.** A forecast runs on a thread of its own. The newest request wins: an older
+forecast, or one of a game since stepped, loaded or reloaded, stops at its next month and
+sends no event (a lever change does not stop it; the client asks again after one). The
+effects table runs on every core but one (at most 16), stops at the next month (not the
+next lever) when stale, and waits between months while a forecast runs, so the forecast
+comes first. A lever change (`set_lever`, `cancel_lever`) changes the "as is" branch, so a
+table asked for since the last month starts again at once with that lever first; its
+`effects_done` still comes. A forecast and the table of the same game share their "as is"
+branch: a forecast after the table has run only its changed branch. A save keeps the last
+complete table of the game as it is (session file version 5); loading it sends its
+`effects` events and `effects_done` straight after `loaded`, so the board has its links
+from the first frame. An older save loads without one.
 
 ## Lever inputs and political capital
 

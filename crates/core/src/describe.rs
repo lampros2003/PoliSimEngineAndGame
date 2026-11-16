@@ -110,7 +110,75 @@ pub fn humanise(name: &str) -> String {
     }
 }
 
+/// Stage S14.3: one step of a route through the dependency graph: an entry, and whether the
+/// link that led to it reads the value before it through a lag (`prev()` or a lag's chain).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Link {
+    pub name: String,
+    pub lagged: bool,
+}
+
 impl Catalogue {
+    /// Stage S14.3: a breadth-first search from `from` along "is read by" (each entry's
+    /// inputs, then its lagged inputs, readers in catalogue order: the order the game
+    /// client's own search used). Each entry reached, in order, with the entry it was
+    /// reached from and whether that link is lagged.
+    fn search<'a>(&'a self, from: &'a str) -> Vec<(&'a str, usize, bool)> {
+        let mut readers: std::collections::HashMap<&str, Vec<(&str, bool)>> = Default::default();
+        for entry in &self.entries {
+            for (list, lagged) in [(&entry.inputs, false), (&entry.lagged_inputs, true)] {
+                for used in list {
+                    let of = readers.entry(used.as_str()).or_default();
+                    if !of.iter().any(|(n, _)| *n == entry.name) {
+                        of.push((entry.name.as_str(), lagged));
+                    }
+                }
+            }
+        }
+        let mut found: Vec<(&str, usize, bool)> = vec![(from, 0, false)];
+        let mut seen: std::collections::HashSet<&str> = [from].into();
+        let mut at = 0;
+        while at < found.len() {
+            for &(next, lagged) in readers.get(found[at].0).map(Vec::as_slice).unwrap_or_default() {
+                if seen.insert(next) {
+                    found.push((next, at, lagged));
+                }
+            }
+            at += 1;
+        }
+        found
+    }
+
+    /// Stage S14.3: every entry a change in `from` reaches through the static dependency
+    /// graph, nearest first, each marked lagged when the route found to it passes a lag
+    /// (so the change shows there a step or more later). Empty for an unknown name.
+    pub fn reach(&self, from: &str) -> Vec<Link> {
+        let found = self.search(from);
+        let mut lagged = vec![false; found.len()];
+        for k in 1..found.len() {
+            lagged[k] = found[k].2 || lagged[found[k].1];
+        }
+        found.iter().zip(lagged).skip(1).map(|(f, lagged)| Link { name: f.0.to_string(), lagged }).collect()
+    }
+
+    /// Stage S14.3: a shortest chain of entries from `from` to `to`, each reading the one
+    /// before it, both ends included, each marked when the link into it is lagged. Empty
+    /// when `to` cannot be reached; just `from` when they are the same.
+    pub fn path(&self, from: &str, to: &str) -> Vec<Link> {
+        let found = self.search(from);
+        let Some(mut k) = found.iter().position(|f| f.0 == to) else { return Vec::new() };
+        let mut out = Vec::new();
+        loop {
+            out.push(Link { name: found[k].0.to_string(), lagged: found[k].2 });
+            if k == 0 {
+                break;
+            }
+            k = found[k].1;
+        }
+        out.reverse();
+        out
+    }
+
     /// Stage S6.1: fills each entry's inputs from a simulation of the same model: the
     /// values its formula reads (`deps`, `lagged` by symbol, as the simulation compiled
     /// them) and, for an account, the flows into and out of it. The icon web draws them.

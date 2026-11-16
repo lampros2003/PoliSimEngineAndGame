@@ -31,7 +31,7 @@ pub mod text;
 pub mod units;
 pub mod vm;
 
-pub use describe::Catalogue;
+pub use describe::{Catalogue, Link};
 pub use error::{Error, Result};
 pub use explain::{Explanation, Num, Part};
 pub use model::{

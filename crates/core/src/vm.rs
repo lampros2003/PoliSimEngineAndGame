@@ -301,6 +301,11 @@ fn eval_all(prog: &Program, cx: &EvalCtx, entity: Option<usize>, count: usize, p
     // Records (and cells) are independent, so tasks of whole blocks run on several threads
     // and give what one thread would; the parts are joined in order, and the first failure
     // in order is the one reported, as if the blocks had run one after another.
+    if let Some(out) = eval_into(prog, cx, entity, count, prepared, once, task) {
+        return Ok(out);
+    }
+    // Something failed: run again in parts, to report the first failure in order with the
+    // values before it.
     let starts: Vec<usize> = (0..count).step_by(task).collect();
     let parts: Vec<Partial> =
         starts.par_iter().map(|&s| eval_range(prog, cx, entity, s, (s + task).min(count), prepared, once)).collect();
@@ -315,6 +320,51 @@ fn eval_all(prog: &Program, cx: &EvalCtx, entity: Option<usize>, count: usize, p
         }
     }
     Ok(out)
+}
+
+/// Stage S14.3: every record or cell, tasks of `task` written straight into one column
+/// (no parts to join). `None` if any task failed.
+fn eval_into(
+    prog: &Program,
+    cx: &EvalCtx,
+    entity: Option<usize>,
+    count: usize,
+    prepared: &Prepared,
+    once: Option<(&Hoisted, &[Val])>,
+    task: usize,
+) -> Option<Col> {
+    fn fill<T: Copy + Send>(
+        out: &mut [T],
+        task: usize,
+        register: impl Fn(&Regs, usize) -> &[T] + Sync,
+        run: impl Fn(usize, usize, &mut dyn FnMut(&Regs, usize)) -> bool + Sync,
+    ) -> bool {
+        out.par_chunks_mut(task).enumerate().all(|(k, chunk)| {
+            let mut at = 0;
+            run(k * task, chunk.len(), &mut |regs, len| {
+                chunk[at..at + len].copy_from_slice(&register(regs, len)[..len]);
+                at += len;
+            })
+        })
+    }
+    let r = prog.result as usize;
+    let run = |start: usize, len: usize, sink: &mut dyn FnMut(&Regs, usize)| {
+        run_range(prog, cx, entity, start, start + len, prepared, once, sink).is_ok()
+    };
+    match prog.ty {
+        Ty::Int => {
+            let mut out = vec![0i64; count];
+            fill(&mut out, task, |regs, _| &regs.i[r], run).then_some(Col::I(out))
+        }
+        Ty::Real => {
+            let mut out = vec![0.0f64; count];
+            fill(&mut out, task, |regs, _| &regs.f[r], run).then_some(Col::F(out))
+        }
+        Ty::Bool => {
+            let mut out = vec![false; count];
+            fill(&mut out, task, |regs, _| &regs.b[r], run).then_some(Col::B(out))
+        }
+    }
 }
 
 /// Format 1: evaluates a formula with dimensions for every cell of its domain, in row-major
@@ -505,10 +555,34 @@ fn eval_range(
     prepared: &Prepared,
     once: Option<(&Hoisted, &[Val])>,
 ) -> Partial {
+    let r = prog.result as usize;
+    let mut out = empty(prog.ty, end - start);
+    let ran = run_range(prog, cx, entity, start, end, prepared, once, &mut |regs, len| match &mut out {
+        Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
+        Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
+        Col::B(v) => v.extend_from_slice(&regs.b[r][..len]),
+    });
+    match ran {
+        Ok(()) => Ok(out),
+        Err((at, e)) => Err((at, e, out)),
+    }
+}
+
+/// Records (or cells) `start..end`, block after block, each block's registers handed to
+/// `sink` with its length. On failure: where the failing block starts, and why.
+#[allow(clippy::too_many_arguments)]
+fn run_range(
+    prog: &Program,
+    cx: &EvalCtx,
+    entity: Option<usize>,
+    start: usize,
+    end: usize,
+    prepared: &Prepared,
+    once: Option<(&Hoisted, &[Val])>,
+    sink: &mut dyn FnMut(&Regs, usize),
+) -> Result<(), (usize, String)> {
     let count = end - start;
     let mut regs = Regs::take(prog, BLOCK.min(count.max(1)));
-    let r = prog.result as usize;
-    let mut out = empty(prog.ty, count);
     let mut at = start;
     let ops = once.map_or(prog.ops.as_slice(), |(h, _)| h.each.as_slice());
     while at < end {
@@ -524,17 +598,13 @@ fn eval_range(
         }
         if let Err(e) = run_block(prog, ops, cx, entity, at, len, &mut regs, prepared) {
             regs.put();
-            return Err((at, e, out));
+            return Err((at, e));
         }
-        match &mut out {
-            Col::I(v) => v.extend_from_slice(&regs.i[r][..len]),
-            Col::F(v) => v.extend_from_slice(&regs.f[r][..len]),
-            Col::B(v) => v.extend_from_slice(&regs.b[r][..len]),
-        }
+        sink(&regs, len);
         at += len;
     }
     regs.put();
-    Ok(out)
+    Ok(())
 }
 
 /// `wsum` and `wcount`. Whole-number sums are exact; a real sum is accumulated in
