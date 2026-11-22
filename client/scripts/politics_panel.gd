@@ -245,7 +245,7 @@ func _draw_stance(c: Control, info: Dictionary) -> void:
 		c.draw_string(strong, Vector2(x, y + 5), words, align, width, Palette.SMALL, Palette.INK)
 		if who != "":
 			c.draw_string(body, Vector2(x, y + 24), who, align, width, Palette.SMALL, Palette.MUTED)
-	c.draw_string(body, Vector2(x0, y + 28), "%+.1f" % value, HORIZONTAL_ALIGNMENT_CENTER, x1 - x0, Palette.SMALL, Palette.MUTED)
+	c.draw_string(body, Vector2(x0, y + 28), "0.0" if absf(value) < 0.05 else ("+" if value > 0.0 else "−") + "%.1f" % absf(value), HORIZONTAL_ALIGNMENT_CENTER, x1 - x0, Palette.SMALL, Palette.MUTED)
 
 
 ## Stage S15.3: the regions, off the ring: a row each, as in the groups' table.
@@ -428,7 +428,8 @@ func _show_issues(cells_of: Callable) -> void:
 			parts.append("%s –" % labels[i])
 			continue
 		var d := (values[i] / before[i] - 1.0) * 100.0
-		parts.append("%s %s%.1f%%" % [labels[i], "+" if d >= 0.0 else "−", absf(d)])
+		# Stage S17.1: no signed noughts ("Health −0.0%").
+		parts.append("%s %s%.1f%%" % [labels[i], "" if absf(d) < 0.05 else ("+" if d > 0.0 else "−"), absf(d)])
 	_issues.text = "What voters weigh, against the last election: " + ", ".join(parts) + "."
 	_issues.tooltip_text = "Health, education and policing: real spending per person served. The environment: the path to net zero over actual emissions. A fall costs the government votes, most among the age groups that care most."
 

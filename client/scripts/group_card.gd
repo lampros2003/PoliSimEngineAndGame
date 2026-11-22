@@ -233,10 +233,12 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 		top = maxf(top, absf(v))
 	for i in values.size():
 		var bar: Bar = _drivers.get_child(i * 3 + 1)
-		bar.fraction = values[i] / top
+		# Stage S17.1: no bar beside "0.00", and a true minus sign.
+		var nought: bool = absf(values[i]) < 0.005
+		bar.fraction = 0.0 if nought else values[i] / top
 		bar.queue_redraw()
 		var amount: Label = _drivers.get_child(i * 3 + 2)
-		amount.text = "–" if now == null else ("%+.2f" % values[i] if absf(values[i]) >= 0.005 else "0.00")
+		amount.text = "–" if now == null else ("0.00" if nought else ("+" if values[i] > 0.0 else "−") + "%.2f" % absf(values[i]))
 		drivers_shown.append([str(drivers[i][0]), float(values[i])])
 
 

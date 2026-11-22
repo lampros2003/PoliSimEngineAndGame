@@ -236,17 +236,17 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 		more.theme_type_variation = "Link"
 		more.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var words := "More: %s" % ", ".join(rest.map(func(e): return str(e.get("label", e["name"])).to_lower()))
-		more.text = "▸ " + (words if words.length() <= 70 else "More: %d further settings" % rest.size())
+		more.text = "▶  " + (words if words.length() <= 70 else "More: %d further settings" % rest.size())
 		_controls.add_child(more)
 		_more = VBoxContainer.new()
 		_more.name = "more_controls"
 		_more.add_theme_constant_override("separation", 12)
 		_more.visible = false
 		_controls.add_child(_more)
-		var shown_words := more.text.trim_prefix("▸ ")
+		var shown_words := more.text.trim_prefix("▶  ")
 		more.pressed.connect(func() -> void:
 			_more.visible = not _more.visible
-			more.text = ("▾ " if _more.visible else "▸ ") + shown_words
+			more.text = ("▼  " if _more.visible else "▶  ") + shown_words  # the folds' own triangles
 			more_toggled.emit())
 		for entry in rest:
 			_holder = _more
@@ -399,6 +399,7 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 		_finish_row(name, entry, box, null, null, steps)
 		return
 	var slider := HSlider.new()
+	Palette.ring_when_focused(slider)  # stage S17.1
 	slider.name = "slider_" + name
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -521,6 +522,8 @@ func _typed(name: String, value: float) -> void:
 			draft[name] = [raw, stored]
 		if put_button != null:
 			put_button.disabled = draft.is_empty()
+		if hint != null:
+			hint.visible = draft.is_empty()  # "Pick a setting…" has been done
 		draft_changed.emit(name, raw)
 		return
 	lever_changed.emit(name, raw)
@@ -549,7 +552,7 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 		var entry: Dictionary = row["entry"]
 		var value: Variant = current.call(name)
 		var said: String = fmt.value(entry, value, false, false) if value != null else ""
-		row["now"].text = "" if value == null else ("not in force" if introducing else (said if said.to_lower().begins_with("as now") else "now " + said))
+		row["now"].text = "" if value == null else ("not in force" if introducing else (said if said.to_lower().contains("as now") else "now " + said))
 		var shown: Variant = pending.get(name, value)
 		if introducing:
 			shown = draft[name][1] if draft.has(name) else off_stored
@@ -567,7 +570,7 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 			# A step chosen but not yet in force is ochre, the colour of what waits.
 			var waits: bool = chosen and (introducing or pending.has(name))
 			if waits:
-				step.add_theme_stylebox_override("pressed", Palette._flat(Palette.OCHRE, Palette.INK, 2, 8, 4, 0))
+				step.add_theme_stylebox_override("pressed", Palette._flat(Palette.OCHRE, Palette.INK, 2, 4, 8, 0))
 				step.add_theme_color_override("font_pressed_color", Palette.INK)
 			else:
 				step.remove_theme_stylebox_override("pressed")
@@ -652,9 +655,12 @@ func show_repeal(cost: float, preview: Dictionary, left := -1.0) -> void:
 		var votes := int(preview.get("votes_for", 0))
 		var against := int(preview.get("seats", 0)) - votes
 		words.append(("The Commons would pass it %d to %d." if preview.get("passes", false) else "The Commons would vote it down, %d to %d.") % [votes, against])
-	if cost >= 0.0 and left >= 0.0 and cost > left:
+	var short := cost >= 0.0 and left >= 0.0 and cost > left
+	if short:
 		words.append("Not enough political capital: %.1f left." % maxf(left, 0.0))
 	repeal_note.text = " ".join(words)
+	# Stage S17.1: a repeal that cannot be paid for says so in the colour of a refusal.
+	repeal_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.MUTED)
 
 
 ## What the changes waiting would do in a year, as signed bars: `rows` is the forecast's
@@ -736,21 +742,28 @@ func _fill(grid: GridContainer, items: Array, groups: bool) -> void:
 		name.text = str(item[1])
 		name.theme_type_variation = "LinkRow"
 		name.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		name.custom_minimum_size = Vector2(170, 0)
+		# Stage S17.1: one width for the names in both tables (what it would do, who would
+		# cheer), so their bars start from one line; a longer name is cut short, whole in its tooltip.
+		name.custom_minimum_size = Vector2(230, 0)
+		name.clip_text = true
+		name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name.tooltip_text = str(item[1])
 		var target := str(item[6]) if item.size() > 6 else str(item[2].get("name", ""))
 		name.pressed.connect(func() -> void: follow.emit(target))
 		grid.add_child(name)
+		var said: String = fmt.change(item[2], it[1])
 		var bar := Bar.new()
 		bar.custom_minimum_size = Vector2(150, 18)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bar.fraction = ((absf(it[1]) if groups else it[3]) / biggest) * signf(it[1])
+		# Stage S17.1: no bar beside "no change" (a move too small to show had a sliver of one).
+		bar.fraction = 0.0 if said == fmt.change(item[2], 0.0) else ((absf(it[1]) if groups else it[3]) / biggest) * signf(it[1])
 		# Sage for a change for the better, brick for the worse, where that is known.
 		var better := str(item[5]) if item.size() > 5 else ""
 		bar.up_colour = Palette.INK if better == "" else (Palette.SAGE if better == "high" else Palette.BRICK)
 		bar.down_colour = Palette.INK if better == "" else (Palette.BRICK if better == "high" else Palette.SAGE)
 		grid.add_child(bar)
 		var amount := Label.new()
-		amount.text = fmt.change(item[2], it[1])
+		amount.text = said
 		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		amount.custom_minimum_size = Vector2(110, 0)
 		grid.add_child(amount)

@@ -55,19 +55,11 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 	return label
 
 
-## Stage S17.1: a heading or a total in the names' column, its words starting where the lines'
-## do: a line is a link with 4 px inside its left edge, so these stand 4 px in, by the layout
-## (two spaces did it before, and put the totals 3 px off the lines).
-func _in_names(label: Label) -> MarginContainer:
-	var inset := MarginContainer.new()
-	inset.add_theme_constant_override("margin_left", 4)
-	inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inset.add_child(label)
-	return inset
-
-
+## Stage S17.1: a heading, a line and a total all start on the names' column's own left edge,
+## by the layout: a link has no room at its sides now, and the totals are no longer set in
+## from it by two spaces (which put them 3 px off the lines).
 func _section(title: String) -> void:
-	_grid.add_child(_in_names(_cell(title, Palette.MUTED, false, Palette.SMALL)))
+	_grid.add_child(_cell(title, Palette.MUTED, false, Palette.SMALL))
 	for i in 3:
 		_grid.add_child(Control.new())
 
@@ -94,7 +86,7 @@ func _total(key: String, title: String) -> void:
 	var total := _cell(title, Palette.TEXT, false, Palette.FONT_SIZE)
 	total.name = "total_" + key
 	total.add_theme_font_override("font", Palette.text(600))
-	_grid.add_child(_in_names(total))
+	_grid.add_child(total)
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
 	for c in cells:
 		_grid.add_child(c)
@@ -205,7 +197,7 @@ func _draw_summary() -> void:
 	_summary.draw_line(Vector2(x, 2.0), Vector2(x, 92.0), Palette.INK, 1.5)
 	_summary.draw_line(Vector2(x2, 2.0), Vector2(x2, 92.0), Palette.INK, 1.5)
 	var words: String = ("SURPLUS " if gap >= 0.0 else "DEFICIT ") + fmt.value(money, int(absf(gap)), true, false)
-	_summary.draw_string(caps, Vector2(x2 + 12.0, 98.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.GOOD if gap >= 0.0 else Palette.BAD)
+	_summary.draw_string(caps, Vector2(x2 + 16.0, 98.0), words, HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.GOOD if gap >= 0.0 else Palette.BAD)
 
 
 ## Green when the budget improves (more revenue, less spending), red when it worsens.

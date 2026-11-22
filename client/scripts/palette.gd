@@ -167,6 +167,18 @@ static func focus_ring() -> StyleBoxFlat:
 	return ring
 
 
+## Stage S17.1: for a control whose kind draws no ring of its own in this engine (a slider
+## only brightens its grabber): the ring, drawn over it while it has the keyboard.
+static func ring_when_focused(control: Control) -> void:
+	var ring := focus_ring()
+	control.set_meta("focus_drawn", true)
+	control.focus_entered.connect(control.queue_redraw)
+	control.focus_exited.connect(control.queue_redraw)
+	control.draw.connect(func() -> void:
+		if control.has_focus():
+			control.draw_style_box(ring, Rect2(Vector2.ZERO, control.size)))
+
+
 ## Stage S17.1: the row chosen in a list (a menu, the search's matches): the ochre tint, with
 ## an ink edge down its left so it is told from its neighbours by more than a tint.
 static func chosen_row(margin_h := 8, margin_v := 4) -> StyleBoxFlat:
@@ -249,8 +261,10 @@ static func make_theme() -> Theme:
 	for type in ["Button", "MenuButton", "OptionButton", "LinkButton", "RichTextLabel"]:
 		theme.set_stylebox("focus", type, focus)
 	theme.set_font("font", "Button", text(500))
-	_button_states(theme, "Button", _flat(CARD, INK, 2, 12, 4, 3), _flat(HOVER, INK, 2, 12, 4, 3),
-		_flat(CARD_DEEP, INK, 2, 12, 4, 0), _flat(PAPER, LINE, 2, 12, 4, 0), INK, INK, LINE)
+	# 8 px above and below the words: with a line of 15 px type a button is 37 px tall, over the
+	# 32 px a target needs (4 px made it 29).
+	_button_states(theme, "Button", _flat(CARD, INK, 2, 12, 8, 3), _flat(HOVER, INK, 2, 12, 8, 3),
+		_flat(CARD_DEEP, INK, 2, 12, 8, 0), _flat(PAPER, LINE, 2, 12, 8, 0), INK, INK, LINE)
 	# Primary: the one main action (Next month); ochre, the colour of acting.
 	theme.set_type_variation("Primary", "Button")
 	_button_states(theme, "Primary", _flat(OCHRE, INK, 2, 16, 8, 4), _flat(PRIMARY_HOVER, INK, 2, 16, 8, 4),
@@ -259,8 +273,8 @@ static func make_theme() -> Theme:
 	theme.set_font_size("font_size", "Primary", 16)
 	# Quiet: secondary actions on the top bar, text with an ink edge only on hover.
 	theme.set_type_variation("Quiet", "Button")
-	_button_states(theme, "Quiet", _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 4), _flat(Color(INK, 0.06), INK, 2, 8, 4),
-		_flat(Color(INK, 0.12), INK, 2, 8, 4), _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 4), INK, INK, LINE)
+	_button_states(theme, "Quiet", _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 8), _flat(Color(INK, 0.06), INK, 2, 8, 8),
+		_flat(Color(INK, 0.12), INK, 2, 8, 8), _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 8), INK, INK, LINE)
 	theme.set_font("font", "Quiet", display(500, 1))
 	theme.set_font_size("font_size", "Quiet", 15)
 	theme.set_constant("h_separation", "Quiet", 8)
@@ -268,16 +282,18 @@ static func make_theme() -> Theme:
 	# Link: an action inside a card ("Undo", "Back"): blue text.
 	theme.set_type_variation("Link", "Button")
 	# Stage S13.6: underlined on hover, so every link answers the pointer.
-	var underline := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 4, 4)
+	# Stage S17.1: nothing at a link's sides, so its words start and end where the plain text
+	# above and below them does (4 px each side set every link 4 px off its neighbours).
+	var underline := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 0, 4)
 	underline.border_width_bottom = 1
-	_button_states(theme, "Link", _empty(), underline, underline, _empty(), BLUE, LINK_HOVER, LINE)
+	_button_states(theme, "Link", _empty(0, 4), underline, underline, _empty(0, 4), BLUE, LINK_HOVER, LINE)
 	theme.set_font("font", "Link", text(600))
 	theme.set_font_size("font_size", "Link", SMALL)
 	# Stage S14.1: a link in a table's row, with no more room above and below than its text.
 	theme.set_type_variation("LinkRow", "Link")
-	var row_line := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 4, 0)
+	var row_line := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 0, 0)
 	row_line.border_width_bottom = 1
-	_button_states(theme, "LinkRow", _empty(4, 0), row_line, row_line, _empty(4, 0), BLUE, LINK_HOVER, LINE)
+	_button_states(theme, "LinkRow", _empty(0, 0), row_line, row_line, _empty(0, 0), BLUE, LINK_HOVER, LINE)
 	# Stage S13.6: a line of the month's report, or a row in a sheet: a tint under the pointer.
 	theme.set_type_variation("ReportLine", "Button")
 	_button_states(theme, "ReportLine", _empty(8, 4), _flat(Color(INK, 0.07), Color(0, 0, 0, 0), 0, 8, 4),
@@ -290,15 +306,18 @@ static func make_theme() -> Theme:
 
 	# Stage S14.1: the heading of a section that opens and closes: tracked capitals in ink.
 	theme.set_type_variation("Fold", "Button")
-	var fold_hover := _flat(Color(INK, 0.06), Color(0, 0, 0, 0), 0, 4, 4)
-	_button_states(theme, "Fold", _empty(4, 4), fold_hover, fold_hover, _empty(4, 4), INK, INK, MUTED)
+	var fold_hover := _flat(Color(INK, 0.06), Color(0, 0, 0, 0), 0, 0, 4)
+	fold_hover.expand_margin_left = 4  # the tint under the pointer reaches past the words; the words stay on the text's edge
+	fold_hover.expand_margin_right = 4
+	_button_states(theme, "Fold", _empty(0, 4), fold_hover, fold_hover, _empty(0, 4), INK, INK, MUTED)
 	theme.set_font("font", "Fold", display(600, 1))
 	theme.set_font_size("font_size", "Fold", CAPS)
 
 	# Stage S13.5: a step of a level policy's control: card stock, the step chosen in ink.
 	theme.set_type_variation("Step", "Button")
-	_button_states(theme, "Step", _flat(CARD, INK, 2, 8, 4, 2), _flat(HOVER, INK, 2, 8, 4, 2),
-		_flat(INK, INK, 2, 8, 4, 0), _flat(PAPER, LINE, 2, 8, 4, 0), INK, INK, LINE)
+	# 4 px each side, so five steps across a popup each hold two words on one line.
+	_button_states(theme, "Step", _flat(CARD, INK, 2, 4, 8, 2), _flat(HOVER, INK, 2, 4, 8, 2),
+		_flat(INK, INK, 2, 4, 8, 0), _flat(PAPER, LINE, 2, 4, 8, 0), INK, INK, LINE)
 	for key in ["font_pressed_color", "font_hover_pressed_color"]:
 		theme.set_color(key, "Step", CARD)
 	theme.set_font("font", "Step", text(500))
@@ -328,6 +347,8 @@ static func make_theme() -> Theme:
 	theme.set_stylebox("normal", "LineEdit", field)
 	theme.set_stylebox("focus", "LineEdit", focus)  # drawn over the field's own box
 	theme.set_stylebox("read_only", "LineEdit", _flat(PAPER, LINE, 2, 8, 4))
+	theme.set_color("clear_button_color", "LineEdit", MUTED)  # stage S17.1: the cross could hardly be seen
+	theme.set_color("clear_button_color_pressed", "LineEdit", INK)
 	theme.set_font("font", "LineEdit", text(500))
 
 	# Sliders: an ink track, an ochre grabber.
@@ -344,7 +365,7 @@ static func make_theme() -> Theme:
 	theme.set_stylebox("grabber_area_highlight", "HSlider", filled)
 	theme.set_icon("grabber", "HSlider", _grabber(false))
 	theme.set_icon("grabber_highlight", "HSlider", _grabber(true))
-	theme.set_stylebox("focus", "HSlider", focus)  # stage S13.6: the keyboard's place
+	# A slider draws no "focus" box in this engine: Palette.ring_when_focused draws its ring.
 
 	# Menus, tooltips, option buttons.
 	theme.set_stylebox("panel", "PopupMenu", card(8, 4))

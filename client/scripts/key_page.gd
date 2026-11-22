@@ -20,7 +20,7 @@ func build(board: Web) -> void:
 	Palette.rule_rows(grid)
 	add_child(grid)
 	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; Add policy, on the top bar, lists those not in force.")
-	_row(grid, _indicators(), "Indicators", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
+	_row(grid, _indicators(), "Statistics", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
 	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in %s, each named once inside it. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure.%s" % [
 		_families_word(board), roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0),
 		" Groups of belief answer to where the government stands, not how they are doing: Parliament shows the stances." if not board.play_web.get("stances", []).is_empty() else ""])

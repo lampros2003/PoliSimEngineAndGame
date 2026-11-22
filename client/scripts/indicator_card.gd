@@ -72,15 +72,21 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	_figure.add_theme_font_size_override("font_size", 44)
 	figures.add_child(_figure)
 	_change = Label.new()
-	_change.size_flags_vertical = Control.SIZE_SHRINK_END
 	_change.add_theme_font_override("font", Palette.text(600))
-	figures.add_child(_change)
+	# Stage S17.1: on the figure's baseline (at the row's foot it hung under it by the figure's
+	# own descent).
+	var lift := MarginContainer.new()
+	lift.size_flags_vertical = Control.SIZE_SHRINK_END
+	lift.add_theme_constant_override("margin_bottom", 8)
+	lift.add_child(_change)
+	figures.add_child(lift)
 	if str(entry.get("doc", "")) != "":
 		add_child(_muted(LeverPanel._sentence(str(entry["doc"]))))
 	if situation:
 		return
 	if row != "":
 		var chart_head := HBoxContainer.new()
+		chart_head.name = "chart_head"
 		chart_head.add_child(Palette.caps("History"))
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -211,7 +217,10 @@ func set_see_also(items: Array) -> void:
 		link.pressed.connect(func() -> void: follow.emit(target))
 		line.add_child(link)
 	add_child(line)
-	move_child(line, mini(3, get_child_count() - 1))
+	# Stage S17.1: always above the history's heading (a statistic with no description had it
+	# between the heading and its chart).
+	var head := find_child("chart_head", false, false)
+	move_child(line, head.get_index() if head != null else mini(3, get_child_count() - 1))
 
 
 ## For the checks: the labels "See also" lists.

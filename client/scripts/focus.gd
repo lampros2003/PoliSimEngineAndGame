@@ -80,10 +80,14 @@ static func leave(card: Control, before: Control) -> void:
 
 
 ## True when `control`, holding the keyboard, shows it: a ring of at least 2 px in a colour 3
-## to 1 against the ground round it (the theme's "focus" box), or its own drawing (`focus_drawn`).
+## to 1 against the ground round it. Buttons of every kind, fields and text that can be
+## selected draw the theme's "focus" box themselves; any other kind of control (a slider)
+## draws nothing of the sort, and counts only if Palette.ring_when_focused draws it.
 static func ringed(control: Control) -> bool:
 	if control.has_meta("focus_drawn"):
 		return true
+	if not (control is BaseButton or control is LineEdit or control is RichTextLabel):
+		return false
 	if not control.has_theme_stylebox("focus"):
 		return false
 	var box := control.get_theme_stylebox("focus") as StyleBoxFlat

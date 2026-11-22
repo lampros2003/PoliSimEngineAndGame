@@ -33,8 +33,9 @@ func _initialize() -> void:
 			return _fail("the summary reads: " + panel._summary.text)
 		if main.lost or not main.can_advance():
 			return _fail("the game stopped")
-		# Stage S8.3: the issues, nothing changed yet since the stand-in election.
-		if not panel._issues.visible or not panel._issues.text.begins_with("What voters weigh, against the last election: Health +0.0%"):
+		# Stage S8.3: the issues, nothing changed yet since the stand-in election (stage S17.1: a
+		# nought without a sign; "+0.0%" was read here before).
+		if not panel._issues.visible or not panel._issues.text.begins_with("What voters weigh, against the last election: Health 0.0%"):
 			return _fail("the issues read: " + panel._issues.text)
 		main.open_overlay("parliament")
 		await _settle()

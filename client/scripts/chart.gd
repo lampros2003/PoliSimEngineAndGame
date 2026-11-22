@@ -16,6 +16,9 @@ var hover := -1
 var _legend_boxes: Array = []  # [Rect2, row]
 
 const PAD_LEFT := 96.0
+## Stage S17.1: the room the value labels have, PAD_LEFT or what the widest of them needs
+## ("54.00p a litre" was cut short).
+var _pad_left := PAD_LEFT
 const PAD_RIGHT := 18.0
 const PAD_TOP := 40.0
 const PAD_BOTTOM := 34.0
@@ -44,7 +47,7 @@ func has_row(row: String) -> bool:
 func _plot_rect() -> Rect2:
 	# Stage S14.1: one line needs no legend (the popup's title names it), so no room for one.
 	var top := PAD_TOP if series.size() > 1 else 14.0
-	return Rect2(PAD_LEFT, top, maxf(10.0, size.x - PAD_LEFT - PAD_RIGHT), maxf(10.0, size.y - top - PAD_BOTTOM))
+	return Rect2(_pad_left, top, maxf(10.0, size.x - _pad_left - PAD_RIGHT), maxf(10.0, size.y - top - PAD_BOTTOM))
 
 
 func _range() -> Vector2:
@@ -97,6 +100,16 @@ func _y(v: float, rect: Rect2, r: Vector2) -> float:
 	return rect.end.y - rect.size.y * (v - r.x) / (r.y - r.x)
 
 
+## A rate to two places, always two (a trailing nought kept, so a scale's marks line up).
+func _percent2(v: float) -> String:
+	var words: String = fmt.percent(v, 2)
+	var body := words.trim_suffix("%")
+	var places := body.length() - body.find(".") - 1 if body.contains(".") else 0
+	if places == 0:
+		body += "."
+	return body + "0".repeat(maxi(0, 2 - places)) + "%"
+
+
 func _label(v: float) -> String:
 	if fmt == null:
 		return str(v)
@@ -106,6 +119,7 @@ func _label(v: float) -> String:
 func _draw() -> void:
 	var font := get_theme_default_font()
 	var small := Palette.SMALL
+	_pad_left = PAD_LEFT
 	var rect := _plot_rect()
 	_legend_boxes.clear()
 	if series.is_empty():
@@ -117,14 +131,35 @@ func _draw() -> void:
 	var ticks := _nice_ticks(r.x, r.y)
 	# A rate whose gridlines are closer than a tenth of a point is marked to two places, so
 	# they do not all read the same (a gilt yield moving by hundredths).
-	var fine: bool = fmt != null and fmt.is_rate(entry) and ticks.size() > 1 and (ticks[1] - ticks[0]) * 100.0 < 0.099
+	# Stage S17.1: also when they are not whole tenths of a point (20.25% and 20.75% read 20.2%
+	# and 20.8%), and every mark to the same number of places (4.34%, 4.32%, 4.30%).
+	var gap: float = (ticks[1] - ticks[0]) * 100.0 if ticks.size() > 1 else 1.0
+	var fine: bool = fmt != null and fmt.is_rate(entry) and ticks.size() > 1 and (gap < 0.099 or not is_equal_approx(gap * 10.0, roundf(gap * 10.0)))
+	# Stage S17.1: the gridlines at both ends of the range are drawn and marked, so no line runs
+	# outside the marked values (the ends are whole steps: see _range).
+	if ticks.size() > 1:
+		var step: float = ticks[1] - ticks[0]
+		if ticks[0] - r.x > step * 0.5 and is_equal_approx(roundf(r.x / step), r.x / step):
+			ticks.insert(0, r.x)
+		if r.y - ticks[-1] > step * 0.5 and is_equal_approx(roundf(r.y / step), r.y / step):
+			ticks.append(r.y)
+	var marks := {}
+	var last_words := ""
+	for t in ticks:
+		var words: String = _percent2(t) if fine else _label(t)
+		# Stage S17.1: a mark that reads as the one below it is left off (£2.91tn twice).
+		marks[t] = "" if words == last_words else words
+		last_words = words
+		_pad_left = maxf(_pad_left, font.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x + 16.0)
+	rect = _plot_rect()
 	for t in ticks:
 		# Stage S13.5: a whole-number value (an age, a year, a level) is marked at whole numbers only.
 		if ((entry.get("type", "") == "int" and not entry.get("money", false)) or entry.has("levels")) and not is_equal_approx(t, roundf(t)):
 			continue
 		var y := _y(t, rect, r)
 		draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Palette.RULE, 1.0)
-		draw_string(font, Vector2(4, y + 5), fmt.percent(t, 2) if fine else _label(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_LEFT - 12, small, Palette.MUTED)
+		if str(marks[t]) != "":
+			draw_string(font, Vector2(4, y + 5), str(marks[t]), HORIZONTAL_ALIGNMENT_RIGHT, _pad_left - 12, small, Palette.MUTED)
 	if r.x < 0.0 and r.y > 0.0:
 		var zero := _y(0.0, rect, r)
 		draw_line(Vector2(rect.position.x, zero), Vector2(rect.end.x, zero), Palette.MUTED, 1.0)
@@ -155,7 +190,7 @@ func _draw() -> void:
 				points = PackedVector2Array()
 		_polyline(points, s["color"])
 	# Legend, for two lines.
-	var x := PAD_LEFT
+	var x := _pad_left
 	for s in (series if series.size() > 1 else []):
 		var text: String = s["label"] + ("  ×" if series.size() > 1 and s != series[0] and s.get("removable", true) else "")
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x
@@ -191,7 +226,7 @@ func _polyline(points: PackedVector2Array, color: Color) -> void:
 	if points.size() >= 2:
 		draw_polyline(points, color, 2.5, true)
 	elif points.size() == 1:
-		draw_circle(points[0], 2.5, color)
+		draw_circle(points[0], 4.0, color)  # a first month's one point: a mark that can be seen
 
 
 func _gui_input(event: InputEvent) -> void:

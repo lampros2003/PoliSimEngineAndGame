@@ -837,7 +837,18 @@ which is kept with sage and ochre for fills. A mark that carries meaning reaches
 is keyed in ink: what is filled of a group's approval gauge (mustard was 1.5 to 1 against
 its track), the ring round the node whose popup is open, a guide's target; an unmeasured
 link is ink at 60%; three blocs' colours (gold, yellow, grey) are deeper; the search's
-placeholder is ink at 70%. No text is under 12 pixels.
+placeholder is ink at 70%. No text is under 12 pixels. A button is 37 pixels tall (8 above
+and below a line of 15-pixel type). A link has nothing at its sides, so its words start and
+end where the plain text above and below them does, and a popup's Back and Close stand on
+its content's edges; a fold's heading likewise, its tint under the pointer reaching 4
+pixels past its words. A chart gives its marks the room the widest needs, marks both ends
+of its range, leaves off a mark that reads as the one below it, gives a rate's marks one
+number of places, and draws a single point 4 pixels in radius. No bar is drawn beside a
+change that reads "no change" or "0.00". A column of money is in whole pounds when any of
+its rows is. A nought has no sign, and a negative percentage a true minus sign. An area
+too narrow for its name on the rim is named by what comes before its "and" (ENVIRONMENT),
+and one too narrow for that keeps only its arc. A popup holds one content: opening one
+empties the card of whatever a closing cut short had left in it.
 
 **What `main.gd` offers the checks.** Actions: `open_node(key)` (a board key, or the key
 of a policy not in force), `open_indicator(name, row, origin)`, `open_add_policy(key)`

@@ -943,8 +943,17 @@ func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
 	var per := 1.0 / ring.length()
 	var room := _span(ring, middle - share * 0.5, middle + share * 0.5) * 0.92
 	if width * per > room:
-		text = ""  # an area too narrow for its name keeps only its arc
-		width = 0.0
+		# Stage S17.1: an area too narrow for its whole name is named by what comes before its
+		# "and" (ENVIRONMENT for Environment and energy, which had no name on the rim at any
+		# size); one too narrow even for that keeps only its arc.
+		var first := text.get_slice(" AND ", 0)
+		var first_width := font.get_string_size(first, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+		if first != text and first_width * per <= room:
+			text = first
+			width = first_width
+		else:
+			text = ""
+			width = 0.0
 	var fa := ring.fraction(middle - share * 0.44)
 	var fb := ring.fraction(middle + share * 0.44)
 	if fb < fa:
@@ -2221,6 +2230,13 @@ func _draw_centre(n: Dictionary) -> void:
 	for line in lines:
 		var words := str(line[1])
 		if words.contains(" ") and _text_w(line[0], words, maxi(12, int(line[2] * 0.85))) > r * 1.35:
+			# Stage S17.1: a line in two parts goes on two lines at its point, which goes ("Capital
+			# 47.0 ·" was left with it hanging).
+			var point := words.find(" · ")
+			if point >= 0:
+				fitted.append([line[0], words.left(point), line[2], line[3]])
+				fitted.append([line[0], words.substr(point + 3), line[2], line[3]])
+				continue
 			var cut := -1  # the space nearest the middle
 			for i in words.length():
 				if words[i] == " " and (cut < 0 or absi(i - words.length() / 2) < absi(cut - words.length() / 2)):

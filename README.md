@@ -117,6 +117,14 @@ the speed budget in `client/tests/perf_check.gd`):
 python tools/check_client.py --godot godot
 ```
 
+Every popup, fold and sheet photographed at 1366x768 and 1920x1080 for a person to read
+(stage S17; needs a display, so on a server run it under `xvfb-run`; about three minutes
+for some 110 pictures):
+
+```bash
+godot --rendering-driver opengl3 --resolution 1920x1080 --path client --script res://tests/folds_check.gd -- --scenario=models/uk/scenarios/2025.toml --shots=shots
+```
+
 The UK's strategies for the balance report (`docs/S13-BALANCE.md`), played on the engine:
 
 ```bash
@@ -134,10 +142,14 @@ What it recorded (the state hashes, `conformance/`) now pins the engine
 
 The roadmap is in `reports/PoliSim engine architecture pathways.md`.
 
-Stages S0 to S10 are done, except what waits for the owner (the Windows play test of S2
-and the business decisions of S7): `docs/PLAN.md` says where each stage stands, and
-`docs/S3-PLAN.md` to `docs/S10-PLAN.md` hold their milestones. The tables below are the
-first stages' exit criteria.
+Stages S0 to S17 are done, except what waits for the owner (the business decisions of S7,
+the licence pages, and three questions from his play tests): `docs/PLAN.md` says where each
+stage stands and what is needed from him, and `docs/S3-PLAN.md` to `docs/S17-PLAN.md` hold
+their milestones. The last, S17 (2026-11-22), was a second polish pass of the client, each
+item with a check that keeps it fixed: contrast measured to WCAG 2.1, one spacing scale, the
+keyboard kept inside an open popup or sheet, the top bar's order of giving way, and every
+fold of every popup fitted and measured at two window sizes. The tables below are the first
+stages' exit criteria.
 
 **Stage S0 (specification, oracle, data gate)**
 

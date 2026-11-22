@@ -120,7 +120,8 @@ func factor(entry: Dictionary, shown := true) -> float:
 
 static func percent(fraction: float, decimals := 1) -> String:
 	var text := String.num(absf(fraction) * 100.0, decimals)
-	return ("-" if fraction < 0.0 and not is_nought(text) else "") + text + "%"
+	# Stage S17.1: a true minus sign, as money has ("Growth -0.4%" had a hyphen).
+	return (MINUS if fraction < 0.0 and not is_nought(text) else "") + text + "%"
 
 
 ## Describes the part of a unit that is not the currency: " a month", " per household".

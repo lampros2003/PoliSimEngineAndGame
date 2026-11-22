@@ -155,7 +155,9 @@ func show_explanation(e: Dictionary) -> void:
 		bar.custom_minimum_size = Vector2(100, 18)
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bar.fraction = 0.0 if effect == null or biggest == 0.0 else float(effect) / biggest
+		# Stage S17.1: no bar beside "no change" (a move too small to show had a sliver of one).
+		var none: bool = effect == null or biggest == 0.0 or fmt.change(entry, effect) == fmt.change(entry, 0.0)
+		bar.fraction = 0.0 if none else float(effect) / biggest
 		row.add_child(bar)
 		var amount := Label.new()
 		amount.custom_minimum_size = Vector2(110, 0)

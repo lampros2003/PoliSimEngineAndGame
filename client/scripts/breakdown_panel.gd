@@ -201,6 +201,13 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable) -> void:
 			share = now[i] / before[i] - 1.0
 			widest = maxf(widest, absf(share))
 		shares.append(share)
+	# Stage S17.1: one precision down a column of money: where any row is in whole pounds
+	# (£10,000 or more), every row is ("£9,725.42" stood over "£14,596").
+	_whole = false
+	if fmt.is_money(entry):
+		var unit: float = fmt.factor(entry, false) / float(fmt.minor)
+		for v in now:
+			_whole = _whole or (absf(v * unit) >= 1e4 and absf(v * unit) < 1e6)
 	for i in labels.size():
 		var line: Dictionary = _rows[i]
 		var was: Variant = before[i] if i < before.size() else null
@@ -219,8 +226,15 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable) -> void:
 		_all_bar.queue_redraw()
 
 
+var _whole := false
+
+
 func _show(cells: Array, entry: Dictionary, now: Variant, before: Variant, share: Variant) -> void:
-	cells[1].text = fmt.value(entry, now, false, false)
+	var shown: Variant = now
+	if _whole and now != null:
+		var unit: float = fmt.factor(entry, false) / float(fmt.minor)
+		shown = roundf(float(now) * unit) / unit
+	cells[1].text = fmt.value(entry, shown, false, false)
 	if now == null or before == null:
 		cells[2].text = "–"
 		cells[3].text = ""

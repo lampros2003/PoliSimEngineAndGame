@@ -18,6 +18,12 @@ in `README.md`. Update the status column here as milestones close.
 | S9 Dilemmas, prices, history | Chosen by the owner on the decision page (2026-11-14): the NHS waiting list, dilemmas, taxes that reach prices, and the voters' reactions fitted to past elections (`docs/S9-PLAN.md`, done; the fit to past elections is weak evidence and only moves the judgements a little). Open for the play test: a seed of its own for each new game, and the size of the dilemmas' political costs |
 | S10 The engine: speed, reliability, power | At the owner's request (2026-11-14) (`docs/S10-PLAN.md`, done): a profile by formula; records, cells, sums and independent formulas on several threads (the UK's month 29 to 20 ms, every hash unchanged); thread-count, fuzzing and failure-order tests, and a game that survives a panic in its simulation thread; `div`, `mod`, `largest`, `smallest` and `sum_by` in the formula language; loading three times faster; lags (`[lag.x]`); `ln`, `sqrt`, `pow` and `quantile`; national parts of record formulas computed once |
 | S11 Curves, who loses out, speed | Chosen by the owner (2026-11-14): effect curves and the UK on them, poverty and median income against the government's statistics, and engine speed (`docs/S11-PLAN.md`, done). The UK's month is 14 to 16 ms on four threads with the poverty measures |
+| S12 Pages, the policy web, political capital, a map | At the owner's request (2026-11-14) (`docs/S12-PLAN.md`, done). The client it made was rejected the next day as a dashboard with pages; political capital, an engine rule, stayed |
+| S13 The web is the game | The owner's brief (2026-11-14, `docs/S13-PLAN.md`, done): one full-screen board of policies, statistics and groups of voters, everything opened by clicking a node; looking ahead (forecasts, an effects table); nineteen real policies introduced and repealed; a whole term played as a check, and the balance report (`docs/S13-BALANCE.md`); the public finances made to matter |
+| S14 After the first playtest | The owner played on 2026-11-16 (`docs/S14-PLAN.md`, done): the board fixed to the screen, the groups as one ring with approval gauges, colours by what a thing is, a speed budget the checks enforce; the Python reference retired (the engine is the only implementation, `polisim serve`); a bridge that never makes the next month wait; Bank Rate, mortgages, slumps that last |
+| S15 After the second playtest | "Better by quite a bit" (2026-11-16, `docs/S15-PLAN.md`, done): groups by belief, work and place; an Add policy sheet in place of the bubbles; search; twelve policies and twelve statistics more |
+| S16 After the third playtest | 2026-11-16 (`docs/S16-PLAN.md`, done): political capital and approval back on the top bar; a first polish pass (24 faults listed, 20 fixed); belief groups sized from published segments |
+| S17 The second polish pass | Asked for by the owner on 2026-11-16, done on 2026-11-22 (`docs/S17-PLAN.md`): contrast measured, one spacing scale, the keyboard inside popups and sheets, the top bar's order of giving way, every fold photographed at two sizes, a mod that adds what the model lacks; each with a check that keeps it fixed. Before it, two checks that failed now and then in CI were traced to their causes (a real fault in the bridge, and a speed budget that took no account of the machine) |
 
 ## Decisions this plan rests on
 
@@ -40,7 +46,8 @@ Earlier decisions (the 22-question ballot) are in
 ## How we work
 
 - **One pull request per stage** into `main`, built up from small commits on the working
-  branch. The owner reads and merges it; nothing reaches `main` any other way.
+  branch. The owner reads and merges it; nothing reaches `main` any other way. (In practice
+  stages S2 to S17 shared one branch; from here on a stage is a pull request again.)
 - **Every milestone ends with something the owner can run** on Windows, downloaded from
   the pull request's CI run, plus a short note saying what to try.
 - **CI is the gate.** A milestone is not done until CI is green on Windows and Linux:
@@ -153,6 +160,19 @@ therefore the first item of S4, when households make "who gains and who loses" v
 | The trace is confusing for figures that are not sums | The owner cannot explain a chain | Show the remainder honestly; prefer walking through sums, which are exact |
 
 ## What I need from the owner
+
+As it stands on 2026-11-22, after S17:
+
+| When | What | Why |
+|---|---|---|
+| Now | Play the newest Windows build (the `PoliSim-windows` download on the latest CI run) at the window size you use, and once with the keyboard: Tab through a popup, Esc out of it | S17's checks measure contrast, spacing, fit and focus. How it looks and feels on a real screen is yours to say |
+| Now | Say whether each new game should have a seed of its own | Today every game of a scenario meets its chance events in the same months |
+| Now | Say whether the dilemmas' political costs are the right size, and whether the S11 effect curves feel right in play | Open since S9 and S11 |
+| Before any release | Open the licence pages in `docs/data/first-country-licences.md` (the Open Parliament Licence among them) and confirm them | I could only read search summaries of those pages |
+| When you want outside eyes | Name one or two people to play it cold | Every playtest so far has been yours, and you know the model |
+
+The list as it was written after S1, kept for the record (the first-country and election-study
+rows were settled on 2026-11-14):
 
 | When | What | Why |
 |---|---|---|

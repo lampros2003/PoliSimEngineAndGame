@@ -38,7 +38,7 @@ const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
 ## Stage S14.1: the strip under the top bar (situations, the one-line notices).
 const STRIP_HEIGHT := Strip.HEIGHT
-const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]indicators[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs in families, each arc's outer edge a gauge of how many of them back you; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
+const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]statistics[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs in families, each arc's outer edge a gauge of how many of them back you; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
 
 [b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote. "In a year" shows what the change would do.
 
@@ -46,7 +46,7 @@ const HELP := """[b]The board[/b] is the country, and the whole screen. Round th
 
 [b]Find anything[/b] with the search field on the top bar (/ or Ctrl+F): policies, statistics, groups, situations, policies not in force, and the statistics kept off the board. The board dims to what matches; Enter opens the first; the arrows move between them.
 
-[b]See why[/b]: click an indicator for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most; "See also" opens the statistics behind it that are not on the board.
+[b]See why[/b]: click a statistic for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most; "See also" opens the statistics behind it that are not on the board.
 
 [b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers; a situation also flags the statistic that set it off, and clicking its pennant lights that statistic and says why.
 
@@ -471,7 +471,8 @@ func _build_bar() -> void:
 	line.add_child(coin)
 	line.move_child(coin, 0)
 	_vital.add_child(_capital)
-	row.add_child(_rule())
+	_chips_rule = _rule()
+	row.add_child(_chips_rule)
 	_chips = HBoxContainer.new()
 	_chips.add_theme_constant_override("separation", 0)
 	_chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -598,6 +599,7 @@ func _fit_bar() -> void:
 	var fits := func() -> bool: return row.get_combined_minimum_size().x <= room
 	_words(true)
 	_add_button.text = "Add policy"
+	_chips_rule.visible = true  # counted in every fit, so hiding it at the end changes no decision
 	search.set_compact(false, false)
 	for chip in _chips.get_children():
 		(chip as Control).visible = true
@@ -621,11 +623,15 @@ func _fit_bar() -> void:
 	if not fits.call():
 		_add_button.text = ""
 		_bar_state["add_words"] = false
+	# No rule before the figures when every one of them has given way.
+	_chips_rule.visible = _chips.get_children().any(func(c): return (c as Control).visible)
 	_fitting = false
+	_place_results.call_deferred()
 
 
 var _fitting := false
 var _add_button: Button
+var _chips_rule: Control
 var _bar_state := {"words": true, "search": true, "hidden": PackedStringArray(), "add_words": true}
 
 
@@ -1033,6 +1039,8 @@ func _show_chip(key: String, count: bool) -> void:
 
 ## "high" or "low" when the board says which way a row is better, "" otherwise.
 func _better(key: String) -> String:
+	if key == _approval_key():
+		return "high"  # stage S17.1: the approval's change in the colour the centre gives it
 	var node: Dictionary = board.nodes.get("indicator:" + key, {})
 	return str(node.get("better", ""))
 
@@ -1347,9 +1355,21 @@ func _searched(found: Array) -> void:
 		if str(r.get("node", "")) != "":
 			keys.append(str(r["node"]))
 	board.set_search(keys, search.text.strip_edges() != "")
-	search.results.position = search.get_global_rect().position + Vector2(0, search.size.y + 6.0)
+	_place_results()
+	_place_results.call_deferred()  # again once the bar has made room for the field
 	if found.is_empty():
 		board.light("")
+
+
+## Stage S17.1: the search's list hangs under the top bar (not under the field, where the bar
+## cut off its top), its left edge on the field's, and inside the window. The field moves
+## when it opens from its button, so the list is placed again whenever the bar fits itself.
+func _place_results() -> void:
+	if search == null or search.results == null:
+		return
+	var wide: float = search.results.get_combined_minimum_size().x
+	var x := minf(search.get_global_rect().position.x, size.x - wide - 8.0)
+	search.results.position = Vector2(maxf(x, 8.0), BAR_HEIGHT + 4.0)
 
 
 ## A result chosen: its popup, a situation's explanation, or the Add policy sheet at it.

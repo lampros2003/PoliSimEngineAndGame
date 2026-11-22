@@ -57,7 +57,7 @@ func _ready() -> void:
 	var bar := HBoxContainer.new()
 	var bar_margin := MarginContainer.new()
 	for side in ["left", "right"]:
-		bar_margin.add_theme_constant_override("margin_" + side, 16)
+		bar_margin.add_theme_constant_override("margin_" + side, 24)  # Back and Close on the content's own edges
 	bar_margin.add_theme_constant_override("margin_top", 8)
 	bar_margin.add_child(bar)
 	column.add_child(bar_margin)
@@ -123,10 +123,13 @@ func back() -> void:
 
 
 func _show(build: Callable, origin: Rect2, grow: bool) -> void:
-	if content != null:
-		_holder.remove_child(content)
-		content.queue_free()
-		content = null
+	# Stage S17.1: everything the card held goes, not only what it holds now: a popup closed
+	# and another opened before the closing had finished (35 ms) left the first one's content
+	# in the card, drawn under the second's (opening stops the closing that would have freed it).
+	for child in _holder.get_children():
+		_holder.remove_child(child)
+		child.queue_free()
+	content = null
 	content = build.call()
 	content.custom_minimum_size.x = _width() - 48.0
 	_holder.add_child(content)
@@ -216,3 +219,8 @@ func close() -> void:
 func relayout() -> void:
 	if is_open():
 		_place.call_deferred(false)
+		# Stage S17.1: and once more a frame on, when wrapped text has settled its height: a fold
+		# opened in a popup with room to spare was left with a scroll bar.
+		get_tree().process_frame.connect(func() -> void:
+			if is_open():
+				_place(false), CONNECT_ONE_SHOT)

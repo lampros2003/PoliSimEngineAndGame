@@ -12,7 +12,8 @@ extends SceneTree
 ## loses", one off the board; a group of voters counted from households with each fold and a
 ## household's account, an estimated group, a group of belief; a situation; The Budget,
 ## Parliament with each fold, Add policy, the key, help, a question put to the player and
-## the month's report.
+## the month's report. Also: a popup opened in the moment another closes holds only its own
+## content (the first one's stayed under it).
 
 const Contrast := preload("res://scripts/contrast.gd")
 
@@ -83,7 +84,7 @@ func _popups() -> void:
 	main.open_node("policy:income_tax")
 	await _open()
 	await _state("policy-income_tax", main.popup.card)
-	main.type_lever("basic_rate", 21.0)
+	main.type_lever("basic_rate", 23.0)  # not 21: the walk's own bill, further on, makes it 21
 	await _year()
 	await _state("policy-income_tax-changed", main.popup.card)
 	await _screen("board-with-popup")
@@ -97,6 +98,16 @@ func _popups() -> void:
 		await _state(key.replace(":", "-"), main.popup.card)
 		main.close_popup()
 		await _settle()
+	# A popup closed and another opened in the same moment holds only the second.
+	main.open_node("policy:income_tax")
+	await _open()
+	main.close_popup()
+	main.open_node("indicator:gdp")
+	await _open()
+	if main.popup._holder.get_child_count() != 1 or main.indicator_card() == null:
+		_faults.append("a popup opened as another closed holds %d contents" % main.popup._holder.get_child_count())
+	main.close_popup()
+	await _settle()
 	# A policy being introduced, with its setting picked.
 	main.open_node("policy:ev_grant")
 	await _open()
