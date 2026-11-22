@@ -12,14 +12,34 @@ extends SceneTree
 ## 50 ms pause before it is asked, and a few frames. The plan's 250 ms is below the engine's own.
 ## Stage S15.1: a key typed into search (its matches, the list, the board dimmed) within 4 ms,
 ## with no engine call.
+##
+## Stage S17: the budgets are for the machine they were set on, and what they hold to account
+## is the client; a slower machine is not a slower client (a shared Windows runner took
+## 706 ms over a forecast that takes 323 ms here, with every other figure up as much, and
+## the check failed on the same commit that passed beside it). So the machine is timed first,
+## on work the client has no hand in: the engine's own twelve-month look ahead (both branches,
+## on a game of its own, before the screen exists) and a fixed loop of script. Where the
+## slower of the two takes k times its reference, the budgets for work the processor bounds
+## (SCALED) are k times as long; on a machine as fast as the reference they stand as
+## written. Opening and closing a popup are timed animations and an idle redraw is a count:
+## those never stretch. A forecast over its budget is measured once more, as a popup is.
 
 const BUDGET := {"open": 120.0, "close": 80.0, "month": 150.0, "year": 1000.0, "hover": 16.0, "idle_redraws": 0.0, "forecast": 600.0, "keystroke": 4.0}
+## What the reference machine (four cores, where the budgets were set) takes over the two
+## yardsticks, in milliseconds, best of three; and the budgets that stretch with them.
+const REFERENCE := {"look_ahead": 255.0, "script": 85.0}
+const SCALED := ["month", "year", "hover", "forecast", "keystroke"]
 
 var main: Control
 var _draws := {}
 
 
 func _initialize() -> void:
+	var machine := _machine()
+	var slower: float = maxf(1.0, maxf(machine["look_ahead"] / REFERENCE["look_ahead"], machine["script"] / REFERENCE["script"]))
+	var budget := {}
+	for k in BUDGET:
+		budget[k] = BUDGET[k] * (slower if k in SCALED else 1.0)
 	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	main.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -37,7 +57,7 @@ func _initialize() -> void:
 	# A popup, opened and closed five times over a policy, an indicator and a group; once more
 	# if over budget (the machine is shared: another program's burst is not the screen's).
 	var timed: Array = await _popups()
-	if timed[0] > BUDGET["open"] or timed[1] > BUDGET["close"]:
+	if timed[0] > budget["open"] or timed[1] > budget["close"]:
 		var again: Array = await _popups()
 		timed = [minf(timed[0], again[0]), minf(timed[1], again[1]), minf(timed[2], again[2])]
 	got["open"] = timed[0]
@@ -90,10 +110,84 @@ func _initialize() -> void:
 	var held: bool = main.effects_running
 	main.hover("")
 	await _frames(10)
-	# A forecast after a control moves, three times.
+	# A forecast after a control moves, three times; once more if over budget.
 	await _settle()
+	got["forecast"] = await _forecasts([21.0, 22.0, 21.5])
+	if got["forecast"] > budget["forecast"]:
+		got["forecast"] = minf(got["forecast"], await _forecasts([20.5, 22.5, 21.0]))
+	main.game.cancel_lever("basic_rate")
+	main.close_popup()
+	await _settle()
+	var words := PackedStringArray()
+	var over := PackedStringArray()
+	for k in BUDGET:
+		words.append("%s %.1f (budget %.0f)" % [k, got[k], budget[k]])
+		if got[k] > budget[k]:
+			over.append(k)
+	print("perf: %s; of opening, building the popup %.1f ms; hovered while the table was %s; idle redraws by layer %s; this machine %.2f times the reference's time (look ahead %.0f ms against %.0f, script %.0f ms against %.0f)" % [", ".join(words), build_ms,
+		"still running" if held else "already in", idle_detail, slower, machine["look_ahead"], REFERENCE["look_ahead"], machine["script"], REFERENCE["script"]])
+	while main.effects_running:
+		await process_frame
+	if not over.is_empty():
+		push_error("over budget: " + ", ".join(over))
+		quit(1)
+		return
+	quit(0)
+
+
+## How fast this machine is, in milliseconds, each the best of three: `look_ahead`, the
+## engine's own time for what a forecast asks of it (twelve months, as the game is and with a
+## lever changed, on a game of its own with no screen and no effects table beside it), and
+## `script`, a fixed loop of the kind of work the interface does (strings and dictionaries).
+func _machine() -> Dictionary:
+	var scenario := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--scenario="):
+			scenario = arg.substr(11)
+	var base := ProjectSettings.globalize_path("res://")
+	for candidate in [base.path_join(scenario), base.path_join("..").path_join(scenario)]:
+		if FileAccess.file_exists(candidate):
+			scenario = candidate.simplify_path()
+			break
+	var look_ahead := 99999.0
+	var probe := PoliSim.new()
+	if probe.open(scenario) == "":
+		probe.advance(1)
+		while probe.is_busy():
+			OS.delay_msec(1)
+		probe.poll()
+		var now: float = probe.latest("basic_rate")
+		for value in [0.21, 0.22, 0.215]:
+			probe.set_lever("basic_rate", value)  # both branches are new each time
+			var asked := Time.get_ticks_usec()
+			probe.request_forecast({"basic_rate": now}, 12, "speed")
+			var answered := false
+			while not answered and Time.get_ticks_usec() - asked < 20_000_000:
+				OS.delay_msec(1)
+				for event in probe.poll():
+					answered = answered or str(event.get("kind", "")) == "forecast"
+			if answered:
+				look_ahead = minf(look_ahead, (Time.get_ticks_usec() - asked) / 1000.0)
+	probe = null
+	var script := 99999.0
+	for n in 3:
+		var began := Time.get_ticks_usec()
+		var words := {}
+		var total := 0
+		for i in 200000:
+			var key := "row%d" % (i % 997)
+			words[key] = int(words.get(key, 0)) + i
+			if key.contains("9"):
+				total += key.length()
+		script = minf(script, (Time.get_ticks_usec() - began) / 1000.0)
+	return {"look_ahead": look_ahead, "script": script}
+
+
+## The median, in milliseconds, of a forecast after the basic rate is typed at each of
+## `values`: from the key to "In a year" filled for that setting.
+func _forecasts(values: Array) -> float:
 	var forecasts := []
-	for value in [21.0, 22.0, 21.5]:
+	for value in values:
 		var asked := Time.get_ticks_usec()
 		main.type_lever("basic_rate", value)
 		main.policy_card().year_shown = []  # the figures for this setting, not the last
@@ -106,25 +200,7 @@ func _initialize() -> void:
 				break
 		forecasts.append(took)
 		await _frames(5)
-	got["forecast"] = _median(forecasts)
-	main.game.cancel_lever("basic_rate")
-	main.close_popup()
-	await _settle()
-	var words := PackedStringArray()
-	var over := PackedStringArray()
-	for k in BUDGET:
-		words.append("%s %.1f (budget %.0f)" % [k, got[k], BUDGET[k]])
-		if got[k] > BUDGET[k]:
-			over.append(k)
-	print("perf: %s; of opening, building the popup %.1f ms; hovered while the table was %s; idle redraws by layer %s" % [", ".join(words), build_ms,
-		"still running" if held else "already in", idle_detail])
-	while main.effects_running:
-		await process_frame
-	if not over.is_empty():
-		push_error("over budget: " + ", ".join(over))
-		quit(1)
-		return
-	quit(0)
+	return _median(forecasts)
 
 
 ## [open, close, of opening the build], medians of five, in milliseconds.

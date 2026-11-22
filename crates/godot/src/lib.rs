@@ -173,6 +173,50 @@ impl View {
     }
 }
 
+/// A lever in a list of changes waiting: set to a value, or taken out.
+fn put(pending: &mut Vec<(String, Val)>, lever: &str, value: Option<Val>) {
+    pending.retain(|(l, _)| l != lever);
+    if let Some(value) = value {
+        pending.push((lever.to_string(), value));
+    }
+}
+
+/// Lever changes the interface has made that the worker's updates do not show yet.
+///
+/// The mirror shows a change the moment it is made. An update for an earlier request (one
+/// the worker was still on when the lever was set) carries the worker's list from before
+/// the change, and applied as it stands would take the change out of the mirror until the
+/// lever's own update arrived: long enough, on a busy machine, for the interface to find
+/// nothing waiting and never ask what the change would do. The worker answers every
+/// request with exactly one update, in the order sent, so counting them says which changes
+/// an update already holds; the others are put back on top of it.
+#[derive(Default)]
+struct Unseen {
+    /// Requests sent to the worker, and updates had back from it.
+    sent: u64,
+    answered: u64,
+    /// The request that carried each change, the lever, and its value (`None`: cancelled).
+    levers: Vec<(u64, String, Option<Val>)>,
+}
+
+impl Unseen {
+    /// A change made in the mirror, carried by the request just sent.
+    fn lever(&mut self, view: &mut View, lever: &str, value: Option<Val>) {
+        put(&mut view.pending, lever, value);
+        self.levers.push((self.sent, lever.to_string(), value));
+    }
+
+    /// The worker's next update: applied, then the changes it cannot hold yet put back.
+    fn answer(&mut self, view: &mut View, update: Update) {
+        self.answered += 1;
+        view.apply(update);
+        self.levers.retain(|(request, _, _)| *request > self.answered);
+        for (_, lever, value) in &self.levers {
+            put(&mut view.pending, lever, *value);
+        }
+    }
+}
+
 /// Stage S14.3: how much of the session the interface's mirror already has.
 struct Sent {
     history: usize,
@@ -376,6 +420,8 @@ fn worker(
                 Some(EventData::Failed(message))
             }
         };
+        // Exactly one update for every request, whatever happened: the interface counts them
+        // (see `Unseen`).
         let _ = replies.send(Reply::Update(Box::new(sent.update(&session, &failed, reset))));
         if let Some(event) = event {
             let _ = replies.send(Reply::Event(event));
@@ -1013,6 +1059,8 @@ pub struct PoliSim {
     play: VarDictionary,
     scenario_name: String,
     view: View,
+    /// Lever changes shown in the mirror that the worker has yet to confirm.
+    unseen: Unseen,
     base: Base<RefCounted>,
 }
 
@@ -1031,6 +1079,7 @@ impl IRefCounted for PoliSim {
             play: VarDictionary::new(),
             scenario_name: String::new(),
             view: View::default(),
+            unseen: Unseen::default(),
             base,
         }
     }
@@ -1061,6 +1110,7 @@ impl PoliSim {
             self.outstanding.fetch_sub(1, Ordering::SeqCst);
             return false;
         }
+        self.unseen.sent += 1;
         true
     }
 
@@ -1110,6 +1160,7 @@ impl PoliSim {
         self.model = Some(info.model);
         self.catalogue = Some(info.catalogue);
         self.view = view_of(&session);
+        self.unseen = Unseen::default();
         self.looks = Arc::new(Looks::default());
         let looks = Arc::clone(&self.looks);
         let (request_tx, request_rx) = channel();
@@ -1150,7 +1201,7 @@ impl PoliSim {
         // before any event is returned.
         while let Ok(reply) = replies.try_recv() {
             match reply {
-                Reply::Update(u) => self.view.apply(*u),
+                Reply::Update(u) => self.unseen.answer(&mut self.view, *u),
                 Reply::Model(info) => {
                     self.model = Some(info.model);
                     self.catalogue = Some(info.catalogue);
@@ -1186,9 +1237,9 @@ impl PoliSim {
         let Some(raw) = raw_from_variant(&value) else { return "not a number or true/false".into() };
         match check_lever(model, &name, &raw) {
             Ok(checked) => {
-                self.view.pending.retain(|(l, _)| *l != name);
-                self.view.pending.push((name.clone(), checked));
-                self.send(Request::SetLever(name, raw));
+                if self.send(Request::SetLever(name.clone(), raw)) {
+                    self.unseen.lever(&mut self.view, &name, Some(checked));
+                }
                 GString::new()
             }
             Err(e) => e.to_string().as_str().into(),
@@ -1326,8 +1377,9 @@ impl PoliSim {
     #[func]
     fn cancel_lever(&mut self, name: GString) {
         let name = name.to_string();
-        self.view.pending.retain(|(l, _)| *l != name);
-        self.send(Request::CancelLever(name));
+        if self.send(Request::CancelLever(name.clone())) {
+            self.unseen.lever(&mut self.view, &name, None);
+        }
     }
 
     /// Asks why `name` changed in the last step; the answer arrives as an "explained" event.
@@ -1562,5 +1614,73 @@ impl PoliSim {
             out.push(pyfmt::hex(h).as_str());
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An update as the worker sends it after a request that changed no month.
+    fn update(pending: &[(&str, Val)]) -> Update {
+        Update {
+            steps_done: 1,
+            pending: pending.iter().map(|(l, v)| (l.to_string(), *v)).collect(),
+            failed: None,
+            month: None,
+            reset: false,
+            history: History::default(),
+            changes: Vec::new(),
+        }
+    }
+
+    fn waiting(view: &View) -> Vec<(&str, Val)> {
+        view.pending.iter().map(|(l, v)| (l.as_str(), *v)).collect()
+    }
+
+    /// A lever set while the worker is still on an earlier request stays in the mirror when
+    /// that request's update, made before the change, arrives.
+    #[test]
+    fn a_lever_set_survives_an_older_update() {
+        let (mut view, mut unseen) = (View::default(), Unseen::default());
+        unseen.sent += 1; // an effects table is asked for
+        unseen.sent += 1; // then a lever is set
+        unseen.lever(&mut view, "drinking_age", Some(Val::I(21)));
+        assert_eq!(waiting(&view), [("drinking_age", Val::I(21))]);
+        unseen.answer(&mut view, update(&[])); // the table's update: nothing waiting yet
+        assert_eq!(waiting(&view), [("drinking_age", Val::I(21))]);
+        unseen.answer(&mut view, update(&[("drinking_age", Val::I(21))]));
+        assert_eq!(waiting(&view), [("drinking_age", Val::I(21))]);
+        assert!(unseen.levers.is_empty());
+    }
+
+    /// The same for a change withdrawn, and for one typed twice: the newest wins.
+    #[test]
+    fn a_lever_cancelled_or_typed_again_survives_an_older_update() {
+        let (mut view, mut unseen) = (View::default(), Unseen::default());
+        view.pending = vec![("basic_rate".to_string(), Val::F(0.21)), ("vat_rate".to_string(), Val::F(0.2))];
+        unseen.sent += 1; // a forecast
+        unseen.sent += 1;
+        unseen.lever(&mut view, "basic_rate", None);
+        unseen.sent += 1;
+        unseen.lever(&mut view, "vat_rate", Some(Val::F(0.22)));
+        let before = [("basic_rate", Val::F(0.21)), ("vat_rate", Val::F(0.2))];
+        unseen.answer(&mut view, update(&before)); // the forecast's
+        assert_eq!(waiting(&view), [("vat_rate", Val::F(0.22))]);
+        unseen.answer(&mut view, update(&[("vat_rate", Val::F(0.2))])); // the cancel's
+        assert_eq!(waiting(&view), [("vat_rate", Val::F(0.22))]);
+        unseen.answer(&mut view, update(&[("vat_rate", Val::F(0.22))]));
+        assert_eq!(waiting(&view), [("vat_rate", Val::F(0.22))]);
+        assert!(unseen.levers.is_empty());
+    }
+
+    /// Once the worker has answered, its list is the truth: a change it refused goes.
+    #[test]
+    fn the_worker_has_the_last_word() {
+        let (mut view, mut unseen) = (View::default(), Unseen::default());
+        unseen.sent += 1;
+        unseen.lever(&mut view, "basic_rate", Some(Val::F(0.5)));
+        unseen.answer(&mut view, update(&[]));
+        assert!(view.pending.is_empty());
     }
 }

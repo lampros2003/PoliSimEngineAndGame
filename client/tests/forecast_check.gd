@@ -5,7 +5,9 @@ extends SceneTree
 ## before); the Commons vote line says the bill
 ## would pass; once the effects table has arrived, Income tax's links on the board are
 ## measured and point the way the table has the basic rate move them; and a VAT rise typed after an expensive
-## income tax bill says there is not enough political capital for it.
+## income tax bill says there is not enough political capital for it. A value typed while
+## the engine is still on an earlier request (an effects table just asked for) stays among
+## the changes waiting in every frame, and its year ahead still arrives.
 
 var main: Control
 
@@ -53,6 +55,30 @@ func _initialize() -> void:
 		if signf(best) != float(link["sign"]):
 			return _fail("the link to %s points %s, the table %s" % [row, link["sign"], best])
 	main.hover("")
+	# A value typed while the engine is on an earlier request: the update that request sends
+	# back was made before the change, and must not take it out of what the interface holds
+	# (it did, for a moment; on a slow machine long enough that no forecast was asked for).
+	main.game.cancel_lever("basic_rate")
+	await _settle()
+	while main.effects_running:
+		await process_frame
+	main.open_node("policy:drinking_age")
+	await process_frame
+	card = main.policy_card()
+	main._measured.clear()
+	main._ask_effects(PackedStringArray())
+	main.type_lever("drinking_age", 21.0)
+	card.year_shown = []
+	var until := Time.get_ticks_msec() + 30000
+	while card.year_shown.is_empty() and Time.get_ticks_msec() < until:
+		if not main.game.pending().has("drinking_age"):
+			return _fail("the drinking age typed was lost from the changes waiting: %s" % [main.game.pending()])
+		await process_frame
+	if card.year_shown.is_empty() or not card.year_heading.contains("21 YEARS"):
+		return _fail("a value typed during an effects request, in a year: %s; %s" % [card.year_shown, card.year_heading])
+	main.game.cancel_lever("drinking_age")
+	main.close_popup()
+	await _settle()
 	main.type_lever("basic_rate", 80.0)
 	main.type_lever("vat_rate", 50.0)
 	await _settle()
@@ -61,7 +87,7 @@ func _initialize() -> void:
 		await process_frame
 	if not refused.contains("Not enough political capital: needs "):
 		return _fail("the unaffordable bill reads: " + refused)
-	print("forecast: a basic rate rise shows income tax up (%s) and the budget balance up (%s) in a year; %s; %d measured links; \"%s\"" % [
+	print("forecast: a basic rate rise shows income tax up (%s) and the budget balance up (%s) in a year; %s; %d measured links; a value typed during an effects request kept and forecast; \"%s\"" % [
 		year["Income tax"], year["Budget balance"], vote, links.size(), refused])
 	quit(0)
 
