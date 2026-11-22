@@ -233,7 +233,9 @@ def main() -> int:
             capture_output=True, encoding="utf-8", timeout=900)
         if uk.returncode != 0 or not dump.exists():
             print(uk.stdout.strip()[-2000:], uk.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
-            print("res://tests/budget_dump.gd failed", file=sys.stderr)
+            # With the exit code and whether its work was done: a session that ends badly after
+            # writing everything it should is a different fault from one that never got there.
+            print(f"res://tests/budget_dump.gd failed (exit code {uk.returncode}; budget written: {dump.exists()})", file=sys.stderr)
             return 1
         problems = compare_uk_budget(dump.read_text(encoding="utf-8"))
         if problems:

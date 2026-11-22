@@ -67,6 +67,9 @@ struct Looks {
     forecast: AtomicU64,
     /// Forecasts running: the effects table waits for them between months.
     forecasting: AtomicUsize,
+    /// Threads looking ahead (forecasts and effects tables) that have not ended yet: a game
+    /// that closes waits for them (see `Alive`).
+    alive: AtomicUsize,
     /// The last "as is" branch run: state, months, outlook. A forecast and the effects
     /// table of the same game share it.
     as_is: Mutex<Option<(u64, u64, Outlook)>>,
@@ -88,6 +91,39 @@ impl Looks {
             *held = Some((state, months, outlook.clone()));
         }
     }
+}
+
+/// A thread that looks ahead, counted from before it starts until it has ended, even by a
+/// panic. They are not joined (the next month never waits for one), so without the count a
+/// game could close, and the program end, with some still running: on Windows the client's
+/// checks now and then ended with a failure code after doing all their work, from a script
+/// that quit while an effects table was being made. `PoliSim::close` tells them to stop and
+/// waits for the count to reach nought.
+struct Alive(Arc<Looks>);
+
+impl Alive {
+    fn start(looks: &Arc<Looks>) -> Alive {
+        looks.alive.fetch_add(1, Ordering::SeqCst);
+        Alive(Arc::clone(looks))
+    }
+}
+
+impl Drop for Alive {
+    fn drop(&mut self) {
+        self.0.alive.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Waits until no thread is looking ahead, or `limit` has passed; true if none is left.
+fn wait_for_looks(looks: &Looks, limit: std::time::Duration) -> bool {
+    let until = std::time::Instant::now() + limit;
+    while looks.alive.load(Ordering::SeqCst) > 0 {
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    true
 }
 
 /// Stage S14.3: counts a forecast as running until it ends, even by a panic.
@@ -587,7 +623,9 @@ impl Work {
         }
         let (replies, generation, looks) =
             (self.replies.clone(), Arc::clone(&self.generation), Arc::clone(&self.looks));
+        let alive = Alive::start(&self.looks);
         let spawned = std::thread::Builder::new().name("polisim-effects".to_string()).spawn(move || {
+            let _alive = alive;
             let stale = || generation.load(Ordering::SeqCst) != mine;
             let stop = || {
                 while looks.forecasting.load(Ordering::SeqCst) > 0 && !stale() {
@@ -665,9 +703,11 @@ impl Work {
         };
         let (month, state) = (looks.month.load(Ordering::SeqCst), looks.state.load(Ordering::SeqCst));
         let running = Running::start(looks);
+        let alive = Alive::start(looks);
         let (replies, looks) = (self.replies.clone(), Arc::clone(looks));
         let spawned = std::thread::Builder::new().name("polisim-forecast".to_string()).spawn(move || {
             let _running = running;
+            let _alive = alive;
             let stale = || looks.forecast.load(Ordering::SeqCst) != mine || looks.month.load(Ordering::SeqCst) != month;
             let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let forecast = fork.forecast(looks.as_is(state, months), &changes, months, &stale);
@@ -1100,6 +1140,11 @@ impl PoliSim {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+        // The worker may have started one more look ahead while it finished its last request:
+        // that one is told to stop too, and none is left running when the game has closed.
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.looks.month.fetch_add(1, Ordering::SeqCst);
+        wait_for_looks(&self.looks, std::time::Duration::from_secs(10));
         self.replies = None;
     }
 
@@ -1672,6 +1717,31 @@ mod tests {
         unseen.answer(&mut view, update(&[("vat_rate", Val::F(0.22))]));
         assert_eq!(waiting(&view), [("vat_rate", Val::F(0.22))]);
         assert!(unseen.levers.is_empty());
+    }
+
+    /// A game that closes waits for its look-ahead threads, and gives up at its limit.
+    #[test]
+    fn closing_waits_for_the_threads_that_look_ahead() {
+        let looks = Arc::new(Looks::default());
+        assert!(wait_for_looks(&looks, std::time::Duration::from_millis(1)));
+        let alive = Alive::start(&looks);
+        let thread = std::thread::spawn(move || {
+            let _alive = alive;
+            std::thread::sleep(std::time::Duration::from_millis(60));
+        });
+        assert_eq!(looks.alive.load(Ordering::SeqCst), 1);
+        assert!(!wait_for_looks(&looks, std::time::Duration::from_millis(5)));
+        assert!(wait_for_looks(&looks, std::time::Duration::from_secs(10)));
+        assert_eq!(looks.alive.load(Ordering::SeqCst), 0);
+        thread.join().unwrap();
+        // A thread that panics is counted out all the same.
+        let alive = Alive::start(&looks);
+        let _ = std::thread::spawn(move || {
+            let _alive = alive;
+            panic!("a look ahead that fails");
+        })
+        .join();
+        assert!(wait_for_looks(&looks, std::time::Duration::from_secs(10)));
     }
 
     /// Once the worker has answered, its list is the truth: a change it refused goes.
