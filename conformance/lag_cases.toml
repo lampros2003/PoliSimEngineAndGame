@@ -1,0 +1,275 @@
+# Lags (docs/spec/06-model-format-1.md, stage S10.5): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/lags.rs).
+#
+# Each case appends `add` to the base model (\n stands for a line break), schedules the
+# `commands` ([step, lever, value], none if absent), runs `steps` steps and expects one of:
+#   ran      - every step runs; `series` gives, for each named value, its value after each
+#              step;
+#   refused  - loading or starting the model fails;
+#   runtime  - the steps before `at` run, and step `at` fails.
+#
+# In the base, `count` is 1 after the first step, 2 after the second, and so on: it is
+# updated in the first phase. `level` is `count` as a real, computed in the second phase,
+# and `cells` is `level` plus 10 times the position of each side.
+
+base = """
+[model]
+id = "lags"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one", "two"]
+
+[dim.side]
+members = ["left", "right"]
+
+[sector.payer]
+
+[sector.payee]
+
+[instrument.cash]
+unit = "GBP"
+issuer = "payer"
+
+[account.payer_cash]
+sector = "payer"
+instrument = "cash"
+
+[account.payee_cash]
+sector = "payee"
+instrument = "cash"
+initial = 0
+
+[state.count]
+type = "int"
+unit = "1"
+phase = "one"
+initial = 0
+next = "count + 1"
+
+[var.level]
+type = "real"
+unit = "1"
+phase = "two"
+expr = "count * 1.0"
+
+[var.cells]
+type = "real"
+unit = "1"
+phase = "two"
+dims = ["side"]
+expr = "level + 10.0 * coord(side)"
+
+[lever.rate]
+type = "real"
+unit = "1"
+default = 0.5
+range = [0.0, 1.0]
+
+[param.fee]
+type = "money"
+unit = "GBP/month"
+value = 2.5
+
+[flow.payment]
+from = "payer"
+to = "payee"
+phase = "two"
+expr = "fee * count"
+"""
+
+[[case]]
+name = "a lag of a var holds its initial value, then the value n steps before"
+add = '[lag.back]\nof = "level"\nsteps = 3\ninitial = 0.0'
+steps = 6
+expect = "ran"
+series = { level = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], back = [0.0, 0.0, 0.0, 1.0, 2.0, 3.0] }
+
+[[case]]
+name = "a lag of one step is what prev gives"
+add = '[var.counted]\ntype = "real"\nunit = "1"\nphase = "two"\ninitial = 0.0\nexpr = "count * 1.0"\n\n[var.before]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "prev(counted)"\n\n[lag.back]\nof = "counted"\nsteps = 1'
+steps = 4
+expect = "ran"
+series = { before = [0.0, 1.0, 2.0, 3.0], back = [0.0, 1.0, 2.0, 3.0] }
+
+[[case]]
+name = "prev of a lag gives its value a step before, its initial value at first"
+add = '[lag.back]\nof = "level"\nsteps = 2\ninitial = 0.5\n\n[var.before]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "prev(back)"'
+steps = 5
+expect = "ran"
+series = { back = [0.5, 0.5, 1.0, 2.0, 3.0], before = [0.5, 0.5, 0.5, 1.0, 2.0] }
+
+[[case]]
+name = "read during a step, a lag gives the value n steps before that step"
+add = '[lag.back]\nof = "level"\nsteps = 2\ninitial = -1.0\n\n[var.seen]\ntype = "real"\nunit = "1"\nphase = "one"\nexpr = "back"'
+steps = 5
+expect = "ran"
+series = { seen = [-1.0, -1.0, 1.0, 2.0, 3.0] }
+
+[[case]]
+name = "a lag of a state updated in an earlier phase sees the step's update"
+add = '[lag.back]\nof = "count"\nsteps = 2'
+steps = 5
+expect = "ran"
+series = { count = [1, 2, 3, 4, 5], back = [0, 0, 1, 2, 3] }
+
+[[case]]
+name = "a lag updated in the same phase as its state sees it before the update, a step further back"
+add = '[lag.back]\nof = "count"\nsteps = 2\nphase = "one"'
+steps = 5
+expect = "ran"
+series = { count = [1, 2, 3, 4, 5], back = [0, 0, 0, 1, 2] }
+
+[[case]]
+name = "a lag takes the initial value of what it follows unless given one"
+add = '[state.stock]\ntype = "int"\nunit = "1"\nphase = "one"\ninitial = 7\nnext = "stock + 2"\n\n[lag.back]\nof = "stock"\nsteps = 3'
+steps = 5
+expect = "ran"
+series = { stock = [9, 11, 13, 15, 17], back = [7, 7, 7, 9, 11] }
+
+[[case]]
+name = "an initial value given replaces the one of what it follows"
+add = '[lag.back]\nof = "count"\nsteps = 2\ninitial = 100'
+steps = 4
+expect = "ran"
+series = { back = [100, 100, 1, 2] }
+
+[[case]]
+name = "a lag of a lever follows its setting, starting from its default"
+add = '[lag.back]\nof = "rate"\nsteps = 2'
+commands = [[1, "rate", 0.75], [3, "rate", 0.25]]
+steps = 5
+expect = "ran"
+series = { rate = [0.5, 0.75, 0.75, 0.25, 0.25], back = [0.5, 0.5, 0.5, 0.75, 0.75] }
+
+[[case]]
+name = "a lag of a dimensioned var keeps every cell"
+add = '[lag.back]\nof = "cells"\nsteps = 2\ninitial = 0.0\n\n[var.left_back]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "back[side: left]"\n\n[var.right_back]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "back[side: right]"'
+steps = 4
+expect = "ran"
+series = { left_back = [0.0, 0.0, 1.0, 2.0], right_back = [0.0, 0.0, 11.0, 12.0] }
+
+[[case]]
+name = "a lag of a national flow is money"
+add = '[lag.back]\nof = "payment"\nsteps = 2\ninitial = 0\n\n[var.paid_back]\ntype = "money"\nunit = "GBP/month"\nphase = "two"\nexpr = "back"'
+steps = 4
+expect = "ran"
+series = { paid_back = [0, 0, 250, 500] }
+
+[[case]]
+name = "lags may follow lags"
+add = '[lag.back]\nof = "level"\nsteps = 1\ninitial = 0.0\n\n[lag.back_again]\nof = "back"\nsteps = 2'
+steps = 5
+expect = "ran"
+series = { back = [0.0, 1.0, 2.0, 3.0, 4.0], back_again = [0.0, 0.0, 0.0, 1.0, 2.0] }
+
+[[case]]
+name = "a lag of 1,200 steps is allowed"
+add = '[lag.back]\nof = "count"\nsteps = 1200'
+steps = 2
+expect = "ran"
+series = { back = [0, 0] }
+
+[[case]]
+name = "a formula may read a lag's states like any other"
+add = '[lag.back]\nof = "count"\nsteps = 3\ninitial = 0\n\n[var.middle]\ntype = "int"\nunit = "1"\nphase = "two"\nexpr = "back__2"'
+steps = 4
+expect = "ran"
+series = { middle = [0, 0, 1, 2], back = [0, 0, 0, 1] }
+
+[[case]]
+name = "a dilemma's answer may change a lag like any var"
+add = '[lag.back]\nof = "level"\nsteps = 2\ninitial = 0.0\n\n[dilemma.d]\nstart = "count >= 1"\n[[dilemma.d.option]]\nname = "a"\neffect = { back = "{base} + 100.0" }\n[[dilemma.d.option]]\nname = "b"'
+commands = [[1, "d", 1]]
+steps = 5
+expect = "ran"
+series = { back = [0.0, 100.0, 101.0, 102.0, 103.0], back__2 = [0.0, 1.0, 2.0, 3.0, 4.0] }
+
+[[case]]
+name = "a mistake in what a lag follows fails in the step it is computed"
+add = '[var.half]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "1.0 / (3.0 - level)"\n\n[var.whole]\ntype = "int"\nunit = "1"\nphase = "two"\nexpr = "round(half)"\n\n[lag.back]\nof = "whole"\nsteps = 2\ninitial = 0'
+steps = 5
+expect = "runtime"
+at = 2
+
+# ---- lags the loader refuses
+
+[[case]]
+name = "a lag without of is refused"
+add = '[lag.back]\nsteps = 2\ninitial = 0'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of a param is refused"
+add = '[lag.back]\nof = "fee"\nsteps = 2\ninitial = 0'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of something undeclared is refused"
+add = '[lag.back]\nof = "nothing"\nsteps = 2\ninitial = 0'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of no steps is refused"
+add = '[lag.back]\nof = "count"\nsteps = 0'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of more than 1,200 steps is refused"
+add = '[lag.back]\nof = "count"\nsteps = 1201'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of a part step is refused"
+add = '[lag.back]\nof = "count"\nsteps = 2.5'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag of a var without an initial value is refused"
+add = '[lag.back]\nof = "level"\nsteps = 2'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag whose name is taken is refused"
+add = '[lag.level]\nof = "count"\nsteps = 1'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag following a var of a later phase than its own is refused"
+add = '[lag.back]\nof = "level"\nsteps = 2\ninitial = 0.0\nphase = "one"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag whose inner state's name is taken is refused"
+add = '[var.back__2]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "1.0"\n\n[lag.back]\nof = "count"\nsteps = 2'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag with an unknown key is refused"
+add = '[lag.back]\nof = "count"\nsteps = 2\nwhen = "count > 1"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag in an unknown phase is refused"
+add = '[lag.back]\nof = "count"\nsteps = 2\nphase = "three"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a lag's initial value of the wrong type is refused"
+add = '[lag.back]\nof = "count"\nsteps = 2\ninitial = 0.5'
+steps = 1
+expect = "refused"

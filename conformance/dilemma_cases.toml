@@ -1,0 +1,314 @@
+# Dilemmas (docs/spec/06-model-format-1.md, stage S9.1): cases with the outcome
+# recorded for each (by the Python reference implementation until stage S14.2), which the
+# engine runs (crates/core/tests/dilemmas.rs).
+#
+# Each case appends `add` to the base model (\n stands for a line break), schedules the
+# `answers` ([step, dilemma, answer], none if absent), runs `steps` steps and expects one of:
+#   ran      - every step runs; `series` gives, for each named value, its value after each
+#              step;
+#   refused  - loading or starting the model fails;
+#   runtime  - the steps before `at` run, and step `at` fails.
+#
+# In the base, `count` is 1 after the first step, 2 after the second, and so on: it is
+# updated in the first phase, and a dilemma's states, by default, in the last. So a
+# dilemma with start = "count >= 2" opens at the end of step 1 and can be answered from
+# step 2.
+
+base = """
+[model]
+id = "dilemmas"
+format = 1
+currency = "GBP"
+minor_units = 100
+step = "month"
+phases = ["one", "two"]
+
+[state.count]
+type = "int"
+unit = "1"
+phase = "one"
+initial = 0
+next = "count + 1"
+
+[param.rate]
+type = "real"
+unit = "1"
+value = 0.5
+
+[var.cost]
+type = "real"
+unit = "1"
+phase = "two"
+expr = "1.0"
+
+[state.stock]
+type = "int"
+unit = "1"
+phase = "two"
+initial = 0
+next = "stock + 1"
+"""
+
+[[case]]
+name = "opens when its start holds and stays open while unanswered"
+add = '[dilemma.d]\nlabel = "D"\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 5
+expect = "ran"
+series = { d_open = [false, true, true, true, true], d_choice = [0, 0, 0, 0, 0], d = [0, 0, 0, 0, 0] }
+
+[[case]]
+name = "an answer closes it, stays in force, and its lever returns to 0"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 2]]
+steps = 5
+expect = "ran"
+series = { d_open = [false, true, false, false, false], d_choice = [0, 0, 2, 2, 2], d_answer = [0, 0, 2, 2, 2], d_age = [0, 1, 0, 1, 2], d = [0, 0, 0, 0, 0] }
+
+[[case]]
+name = "an effect lasts its months, counting the month of the answer"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\nmonths = 2\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 1]]
+steps = 6
+expect = "ran"
+series = { cost = [1.0, 1.0, 2.0, 2.0, 1.0, 1.0] }
+
+[[case]]
+name = "an effect without months lasts for good, and may change a state's next"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"\neffect = { stock = "{base} + 10" }'
+answers = [[2, "d", 2]]
+steps = 4
+expect = "ran"
+series = { stock = [1, 2, 13, 24] }
+
+[[case]]
+name = "the other answer's effects do not apply"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"\neffect = { cost = "{base} - 1.0" }'
+answers = [[2, "d", 2]]
+steps = 4
+expect = "ran"
+series = { cost = [1.0, 1.0, 0.0, 0.0] }
+
+[[case]]
+name = "unanswered, nothing changes"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 4
+expect = "ran"
+series = { cost = [1.0, 1.0, 1.0, 1.0], d_open = [false, true, true, true] }
+
+[[case]]
+name = "without again_after it never opens again"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 1]]
+steps = 6
+expect = "ran"
+series = { d_open = [false, true, false, false, false, false] }
+
+[[case]]
+name = "again_after opens it again that many months after the answer"
+add = '[dilemma.d]\nstart = "count >= 2"\nagain_after = 3\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 2], [5, "d", 1]]
+steps = 8
+expect = "ran"
+series = { d_open = [false, true, false, false, true, false, false, true], d_choice = [0, 0, 2, 2, 2, 1, 1, 1], d_age = [0, 1, 0, 1, 2, 0, 1, 2] }
+
+[[case]]
+name = "a start that stops holding keeps it closed"
+add = '[dilemma.d]\nstart = "count == 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 4
+expect = "ran"
+series = { d_open = [false, true, true, true] }
+
+[[case]]
+name = "a later dilemma's effect wraps an earlier one's"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"\n[dilemma.e]\nstart = "count >= 3"\n[[dilemma.e.option]]\nname = "a"\neffect = { cost = "{base} * 10.0" }\n[[dilemma.e.option]]\nname = "b"'
+answers = [[2, "d", 1], [3, "e", 1]]
+steps = 5
+expect = "ran"
+series = { cost = [1.0, 1.0, 2.0, 20.0, 20.0], e_open = [false, false, true, false, false] }
+
+[[case]]
+name = "two dilemmas answered in the same step"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"\n[dilemma.e]\nstart = "count >= 2"\n[[dilemma.e.option]]\nname = "a"\n[[dilemma.e.option]]\nname = "b"\n[[dilemma.e.option]]\nname = "c"'
+answers = [[2, "d", 1], [2, "e", 3]]
+steps = 3
+expect = "ran"
+series = { d_choice = [0, 0, 1], e_choice = [0, 0, 3] }
+
+[[case]]
+name = "states in an earlier phase see the step before"
+add = '[dilemma.d]\nstart = "count >= 2"\nphase = "one"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 4
+expect = "ran"
+series = { d_open = [false, false, true, true] }
+
+[[case]]
+name = "24 dilemmas changing one formula: each reads the last through a var of its own"
+add = '[dilemma.d1]\nstart = "count >= 2"\n[[dilemma.d1.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d1.option]]\nname = "b"\n[dilemma.d2]\nstart = "count >= 2"\n[[dilemma.d2.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d2.option]]\nname = "b"\n[dilemma.d3]\nstart = "count >= 2"\n[[dilemma.d3.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d3.option]]\nname = "b"\n[dilemma.d4]\nstart = "count >= 2"\n[[dilemma.d4.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d4.option]]\nname = "b"\n[dilemma.d5]\nstart = "count >= 2"\n[[dilemma.d5.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d5.option]]\nname = "b"\n[dilemma.d6]\nstart = "count >= 2"\n[[dilemma.d6.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d6.option]]\nname = "b"\n[dilemma.d7]\nstart = "count >= 2"\n[[dilemma.d7.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d7.option]]\nname = "b"\n[dilemma.d8]\nstart = "count >= 2"\n[[dilemma.d8.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d8.option]]\nname = "b"\n[dilemma.d9]\nstart = "count >= 2"\n[[dilemma.d9.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d9.option]]\nname = "b"\n[dilemma.d10]\nstart = "count >= 2"\n[[dilemma.d10.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d10.option]]\nname = "b"\n[dilemma.d11]\nstart = "count >= 2"\n[[dilemma.d11.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d11.option]]\nname = "b"\n[dilemma.d12]\nstart = "count >= 2"\n[[dilemma.d12.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d12.option]]\nname = "b"\n[dilemma.d13]\nstart = "count >= 2"\n[[dilemma.d13.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d13.option]]\nname = "b"\n[dilemma.d14]\nstart = "count >= 2"\n[[dilemma.d14.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d14.option]]\nname = "b"\n[dilemma.d15]\nstart = "count >= 2"\n[[dilemma.d15.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d15.option]]\nname = "b"\n[dilemma.d16]\nstart = "count >= 2"\n[[dilemma.d16.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d16.option]]\nname = "b"\n[dilemma.d17]\nstart = "count >= 2"\n[[dilemma.d17.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d17.option]]\nname = "b"\n[dilemma.d18]\nstart = "count >= 2"\n[[dilemma.d18.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d18.option]]\nname = "b"\n[dilemma.d19]\nstart = "count >= 2"\n[[dilemma.d19.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d19.option]]\nname = "b"\n[dilemma.d20]\nstart = "count >= 2"\n[[dilemma.d20.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d20.option]]\nname = "b"\n[dilemma.d21]\nstart = "count >= 2"\n[[dilemma.d21.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d21.option]]\nname = "b"\n[dilemma.d22]\nstart = "count >= 2"\n[[dilemma.d22.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d22.option]]\nname = "b"\n[dilemma.d23]\nstart = "count >= 2"\n[[dilemma.d23.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d23.option]]\nname = "b"\n[dilemma.d24]\nstart = "count >= 2"\n[[dilemma.d24.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d24.option]]\nname = "b"'
+answers = [[2, "d1", 1], [2, "d2", 1], [2, "d3", 1], [2, "d4", 1], [2, "d5", 1], [2, "d6", 1], [2, "d7", 1], [2, "d8", 1], [2, "d9", 1], [2, "d10", 1], [2, "d11", 1], [2, "d12", 1], [2, "d13", 1], [2, "d14", 1], [2, "d15", 1], [2, "d16", 1], [2, "d17", 1], [2, "d18", 1], [2, "d19", 1], [2, "d20", 1], [2, "d21", 1], [2, "d22", 1], [2, "d23", 1], [2, "d24", 1]]
+steps = 3
+expect = "ran"
+series = { cost = [1.0, 1.0, 25.0], cost_before_d1 = [1.0, 1.0, 1.0], cost_before_d24 = [1.0, 1.0, 24.0] }
+
+[[case]]
+name = "an answer's effect on a state goes through a var too"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { stock = "{base} * 2" }\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 1]]
+steps = 4
+expect = "ran"
+series = { stock = [1, 2, 6, 14], stock_before_d = [1, 2, 3, 7] }
+
+# ---- answers that are errors
+
+[[case]]
+name = "an answer to a dilemma that is not open"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[1, "d", 1]]
+steps = 3
+expect = "runtime"
+at = 1
+
+[[case]]
+name = "an answer of 0"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 0]]
+steps = 3
+expect = "runtime"
+at = 2
+
+[[case]]
+name = "an answer beyond the last"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 3]]
+steps = 3
+expect = "runtime"
+at = 2
+
+[[case]]
+name = "a second answer once it has closed"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+answers = [[2, "d", 1], [3, "d", 2]]
+steps = 4
+expect = "runtime"
+at = 3
+
+# ---- refused
+
+[[case]]
+name = "an unknown key"
+add = '[dilemma.d]\nstart = "count >= 2"\nchance = 0.5\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an unknown key in an answer"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\nweight = 2\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "no start"
+add = '[dilemma.d]\nlabel = "D"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "one answer"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "seven answers"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"\n[[dilemma.d.option]]\nname = "c"\n[[dilemma.d.option]]\nname = "e"\n[[dilemma.d.option]]\nname = "f"\n[[dilemma.d.option]]\nname = "g"\n[[dilemma.d.option]]\nname = "h"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an answer without a name"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nlabel = "A"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a name given twice"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "a"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a name that is not a lowercase identifier"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "Settle"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "months of 0"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\nmonths = 0\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "months that are not whole"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\nmonths = 1.5\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "again_after of 0"
+add = '[dilemma.d]\nstart = "count >= 2"\nagain_after = 0\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "again_after that is true"
+add = '[dilemma.d]\nstart = "count >= 2"\nagain_after = true\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an effect on a parameter"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { rate = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an effect on nothing the model has"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { price = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an effect on what a dilemma makes"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { d_age = "{base} + 1" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an effect that is not a formula"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = 2.0 }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "an effect of the wrong type"
+add = '[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = "count >= 1" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a start that is not true or false"
+add = '[dilemma.d]\nstart = "count + 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a name the dilemma would make that the model has"
+add = '[var.d_open]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "0.0"\n[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"
+
+[[case]]
+name = "a name a dilemma's effect would make that the model has"
+add = '[var.cost_before_d]\ntype = "real"\nunit = "1"\nphase = "two"\nexpr = "0.0"\n[dilemma.d]\nstart = "count >= 2"\n[[dilemma.d.option]]\nname = "a"\neffect = { cost = "{base} + 1.0" }\n[[dilemma.d.option]]\nname = "b"'
+steps = 1
+expect = "refused"

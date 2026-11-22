@@ -29,6 +29,7 @@ unit = "GBP"
 issuer = "government"       # the issuer's balance is minus everyone else's holdings
 
 [account.hh_money]
+label = "Household savings"
 sector = "households"
 instrument = "money"
 initial = { column = "money0" }
@@ -36,12 +37,14 @@ range = [0, inf]            # no household credit in this model
 doc = "Money held by each household"
 
 [account.firm_money]
+label = "Firms' cash"
 sector = "firms"
 instrument = "money"
 initial = 3_440_000_000
 doc = "Money held by firms: profits not yet paid out"
 
 [account.gov_money]
+label = "Government's money position"
 sector = "government"
 instrument = "money"
 doc = "Government's position: minus the money it has issued"
@@ -54,11 +57,13 @@ id = "id"
 weight = "weight"           # real households each record stands for
 
 [entity.household.columns.wage]
+label = "Wage when employed"
 type = "money"
 unit = "GBP/month/household"
 doc = "Gross monthly wage when employed"
 
 [entity.household.columns.equity_units]
+label = "Shares owned"
 type = "int"
 unit = "share/household"
 doc = "Shares in the firm sector owned by each household"

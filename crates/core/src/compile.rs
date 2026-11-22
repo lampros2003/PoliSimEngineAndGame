@@ -1,13 +1,16 @@
 //! Type and unit checking, and translation of a syntax tree into bytecode.
 //!
-//! This is a port of the oracle's `_Builder` (oracle/polisim_oracle/expr.py). It must
-//! accept and reject exactly the same formulas; conformance/cases.tsv holds it to that.
+//! Ported from the retired Python reference's formula builder. docs/spec/02 defines which
+//! formulas are accepted and rejected; conformance/cases.tsv pins it to that.
 
 use std::collections::BTreeSet;
 
 use crate::error::{Error, Result};
 use crate::model::{Kind, Model};
-use crate::program::{Agg, AggKind, Cmp, Compiled, Op, Program, R, Rounding, Src, TableUse, Ty};
+use crate::program::{
+    Agg, AggBy, AggKind, Cmp, Compiled, Fixed, IndexUse, Op, Program, R, Rounding, Src, Sub, SubKind, SumBy, TableUse,
+    Ty,
+};
 use crate::syntax::{BinOp, Node, parse};
 use crate::units::{self, Unit};
 
@@ -29,6 +32,14 @@ struct Builder<'a> {
     n_b: u32,
     aggs: Vec<Agg>,
     tables: Vec<TableUse>,
+    curves: Vec<TableUse>,
+    /// Format 1: the dimensions in scope, which are the program's domain in this order.
+    scope: Vec<usize>,
+    gathers: Vec<Vec<u32>>,
+    coords: Vec<Vec<i64>>,
+    indexes: Vec<IndexUse>,
+    subs: Vec<Sub>,
+    aggs_by: Vec<AggBy>,
 }
 
 fn number(b: &Built, what: &str) -> Check<()> {
@@ -54,12 +65,29 @@ fn arg_count(fname: &str, args: &[Node], count: usize) -> Check<()> {
 
 impl<'a> Builder<'a> {
     fn new(model: &'a Model, deps: &'a mut BTreeSet<usize>, lagged: &'a mut BTreeSet<usize>) -> Builder<'a> {
-        Builder { model, deps, lagged, ops: Vec::new(), n_i: 0, n_f: 0, n_b: 0, aggs: Vec::new(), tables: Vec::new() }
+        Builder {
+            model,
+            deps,
+            lagged,
+            ops: Vec::new(),
+            n_i: 0,
+            n_f: 0,
+            n_b: 0,
+            aggs: Vec::new(),
+            tables: Vec::new(),
+            curves: Vec::new(),
+            scope: Vec::new(),
+            gathers: Vec::new(),
+            coords: Vec::new(),
+            indexes: Vec::new(),
+            subs: Vec::new(),
+            aggs_by: Vec::new(),
+        }
     }
 
     fn finish(self, result: &Built) -> Check<Program> {
         let narrow = |n: u32| u16::try_from(n).map_err(|_| "formula is too large".to_string());
-        Ok(Program {
+        let mut prog = Program {
             ops: self.ops,
             n_i: narrow(self.n_i)?,
             n_f: narrow(self.n_f)?,
@@ -68,7 +96,162 @@ impl<'a> Builder<'a> {
             ty: result.ty,
             aggs: self.aggs,
             tables: self.tables,
-        })
+            curves: self.curves,
+            gathers: self.gathers,
+            coords: self.coords,
+            indexes: self.indexes,
+            subs: self.subs,
+            aggs_by: self.aggs_by,
+            hoisted: None,
+        };
+        prog.hoisted = crate::program::hoist(&prog);
+        Ok(prog)
+    }
+
+    // ---------------------------------------------------------------- format 1
+
+    fn dim_name(&self, d: usize) -> &str {
+        &self.model.dims[d].name
+    }
+
+    /// The dimension a node names, for `sum`, `coord` and `cohort_shift`.
+    fn dim_arg(&self, node: &Node, fname: &str) -> Check<usize> {
+        match node {
+            Node::Name(name) => match self.model.dim_index.get(name.as_str()) {
+                Some(d) => Ok(*d),
+                None => Err(format!("{fname}(): {name} is not a declared dimension")),
+            },
+            _ => Err(format!("{fname}(): that is not a declared dimension")),
+        }
+    }
+
+    /// Strides of row-major storage over `dims`: the last varies fastest.
+    fn strides(&self, dims: &[usize]) -> Vec<usize> {
+        let mut out = vec![1usize; dims.len()];
+        for k in (0..dims.len().saturating_sub(1)).rev() {
+            out[k] = out[k + 1] * self.model.dims[dims[k + 1]].size();
+        }
+        out
+    }
+
+    /// For every cell of the domain, the flat index into a value stored over `target`
+    /// (whose dimensions not in `skip` must all be in scope), counting only those dimensions.
+    fn map_over_domain(&self, target: &[usize], skip: &[usize]) -> Vec<u32> {
+        let domain = &self.scope;
+        let dstrides = self.strides(domain);
+        let tstrides = self.strides(target);
+        let cells = self.model.cell_count(domain);
+        let parts: Vec<(usize, usize, usize)> = target
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| !skip.contains(d))
+            .map(|(k, d)| {
+                let at = domain.iter().position(|x| x == d).expect("checked to be in scope");
+                (dstrides[at], self.model.dims[*d].size(), tstrides[k])
+            })
+            .collect();
+        (0..cells).map(|c| parts.iter().map(|(ds, size, ts)| ((c / ds) % size) * ts).sum::<usize>() as u32).collect()
+    }
+
+    fn push_table<T>(list: &mut Vec<T>, item: T) -> Check<u16> {
+        let index = u16::try_from(list.len()).map_err(|_| "formula is too large".to_string())?;
+        list.push(item);
+        Ok(index)
+    }
+
+    fn index(&mut self, name: &str, coords: &[(String, Node)], ctx: Option<usize>) -> Check<Built> {
+        let Some(&id) = self.model.sym_index.get(name) else {
+            return Err(format!("unknown name {name:?}"));
+        };
+        let sym = &self.model.symbols[id];
+        if sym.dims.is_empty() {
+            return Err(format!("{name:?} has no dimensions to index"));
+        }
+        let (dims, ty, unit) = (sym.dims.clone(), sym.ty, sym.unit.clone());
+        self.deps.insert(id);
+        let strides = self.strides(&dims);
+        let mut fixed: Vec<Fixed> = Vec::new();
+        let mut fixed_dims: Vec<usize> = Vec::new();
+        for (dim, node) in coords {
+            let Some(k) = dims.iter().position(|d| self.model.dims[*d].name == *dim) else {
+                return Err(format!("{name}[{dim}: ...]: {name} has no dimension {dim:?}"));
+            };
+            let d = dims[k];
+            if fixed_dims.contains(&d) {
+                return Err(format!("{name}[...]: {dim} is fixed twice"));
+            }
+            let info = &self.model.dims[d];
+            let (size, first) = (info.size() as u32, info.first);
+            let member = match (first, node) {
+                (None, Node::Name(n)) => info.members.iter().position(|m| m == n),
+                _ => None,
+            };
+            let reg = match member {
+                Some(pos) => {
+                    let r = self.reg(Ty::Int);
+                    self.ops.push(Op::ConstI(r, pos as i64));
+                    r
+                }
+                None => {
+                    let b = self.build(node, ctx)?;
+                    if b.ty != Ty::Int {
+                        return Err(format!("{name}[{dim}: ...]: a coordinate must be a whole number"));
+                    }
+                    if b.unit.is_some() {
+                        units::unify(&b.unit, &Some(Unit::one()), &format!("{name}[{dim}: ...] coordinate"))?;
+                    }
+                    b.reg
+                }
+            };
+            fixed_dims.push(d);
+            fixed.push(Fixed {
+                dim: dim.clone(),
+                reg,
+                first: if member.is_some() { 0 } else { first.unwrap_or(0) },
+                size,
+                stride: strides[k] as u32,
+            });
+        }
+        if let Some(d) = dims.iter().find(|d| !fixed_dims.contains(d) && !self.scope.contains(d)) {
+            return Err(format!("{name}[...]: {} is neither fixed nor in scope here", self.dim_name(*d)));
+        }
+        let base = if dims.iter().all(|d| fixed_dims.contains(d)) {
+            Vec::new()
+        } else {
+            self.map_over_domain(&dims, &fixed_dims)
+        };
+        let src = Src { sym: id as u32, lagged: false };
+        let use_index = Self::push_table(&mut self.indexes, IndexUse { name: name.to_string(), src, base, fixed })?;
+        let d = self.reg(ty);
+        self.ops.push(match ty {
+            Ty::Int => Op::IndexI(d, use_index),
+            Ty::Real => Op::IndexF(d, use_index),
+            Ty::Bool => Op::IndexB(d, use_index),
+        });
+        Ok(Built { ty, unit: Some(unit), reg: d })
+    }
+
+    /// `sum` and `cohort_shift`: `x` compiled over `domain` as a sub-program.
+    fn sub_program(
+        &mut self,
+        x: &Node,
+        domain: Vec<usize>,
+        ctx: Option<usize>,
+        what: &str,
+    ) -> Check<(Ty, Option<Unit>, Program)> {
+        let mut sub = Builder::new(self.model, self.deps, self.lagged);
+        sub.scope = domain;
+        let inner = sub.build(x, ctx)?;
+        number(&inner, what)?;
+        let (ty, unit) = (inner.ty, inner.unit.clone());
+        Ok((ty, unit, sub.finish(&inner)?))
+    }
+
+    fn load_sub(&mut self, ty: Ty, unit: Option<Unit>, sub: Sub) -> Check<Built> {
+        let index = Self::push_table(&mut self.subs, sub)?;
+        let d = self.reg(ty);
+        self.ops.push(if ty == Ty::Int { Op::LoadSubI(d, index) } else { Op::LoadSubF(d, index) });
+        Ok(Built { ty, unit, reg: d })
     }
 
     fn reg(&mut self, ty: Ty) -> R {
@@ -132,6 +315,7 @@ impl<'a> Builder<'a> {
                 self.binary(*op, a, b)
             }
             Node::Call(fname, args) => self.call(fname, args, ctx),
+            Node::Index(name, coords) => self.index(name, coords, ctx),
         }
     }
 
@@ -146,6 +330,25 @@ impl<'a> Builder<'a> {
         }
         let sym = &self.model.symbols[id];
         let src = Src { sym: id as u32, lagged };
+        if !sym.dims.is_empty() {
+            let (dims, ty, unit) = (sym.dims.clone(), sym.ty, sym.unit.clone());
+            if let Some(missing) = dims.iter().find(|d| !self.scope.contains(d)) {
+                let missing = self.dim_name(*missing).to_string();
+                return Err(format!(
+                    "{name:?} holds one value per cell of its dimensions; {missing} is not in scope here: sum it with \
+                     sum({name}, {missing}) or fix it with {name}[{missing}: ...]"
+                ));
+            }
+            let map = self.map_over_domain(&dims, &[]);
+            let g = Self::push_table(&mut self.gathers, map)?;
+            let d = self.reg(ty);
+            self.ops.push(match ty {
+                Ty::Int => Op::LoadGI(d, src, g),
+                Ty::Real => Op::LoadGF(d, src, g),
+                Ty::Bool => Op::LoadGB(d, src, g),
+            });
+            return Ok(Built { ty, unit: Some(unit), reg: d });
+        }
         let d = self.reg(sym.ty);
         match sym.entity {
             None => self.ops.push(match sym.ty {
@@ -270,6 +473,38 @@ impl<'a> Builder<'a> {
                 });
                 Ok(Built { ty, unit, reg: d })
             }
+            "exp" => {
+                arg_count(fname, args, 1)?;
+                let a = self.build(&args[0], ctx)?;
+                number(&a, "exp()")?;
+                if a.unit.is_some() {
+                    units::unify(&a.unit, &Some(Unit::one()), "exp() argument")?;
+                }
+                let x = self.as_real(&a);
+                let d = self.reg(Ty::Real);
+                self.ops.push(Op::Exp(d, x));
+                Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
+            }
+            "ln" | "sqrt" | "pow" => {
+                // Stage S10.6: real or whole arguments of unit 1, taken as reals.
+                arg_count(fname, args, if fname == "pow" { 2 } else { 1 })?;
+                let mut regs = Vec::with_capacity(2);
+                for arg in args {
+                    let a = self.build(arg, ctx)?;
+                    number(&a, &format!("{fname}()"))?;
+                    if a.unit.is_some() {
+                        units::unify(&a.unit, &Some(Unit::one()), &format!("{fname}() argument"))?;
+                    }
+                    regs.push(self.as_real(&a));
+                }
+                let d = self.reg(Ty::Real);
+                self.ops.push(match fname {
+                    "ln" => Op::Ln(d, regs[0]),
+                    "sqrt" => Op::Sqrt(d, regs[0]),
+                    _ => Op::Pow(d, regs[0], regs[1]),
+                });
+                Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
+            }
             "abs" => {
                 arg_count(fname, args, 1)?;
                 let a = self.build(&args[0], ctx)?;
@@ -347,6 +582,100 @@ impl<'a> Builder<'a> {
                 self.ops.push(Op::MulDiv(d, a.reg, b.reg, c.reg));
                 Ok(Built { ty: Ty::Int, unit: Some(unit), reg: d })
             }
+            "div" | "mod" => {
+                arg_count(fname, args, 2)?;
+                let a = self.build(&args[0], ctx)?;
+                let b = self.build(&args[1], ctx)?;
+                if !(a.ty == Ty::Int && b.ty == Ty::Int) {
+                    return Err(format!("{fname}() needs two whole numbers"));
+                }
+                let unit = if fname == "div" {
+                    Some(units::div(&a.unit, &b.unit))
+                } else {
+                    units::unify(&a.unit, &b.unit, "mod()")?
+                };
+                let d = self.reg(Ty::Int);
+                self.ops.push(if fname == "div" { Op::DivI(d, a.reg, b.reg) } else { Op::ModI(d, a.reg, b.reg) });
+                Ok(Built { ty: Ty::Int, unit, reg: d })
+            }
+            "sum_by" => {
+                arg_count(fname, args, 4)?;
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("sum_by() is not available in a per-{entity} formula"));
+                }
+                let d = self.dim_arg(&args[1], fname)?;
+                let t = self.dim_arg(&args[3], fname)?;
+                if !self.scope.contains(&t) {
+                    return Err(format!("sum_by(): {} is not in scope here", self.dim_name(t)));
+                }
+                if self.scope.contains(&d) {
+                    return Err(format!("sum_by(): {} is already in scope", self.dim_name(d)));
+                }
+                let outer_dims: Vec<usize> = self.scope.iter().copied().filter(|x| *x != t).collect();
+                let mut domain = outer_dims.clone();
+                domain.push(d);
+                let cells = self.model.cell_count(&domain);
+                let (ty, unit, prog) = self.sub_program(&args[0], domain.clone(), ctx, "sum_by()")?;
+                let mut keyed = Builder::new(self.model, self.deps, self.lagged);
+                keyed.scope = domain;
+                let key = keyed.build(&args[2], ctx)?;
+                if key.ty != Ty::Int {
+                    return Err("sum_by(): the key must be a whole number".to_string());
+                }
+                units::unify(&key.unit, &Some(Unit::one()), "sum_by() key")?;
+                let key = keyed.finish(&key)?;
+                // Each cell of the result without t, in row-major order: its index with t at 0.
+                let strides = self.strides(&self.scope);
+                let outer = self.model.cell_count(&outer_dims);
+                let mut bases = Vec::with_capacity(outer);
+                for c in 0..outer {
+                    let (mut rest, mut base) = (c, 0usize);
+                    for &x in outer_dims.iter().rev() {
+                        let size = self.model.dims[x].size();
+                        let at = self.scope.iter().position(|s| *s == x).expect("in scope");
+                        base += (rest % size) * strides[at];
+                        rest /= size;
+                    }
+                    bases.push(u32::try_from(base).map_err(|_| "sum_by(): too many cells".to_string())?);
+                }
+                let at = self.scope.iter().position(|s| *s == t).expect("in scope");
+                let by = SumBy {
+                    key,
+                    bases,
+                    stride: strides[at],
+                    size: self.model.dims[t].size(),
+                    first: self.model.dims[t].first.unwrap_or(0),
+                    dim: self.dim_name(t).to_string(),
+                    cells: self.model.cell_count(&self.scope),
+                };
+                let group = self.model.dims[d].size();
+                self.load_sub(ty, unit, Sub { kind: SubKind::SumBy { group }, cells, prog, by: Some(Box::new(by)) })
+            }
+            "largest" | "smallest" => {
+                if args.len() < 2 {
+                    return Err(format!("{fname}() takes a value and at least one dimension"));
+                }
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("{fname}() is not available in a per-{entity} formula"));
+                }
+                let mut over: Vec<usize> = Vec::new();
+                for node in &args[1..] {
+                    let d = self.dim_arg(node, fname)?;
+                    if self.scope.contains(&d) || over.contains(&d) {
+                        return Err(format!("{fname}(): {} is already in scope", self.dim_name(d)));
+                    }
+                    over.push(d);
+                }
+                let group = self.model.cell_count(&over);
+                let mut domain = self.scope.clone();
+                domain.extend(&over);
+                let cells = self.model.cell_count(&domain);
+                let (ty, unit, prog) = self.sub_program(&args[0], domain, ctx, &format!("{fname}()"))?;
+                let kind = if fname == "largest" { SubKind::Largest { group } } else { SubKind::Smallest { group } };
+                self.load_sub(ty, unit, Sub { kind, cells, prog, by: None })
+            }
             "per_step" | "times_step" => {
                 arg_count(fname, args, 1)?;
                 let a = self.build(&args[0], ctx)?;
@@ -356,6 +685,7 @@ impl<'a> Builder<'a> {
                 Ok(Built { ty: a.ty, unit: Some(unit), reg: a.reg })
             }
             "marginal" => self.marginal(args, ctx),
+            "curve" => self.curve(args, ctx),
             "prev" => {
                 arg_count(fname, args, 1)?;
                 let Node::Name(name) = &args[0] else {
@@ -378,6 +708,9 @@ impl<'a> Builder<'a> {
                 let Some(stream) = stream else {
                     return Err("rand() takes the name of a declared random stream".to_string());
                 };
+                if !self.scope.is_empty() {
+                    return Err("rand() is not available in a formula with dimensions".to_string());
+                }
                 let d = self.reg(Ty::Real);
                 self.ops.push(Op::Rand(d, stream, ctx.is_some()));
                 Ok(Built { ty: Ty::Real, unit: Some(Unit::one()), reg: d })
@@ -393,6 +726,44 @@ impl<'a> Builder<'a> {
                 self.ops.push(if inner.ty == Ty::Int { Op::LoadAggI(d, index) } else { Op::LoadAggF(d, index) });
                 Ok(Built { ty: inner.ty, unit: Some(unit), reg: d })
             }
+            "quantile" => {
+                // Stage S10.9: quantile(entity, x, share); the share is national and real.
+                // Stage S11.2: an optional count per record multiplies its weight.
+                if args.len() != 4 {
+                    arg_count(fname, args, 3)?;
+                }
+                let (entity, inner, sub) = self.aggregate(fname, &args[..2], ctx)?;
+                number(&inner, "quantile()")?;
+                let prog = sub.finish(&inner)?;
+                let mut part = Builder::new(self.model, self.deps, self.lagged);
+                let share = part.build(&args[2], None)?;
+                number(&share, "quantile() share")?;
+                if share.unit.is_some() {
+                    units::unify(&share.unit, &Some(Unit::one()), "quantile() share")?;
+                }
+                let reg = part.as_real(&share);
+                let share = part.finish(&Built { ty: Ty::Real, unit: share.unit, reg })?;
+                let times = match args.get(3) {
+                    Some(node) => {
+                        let mut each = Builder::new(self.model, self.deps, self.lagged);
+                        let times = each.build(node, Some(entity))?;
+                        if times.ty != Ty::Int {
+                            return Err("quantile(): the count must be a whole number".to_string());
+                        }
+                        if times.unit.is_some() {
+                            units::unify(&times.unit, &Some(Unit::one()), "quantile() count")?;
+                        }
+                        Some(each.finish(&times)?)
+                    }
+                    None => None,
+                };
+                let index = self.push_agg(AggKind::Quantile, entity, prog)?;
+                self.aggs[index as usize].share = Some(share);
+                self.aggs[index as usize].times = times;
+                let d = self.reg(inner.ty);
+                self.ops.push(if inner.ty == Ty::Int { Op::LoadAggI(d, index) } else { Op::LoadAggF(d, index) });
+                Ok(Built { ty: inner.ty, unit: inner.unit, reg: d })
+            }
             "wcount" => {
                 let (entity, inner, sub) = self.aggregate(fname, args, ctx)?;
                 boolean(&inner, "wcount()")?;
@@ -402,6 +773,122 @@ impl<'a> Builder<'a> {
                 let d = self.reg(Ty::Int);
                 self.ops.push(Op::LoadAggI(d, index));
                 Ok(Built { ty: Ty::Int, unit: Some(unit), reg: d })
+            }
+            "sum" => {
+                if args.len() < 2 {
+                    return Err("sum() takes a value and at least one dimension".to_string());
+                }
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("sum() is not available in a per-{entity} formula"));
+                }
+                let mut summed: Vec<usize> = Vec::new();
+                for node in &args[1..] {
+                    let d = self.dim_arg(node, "sum")?;
+                    if self.scope.contains(&d) || summed.contains(&d) {
+                        return Err(format!("sum(): {} is already in scope", self.dim_name(d)));
+                    }
+                    summed.push(d);
+                }
+                let group = self.model.cell_count(&summed);
+                let mut domain = self.scope.clone();
+                domain.extend(&summed);
+                let cells = self.model.cell_count(&domain);
+                let (ty, unit, prog) = self.sub_program(&args[0], domain, ctx, "sum()")?;
+                self.load_sub(ty, unit, Sub { kind: SubKind::Sum { group }, cells, prog, by: None })
+            }
+            "wsum_by" | "wcount_by" => {
+                arg_count(fname, args, 4)?;
+                if let Some(entity) = ctx {
+                    let entity = &self.model.entities[entity].name;
+                    return Err(format!("{fname}() cannot be used inside a per-{entity} formula"));
+                }
+                let entity = match &args[0] {
+                    Node::Name(name) => self.model.entity_index.get(name.as_str()).copied(),
+                    _ => None,
+                };
+                let Some(entity) = entity else {
+                    return Err(format!("{fname}(): the first argument must be the name of an entity"));
+                };
+                let dim = self.dim_arg(&args[2], fname)?;
+                if !self.scope.contains(&dim) {
+                    return Err(format!("{fname}(): {} is not in scope here", self.dim_name(dim)));
+                }
+                let (value_ty, value_unit, value) = {
+                    let mut sub = Builder::new(self.model, self.deps, self.lagged);
+                    let b = sub.build(&args[1], Some(entity))?;
+                    (b.ty, b.unit.clone(), sub.finish(&b)?)
+                };
+                let (key_ty, key_unit, key) = {
+                    let mut sub = Builder::new(self.model, self.deps, self.lagged);
+                    let b = sub.build(&args[3], Some(entity))?;
+                    (b.ty, b.unit.clone(), sub.finish(&b)?)
+                };
+                if key_ty != Ty::Int {
+                    return Err(format!("{fname}(): the key must be a whole number"));
+                }
+                if key_unit.is_some() {
+                    units::unify(&key_unit, &Some(Unit::one()), &format!("{fname}() key"))?;
+                }
+                let entity_base = Unit::base(&self.model.entities[entity].name);
+                let entity_unit = Some(entity_base.clone());
+                let (kind, ty, unit) = if fname == "wsum_by" {
+                    if value_ty == Ty::Bool {
+                        return Err("wsum_by() needs a number, not a true/false value".to_string());
+                    }
+                    let kind = if value_ty == Ty::Int { AggKind::SumInt } else { AggKind::SumReal };
+                    (kind, value_ty, units::mul(&value_unit, &entity_unit))
+                } else {
+                    if value_ty != Ty::Bool {
+                        return Err("wcount_by() needs a true/false value, not a number".to_string());
+                    }
+                    (AggKind::Count, Ty::Int, entity_base)
+                };
+                let info = &self.model.dims[dim];
+                let agg = AggBy {
+                    name: if fname == "wsum_by" { "wsum_by" } else { "wcount_by" },
+                    kind,
+                    entity,
+                    value,
+                    key,
+                    dim: info.name.clone(),
+                    first: info.first.unwrap_or(0),
+                    size: info.size(),
+                };
+                let map = self.map_over_domain(&[dim], &[]);
+                let g = Self::push_table(&mut self.gathers, map)?;
+                let index = Self::push_table(&mut self.aggs_by, agg)?;
+                let d = self.reg(ty);
+                self.ops.push(if ty == Ty::Int { Op::LoadAggByI(d, index, g) } else { Op::LoadAggByF(d, index, g) });
+                Ok(Built { ty, unit: Some(unit), reg: d })
+            }
+            "coord" => {
+                arg_count(fname, args, 1)?;
+                let dim = self.dim_arg(&args[0], "coord")?;
+                let Some(at) = self.scope.iter().position(|d| *d == dim) else {
+                    return Err(format!("coord({0}): {0} is not in scope here", self.dim_name(dim)));
+                };
+                let info = &self.model.dims[dim];
+                let (size, first) = (info.size(), info.first.unwrap_or(0));
+                let stride = self.strides(&self.scope)[at];
+                let cells = self.model.cell_count(&self.scope);
+                let table: Vec<i64> = (0..cells).map(|c| first + ((c / stride) % size) as i64).collect();
+                let index = Self::push_table(&mut self.coords, table)?;
+                let d = self.reg(Ty::Int);
+                self.ops.push(Op::Coord(d, index));
+                Ok(Built { ty: Ty::Int, unit: Some(Unit::one()), reg: d })
+            }
+            "cohort_shift" => {
+                arg_count(fname, args, 2)?;
+                let dim = self.dim_arg(&args[1], "cohort_shift")?;
+                let Some(at) = self.scope.iter().position(|d| *d == dim) else {
+                    return Err(format!("cohort_shift(): {} is not in scope here", self.dim_name(dim)));
+                };
+                let stride = self.strides(&self.scope)[at];
+                let size = self.model.dims[dim].size();
+                let cells = self.model.cell_count(&self.scope);
+                let (ty, unit, prog) = self.sub_program(&args[0], self.scope.clone(), ctx, "cohort_shift()")?;
+                self.load_sub(ty, unit, Sub { kind: SubKind::Shift { stride, size }, cells, prog, by: None })
             }
             _ => Err(format!("unknown function {fname:?}")),
         }
@@ -441,6 +928,9 @@ impl<'a> Builder<'a> {
         };
         let model = self.model;
         let spec = &model.tables[table];
+        if spec.x_unit.is_some() {
+            return Err(format!("marginal(): table {:?} is a curve", spec.name));
+        }
         let table_unit = Some(spec.unit.clone());
         units::unify(&x.unit, &table_unit, &format!("marginal() with table {:?}", spec.name))?;
         let (mut lows, mut rates) = (Vec::new(), Vec::new());
@@ -469,6 +959,51 @@ impl<'a> Builder<'a> {
         Ok(Built { ty: Ty::Int, unit: x.unit, reg: d })
     }
 
+    /// Stage S11.1: `curve(x, table)`, as docs/spec/02 defines it.
+    fn curve(&mut self, args: &[Node], ctx: Option<usize>) -> Check<Built> {
+        arg_count("curve", args, 2)?;
+        let x = self.build(&args[0], ctx)?;
+        number(&x, "curve()")?;
+        let table = match &args[1] {
+            Node::Name(name) => self.model.table_index.get(name.as_str()).copied(),
+            _ => None,
+        };
+        let Some(table) = table else {
+            return Err("curve(): the second argument must be the name of a table".to_string());
+        };
+        let model = self.model;
+        let spec = &model.tables[table];
+        let Some(x_unit) = spec.x_unit.clone() else {
+            return Err(format!("curve(): table {:?} is not a curve", spec.name));
+        };
+        if x.unit.is_some() {
+            units::unify(&x.unit, &Some(x_unit.clone()), &format!("curve() with table {:?}", spec.name))?;
+        }
+        let x_reg = self.as_real(&x);
+        let (mut xs, mut ys) = (Vec::new(), Vec::new());
+        for (x_src, y_src) in &spec.bands {
+            // A point's coordinates are national formulas, whatever the caller's context.
+            let mut point = Vec::with_capacity(2);
+            for (src, unit, axis) in [(x_src, &x_unit, "x"), (y_src, &spec.unit, "y")] {
+                let mut builder = Builder::new(model, self.deps, self.lagged);
+                let value = builder.build(&parse(src)?, None)?;
+                number(&value, &format!("table {:?} point", spec.name))?;
+                if value.unit.is_some() {
+                    units::unify(&value.unit, &Some(unit.clone()), &format!("table {:?} point {axis}", spec.name))?;
+                }
+                let reg = builder.as_real(&value);
+                point.push(builder.finish(&Built { ty: Ty::Real, unit: None, reg })?);
+            }
+            ys.push(point.pop().expect("two"));
+            xs.push(point.pop().expect("two"));
+        }
+        let index = u16::try_from(self.curves.len()).map_err(|_| "formula is too large".to_string())?;
+        self.curves.push(TableUse { table, lows: xs, rates: ys });
+        let d = self.reg(Ty::Real);
+        self.ops.push(Op::Curve(d, x_reg, index));
+        Ok(Built { ty: Ty::Real, unit: Some(spec.unit.clone()), reg: d })
+    }
+
     fn aggregate(&mut self, fname: &str, args: &[Node], ctx: Option<usize>) -> Check<(usize, Built, Builder<'_>)> {
         arg_count(fname, args, 2)?;
         if let Some(entity) = ctx {
@@ -491,7 +1026,7 @@ impl<'a> Builder<'a> {
 impl Builder<'_> {
     fn push_agg(&mut self, kind: AggKind, entity: usize, prog: Program) -> Check<u16> {
         let index = u16::try_from(self.aggs.len()).map_err(|_| "formula is too large".to_string())?;
-        self.aggs.push(Agg { kind, entity, prog });
+        self.aggs.push(Agg { kind, entity, prog, share: None, times: None });
         Ok(index)
     }
 }
@@ -505,6 +1040,7 @@ pub fn compile_formula(
     model: &Model,
     src: &str,
     ctx: Option<usize>,
+    dims: &[usize],
     want_ty: Ty,
     want_unit: &Unit,
     label: &str,
@@ -514,6 +1050,7 @@ pub fn compile_formula(
     let outcome = (|| -> Check<(Program, Option<Unit>)> {
         let node = parse(src)?;
         let mut builder = Builder::new(model, &mut deps, &mut lagged);
+        builder.scope = dims.to_vec();
         let mut built = builder.build(&node, ctx)?;
         if want_ty == Ty::Real && built.ty == Ty::Int {
             let reg = builder.as_real(&built);

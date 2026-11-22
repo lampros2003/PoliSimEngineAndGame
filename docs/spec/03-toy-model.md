@@ -63,7 +63,7 @@ belongs to the first real country model.
 ## Target patterns
 
 These are the behaviours the model was required to show before it was accepted. Each is
-a test in `oracle/tests/test_patterns.py`; "measured" is what the oracle produces with
+a test in `tests/test_patterns.py`; "measured" is what the model produced with
 the central preset and seed 20261113. Policy changes are made at step 120 and compared
 with the unchanged baseline run on the same seed. Because random draws depend only on
 seed, stream, household and step, the two runs share every draw, which is what allows
@@ -97,9 +97,9 @@ evidence that the accounting and the aggregation are right.
 240 steps. Regenerate it only when the model or the contract changes on purpose:
 
 ```bash
-cd oracle
+cargo build --release
+target/release/polisim run models/toy/scenarios/baseline.toml --columns step,hash --out models/toy/golden/baseline.hashes.csv
 ```
 
-```bash
-python -m polisim_oracle run ../models/toy/scenarios/baseline.toml --columns step,hash --out ../models/toy/golden/baseline.hashes.csv
-```
+`python tools/record_goldens.py` re-records every model's hashes this way, and
+`python tools/record_goldens.py --check` checks them without writing.

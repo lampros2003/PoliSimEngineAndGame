@@ -1,0 +1,410 @@
+# A five-year parliament from January 2025, starting from the 2024 accounts.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 60
+preset = "central"
+
+# Stage S13.7 (docs/S13-BALANCE.md): this government wears faster than the model's fitted
+# time in office alone, so that a term of doing nothing ends near the majority line rather
+# than safely above it. Nil in the base month (politics/README.md, "Wear of office").
+[params]
+# Stage S15.2: -0.025 to -0.022, so that doing nothing stays within 320 to 332 seats now that
+# rents, bills and public pay weigh with the new groups (docs/S13-BALANCE.md, "After S15.2").
+vote_wear_effect = -0.022
+# Stage S13.8 (docs/S13-BALANCE.md, "After S13.8"): lenders and voters mind the public
+# finances (models/uk/finances.toml; politics/README.md, "The public finances"). Both are nil
+# in the base month.
+lender_premium_effect = 0.75
+vote_finances_effect = 1.0
+
+[play]
+# Stage S7.1: listed on the start screen.
+title = "The United Kingdom, 2025"
+summary = "Govern the United Kingdom from January 2025, with 411 of the 650 seats in the Commons, through the general election due in July 2029."
+country = "United Kingdom"
+currency_symbol = "£"
+currency_name = "pounds"
+start = "2025-01"
+term = 60
+government = "government"
+# Amounts paid each month are shown at an annual rate, as the public finances are published.
+amounts = "year"
+# Stage S13.2: short names for the top bar and the board. Stage S15.3: a policy's key gives it
+# a shorter name on the board (its popup keeps the whole one).
+labels = { schools = "Schools", culture = "Culture", policing = "Police and courts", housing = "Local services", government = "Running government", visa_threshold = "Visa threshold", prescription_charge = "Prescriptions", homelessness = "Homelessness", government_support = "Approval", gdp = "GDP", unemployment_rate = "Unemployment", consumer_inflation_annual = "Inflation", budget_balance = "Budget balance", debt_to_gdp = "Debt to GDP", output_growth = "Growth", pay_per_employee_job = "Pay per job", workforce_jobs = "Jobs", public_receipts = "Tax receipts", poverty_rate = "Poverty", child_poverty_rate = "Child poverty", pensioner_poverty_rate = "Pensioner poverty", working_age_poverty_rate = "Working-age poverty", median_income = "Median income", net_income_average = "Household income", treatments = "NHS treatments", service_level_overall = "Public services", household_emissions = "Homes' emissions", emissions = "Emissions", dwellings = "Housing stock", crime_incidents = "Crime", prison_population = "Prisoners", healthy_life_expectancy = "Healthy life", smoking_prevalence = "Smoking", alcohol_deaths = "Alcohol deaths", ev_share = "Electric cars", school_attainment = "School results", homes_built = "Homes built", net_migration_annual = "Net migration", inequality = "Inequality", tax_burden = "Tax burden", rents = "Rents", house_prices = "House prices", energy_bills = "Energy bills", strike_days = "Days lost to strikes", business_confidence = "Business confidence", farm_incomes = "Farm incomes", congestion = "Congestion", air_pollution = "Air pollution", research_development = "Research", trade_balance = "Trade balance", bank_rate = "Bank Rate", mortgage_rate = "Mortgage rate", productivity = "Productivity", stance_state = "State or market", stance_order = "Liberty or order", stance_green = "Green", stance_nation = "The nation" }
+headline = ["government_support", "gdp", "unemployment_rate", "consumer_inflation_annual", "budget_balance", "debt_to_gdp"]
+# Stage S17.1: on a top bar short of room these give way in this order, the first first:
+# the size of the economy moves least from month to month (its growth is on the board), then
+# the debt; the budget balance, which every decision moves, goes last. Approval and
+# political capital never do.
+give_way = ["gdp", "debt_to_gdp", "consumer_inflation_annual", "unemployment_rate", "budget_balance"]
+watch = ["gdp", "unemployment_rate", "budget_balance", "debt_to_gdp", "consumer_inflation_annual", "waiting_list"]
+# "Who gains, who loses": net income per household by group, from the households; jobs and
+# pay by industry (stage S6.4).
+breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_income_by_region",
+              "industry_jobs", "industry_pay_per_employee", "service_level", "spending_by_function",
+              "industry_emissions", "poverty_by_group"]
+breakdown_all = "net_income_average"
+breakdown_totals = { poverty_by_group = "poverty_rate", industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job", service_level = "service_level_overall", spending_by_function = "public_services_spending", industry_emissions = "firm_emissions" }
+
+# Stage S5.5: the politics panel and election night.
+[play.politics]
+intention = "vote_intention"
+seats = "seats"
+projected = "projected_seats"
+governing = "governing"
+support = "government_support"
+# Stage S13.7: the player's own bloc's rating: the centre of the board and the top bar's
+# "Approval" show it, so a coalition does not make approval jump; political capital is
+# earned on it.
+own = "own_support"
+turnout = "turnout"
+election = "election_now"
+months_to_election = "months_to_election"
+player = "player_governs"
+majority = 326
+# Stage S8.3: the issues voters weigh, now and at the last election.
+issues = "issue_measure"
+issues_at_election = "issue_at_election"
+
+# Stage S13.2: the board, the game's one screen. Read by the client only; the engine
+# ignores it, so no model hash changes with the layout.
+#
+#   [play.web]
+#   hide = [lever, ...]            levers the player does not hold here (Scotland sets its
+#                                  own income tax rates)
+#   groups = [{ key, label, icon, row, share, family, note }, ...]
+#                                  interest groups round the centre: `row` is the group's
+#                                  approval and `share` its share of the electorate (national
+#                                  result rows); `family` gathers groups on the board (a small
+#                                  gap between families); `note`, if any, is said in place of
+#                                  an approval of nought
+#   group_drivers = { key = "value over the group dimension", ... }
+#                                  what moves each group, read with cells()
+#   group_driver_labels = { key = "plain name", ... }
+#                                  the drivers' names on screen
+#   household = { entity, support, net_income, change, adults, children, region, type,
+#                 account = [...] }  sample households in a group's popup; a group's
+#                                  `households` names the flag that picks them
+#   [[play.web.areas]]            one per policy area, in order round the board
+#   name, icon                     the area's name (set along the rim) and pictogram
+#   policies = [{ key, label, icon, size, levers = [...] }]
+#                                  a policy is one lever or several under one name; its
+#                                  first lever sets its gauge; size 1 to 3 is importance
+#   indicators = [{ row, icon, size, better }]
+#                                  a national result row; `better` is "high" or "low" where
+#                                  that is clear: it sets the node's colour (high green, a
+#                                  good thing; low red, a bad thing; none blue) and tints
+#                                  its rises and falls
+#
+# Stage S13.5: real policies, a growing board, estimated groups.
+#   a policy's `levels = ["...", ...]`  the names of a level policy's settings, in order from
+#                                  the lever's minimum: chosen by name, never as a number
+#   a policy's `off = <value>`     the setting (as typed: pounds for money) at which it is
+#                                  not in force: off the board, offered on the Add policy
+#                                  sheet (stage S15.1), and "Repeal" when in force
+#   a policy's `line = "..."`      one line on what it does, on the Add policy sheet
+#   `unit` on a policy or an indicator, how its value reads: "years" (an age, a life:
+#                                  "18 years"), "year" (a calendar year: "2030"), "multiple"
+#                                  (of 2024's rates: "as now", "+20%"), "pence" ("52.95p"),
+#                                  "count" (a plain number: "9,200,000")
+#   a policy's `per = "..."`       what its amount is for: "a car" reads "£2,500 a car"
+#   a group's `estimate = "..."`   for a group with no households: where its membership is
+#                                  estimated from, said in its popup in their place
+#
+# Stage S14.1: the board as the screen.
+#   approval_good, approval_bad    the approval from which a group's arc is green, and below
+#                                  which it is red (mustard between); 0.38 and 0.28 if absent
+#   an indicator's `better`        also its colour: "high" a good thing (green), "low" a bad
+#                                  thing (red), none neither (blue)
+#
+# Stage S15: search, situations on their nodes, stances, the shelf.
+#   `also = ["...", ...]`          on any policy, indicator or group: more words search finds
+#                                  it by; [play.web] `also = { name = [...] }` for anything else
+#   situations = { situation = row }  the statistic each situation belongs to: its node wears
+#                                  the situation's flag and is lit from its pennant
+#   stances = [{ row, label, low, high, low_group, high_group }]
+#                                  Parliament's scales of where the government stands, the
+#                                  belief groups (by key) at their ends
+#   places = [{ label, row, share, note }]  Parliament's table of the country by place
+#   shelf = [{ row, see }]         statistics off the board: found by search, and linked
+#                                  under "See also" from the popup of `see` (a row on the board)
+#   [play] `labels` by a policy's key  a shorter name for it on the board (its popup keeps
+#                                  the whole name)
+#
+# Icons are file names in client/icons (game-icons.net, credited in client/icons/CREDITS.md).
+[play.web]
+hide = ["starter_rate", "scottish_basic_rate", "scottish_basic_threshold", "intermediate_rate",
+        "intermediate_threshold", "scottish_higher_rate", "scottish_higher_threshold", "advanced_rate",
+        "advanced_threshold", "top_rate", "top_threshold"]
+# Stage S15.2: seven families (docs/S15-PLAN.md, Groups); the regions and smokers stay in the
+# model and in Parliament but leave the ring. Seven terms of what moves a group, by plain name.
+groups = [
+  # Beliefs: where the government stands moves them (models/uk/politics/README.md).
+  { key = "socialists", label = "Socialists", icon = "group-socialists", row = "approval_socialists", share = "share_socialists", family = "Beliefs", estimate = "British Social Attitudes' left of the economic scale, by age, income and region" },
+  { key = "capitalists", label = "Capitalists", icon = "group-capitalists", row = "approval_capitalists", share = "share_capitalists", family = "Beliefs", estimate = "British Social Attitudes' right of the economic scale, by age, income and region" },
+  { key = "liberals", label = "Liberals", icon = "group-liberals", row = "approval_liberals", share = "share_liberals", family = "Beliefs", estimate = "British Social Attitudes' libertarian end, by age, income and region" },
+  { key = "conservatives", label = "Conservatives", icon = "group-conservatives", row = "approval_conservatives", share = "share_conservatives", family = "Beliefs", estimate = "British Social Attitudes' authoritarian end, by age, income and region" },
+  { key = "environmentalists", label = "Environmentalists", icon = "group-environmentalists", row = "approval_environmentalists", share = "share_environmentalists", family = "Beliefs", estimate = "the British Election Study's priority for the environment, by age, income and region" },
+  { key = "patriots", label = "Patriots", icon = "group-patriots", row = "approval_patriots", share = "share_patriots", family = "Beliefs", estimate = "the British Election Study's national identity, by age, income and region" },
+  { key = "in_work", label = "In work", icon = "group-in-work", row = "approval_in_work", share = "share_in_work", households = "household_in_in_work", family = "Work" },
+  { key = "out_of_work", label = "Out of work", icon = "group-out-of-work", row = "approval_out_of_work", share = "share_out_of_work", households = "household_in_out_of_work", family = "Work" },
+  { key = "self_employed", label = "The self-employed", icon = "group-self-employed", row = "approval_self_employed", share = "share_self_employed", households = "household_in_self_employed", family = "Work" },
+  { key = "public_sector", label = "Public sector workers", icon = "group-public-sector", row = "approval_public_sector", share = "share_public_sector", family = "Work", estimate = "the ONS's public sector employment, 6.1 million, by age, income and region" },
+  { key = "trade_unionists", label = "Trade unionists", icon = "group-trade-unionists", row = "approval_trade_unionists", share = "share_trade_unionists", family = "Work", estimate = "the government's trade union membership statistics, 6.4 million, by pay and region" },
+  { key = "farmers", label = "Farmers", icon = "group-farmers", row = "approval_farmers", share = "share_farmers", family = "Work", estimate = "Defra's agricultural workforce, 453,000, by age and region" },
+  { key = "home_owners", label = "Home owners", icon = "group-home-owners", row = "approval_home_owners", share = "share_home_owners", family = "Homes and places", estimate = "the English Housing Survey's share of households who own their home, by age and income" },
+  { key = "renters", label = "Renters", icon = "group-renters", row = "approval_renters", share = "share_renters", family = "Homes and places", estimate = "the English Housing Survey: everyone who does not own their home" },
+  { key = "town", label = "Town and city", icon = "group-town", row = "approval_town", share = "share_town", family = "Homes and places", estimate = "the rural-urban classification: everyone outside rural areas" },
+  { key = "countryside", label = "Countryside", icon = "group-countryside", row = "approval_countryside", share = "share_countryside", family = "Homes and places", estimate = "the rural-urban classification's rural share of each region" },
+  { key = "young", label = "The young", icon = "group-young", row = "approval_young", share = "share_young", households = "household_in_young", family = "Ages" },
+  { key = "midlife", label = "Mid-life", icon = "group-midlife", row = "approval_midlife", share = "share_midlife", households = "household_in_midlife", family = "Ages" },
+  { key = "pensioner", label = "Pensioners", icon = "pensioner", row = "approval_pensioners", share = "share_pensioners", households = "household_in_pensioners", family = "Ages" },
+  { key = "low_income", label = "Low incomes", icon = "group-low-income", row = "approval_low_income", share = "share_low_income", households = "household_in_low_income", family = "Incomes" },
+  { key = "middle_income", label = "Middle incomes", icon = "group-middle-income", row = "approval_middle_income", share = "share_middle_income", households = "household_in_middle_income", family = "Incomes" },
+  { key = "high_income", label = "High incomes", icon = "group-high-income", row = "approval_high_income", share = "share_high_income", households = "household_in_high_income", family = "Incomes" },
+  { key = "parents", label = "Parents", icon = "group-parents", row = "approval_parents", share = "share_parents", households = "household_in_parents", family = "Families" },
+  { key = "lone_parents", label = "Lone parents", icon = "group-lone-parents", row = "approval_lone_parents", share = "share_lone_parents", households = "household_in_lone_parents", family = "Families" },
+  { key = "motorists", label = "Motorists", icon = "group-motorists", row = "approval_motorists", share = "share_motorists", family = "Ways of life", estimate = "the National Travel Survey's share of households with a car, by income" },
+  { key = "drinkers", label = "Drinkers", icon = "group-drinkers", row = "approval_drinkers", share = "share_drinkers", family = "Ways of life", estimate = "the Health Survey for England's share who drank in the last week, by age" },
+]
+group_drivers = { income = "group_driver_income", jobs = "group_driver_jobs", prices_and_time = "group_driver_prices_and_time", services = "group_driver_services", standing = "group_driver_standing", finances = "group_driver_finances", stances = "group_driver_stances", conditions = "group_driver_conditions" }
+# Stage S13.4: a household as the group popup shows it: its flags and figures by name, the
+# data columns read in words through a dimension's labels ("column:dimension"), and its
+# account for the year (a "-" in front is taken away).
+household = { entity = "household", support = "household_support", net_income = "net_income", change = "income_change", adults = "adults", children = "children", region = "region_code:region", type = "type:household_type", account = ["household_earnings", "household_pensions", "-income_tax_year", "-employee_ni_year", "household_benefits"] }
+group_driver_labels = { income = "Their incomes", jobs = "Jobs where they live", prices_and_time = "Prices and time in office", services = "Public services and the climate", standing = "The government's decisions", finances = "The public finances", stances = "Where the government stands", conditions = "Rents, bills, pay and farm incomes" }
+# Stage S14.1: a group's approval arc is green from approval_good, red below approval_bad,
+# mustard between (the share of its likely voters who back the government).
+# Stage S15.2: the row whose node a situation belongs to (the client lights it). The model's
+# [situation] tables take no other key, so the mapping is here.
+situations = { recession = "output_growth", strong_growth = "output_growth", high_unemployment = "unemployment_rate", high_inflation = "consumer_inflation_annual", debt_above_output = "debt_to_gdp", budget_surplus = "budget_balance", no_majority = "government_support", health_strain = "waiting_list", schools_strain = "school_attainment", policing_strain = "crime_incidents", services_improving = "service_level_overall", emissions_above_path = "emissions", emissions_on_track = "emissions", waiting_list_record = "waiting_list", waiting_list_falling = "waiting_list", crime_wave = "crime_incidents", healthy_life_falling = "healthy_life_expectancy", housing_shortage = "homes_built", building_boom = "homes_built", migration_high = "net_migration_annual", migration_falling = "net_migration_annual", lenders_confidence = "gilt_yield_now", homelessness_rising = "homelessness", strike_wave = "strike_days", rents_soaring = "rents" }
+approval_good = 0.38
+approval_bad = 0.28
+# Stage S15.3: Parliament's four stances, each a scale with the belief groups at its ends
+# (`low_group` and `high_group` by key; `low` and `high` the ends' words), and the country by
+# place, the regions that left the ring (`note` said in place of an approval of nought).
+stances = [
+  { row = "stance_state", label = "The state against the market", low = "The market", high = "The state", low_group = "capitalists", high_group = "socialists" },
+  { row = "stance_order", label = "Liberty against order", low = "Liberty", high = "Order", low_group = "liberals", high_group = "conservatives" },
+  { row = "stance_green", label = "Green", low = "Less green", high = "Greener", high_group = "environmentalists" },
+  { row = "stance_nation", label = "The nation", low = "The world", high = "The nation", high_group = "patriots" },
+]
+# Stage S15.5: the statistics that left the board in S15.2, still found by search and linked
+# from the statistic that stands for them.
+shelf = [
+  { row = "net_income_average", see = "median_income" },
+  { row = "workforce_jobs", see = "unemployment_rate" },
+  { row = "working_age_poverty_rate", see = "poverty_rate" },
+  { row = "exports", see = "trade_balance" },
+  { row = "imports", see = "trade_balance" },
+  { row = "public_receipts", see = "tax_burden" },
+  { row = "dwellings", see = "homes_built" },
+  { row = "treatments", see = "waiting_list" },
+  { row = "household_emissions", see = "emissions" },
+]
+places = [
+  { label = "Scotland", row = "approval_scotland", share = "share_scotland" },
+  { label = "Wales", row = "approval_wales", share = "share_wales" },
+  { label = "Northern Ireland", row = "approval_northern_ireland", share = "share_northern_ireland", note = "The governing party does not stand in Northern Ireland, so none of its voters back it." },
+  { label = "London", row = "approval_london", share = "share_london" },
+  { label = "The North", row = "approval_north", share = "share_north" },
+  { label = "The Midlands", row = "approval_midlands", share = "share_midlands" },
+  { label = "The South", row = "approval_south", share = "share_south" },
+]
+
+[[play.web.areas]]
+name = "Economy"
+icon = "economy"
+policies = [
+  { key = "public_investment", label = "Public investment", icon = "public-investment", size = 2, levers = ["public_investment_bill"] },
+  { key = "subsidies", label = "Subsidies to business", icon = "subsidies", size = 1, levers = ["subsidies_bill"] },
+  { key = "government", label = "Running the government", icon = "government", size = 1, levers = ["spending_general"] },
+  # Stage S15.2: two in force at a neutral setting, three to introduce.
+  { key = "public_pay_policy", label = "Public sector pay", icon = "pay", size = 2, levers = ["public_pay_settlement"] },
+  { key = "trade_union_law", label = "Trade union law", icon = "union", size = 2, levers = ["trade_union_law"], levels = ["Stronger unions", "As now", "Tighter ballots and notice"] },
+  { key = "strike_limits", label = "Limits on strikes", icon = "strikes", size = 2, levers = ["strike_limits"], levels = ["None", "Minimum service levels", "Strikes banned in key services"], off = 0, line = "Keep health, transport and schools running in a strike, or ban strikes there." },
+  { key = "rd_grants", label = "Research grants", icon = "research", size = 2, levers = ["rd_grants"], per = "a year", off = 0, line = "Grants for business research and development." },
+]
+indicators = [
+  { row = "gdp", icon = "gdp", size = 3, better = "high" },
+  { row = "unemployment_rate", icon = "unemployment", size = 3, better = "low" },
+  { row = "consumer_inflation_annual", icon = "prices", size = 3, better = "low" },
+  { row = "output_growth", icon = "growth", size = 2, better = "high" },
+  # Stage S13.8: the yield on new gilts, with the lenders' premium.
+  { row = "gilt_yield_now", icon = "debt", size = 2, better = "low" },
+  # Stage S14.5: Bank Rate (neither good nor bad) and productivity; the mortgage rate is in Housing.
+  { row = "bank_rate", icon = "bank-rate", size = 2 },
+  { row = "productivity", icon = "productivity", size = 2, better = "high" },
+  { row = "pay_per_employee_job", icon = "pay", size = 2, better = "high" },
+  { row = "business_investment", icon = "investment", size = 1, better = "high" },
+  # Stage S15.2
+  { row = "business_confidence", icon = "business-confidence", size = 2, better = "high" },
+  { row = "strike_days", icon = "strikes", size = 2, better = "low", unit = "count" },
+  { row = "research_development", icon = "research", size = 1, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Tax"
+icon = "tax"
+policies = [
+  { key = "income_tax", label = "Income tax", icon = "income-tax", size = 3, levers = ["basic_rate", "higher_rate", "additional_rate", "personal_allowance", "higher_threshold", "additional_threshold", "allowance_taper_start"] },
+  { key = "national_insurance", label = "National Insurance", icon = "national-insurance", size = 3, levers = ["ni_main_rate", "ni_upper_rate", "ni_primary_threshold", "ni_upper_limit", "ni_employer_rate", "ni_secondary_threshold", "class4_main_rate", "class4_upper_rate", "class4_lower", "class4_upper"] },
+  { key = "vat", label = "VAT", icon = "vat", size = 3, levers = ["vat_rate"] },
+  { key = "corporation_tax", label = "Corporation tax", icon = "corporation-tax", size = 2, levers = ["corporation_tax_rate"] },
+  { key = "council_tax", label = "Council tax", icon = "council-tax", size = 1, levers = ["council_tax_bill"] },
+  # Stage S15.2
+  { key = "wealth_tax", label = "Wealth tax", icon = "wealth-tax", size = 2, levers = ["net_wealth_tax"], off = 0, line = "A yearly tax on the largest savings." },
+]
+indicators = [
+  { row = "budget_balance", icon = "balance", size = 3, better = "high" },
+  { row = "debt_to_gdp", icon = "debt", size = 3, better = "low" },
+  # Stage S15.2: receipts as a share of output (neither good nor bad).
+  { row = "tax_burden", icon = "tax", size = 2 },
+]
+
+[[play.web.areas]]
+name = "Welfare"
+icon = "welfare"
+policies = [
+  { key = "universal_credit", label = "Universal Credit", icon = "universal-credit", size = 3, levers = ["uc_single", "uc_single_young", "uc_couple", "uc_couple_young", "uc_child", "uc_first_child_older", "uc_work_allowance", "uc_taper", "uc_child_limit"] },
+  { key = "child_benefit", label = "Child Benefit", icon = "child-benefit", size = 2, levers = ["child_benefit_eldest", "child_benefit_other", "hicbc_start", "hicbc_width"] },
+  { key = "pensions", label = "Pensions and benefits", icon = "pensions", size = 3, levers = ["benefits_bill"] },
+  { key = "state_pension_age", label = "State Pension age", icon = "pension-age", size = 2, levers = ["state_pension_age"] },
+  { key = "jobseekers", label = "Unemployment benefit", icon = "jobseekers", size = 1, levers = ["benefit_per_unemployed"] },
+  { key = "winter_fuel_payment", label = "Winter Fuel Payment", icon = "winter-fuel", size = 2, levers = ["winter_fuel_payment"], levels = ["None", "Means-tested, as now", "Universal"], off = 0, line = "A payment to pensioners each winter, to all or to the poorest." },
+  # Stage S15.2
+  { key = "energy_bill_help", label = "Help with energy bills", icon = "energy-bills", size = 2, levers = ["energy_bill_help"], per = "a household a year", off = 0, line = "A discount on every household's energy bills." },
+]
+indicators = [
+  { row = "poverty_rate", icon = "poverty", size = 3, better = "low" },
+  { row = "child_poverty_rate", icon = "child", size = 2, better = "low" },
+  { row = "median_income", icon = "income", size = 2, better = "high" },
+  { row = "pensioner_poverty_rate", icon = "pensioner", size = 1, better = "low" },
+  # Stage S15.2
+  { row = "inequality", icon = "inequality", size = 2, better = "low" },
+]
+
+[[play.web.areas]]
+name = "Health"
+icon = "health"
+policies = [
+  { key = "nhs", label = "The NHS", icon = "hospital", size = 3, levers = ["spending_health"] },
+  { key = "social_care", label = "Social care", icon = "social-care", size = 2, levers = ["spending_social_care"] },
+  { key = "alcohol_duty", label = "Alcohol duty", icon = "alcohol-duty", size = 2, levers = ["alcohol_duty"], unit = "multiple" },
+  { key = "tobacco_duty", label = "Tobacco duty", icon = "tobacco-duty", size = 1, levers = ["tobacco_duty"], unit = "multiple" },
+  { key = "sugar_levy", label = "Sugar levy", icon = "sugar-levy", size = 1, levers = ["sugar_levy"], unit = "multiple", off = 0, line = "A levy on sugary soft drinks, which makers avoid by cutting sugar." },
+  { key = "prescription_charge", label = "Prescription charge", icon = "prescription", size = 1, levers = ["prescription_charge"], per = "an item", off = 0, line = "A charge for each prescription item in England." },
+]
+indicators = [
+  { row = "waiting_list", icon = "waiting-list", size = 3, better = "low" },
+  { row = "healthy_life_expectancy", icon = "healthy-life", size = 2, better = "high", unit = "years" },
+  { row = "smoking_prevalence", icon = "smoking", size = 1, better = "low" },
+  { row = "alcohol_deaths", icon = "alcohol-deaths", size = 1, better = "low", unit = "count" },
+]
+
+[[play.web.areas]]
+name = "Education"
+icon = "education"
+policies = [
+  { key = "schools", label = "Schools and universities", icon = "school", size = 3, levers = ["spending_education"] },
+  { key = "culture", label = "Culture and sport", icon = "culture", size = 1, levers = ["spending_culture"] },
+  { key = "tuition_fee_cap", label = "Tuition fee cap", icon = "tuition-fees", size = 2, levers = ["tuition_fee_cap"], per = "a year", off = 0, line = "University tuition fees, paid with student loans." },
+  { key = "free_school_meals", label = "Free school meals", icon = "school-meals", size = 2, levers = ["free_school_meals"], levels = ["Means-tested, as now", "All on Universal Credit", "All pupils"] },
+  # Stage S15.2
+  { key = "free_childcare", label = "Free childcare", icon = "childcare", size = 2, levers = ["free_childcare"], levels = ["Working parents, as planned", "30 hours for all", "Full days for all under fives"], off = 0, line = "Free childcare for every young child, so more parents can work." },
+]
+indicators = [
+  { row = "school_attainment", icon = "attainment", size = 2, better = "high" },
+  { row = "service_level_overall", icon = "service", size = 2, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Law and order"
+icon = "law"
+policies = [
+  { key = "policing", label = "Police, courts and prisons", icon = "police", size = 3, levers = ["spending_public_order"] },
+  { key = "sentencing", label = "Sentencing", icon = "sentencing", size = 2, levers = ["sentencing"], levels = ["Lenient", "Lighter", "As now", "Tougher", "Tough"] },
+  { key = "drinking_age", label = "Drinking age", icon = "drinking-age", size = 1, levers = ["drinking_age"], unit = "years" },
+  { key = "cannabis_law", label = "Cannabis law", icon = "cannabis", size = 2, levers = ["cannabis_law"], levels = ["Illegal", "Decriminalised", "Legal and taxed"], off = 0, line = "Decriminalise cannabis, or license and tax its sale." },
+  # Stage S15.2
+  { key = "identity_cards", label = "Identity cards", icon = "id-card", size = 2, levers = ["identity_cards"], levels = ["None", "For every adult"], off = 0, line = "A national identity card for every adult." },
+]
+indicators = [
+  { row = "crime_incidents", icon = "crime", size = 3, better = "low", unit = "count" },
+  { row = "prison_population", icon = "prison", size = 1 },
+]
+
+[[play.web.areas]]
+name = "Transport"
+icon = "transport"
+policies = [
+  { key = "transport", label = "Roads and railways", icon = "train", size = 2, levers = ["spending_transport"] },
+  { key = "fuel_duty", label = "Fuel duty", icon = "fuel-duty", size = 3, levers = ["fuel_duty"], unit = "pence", per = "a litre", off = 0, line = "Duty on petrol and diesel, a fixed amount a litre." },
+  { key = "ev_grant", label = "Electric car grant", icon = "ev-grant", size = 2, levers = ["ev_grant"], per = "a car", off = 0, line = "A grant towards every new battery-electric car." },
+  { key = "bus_fare_cap", label = "Bus fare cap", icon = "bus-fare", size = 1, levers = ["bus_fare_cap"], per = "a journey" },
+  # Stage S15.2
+  { key = "rail_ownership", label = "Public ownership of rail", icon = "train", size = 2, levers = ["rail_ownership"], levels = ["As contracts end, as planned", "Every operator now", "Trains, track and freight"], off = 0, line = "Take the railways into public ownership, with fares cut." },
+  { key = "congestion_charge", label = "Congestion charging", icon = "congestion-charge", size = 2, levers = ["congestion_charge"], per = "a trip", off = 0, line = "Charge cars entering the centre of every large city." },
+]
+indicators = [
+  { row = "ev_share", icon = "ev-share", size = 2, better = "high" },
+  # Stage S15.2
+  { row = "congestion", icon = "congestion", size = 2, better = "low" },
+]
+
+[[play.web.areas]]
+name = "Environment and energy"
+icon = "environment"
+policies = [
+  { key = "carbon_price", label = "Carbon price", icon = "carbon-price", size = 3, levers = ["carbon_price"] },
+  { key = "petrol_ban_year", label = "Petrol car ban", icon = "petrol-ban", size = 2, levers = ["petrol_ban_year"], unit = "year" },
+  { key = "insulation_programme", label = "Home insulation", icon = "insulation", size = 2, levers = ["insulation_programme"], per = "a year", off = 0, line = "Public money to insulate homes, cutting bills and emissions." },
+  # Stage S15.2
+  { key = "onshore_wind", label = "Onshore wind", icon = "wind", size = 2, levers = ["onshore_wind"], per = "a year", off = 0, line = "Support for new wind farms on land: cheaper power, turbines in the countryside." },
+  { key = "farm_support", label = "Farm support", icon = "farm-support", size = 2, levers = ["farm_support"], per = "a year", off = 0, line = "Payments to farmers beyond today's schemes." },
+]
+indicators = [
+  { row = "emissions", icon = "emissions", size = 3, better = "low" },
+  # Stage S15.2
+  { row = "energy_bills", icon = "energy-bills", size = 2, better = "low" },
+  { row = "air_pollution", icon = "air-pollution", size = 1, better = "low" },
+  { row = "farm_incomes", icon = "farm-incomes", size = 1, better = "high" },
+]
+
+[[play.web.areas]]
+name = "Housing"
+icon = "housing"
+policies = [
+  { key = "housing", label = "Housing and local environment", icon = "homes", size = 2, levers = ["spending_environment_housing"] },
+  { key = "planning_rules", label = "Planning rules", icon = "planning", size = 3, levers = ["planning_rules"], levels = ["Very restrictive", "Restrictive", "As now", "Liberal", "Very liberal"] },
+  { key = "social_housing", label = "Social housing", icon = "social-housing", size = 2, levers = ["social_housing"], per = "a year", off = 0, line = "Public money to build new social homes." },
+  { key = "rent_controls", label = "Rent controls", icon = "rent-controls", size = 2, levers = ["rent_controls"], levels = ["None", "Capped rises", "Strict"], off = 0, line = "Cap private rent rises each year, or set strict limits." },
+]
+indicators = [
+  { row = "homes_built", icon = "homes-built", size = 2, better = "high", unit = "count" },
+  # Stage S14.5: households in temporary accommodation; and the mortgage rate, what home
+  # owners pay (neither good nor bad).
+  { row = "homelessness", icon = "homelessness", size = 2, better = "low", unit = "count" },
+  { row = "mortgage_rate", icon = "mortgage-rate", size = 1 },
+  # Stage S15.2: rents (a bad thing when they rise) and house prices (neither good nor bad).
+  { row = "rents", icon = "rents", size = 2, better = "low" },
+  { row = "house_prices", icon = "house-prices", size = 1 },
+]
+
+[[play.web.areas]]
+name = "Foreign and trade"
+icon = "trade"
+policies = [
+  { key = "defence", label = "Defence", icon = "defence", size = 3, levers = ["spending_defence"] },
+  { key = "trade_barriers", label = "Trade barriers", icon = "trade-barriers", size = 2, levers = ["trade_barrier_eu", "trade_barrier_united_states", "trade_barrier_china", "trade_barrier_rest_of_world"] },
+  { key = "aid", label = "Overseas aid", icon = "aid", size = 1, levers = ["transfers_abroad_bill"] },
+  { key = "visa_threshold", label = "Visa salary threshold", icon = "visa", size = 2, levers = ["visa_threshold"], per = "a year" },
+]
+indicators = [
+  { row = "net_migration_annual", icon = "migration", size = 2, unit = "count" },
+  # Stage S15.2: exports less imports.
+  { row = "trade_balance", icon = "trade", size = 2, better = "high" },
+]

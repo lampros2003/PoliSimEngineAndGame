@@ -9,7 +9,8 @@ use polisim_core::{Error, RawValue, Row, Scenario, Simulation, Val, units};
 const HELP: &str = "\
 commands:
   step [N]            advance N steps (default 1); an empty line does the same
-  set LEVER VALUE     change a policy lever from the next step on
+  set LEVER VALUE     change a policy lever from the next step on; answer a question put to
+                      you (a dilemma) with set NAME N, N the answer's number
   levers              list the levers, their settings and their limits
   show [NAME ...]     show values from the last step (default: the watch list)
   watch NAME ...      choose what is shown after each step
@@ -56,6 +57,14 @@ fn parse_value(text: &str) -> Option<RawValue> {
             plain.parse::<i64>().map(RawValue::Integer).ok().or_else(|| plain.parse::<f64>().map(RawValue::Float).ok())
         }
     }
+}
+
+/// Stage S13.7: schedules a lever change for `step` as the game's `Session::set_lever` does: a
+/// lever changed again in the same step moves to the end, so a step's bills are voted and
+/// charged in the order they were last made, as in the game.
+fn schedule(commands: &mut Vec<(u64, String, RawValue)>, step: u64, lever: &str, raw: RawValue) {
+    commands.retain(|(at, name, _)| !(*at == step && name == lever));
+    commands.push((step, lever.to_string(), raw));
 }
 
 struct Session {
@@ -107,7 +116,8 @@ impl Session {
 
     fn levers(&self) {
         let model = self.sim.model();
-        for d in model.symbols.iter().filter(|d| d.kind == Kind::Lever) {
+        // A dilemma's lever is answered when the dilemma is put (see `step`).
+        for d in model.symbols.iter().filter(|d| d.kind == Kind::Lever && !d.spec.contains_key("dilemma")) {
             let current = self.sim.scalar(&d.name).expect("levers are national values");
             let scale = if d.money { model.minor as f64 } else { 1.0 };
             let limits = match d.range {
@@ -133,19 +143,51 @@ impl Session {
         }
     }
 
-    /// Advances `count` steps. Returns false when the run has failed and must end.
+    /// Stage S9.1: the first dilemma open with no answer for the next step, by its index.
+    fn waiting(&self) -> Option<usize> {
+        let next = self.sim.steps_done();
+        self.sim.model().dilemmas.iter().position(|d| {
+            matches!(self.sim.scalar(&format!("{}_open", d.name)), Some(Val::B(true)))
+                && !self.commands.iter().any(|(step, lever, _)| *step == next && *lever == d.name)
+        })
+    }
+
+    /// Asks the dilemma waiting for an answer, if any: its text and its numbered answers.
+    fn ask(&self) {
+        let Some(index) = self.waiting() else { return };
+        let d = &self.sim.model().dilemmas[index];
+        println!("{}: {}", d.label, d.doc);
+        for (k, option) in d.options.iter().enumerate() {
+            let doc = if option.doc.is_empty() { String::new() } else { format!(": {}", option.doc) };
+            println!("  {}. {}{doc}", k + 1, option.label);
+        }
+        println!("answer with `set {} N`; no step runs until you do", d.name);
+    }
+
+    /// Advances `count` steps, stopping at a dilemma that waits for an answer. Returns false
+    /// when the run has failed and must end.
     fn step(&mut self, count: u64) -> bool {
+        let mut ran = 0;
         for _ in 0..count {
+            if self.waiting().is_some() {
+                break;
+            }
             match self.sim.step() {
-                Ok(row) => self.last = Some(row),
+                Ok(row) => {
+                    self.last = Some(row);
+                    ran += 1;
+                }
                 Err(error) => {
                     println!("the run has failed and cannot continue: {error}");
                     return false;
                 }
             }
         }
-        println!("after step {} ({} completed):", self.sim.steps_done() - 1, self.sim.steps_done());
-        self.show(&self.watch.clone());
+        if ran > 0 {
+            println!("after step {} ({} completed):", self.sim.steps_done() - 1, self.sim.steps_done());
+            self.show(&self.watch.clone());
+        }
+        self.ask();
         true
     }
 
@@ -158,7 +200,7 @@ impl Session {
             Ok(value) => {
                 let d = self.sim.model().sym(lever).expect("checked");
                 println!("{lever} will be {} from the next step", display(&value, d.money, self.sim.model().minor));
-                self.commands.push((self.sim.steps_done(), lever.to_string(), raw));
+                schedule(&mut self.commands, self.sim.steps_done(), lever, raw);
                 self.sim.set_commands(self.commands.clone());
             }
             Err(error) => println!("not changed: {error}"),
@@ -232,5 +274,53 @@ pub fn play(scenario: Scenario, seed: Option<u64>, resume: Option<Vec<u8>>) -> R
             ["quit" | "exit" | "q"] => return Ok(()),
             _ => println!("not understood; type `help`"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use polisim_core::{RawValue, Simulation, load_scenario};
+
+    use super::schedule;
+
+    /// Stage S13.7: the runner charges a month's bills in the order the game does. Changing
+    /// the electric car grant, then sentencing, then the grant again leaves capital for only
+    /// one of the two bills: the game takes sentencing first (the grant was last made), and so
+    /// must the runner.
+    #[test]
+    fn bills_are_charged_in_the_order_the_game_charges_them() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/uk/scenarios/2025.toml");
+        let made = [
+            ("ev_grant", RawValue::Integer(2500)),
+            ("sentencing", RawValue::Integer(4)),
+            ("ev_grant", RawValue::Integer(2000)),
+        ];
+
+        let mut game = polisim_core::Session::open(&path).unwrap();
+        for (lever, raw) in &made {
+            game.set_lever(lever, raw.clone()).unwrap();
+        }
+        game.step().unwrap();
+        let passed = |lever: &str, changes: &[(String, bool)]| changes.iter().any(|(l, p)| l == lever && *p);
+        let mut game_changes: Vec<(String, bool)> =
+            game.changes().iter().map(|c| (c.lever.clone(), c.passed)).collect();
+        game_changes.sort();
+
+        let scenario = load_scenario(&path).unwrap();
+        let mut sim = Simulation::new(Arc::new(scenario.model.clone()), scenario.config()).unwrap();
+        let mut commands = scenario.commands.clone();
+        for (lever, raw) in &made {
+            schedule(&mut commands, 0, lever, raw.clone());
+        }
+        sim.set_commands(commands);
+        sim.step().unwrap();
+        let mut runner_changes: Vec<(String, bool)> = sim.votes().iter().map(|v| (v.lever.clone(), v.passed)).collect();
+        runner_changes.sort();
+
+        assert!(passed("sentencing", &game_changes) && !passed("ev_grant", &game_changes), "{game_changes:?}");
+        assert_eq!(runner_changes, game_changes);
     }
 }

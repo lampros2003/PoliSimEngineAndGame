@@ -1,0 +1,5 @@
+[scenario]
+model = ".."
+seed = 1
+steps = 3
+preset = "central"

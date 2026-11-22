@@ -1,0 +1,199 @@
+# The situations the player is told about (stage S7.3), model format 1. GENERATED: copied
+# from tools/uk/template/situations.toml by tools/uk/calibrate.py.
+#
+# Each situation turns on when its `start` holds and off when its `end` does; the gap
+# between the two keeps it from flickering on and off from month to month.
+
+[var.real_gdp_smoothed]
+label = "Output at 2024 prices, smoothed"
+doc = "Output at 2024 prices, averaged exponentially over about a quarter"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "select(prev(real_gdp_smoothed) > 0.0, prev(real_gdp_smoothed) + (real_gdp - prev(real_gdp_smoothed)) / 3.0, real_gdp)"
+# Read through prev(): nothing before the first month.
+initial = 0.0
+
+[var.output_growth]
+label = "Output growth, annual rate"
+doc = "This month's growth of output at 2024 prices, smoothed over about a quarter, at an annual rate"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "select(prev(real_gdp_smoothed) > 0.0, 12.0 * (real_gdp_smoothed / prev(real_gdp_smoothed) - 1.0), 0.0)"
+
+[situation.recession]
+label = "Recession"
+doc = "Output is falling"
+start = "output_growth < -0.005"
+end = "output_growth > 0.005"
+
+[situation.strong_growth]
+label = "Strong growth"
+doc = "Output is growing by more than 3% a year"
+good = true
+start = "output_growth > 0.03"
+end = "output_growth < 0.025"
+
+[situation.high_unemployment]
+label = "High unemployment"
+doc = "More than 6% of the labour force is out of work"
+start = "unemployment_rate > 0.06"
+end = "unemployment_rate < 0.055"
+
+[situation.high_inflation]
+label = "High inflation"
+doc = "Consumer prices are rising by more than 5% a year"
+start = "consumer_inflation_annual > 0.05"
+end = "consumer_inflation_annual < 0.04"
+
+# Stage S13.8: debt against its level at the start of the game (finances.toml), not against
+# 100% of GDP, which it passed in the 18th month with policy unchanged and then never left.
+[situation.debt_above_output]
+label = "Debt rising fast"
+doc = "Public sector net debt is more than 7 points of GDP above its level at the start of the game (97% in January 2025)"
+start = "debt_at_start > 0.0 and debt_to_gdp > debt_at_start + 0.07"
+end = "debt_to_gdp < debt_at_start + 0.05"
+
+[situation.budget_surplus]
+label = "Budget surplus"
+doc = "The government takes in more than it spends"
+good = true
+start = "budget_balance > 0"
+end = "budget_balance < 0"
+
+[situation.no_majority]
+label = "No majority"
+doc = "The governing blocs hold fewer than the 326 seats needed to govern alone, so a bill can fail"
+start = "government_seats < majority"
+
+# Stage S8.1: public services, from their service levels (functions.toml). The functions
+# are indexed in the order functions.toml declares them: health 0, education 1, police,
+# courts and prisons 3.
+
+[situation.health_strain]
+label = "Health service under strain"
+doc = "Real health spending per person, weighted by need, is more than 5% below its level when the game began"
+start = "service_level[function: 0] < 0.95"
+end = "service_level[function: 0] > 0.97"
+
+[situation.schools_strain]
+label = "Schools under strain"
+doc = "Real spending on education per person aged 4 to 21 is more than 5% below its level when the game began"
+start = "service_level[function: 1] < 0.95"
+end = "service_level[function: 1] > 0.97"
+
+[situation.policing_strain]
+label = "Police and courts under strain"
+doc = "Real spending on police, courts and prisons per person is more than 5% below its level when the game began"
+start = "service_level[function: 3] < 0.95"
+end = "service_level[function: 3] > 0.97"
+
+[situation.services_improving]
+label = "Public services improving"
+doc = "Real spending on public services per person served is more than 5% above its level when the game began"
+good = true
+start = "service_level_overall > 1.05"
+end = "service_level_overall < 1.03"
+
+# Stage S8.2: emissions (emissions.toml) against a straight path to net zero in 2050.
+
+[situation.emissions_above_path]
+label = "Emissions above the path to net zero"
+doc = "Greenhouse gas emissions are more than 5% above a straight path from 2024's to nothing in 2050"
+start = "emissions > 1.05 * net_zero_path"
+end = "emissions < net_zero_path"
+
+[situation.emissions_on_track]
+label = "On track for net zero"
+doc = "Greenhouse gas emissions are below a straight path from 2024's to nothing in 2050"
+good = true
+start = "emissions < 0.98 * net_zero_path"
+end = "emissions > net_zero_path"
+
+# ---- Stage S9.0: the NHS waiting list (nhs.toml)
+
+[situation.waiting_list_record]
+label = "Record NHS waiting list"
+doc = "More people are waiting for planned hospital treatment in England than ever before"
+start = "waiting_list > record_waiting_list"
+end = "waiting_list < round(0.99 * record_waiting_list)"
+
+[situation.waiting_list_falling]
+label = "NHS waiting list falling"
+doc = "The NHS waiting list is more than 5% shorter than at the end of 2024"
+good = true
+start = "waiting_list < round(0.95 * waiting_list_2024)"
+end = "waiting_list > round(0.97 * waiting_list_2024)"
+
+# ---- Stage S13.7: the indicators of stage S13.5 (policies.toml), with thresholds away from
+# their 2024 levels, so that none is on at the start and each comes and goes with policy:
+# with policy unchanged crime rises about 1.3% and healthy life falls about 0.16 years by the
+# 2029 election, short of both.
+
+[situation.crime_wave]
+label = "Crime wave"
+doc = "Crime is more than 2% above its 2024 level (9.2 million incidents a year)"
+start = "crime_incidents > 1.02 * crime_2024"
+end = "crime_incidents < 1.015 * crime_2024"
+
+[situation.healthy_life_falling]
+label = "Healthy life expectancy falling"
+doc = "Healthy life expectancy is more than 0.2 years below its 2022-24 level of 60.8 years"
+start = "healthy_life_expectancy < hle_2024 - 0.2 * hle_year"
+end = "healthy_life_expectancy > hle_2024 - 0.1 * hle_year"
+
+[situation.housing_shortage]
+label = "Housing shortage"
+doc = "Fewer than about 203,000 homes a year are being built in England, 8% fewer than in 2023-24 (221,070)"
+start = "homes_built < 0.92 * homes_built_2024"
+end = "homes_built > 0.96 * homes_built_2024"
+
+[situation.building_boom]
+label = "House-building boom"
+doc = "More than about 236,500 homes a year are being built in England, 7% more than in 2023-24 (221,070)"
+good = true
+start = "homes_built > 1.07 * homes_built_2024"
+end = "homes_built < 1.04 * homes_built_2024"
+
+[situation.migration_high]
+label = "Net migration high"
+doc = "Net migration is more than 8% above its level of the year to mid-2024 (739,000), about 800,000 a year"
+start = "policy_migration_factor > 1.08"
+end = "policy_migration_factor < 1.04"
+
+[situation.migration_falling]
+label = "Net migration falling"
+doc = "Net migration is more than 12% below its level of the year to mid-2024, under about 650,000 a year"
+start = "policy_migration_factor < 0.88"
+end = "policy_migration_factor > 0.92"
+
+# ---- Stage S13.8: the public finances (finances.toml). Lenders' confidence also adds a little
+# to the government's standing with every voter while it lasts (finances_standing).
+
+[situation.lenders_confidence]
+label = "Lenders' confidence"
+doc = "Borrowing, averaged over a year, is more than a point of GDP below its level at the start of the game: lenders ask less for gilts and voters notice"
+good = true
+start = "borrowing_at_start > 0.0 and borrowing_gap < -0.01"
+end = "borrowing_gap > -0.005"
+
+# Stage S14.5: homelessness (statistics.toml).
+[situation.homelessness_rising]
+label = "Homelessness rising"
+doc = "More than 5% more households in temporary accommodation than on 30 September 2024 (126,040 in England); stage S14.5"
+start = "homelessness > 1.05 * temporary_accommodation_2024"
+end = "homelessness < 1.03 * temporary_accommodation_2024"
+
+# Stage S15.2: strikes and rents (statistics.toml).
+[situation.strike_wave]
+label = "A wave of strikes"
+doc = "More than twice 2024's working days lost to strikes, at an annual rate"
+start = "strike_days > 2.0 * strike_days_2024"
+end = "strike_days < 1.5 * strike_days_2024"
+
+[situation.rents_soaring]
+label = "Rents soaring"
+doc = "Private rents rising more than 7% a year"
+start = "rent_growth > 0.07"
+end = "rent_growth < 0.05"

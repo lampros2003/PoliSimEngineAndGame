@@ -1,0 +1,24 @@
+# Valmora with the growth-over-the-year mod (mods/year_on_year), for the client test of lags.
+# Not on the start screen (no title); players add the mod to the main scenario there.
+# The economy is the toy model's, scaled up (tools/make_valmora.py).
+
+[scenario]
+mods = ["../../../mods/year_on_year"]
+model = ".."
+seed = 20270101
+steps = 60
+preset = "central"
+
+# Presentation settings for the game client and `polisim play`. Not part of the run.
+[play]
+country = "Valmora"
+currency_symbol = "Cr"
+currency_name = "crowns"
+start = "2027-01"
+term = 60
+government = "government"
+headline = ["gdp", "unemployment_rate", "gov_balance", "-gov_money"]
+watch = ["gdp", "yoy_gdp_a_year_before", "yoy_growth", "unemployment_rate", "gov_balance"]
+
+[play.labels]
+"-gov_money" = "Public debt"

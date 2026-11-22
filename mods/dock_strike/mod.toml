@@ -1,0 +1,8 @@
+# An example dilemma for Valmora (stage S9.1; docs/spec/06-model-format-1.md, Dilemmas).
+[mod]
+id = "dock_strike"
+name = "A dock strike"
+version = "1.0"
+model = "valmora"
+description = "Valmora's dockers walk out over pay in the third month, and the government must answer: pay them, or wait them out."
+files = ["dock_strike.toml"]

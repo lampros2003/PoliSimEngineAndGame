@@ -1,0 +1,660 @@
+"""The UK national model, version 0 (docs/S3-PLAN.md, milestone S3.2).
+
+The model is calibrated so that its first month is one twelfth of the 2024 national
+accounts and public finances. These tests hold it to that, check that money, gilts and
+loans balance on every step, and check that thirty years of unchanged policy stay inside
+broad, plausible ranges. They are not a validation against history: that is the hindcast
+(S3.4).
+"""
+
+from __future__ import annotations
+
+import csv
+import functools
+import sys
+import tomllib
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+
+from engine import Simulation, load_model  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+UK = ROOT / "models" / "uk"
+SEED = 2025
+PENCE_PER_MILLION = 100_000_000  # £1 million in pence
+MONTHS = 12
+
+
+@functools.lru_cache(maxsize=None)
+def model():
+    return load_model(UK)
+
+
+# These tests cover two years, the length of the recorded hashes; the 30-year checks are in
+# crates/core/tests/uk_long_run.rs.
+STEPS = 24
+
+
+@functools.lru_cache(maxsize=None)
+def run(steps: int = STEPS, preset: str = "central"):
+    return Simulation(model(), seed=SEED, preset=preset).run(steps)
+
+
+def quarter_off_services() -> dict[str, int]:
+    """Every public service cut by a quarter: each function's spending lever (stage S8.0) at
+    three quarters of its 2024 setting, in pounds a month."""
+    return {d.name: d.spec["default"] * 3 // 4 for d in model().symbols.values()
+            if d.kind == "lever" and d.name.startswith("spending_")}
+
+
+@functools.lru_cache(maxsize=None)
+def published(year: str = "2024") -> dict[str, float]:
+    with open(UK / "data" / "annual.csv", newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            if row["period"] == year:
+                return {k: float(v) for k, v in row.items() if k != "period" and v != ""}
+    raise KeyError(year)
+
+
+def annualised(row, *names) -> float:
+    """Twelve times a month's flows, in £ million a year."""
+    return sum(row[n] for n in names) * MONTHS / PENCE_PER_MILLION
+
+
+class FirstMonth(unittest.TestCase):
+    """Month one is January 2025, one month on from the 2024 base: prices have risen by one
+    month of inflation (about 0.17%), so flows are matched to within half a percent."""
+
+    def assertClose(self, got, want, tolerance=0.005, what=""):
+        self.assertLess(abs(got / want - 1), tolerance, f"{what}: model {got:,.0f}, published {want:,.0f}")
+
+    def test_national_accounts(self):
+        first, p = run()[0], published()
+        self.assertClose(annualised(first, "gdp"), p["gdp"], what="GDP")
+        self.assertClose(annualised(first, "consumption"), p["household_consumption"] + p["npish_consumption"],
+                         what="consumption")
+        self.assertClose(annualised(first, "wages", "public_pay"), p["compensation_of_employees"],
+                         what="compensation of employees")
+        self.assertClose(annualised(first, "disposable_income"), p["household_disposable_income"],
+                         what="disposable income")
+        self.assertClose(annualised(first, "exports"), p["exports"], what="exports")
+        self.assertClose(annualised(first, "imports"), p["imports"], what="imports")
+
+    def test_public_finances(self):
+        first, p = run()[0], published()
+        self.assertClose(annualised(first, "public_receipts"), p["ps_current_receipts"], what="receipts")
+        self.assertClose(annualised(first, "income_tax"), p["income_tax"], what="income tax")
+        self.assertClose(annualised(first, "national_insurance"), p["social_contributions"], what="NICs")
+        self.assertClose(annualised(first, "vat"), p["vat"], what="VAT")
+        self.assertClose(annualised(first, "corporation_tax"), p["corporation_tax"], what="corporation tax")
+        self.assertClose(annualised(first, "budget_balance"), p["ps_net_borrowing"], what="net borrowing")
+        # Debt at the end of the month, less that month's borrowing, is the 2024 figure.
+        opening = (first["public_debt"] - first["borrowing"]) / PENCE_PER_MILLION
+        self.assertClose(opening, p["ps_net_debt"] * 1000, tolerance=1e-9, what="net debt")
+
+    def test_labour_market(self):
+        first, p = run()[0], published()
+        self.assertAlmostEqual(first["unemployment_rate"], p["unemployment_rate"] / 100, delta=0.0005)
+        self.assertAlmostEqual(first["employment"] / 1000, p["employment"], delta=p["employment"] * 0.002)
+
+
+class SectorBalances(unittest.TestCase):
+    """Net lending is the change in what a sector holds. Households and financial
+    corporations reproduce 2024. The model's government is the public sector, measured as
+    public sector net borrowing, which was £25.7bn less than general government's net
+    borrowing in the sector accounts; firms carry that difference, so they are left out."""
+
+    def net_lending(self):
+        sim = Simulation(model(), seed=SEED)
+        before = {name: sim.rt.S[name] for name in model().accounts.values()}
+        row = sim.step()
+        totals: dict[str, float] = {}
+        for (sector, _), name in model().accounts.items():
+            totals[sector] = totals.get(sector, 0) + (row[name] - before[name]) * MONTHS / PENCE_PER_MILLION
+        return totals
+
+    def test_first_month_net_lending(self):
+        lending, p = self.net_lending(), published()
+        self.assertAlmostEqual(lending["households"], p["net_lending_households"], delta=50)
+        self.assertAlmostEqual(lending["banks"], p["net_lending_financial_corporations"], delta=50)
+        self.assertAlmostEqual(lending["government"], p["ps_net_borrowing"], delta=50)
+        abroad = p["net_lending_rest_of_world"]
+        self.assertAlmostEqual(lending["rest_of_world"], abroad, delta=0.03 * abs(abroad))
+        self.assertAlmostEqual(sum(lending.values()), 0, delta=1e-6)
+
+
+class Accounting(unittest.TestCase):
+    def test_every_instrument_nets_to_zero_on_every_step(self):
+        for row in run():
+            money = sum(row[k] for k in ("household_money", "firm_money", "bank_money", "government_money",
+                                         "foreign_money"))
+            self.assertEqual(money, 0, f"money at step {row['step']}")
+            self.assertEqual(row["gilts_issued"] + row["bank_gilts"] + row["foreign_gilts"], 0)
+            self.assertEqual(row["firm_loans"] + row["bank_loans"], 0)
+
+    def test_debt_rises_by_exactly_the_deficit(self):
+        rows = run()
+        for before, after in zip(rows, rows[1:]):
+            self.assertEqual(after["public_debt"] - before["public_debt"], -after["budget_balance"],
+                             f"step {after['step']}")
+
+    def test_borrowing_is_the_deficit_and_repayment_the_surplus(self):
+        for row in run():
+            self.assertEqual(row["borrowing"] - row["repayment"], -row["budget_balance"])
+            self.assertGreaterEqual(min(row["borrowing"], row["repayment"]), 0)
+
+
+class Presets(unittest.TestCase):
+    def test_the_presets_all_run(self):
+        for preset in ("low", "central", "high"):
+            self.assertEqual(len(run(3, preset)), 3)
+
+    def test_every_preset_reproduces_the_base_month(self):
+        # Stage S6.0: the presets differ in how the economy and the voters move, not in where
+        # they start: consumption, GDP, unemployment and the polls of the first month agree.
+        central = run(3, "central")[0]
+        for preset in ("low", "high"):
+            first = run(3, preset)[0]
+            for name in ("consumption", "gdp"):
+                self.assertLess(abs(first[name] / central[name] - 1), 1e-6, (preset, name))
+            for name in ("unemployment_rate", "government_support", "turnout"):
+                self.assertAlmostEqual(first[name], central[name], places=9, msg=(preset, name))
+
+    def test_the_presets_spread_the_outcomes(self):
+        # Higher world demand, productivity and labour force growth in the high preset.
+        self.assertLess(run(3, "low")[-1]["gdp"], run(3, "high")[-1]["gdp"])
+
+
+class Population(unittest.TestCase):
+    """The people block (S3.6): ONS's mid-2024 population by region, sex and age, moved on
+    month by month."""
+
+    @staticmethod
+    def table(name):
+        with open(UK / "data" / name, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def test_the_first_month_starts_from_the_published_population(self):
+        sim = Simulation(model(), seed=SEED)
+        cells = self.table("population.csv")
+        regions = model().dims["region"].members
+        sexes = model().dims["sex"].members
+        for row in cells[:: 17]:
+            flat = (regions.index(row["region"]) * 2 + sexes.index(row["sex"])) * 91 + int(row["age"])
+            self.assertEqual(sim.rt.C["population"][flat], float(row["people"]))
+        self.assertEqual(run()[0]["population_total"], float(sum(int(r["people"]) for r in cells)))
+        self.assertEqual(run()[0]["population_total"], 69_281_437)
+
+    def test_the_first_months_births_and_deaths_are_a_twelfth_of_the_published_year(self):
+        change = self.table("population_change.csv")
+        first = run()[0]
+        self.assertAlmostEqual(first["births_total"] * 12, sum(int(c["births"]) for c in change), delta=1)
+        self.assertAlmostEqual(first["deaths_total"] * 12, sum(int(c["deaths"]) for c in change), delta=1)
+
+    def test_a_year_on_the_population_has_grown_by_about_the_published_change(self):
+        change = self.table("population_change.csv")
+        published = sum(int(c["population_2024"]) - int(c["population_2023"]) for c in change)
+        grown = run()[12]["population_total"] - run()[0]["population_total"]
+        self.assertLess(abs(grown / published - 1), 0.05)
+
+
+class Industries(unittest.TestCase):
+    """The industries block (S3.6): spending turned into output by industry through the
+    2023 input-output tables."""
+
+    @staticmethod
+    def table(name, folder=UK / "data"):
+        with open(folder / name, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def test_the_leontief_inverse_turns_the_tables_final_demand_into_their_output(self):
+        industries = self.table("industries.csv")
+        names = [r["industry"] for r in industries]
+        final = {r["industry"]: sum(float(r[k]) for k in ("households", "government", "investment", "exports"))
+                 for r in industries}
+        inverse = {(r["industry"], r["product"]): float(r["value"]) for r in self.table("leontief.csv", UK / "industries")}
+        for r in industries:
+            made = sum(inverse[(r["industry"], p)] * final[p] for p in names)
+            self.assertAlmostEqual(made / float(r["output"]), 1.0, places=6, msg=r["industry"])
+
+    def test_industries_add_up_to_national_output_in_the_first_month(self):
+        first, p23, p24 = run()[0], published("2023"), published("2024")
+        gva_2024 = 2_497_390 / p23["gdp"] * p24["gdp"]  # the tables' value added, scaled to 2024
+        self.assertLess(abs(first["gva_by_industries"] * 12 / PENCE_PER_MILLION / gva_2024 - 1), 0.02)
+
+    def test_each_industry_is_near_the_tables_scaled_to_2024(self):
+        sim = Simulation(model(), seed=SEED)
+        sim.step()
+        scale = published("2024")["gdp"] / published("2023")["gdp"]
+        outputs = dict(zip(model().dims["industry"].members, sim.rt.C["industry_output"]))
+        for r in self.table("industries.csv"):
+            got = outputs[r["industry"]] * 12 / PENCE_PER_MILLION
+            self.assertLess(abs(got / (float(r["output"]) * scale) - 1), 0.05, r["industry"])
+
+    def test_a_cut_in_public_spending_falls_mostly_on_public_services(self):
+        base = Simulation(model(), seed=SEED)
+        cut = Simulation(model(), seed=SEED, levers=quarter_off_services())
+        base.step()
+        cut.step()
+        names = model().dims["industry"].members
+        fall = {n: b - c for n, b, c in zip(names, base.rt.C["industry_output"], cut.rt.C["industry_output"])}
+        services = fall["public_administration"] + fall["education"] + fall["health"]
+        self.assertGreater(services, 0.5 * sum(fall.values()))
+
+
+class Households(unittest.TestCase):
+    """The households and their 2024-25 rules inside the national model (milestone S4.3)."""
+
+    def test_the_base_month_still_reproduces_2024(self):
+        first, p = run()[0], published()
+        self.assertAlmostEqual(first["income_tax"] * MONTHS / PENCE_PER_MILLION, p["income_tax"], delta=1)
+        self.assertAlmostEqual(first["national_insurance"] * MONTHS / PENCE_PER_MILLION, p["social_contributions"], delta=1)
+        self.assertAlmostEqual(first["benefits"] * MONTHS / PENCE_PER_MILLION, p["ps_social_benefits"], delta=5)
+
+    def test_a_higher_personal_allowance_cuts_tax_and_lifts_spending(self):
+        base = Simulation(model(), seed=SEED).run(2)
+        cut = Simulation(model(), seed=SEED, levers={"personal_allowance": 15000}).run(2)
+        self.assertLess(cut[0]["income_tax"], base[0]["income_tax"])
+        self.assertGreater(cut[0]["disposable_income"], base[0]["disposable_income"])
+        self.assertGreater(cut[1]["consumption"], base[1]["consumption"])
+
+    def test_the_base_month_keeps_the_base_weights(self):
+        with open(UK / "households" / "households.csv", newline="", encoding="utf-8") as handle:
+            base = sum(int(r["weight"]) for r in csv.DictReader(handle))
+        self.assertEqual(run()[0]["households_total"], base)
+
+    def test_people_in_work_follow_the_economys_employment(self):
+        # Stage S4.4: raked each month from the second, the households' workers are the
+        # economy's employment, to within rounding of the weights.
+        for row in run()[1:]:
+            self.assertLess(abs(row["workers_in_households"] / row["employment"] - 1), 1e-4, row["step"])
+
+    def test_households_grow_with_the_population(self):
+        rows = run()
+        households = rows[-1]["households_total"] / rows[0]["households_total"] - 1
+        people = rows[-1]["population_total"] / rows[0]["population_total"] - 1
+        self.assertGreater(households, 0)
+        self.assertLess(abs(households - people), 0.01)
+
+    def test_without_alignment_the_weights_stay(self):
+        rows = Simulation(model(), seed=SEED, levers={"align_households": False}).run(2)
+        self.assertEqual(rows[0]["households_total"], rows[1]["households_total"])
+
+    def test_the_average_rate_levers_are_gone(self):
+        names = set(model().symbols)
+        self.assertNotIn("income_tax_rate", names)
+        self.assertNotIn("nics_rate", names)
+        self.assertIn("personal_allowance", names)
+
+
+class Reproducibility(unittest.TestCase):
+    def test_matches_the_recorded_hashes(self):
+        # Recorded with (tools/record_goldens.py):
+        # polisim run models/uk/scenarios/2025.toml --steps 24 --columns step,hash
+        #     --out models/uk/golden/2025.hashes.csv
+        with open(UK / "golden" / "2025.hashes.csv", newline="", encoding="utf-8") as handle:
+            golden = [row["hash"] for row in csv.DictReader(handle)]
+        self.assertEqual(len(golden), STEPS)
+        # Stage S13.7: with the scenario's own parameters (its wear of office), as recorded.
+        params = tomllib.loads((UK / "scenarios" / "2025.toml").read_text(encoding="utf-8"))["params"]
+        rows = Simulation(model(), seed=SEED, params=params).run(STEPS)
+        self.assertEqual([row["hash"] for row in rows], golden)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class Jobs(unittest.TestCase):
+    """Stage S6.4: jobs by industry, at their 2024 numbers in the first month
+    (models/uk/data/industry_jobs.csv, from ONS JOBS02), then each industry's share of the
+    jobs following its output against the others'."""
+
+    MONTHS = 4
+
+    @staticmethod
+    def sim(**kw):
+        return Simulation(model(), seed=SEED, **kw)
+
+    def test_the_first_month_has_2024_jobs_by_industry(self):
+        with open(UK / "data" / "industry_jobs.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual([r["industry"] for r in rows], model().dims["industry"].members)
+        sim = self.sim()
+        row = sim.step()
+        for r, jobs in zip(rows, sim.column("industry_jobs")):
+            self.assertAlmostEqual(jobs / (float(r["workforce_jobs"]) * 1000), 1.0, places=12, msg=r["industry"])
+        self.assertAlmostEqual(row["workforce_jobs"], sum(float(r["workforce_jobs"]) * 1000 for r in rows), delta=1e-6)
+
+    def test_the_shares_add_to_one_and_the_jobs_to_the_total(self):
+        sim = self.sim()
+        for _ in range(self.MONTHS):
+            row = sim.step()
+            self.assertAlmostEqual(sum(sim.column("industry_job_share")), 1.0, places=12)
+            self.assertAlmostEqual(sum(sim.column("industry_jobs")) / row["workforce_jobs"], 1.0, places=12)
+            self.assertAlmostEqual(row["workforce_jobs"] / row["employment"], model().symbols["jobs_per_worker"].spec["value"],
+                                   places=12)
+
+    def test_a_cut_in_public_spending_moves_jobs_out_of_public_services(self):
+        names = model().dims["industry"].members
+        public = [names.index(n) for n in ("public_administration", "education", "health")]
+        cut = {1: quarter_off_services()}
+
+        def public_share(**kw) -> float:
+            sim = self.sim(**kw)
+            for _ in range(self.MONTHS):
+                sim.step()
+            return sum(sim.column("industry_job_share")[i] for i in public)
+
+        base = public_share()
+        half = public_share(commands=cut) - base
+        whole = public_share(commands=cut, params={"jobs_output_elasticity": 1.0}) - base
+        # A quarter off every public service takes their share of jobs down.
+        self.assertLess(half, -0.001)
+        # Twice the elasticity, about twice the move.
+        self.assertAlmostEqual(whole / half, 2.0, delta=0.1)
+
+    def test_pay_per_employee_job_is_the_industries_pay_over_their_employees(self):
+        sim = self.sim()
+        row = sim.step()
+        employees = [j * s for j, s in zip(sim.column("industry_jobs"), sim.column("employee_share"))]
+        self.assertAlmostEqual(row["pay_per_employee_job"] / (sum(sim.column("industry_pay")) / sum(employees)), 1.0,
+                               places=12)
+        by_industry = dict(zip(model().dims["industry"].members, sim.column("industry_pay_per_employee")))
+        # Finance pays most, hospitality and agriculture least, as in the tables.
+        self.assertEqual(max(by_industry, key=by_industry.get), "finance")
+        self.assertEqual(sorted(by_industry, key=by_industry.get)[:2], ["agriculture", "other_services"])
+
+
+class Functions(unittest.TestCase):
+    """Stage S8.0: public spending by function (HM Treasury's PESA 2025 split), a lever per
+    function, adding up to the 2024 pay bill and purchases."""
+
+    def test_the_functions_add_up_to_2024_pay_and_purchases(self):
+        m = model()
+        with open(UK / "functions" / "split.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual([r["function"] for r in rows], m.dims["function"].members)
+        pay = sum(int(r["pay"]) for r in rows)
+        spending = sum(int(r["spending"]) for r in rows)
+        for r in rows:
+            self.assertEqual(m.symbols["spending_" + r["function"]].spec["default"], int(r["spending"]))
+        sim = Simulation(m, seed=SEED)
+        row = sim.step()
+        # Pounds a month in the files, pence in the run.
+        self.assertEqual(row["public_pay_bill"], pay * 100)
+        self.assertEqual(row["procurement_bill"], (spending - pay) * 100)
+
+    def test_government_demand_keeps_the_tables_mix_in_the_first_month(self):
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        products = {r["product"]: float(r["government"]) for r in Industries.table("shares.csv", UK / "industries")}
+        demand = dict(zip(model().dims["product"].members, sim.column("government_demand")))
+        total = row["public_pay"] + row["procurement"]
+        for product, share in products.items():
+            self.assertAlmostEqual(demand[product], total * share, delta=max(1.0, 1e-9 * total), msg=product)
+
+    def test_a_health_cut_falls_on_health(self):
+        cut = {"spending_health": model().symbols["spending_health"].spec["default"] * 3 // 4}
+        base, after = Simulation(model(), seed=SEED), Simulation(model(), seed=SEED, levers=cut)
+        before = base.step()
+        row = after.step()
+        names = model().dims["product"].members
+        fall = {n: b - a for n, b, a in zip(names, base.column("government_demand"), after.column("government_demand"))}
+        self.assertEqual(max(fall, key=fall.get), "health")
+        # Health's pay is cut with it: fewer public employees.
+        self.assertLess(row["public_employment"], before["public_employment"])
+
+
+class Services(unittest.TestCase):
+    """Stage S8.1: each function's service level, its real spending per person served
+    against the first month, followed over some months."""
+
+    def test_services_start_at_100_and_follow_a_cut_over_months(self):
+        names = model().dims["function"].members
+        health = names.index("health")
+        default = model().symbols["spending_health"].spec["default"]
+        base = Simulation(model(), seed=SEED)
+        cut = Simulation(model(), seed=SEED, commands={1: {"spending_health": default * 3 // 4}})
+        first = cut.step()
+        base.step()
+        self.assertEqual(cut.column("service_level"), [1.0] * len(names))
+        self.assertEqual(first["service_level_overall"], 1.0)
+        cut.step()
+        base.step()
+        level = cut.column("service_level")[health]
+        target = cut.column("service_target")[health]
+        # A quarter less money: heading for about 75%, a sixth of the way there in a month.
+        self.assertAlmostEqual(target, 0.75, delta=0.01)
+        self.assertAlmostEqual(level, 1.0 - (1.0 - target) / 6.0, places=12)
+        for _ in range(3):
+            cut.step()
+            base.step()
+        # Four months on, about half the way: 1 - 0.25 * (1 - (5/6) ** 4).
+        self.assertLess(cut.column("service_level")[health], 0.88)
+        # Other functions are untouched, beyond the population's growth.
+        self.assertAlmostEqual(cut.column("service_level")[names.index("defence")],
+                               base.column("service_level")[names.index("defence")], places=6)
+
+    def test_an_ageing_population_wears_down_health_with_unchanged_money(self):
+        sim = Simulation(model(), seed=SEED)
+        for _ in range(4):
+            row = sim.step()
+        names = model().dims["function"].members
+        levels = dict(zip(names, sim.column("service_level")))
+        self.assertLess(levels["health"], levels["defence"])
+        self.assertLess(levels["social_care"], 1.0)
+        self.assertLess(row["service_level_overall"], 1.0)
+
+
+class Emissions(unittest.TestCase):
+    """Stage S8.2: greenhouse gas emissions by industry and from households, at their 2024
+    levels in the first month (models/uk/data/emissions.csv, ONS), and a carbon price."""
+
+    def test_the_first_month_has_2024_emissions(self):
+        with open(UK / "data" / "emissions.csv", newline="", encoding="utf-8") as handle:
+            kt = {r["sector"]: float(r["kt_co2e"]) for r in csv.DictReader(handle)}
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        names = model().dims["industry"].members
+        for name, tonnes in zip(names, sim.column("industry_emissions")):
+            self.assertAlmostEqual(tonnes / (kt[name] * 1000 / 12), 1.0, places=9, msg=name)
+        self.assertAlmostEqual(row["household_emissions"] / (kt["households"] * 1000 / 12), 1.0, places=9)
+        self.assertEqual(row["carbon_tax_firms"] + row["carbon_tax_households"], 0)
+
+    def test_a_carbon_price_raises_revenue_and_cuts_emissions(self):
+        base = Simulation(model(), seed=SEED)
+        priced = Simulation(model(), seed=SEED, levers={"carbon_price": 100})
+        for _ in range(13):
+            before, row = base.step(), priced.step()
+        # Paid on last month's emissions, £100 (10,000 pence) a tonne.
+        self.assertGreater(row["carbon_tax_firms"], 0)
+        self.assertLess(row["emissions"], before["emissions"])
+        self.assertLess(row["emission_intensity"], before["emission_intensity"])
+        parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
+                 "other_receipts", "customs_duties", "carbon_tax_firms", "carbon_tax_households"]
+        self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))
+
+
+class WaitingList(unittest.TestCase):
+    """Stage S9.0: the NHS waiting list, from NHS England's 2024 flows
+    (models/uk/data/nhs_rtt.csv): referrals join it, treatments and other removals leave it."""
+
+    def test_the_first_month_moves_the_list_as_2024_did(self):
+        with open(UK / "data" / "nhs_rtt.csv", newline="", encoding="utf-8") as handle:
+            rows = {r["month"]: r for r in csv.DictReader(handle)}
+        months = [rows[f"2024-{m:02d}"] for m in range(1, 13)]
+        referrals = sum(int(r["referrals"]) for r in months) / 12
+        treated = sum(int(r["treated"]) for r in months) / 12
+        end_2024 = int(rows["2024-12"]["waiting"])
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        self.assertAlmostEqual(row["referrals"], referrals, places=6)
+        self.assertAlmostEqual(row["treatments"], treated, places=6)
+        # In 2024 the list fell by about 12,000 a month; the first month does about the same.
+        self.assertLess(abs(row["waiting_list"] - end_2024 + 12015), 5000)
+        self.assertEqual(model().symbols["record_waiting_list"].spec["value"], max(int(r["waiting"]) for r in rows.values()))
+
+    def test_a_health_cut_lengthens_the_list_within_a_year(self):
+        cut = {1: {"spending_health": model().symbols["spending_health"].spec["default"] * 9 // 10}}
+        base = Simulation(model(), seed=SEED)
+        cutting = Simulation(model(), seed=SEED, commands=cut)
+        for _ in range(12):
+            row, row_cut = base.step(), cutting.step()
+        self.assertLess(row_cut["treatments"], 0.95 * row["treatments"])
+        self.assertGreater(row_cut["waiting_list"], row["waiting_list"] + 500_000)
+        self.assertTrue(row_cut["waiting_list_record"])
+        self.assertFalse(row["waiting_list_record"])
+
+
+class History(unittest.TestCase):
+    """Stage S9.4: the voters' reactions to income and unemployment, combined with their fit
+    to the general elections of 2010 to 2024 (tools/uk/history.py, from the committed
+    models/uk/data/elections/history.csv)."""
+
+    @staticmethod
+    def history():
+        sys.path.insert(0, str(ROOT / "tools" / "uk"))
+        import history
+        return history
+
+    def test_the_fit_and_its_report_are_current(self):
+        history = self.history()
+        res = history.results()
+        self.assertEqual(res["full"]["n"], 44)
+        # Faster income growth went with swings to the government; the fit's errors are wide.
+        self.assertGreater(res["full"]["income"][0], 0)
+        self.assertGreater(res["full"]["income"][1], 1.0)
+        report = (UK / "data" / "elections" / "HISTORY.md").read_text(encoding="utf-8")
+        self.assertEqual(report, history.report(res), "HISTORY.md is out of date: run tools/uk/history.py")
+
+    def test_the_model_uses_the_combined_effects(self):
+        res = self.history().results()
+        for name, element in (("income", "vote_income_effect"), ("unemployment", "vote_unemployment_effect")):
+            spec = model().symbols[element].spec
+            self.assertEqual({k: spec[k] for k in ("low", "central", "high")},
+                             {k: res[name][k] for k in ("low", "central", "high")}, name)
+            # Between the earlier judgement and the fit.
+            prior, fitted = self.history().PRIOR[name]["central"], res["full"][name][0]
+            self.assertTrue(min(prior, fitted) <= res[name]["central"] <= max(prior, fitted), name)
+
+
+class Prices(unittest.TestCase):
+    """Stage S9.3: taxes on spending reach consumer prices (models/uk/prices.toml): a VAT
+    rise by its pass-through share, the carbon price and customs duties by the share firms
+    pass on, households' own carbon price in full; real incomes and voters follow."""
+
+    def run_with(self, change: dict, months: int = 8) -> dict:
+        sim = Simulation(model(), seed=SEED, commands={1: change} if change else None)
+        rows = [sim.step() for _ in range(months)]
+        return rows[-1]
+
+    def test_the_base_month_has_consumer_prices_at_the_deflator(self):
+        sim = Simulation(model(), seed=SEED)
+        row = sim.step()
+        self.assertEqual(row["tax_wedge"], 0.0)
+        self.assertEqual(row["consumer_price_index"], row["price_index"])
+        self.assertEqual(row["consumer_inflation_annual"], row["inflation_annual"])
+
+    def test_vat_and_the_carbon_price_reach_shop_prices(self):
+        p = {name: model().symbols[name].spec for name in ("vat_pass_through", "cost_pass_through", "vat_base_share")}
+        base_vat = model().symbols["vat_rate"].spec["default"]
+        share = p["vat_base_share"]["value"]
+        base, vat, carbon = self.run_with({}), self.run_with({"vat_rate": base_vat + 0.025}), \
+            self.run_with({"carbon_price": 100})
+        # VAT: its documented share of the rise in what VAT adds to prices, nearly all there
+        # after seven months of a three-month adjustment.
+        documented = p["vat_pass_through"]["central"] * ((1 + (base_vat + 0.025) * share) / (1 + base_vat * share) - 1)
+        self.assertAlmostEqual(vat["tax_wedge"] / documented, 1.0, delta=0.08)
+        # Consumer prices carry the wedge; the deflator does not.
+        self.assertAlmostEqual(vat["consumer_price_index"] / vat["price_index"] - 1, vat["tax_wedge"], delta=0.002)
+        # The carbon price: firms' share passed on, households' own in full.
+        documented = (p["cost_pass_through"]["central"] * carbon["carbon_tax_firms"] / carbon["private_demand"]
+                      + carbon["carbon_tax_households"] / carbon["consumption"])
+        self.assertAlmostEqual(carbon["tax_wedge"] / documented, 1.0, delta=0.1)
+        for row in (vat, carbon):
+            self.assertGreater(row["consumer_inflation_annual"], row["inflation_annual"])
+            # Dearer shopping costs the government votes.
+            self.assertLess(row["government_support"], base["government_support"] - 0.003)
+
+
+class Dilemmas(unittest.TestCase):
+    """Stage S9.2: the UK's dilemmas (models/uk/dilemmas.toml). The engine's
+    crates/core/tests/uk_dilemmas.rs gives every answer and checks what it changes."""
+
+    def test_the_dilemmas_and_the_pay_round(self):
+        self.assertEqual([d["name"] for d in model().dilemmas], [
+            "pay_claim", "nhs_winter", "bank_rescue", "steelworks", "investor", "energy_shock", "water_company",
+            "defence_summit", "prisons_full", "universities", "floods", "net_zero_warning",
+            # Stage S13.7: two chance questions from 2028.
+            "fuel_protest", "small_boats",
+            # Stage S13.8: lenders refuse the gilts.
+            "gilt_crisis"])
+        for d in model().dilemmas:
+            self.assertTrue(2 <= len(d["options"]) <= 3, d["name"])
+            self.assertTrue(d["doc"] and all(o["doc"] for o in d["options"]), d["name"])
+        sim = Simulation(model(), seed=SEED)
+        rows = [sim.step() for _ in range(7)]
+        # Nothing is answered, so the government's standing is untouched; the pay round
+        # opens at the end of June 2025, the sixth month, to be answered in July.
+        self.assertEqual(set(sim.rt.C["government_standing"]), {0.0})
+        self.assertEqual([r["pay_claim_open"] for r in rows], [False] * 5 + [True, True])
+
+
+class Issues(unittest.TestCase):
+    """Stage S8.3: voters weigh health, education, policing and the environment for the
+    government, each as its change since the last election."""
+
+    def test_the_issues_start_where_things_stood_and_a_health_cut_costs_votes(self):
+        names = model().dims["issue"].members
+        self.assertEqual(names, ["health", "education", "policing", "environment"])
+        cut = {1: {"spending_health": model().symbols["spending_health"].spec["default"] * 3 // 4}}
+        weighed = Simulation(model(), seed=SEED, commands=cut)
+        ignored = Simulation(model(), seed=SEED, commands=cut, params={"issue_weight_scale": 0.0})
+        first, first_ignored = weighed.step(), ignored.step()
+        # Nothing has changed since the stand-in election: the polls are as without issues.
+        self.assertEqual(first["government_support"], first_ignored["government_support"])
+        self.assertEqual(weighed.column("issue_at_election")[:3], [1.0, 1.0, 1.0])
+        for _ in range(6):
+            row, row_ignored = weighed.step(), ignored.step()
+        self.assertLess(weighed.column("issue_measure")[0], 0.9)
+        # The health service's decline costs the government on top of the economy.
+        self.assertLess(row["government_support"], row_ignored["government_support"] - 0.003)
+
+
+class Trade(unittest.TestCase):
+    """Stage S6.3: trade by partner, at the 2024 shares (models/uk/data/trade_partners.csv)."""
+
+    def test_partners_add_up_to_2024_trade(self):
+        with open(UK / "data" / "trade_partners.csv", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        exports = sum(float(r["exports"]) for r in rows)
+        imports = sum(float(r["imports"]) for r in rows)
+        self.assertAlmostEqual(exports / published()["exports"], 1.0, delta=0.001)
+        self.assertAlmostEqual(imports / published()["imports"], 1.0, delta=0.001)
+        sim = Simulation(model(), seed=SEED)
+        sim.step()
+        by_partner = sim.column("exports_by_partner")
+        for r, value in zip(rows, by_partner):
+            self.assertAlmostEqual(value / (sum(by_partner)), float(r["exports"]) / exports, places=9)
+
+    def test_a_barrier_cuts_trade_with_that_partner_and_raises_duties(self):
+        base = Simulation(model(), seed=SEED)
+        base.step()
+        walled = Simulation(model(), seed=SEED, levers={"trade_barrier_china": 0.2})
+        row = walled.step()
+        china = model().dims["partner"].members.index("china")
+        # Exports to China fall by 40% (2 times the barrier); to the EU they do not change.
+        exports, exports_base = walled.column("exports_by_partner"), base.column("exports_by_partner")
+        self.assertAlmostEqual(exports[china] / exports_base[china], 0.6, places=9)
+        self.assertEqual(exports[0], exports_base[0])
+        # Imports scale with demand, which the barrier also moves: against the EU's, China's fall 40%.
+        imports, imports_base = walled.column("imports_by_partner"), base.column("imports_by_partner")
+        self.assertAlmostEqual((imports[china] / imports[0]) / (imports_base[china] / imports_base[0]), 0.6, places=9)
+        self.assertAlmostEqual(row["customs_duties"], round(0.2 * walled.column("imports_by_partner")[china]), delta=1)
+        # They are public receipts, so the budget balance counts them.
+        parts = ["income_tax", "national_insurance", "council_tax", "vat", "production_taxes", "corporation_tax",
+                 "other_receipts", "customs_duties", "carbon_tax_firms", "carbon_tax_households"]
+        self.assertEqual(row["public_receipts"], sum(row[p] for p in parts))

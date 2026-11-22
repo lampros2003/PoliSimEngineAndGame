@@ -1,0 +1,8 @@
+# An example mod for the United Kingdom (docs/MODDING.md walks through it).
+[mod]
+id = "wealth_tax"
+name = "A wealth tax"
+version = "1.0"
+model = "uk"
+description = "An annual tax on households' savings above a threshold, paid to the government. The richest fifth of voters hold it against the government."
+files = ["wealth_tax.toml"]

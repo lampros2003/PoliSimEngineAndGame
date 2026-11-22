@@ -1,0 +1,8 @@
+# An example mod for the United Kingdom (docs/MODDING.md walks through it).
+[mod]
+id = "dog_licence"
+name = "A dog licence"
+version = "1.0"
+model = "uk"
+description = "A yearly licence for every dog, paid to the government, as Great Britain had until the late 1980s and Northern Ireland still has. Dog owners hold it against the government."
+files = ["dog_licence.toml"]

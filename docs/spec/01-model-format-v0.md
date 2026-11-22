@@ -2,7 +2,7 @@
 
 A model is a folder of TOML files plus CSV data. The engine contains no model: everything
 it simulates is read from these files, and the base game will be one such folder. The
-loader that defines this format is `oracle/polisim_oracle/model.py`; a complete example
+engine's loader (`crates/core/src/model.rs`) implements this format; a complete example
 is `models/toy/`.
 
 Related: [engine contract](00-engine-contract.md), [formula language](02-formula-language-v0.md).
@@ -35,9 +35,17 @@ reserved. The full identifier of an element is `<model id>:<section>.<name>`, fo
 | `real` | real | any number |
 | `bool` | true/false | `true` / `false` (in CSV: `1`/`0` or `true`/`false`) |
 
-A `money` value times `minor_units` must be a whole number to within 1e-6, otherwise the
-file has more decimal places than the currency and loading fails. In formulas `money` and
+A `money` value times `minor_units` must be a whole number, otherwise the file has more
+decimal places than the currency and loading fails. A value with a fractional part is read
+as the shortest decimal that gives the same 64-bit float (Python's `repr`), which is what
+was typed, and scaled exactly: `2301745961.03` pounds is 230174596103 pence, although the
+floating-point product is 230174596102.99997. In formulas `money` and
 `int` are the same kind of value.
+
+Money is held in minor units everywhere at run time. A `real` whose unit includes the
+currency (an average wage, say) is therefore also in minor units, and its value in a file
+must be written in minor units: the loader scales only `money`. The unit checker cannot
+catch a real written in major units, because pounds and pence share one unit name.
 
 `unit` is a product of named base units with integer powers, read left to right:
 `"GBP/month"`, `"GBP/month/household"`, `"1/month"`, `"share"`, `"1"`. Base units are
@@ -79,7 +87,8 @@ unit is the instrument's, divided by the entity for a record-level account.
 
 A table of records: `data` (CSV path), `id` (column of unique non-negative whole
 numbers), `weight` (column of positive whole numbers: how many real units each record
-stands for). `[entity.<name>.columns.<column>]` declares a data column that formulas may
+stands for; in format 1 it may instead be a state, so that weights change during a run:
+[format 1](06-model-format-1.md#weights-that-change-stage-s44)). `[entity.<name>.columns.<column>]` declares a data column that formulas may
 read, with `type` and `unit`. Other CSV columns can be used only as `initial` values.
 
 ### `[param.<name>]`
@@ -90,15 +99,37 @@ parameter.
 
 ### `[lever.<name>]`
 
+(Format 1 adds an optional `leaning`, `"left"` or `"right"`: which way raising the lever
+moves policy, for a legislature's votes. See [format 1](06-model-format-1.md#bills-stage-s54).)
+
 A value the player sets: `type`, `unit`, `default`, optional `range`. Changed only by
-commands, which take effect before the phases of the step they name.
+commands, which take effect before the phases of the step they name. Optional
+`player = false` marks an input that scenarios set but the game does not offer the
+player, such as world demand or a market interest rate in a historical run; it behaves
+like any other lever.
 
 ### `[table.<name>]`
 
-`kind = "marginal"` is the only kind in format 0. `unit` is the unit of the thresholds.
-`bands` is a list of `{ from = "<formula>", rate = "<formula>" }` in ascending order of
-`from`; both are national formulas, so they can name parameters and levers. Used by
-`marginal()`.
+`kind = "marginal"`: `unit` is the unit of the thresholds. `bands` is a list of
+`{ from = "<formula>", rate = "<formula>" }` in ascending order of `from`; both are national
+formulas, so they can name parameters and levers. Used by `marginal()`.
+
+`kind = "curve"` (stage S11.1): an effect curve, used by `curve()`. `x_unit` is the unit
+of its input and `unit` that of its output. `points` is a list of at least two
+`{ x = "<formula>", y = "<formula>" }`, national formulas (or numbers) of those units, in
+ascending order of `x`; the order is checked whenever the curve is used, since a point may
+name a parameter or a lever. Between two points the curve is a straight line, and beyond
+the first and the last it is level, so a few points give a saturating, S-shaped or
+asymmetric response, and points written from parameters keep their presets:
+
+```toml
+[table.treatments_response]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.5, y = "1.0 - 0.6 * treatment_response" }, { x = 1.0, y = 1.0 },
+          { x = 1.5, y = "1.0 + 0.38 * treatment_response" }]
+```
 
 ### `[stream.<name>]`
 
@@ -123,7 +154,10 @@ A payment: `from` and `to` (two different sectors), `phase`, `expr` for the amou
 optional `instrument` (default: the first declared). It is record-level when either
 sector is; a flow between two record-level sectors is not in format 0. Its type is
 `money` and its unit is derived: the instrument's unit per step, per record if
-record-level. A flow's amount can be read by name like a `var`.
+record-level. A flow's amount can be read by name like a `var`. Optional
+`financial = true` marks a purchase or sale of an asset (paying for gilts, drawing a
+loan) rather than income or spending; it changes nothing in a run, and budget screens
+leave such flows out.
 
 Any element may carry `doc`, a sentence for people and for generated documentation.
 
@@ -137,6 +171,7 @@ model = ".."            # path to the model folder, relative to this file
 seed = 20261113
 steps = 240
 preset = "central"      # which of low / central / high to use
+mods = []               # optional (stage S7.1): mod folders, relative to this file
 
 [params]                # optional overrides
 [levers]                # optional starting settings
@@ -157,5 +192,5 @@ phase; formulas within a phase depend on each other in a circle; something read 
 ## Planned, not in format 0
 
 Patches (`[[patch]]` entries that edit one named element of another model), multiple
-namespaces, dimensions such as region and industry, further table kinds, and native
-operators.
+namespaces, further table kinds, and native operators. Dimensions such as age, region and
+industry, with sums over them and cohort ageing, are [format 1](06-model-format-1.md).

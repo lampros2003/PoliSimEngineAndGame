@@ -1,0 +1,584 @@
+# Model-file format 1: dimensions
+
+Format 1 is format 0 ([model format](01-model-format-v0.md), [formula
+language](02-formula-language-v0.md)) plus **dimensions**: named, ordered sets such as
+age, sex, region or industry, over which a parameter, variable or state holds one value
+per cell. It is what the cohort population table and the industries of stage S3.6 need,
+and what households of stage S4 will look values up in. Everything in format 0 keeps its
+meaning; a model opts in with `format = 1`.
+
+Results must be the same bit for bit on every machine and at any thread count, so every
+operation below states its order of evaluation.
+
+## Declaring a dimension
+
+```toml
+[dim.age]
+range = [0, 100]          # members 0, 1, ..., 100, in that order
+
+[dim.sex]
+members = ["female", "male"]
+
+[dim.region]
+members = ["north_east", "north_west", "yorkshire", "east_midlands"]
+labels = ["North East", "North West", "Yorkshire and The Humber", "East Midlands"]
+```
+
+A dimension is either a **range** of whole numbers (`range = [first, last]`, `first <=
+last`) or a **list** of member names (`members`, each a valid name, no repeats). Members
+are ordered; a member's **position** counts from 0. `labels` are optional names for
+people. A list member may not have the name of any declared element, so that `x[sex:
+female]` can never mean two things. A dimension has at least one member and at most
+1,000,000; a value's cells (the product of its dimensions' sizes) number at most
+16,777,216.
+
+## Dimensioned elements
+
+`param`, `var` and `state` take an optional `dims`, a list of dimension names without
+repeats: `dims = ["sex", "age"]`. The element holds one value per cell, every cell of the
+same type and unit. Cells are stored, hashed and written in **row-major order** of the
+declared list: the last dimension varies fastest. An element with `dims` may not also
+have an `entity`; levers, flows and accounts have no `dims` in format 1.
+
+A dimensioned **parameter** gives its values in one of two ways:
+
+- `value = 0.012` (or the presets `low`, `central`, `high`): the same value in every cell;
+- `data = "data/mortality.csv"`: a CSV file with one column per dimension, named after
+  it, holding the member (the number for a range dimension, the name for a list one), and
+  a value column, named by `column` (default `"value"`). `columns = { low = "lo",
+  central = "mid", high = "hi" }` names one value column per preset instead. Every cell
+  must appear exactly once; a missing, repeated or unknown cell is a load-time error.
+
+A dimensioned **state** gives `initial` as a single number (every cell) or as `{ data =
+"...", column = "..." }` in the same CSV form. A dimensioned **var** that is read through
+`prev()` gives `initial` the same way.
+
+The model hash covers these data files too: after the entities' files, each data file of
+a dimensioned element once, in ascending order of its path as written (compared as UTF-8
+bytes), each preceded by that path as in format 0.
+
+## Formulas over cells
+
+The formula of a dimensioned var or state is evaluated once per cell. Inside it, the
+element's dimensions are **in scope**, and the formula sees the coordinates of the cell
+being computed:
+
+- a value without dimensions is the same in every cell;
+- a dimensioned value whose dimensions are all in scope is read at the current cell's
+  coordinates for those dimensions, whatever their order in its declaration: in a formula
+  for `deaths` with `dims = ["region", "sex", "age"]`, `mortality` with `dims = ["sex",
+  "age"]` is read at this cell's sex and age;
+- reading a dimensioned value with a dimension that is not in scope is a load-time
+  error: reduce it with `sum`, or fix that dimension with an index.
+
+A formula without `dims` (and every format 0 formula) has nothing in scope.
+
+### Indexing
+
+`x[d: e]` reads `x` with dimension `d` fixed; several may be given, `x[sex: female,
+age: 0]`. `x` must be the name of a dimensioned element and `d` one of its dimensions,
+each at most once. The coordinate `e` is:
+
+- for a range dimension, a whole-number expression giving the **member**: `pop[age: 65]`,
+  `pop[age: coord(age) - 1]`;
+- for a list dimension, a member name (`[sex: female]`), or a whole-number expression
+  giving the **position**.
+
+A coordinate outside the dimension is a run-time error. The remaining dimensions of `x`
+must be in scope. The coordinate expressions are evaluated in the scope of the
+surrounding formula, in the order written, before `x` is read; a coordinate must be a
+whole number without a unit. Indexing works in record-level formulas too, so a
+household can look up a rate by its region column: `rate_by_region[region: region_code]`.
+
+### Functions
+
+| Function | Result | Definition |
+|---|---|---|
+| `sum(x, d1, d2, ...)` | as `x` | sum of `x` over every combination of members of the named dimensions |
+| `coord(d)` | whole | the current cell's member along `d` (range dimension) or its position (list dimension) |
+| `cohort_shift(x, d)` | as `x` | `x` moved one member up along `d`; below |
+| `wsum_by(entity, x, d, key)` | as `x` | `wsum` over the records whose `key` is the current cell's member of `d`; below |
+| `wcount_by(entity, c, d, key)` | whole | `wcount` over the records whose `key` is the current cell's member of `d` |
+| `largest(x, d1, ...)`, `smallest(x, d1, ...)` | as `x` | the largest (smallest) value of `x` over the named dimensions; below (stage S10.3) |
+| `sum_by(x, d, key, t)` | as `x` | for each member of `t`, `x` summed over the members of `d` whose `key` names it; below (stage S10.3) |
+
+**`sum`.** The named dimensions must not already be in scope; they are in scope inside
+`x`, along with the surrounding formula's. The terms are taken in row-major order of the
+dimensions **as listed in the call** (the last listed varies fastest), each combination
+once, and accumulated one at a time into a single total that starts at whole-number 0
+when `x` is a whole number and at real 0.0 when it is a real: `total = total + term`.
+Whole numbers are summed exactly and the total must fit in 64 bits (as with `wsum`, only
+the total is checked); reals are added in exactly that order. The unit is the unit of
+`x`.
+
+**`cohort_shift(x, d)`**, for `d` in scope: at the first member of `d` the result is zero
+(whole 0 or real 0.0, as `x`); at a member strictly between the first and the last it is
+`x` at the member below; at the last member it is `x` at the member below plus `x` at the
+last member (an open top group: whoever is in it stays in it). With one member the result
+is `x` itself. Everything else about the cell is unchanged. It is the ageing step of a
+cohort table: one year of ageing at monthly steps, with birthdays spread through the year,
+is
+
+```toml
+[state.population]
+dims = ["region", "sex", "age"]
+next = "population - deaths + migration - ageing_share * population + ageing_share * cohort_shift(population, age) + select(coord(age) == 0, births, 0.0)"
+```
+
+where `ageing_share` is 1/12 a month.
+
+**`wsum_by` and `wcount_by`** (added in stage S4.0) total records by a dimension, such
+as tax paid by households in each region. `d` must be in scope; `x` (or the condition
+`c`) and `key` are record-level formulas, and `key` is a whole number without a unit
+giving each record's member of `d` (a range's member, or a list's position). In the cell
+whose coordinate along `d` is `p`, the result is the `wsum` (or `wcount`) of the records
+whose key is `p`: every record's `x` and key are evaluated, and the terms of the matching
+records are taken in ascending record order, as in `wsum`. A record whose key is not a
+member of `d` is a run-time error. The unit is `unit(x) * entity` (`entity` for
+`wcount_by`). Writing `x` as a dimensioned var with `dims = [d]` gives the totals by
+member; their `sum` over `d` equals the `wsum` of all records, up to rounding of reals.
+
+**`largest` and `smallest`** (stage S10.3) take their dimensions as `sum` does and visit
+the same cells in the same order, keeping the first and then each later value that is
+greater (smaller) than the one kept, as `max` (`min`) does pair by pair: so a not-a-number
+first value is kept, and one later is passed over. `x` is a number; the result has its type
+and unit.
+
+**`sum_by(x, d, key, t)`** (stage S10.3) is the grouped sum over a dimension, as `wsum_by`
+is over records. `t` must be in scope and `d` must not; inside `x` and `key`, `d` is in
+scope and `t` is not. `key` is a whole number without a unit naming a member of `t` (a
+range's member, or a list's position). In the cell whose coordinate along `t` is `p`, the
+result is `x` summed over the members of `d` whose key is `p`, in ascending order of `d`,
+from whole 0 or real 0.0 as `sum` does. Every member's `x` and key are evaluated; a key
+that names no member of `t` is a run-time error. For a key `k`,
+`sum_by(x, d, k, t)` equals `sum(select(k == coord(t), x, 0), d)` for whole numbers, and
+for reals whenever no term is a negative zero, while evaluating `x` once for each member of
+`d` rather than once for each member of `d` and `t`: the UK's regional voting intention,
+summed over 600 voter types into twelve regions, does a twelfth of the work.
+
+### Where the new functions work
+
+`sum`, `coord`, `cohort_shift`, `wsum_by`, `wcount_by`, `largest`, `smallest` and `sum_by`
+work in national and dimensioned formulas, not in record-level ones (a record reaches a dimensioned value only by indexing every dimension).
+`rand` does not work in a dimensioned formula. The inner formula of `wsum` and `wcount`
+is a record's formula and sees no dimensions, even inside a dimensioned formula.
+
+### Evaluation order
+
+Within one cell, a formula is evaluated as in format 0: every argument, left to right.
+The cells of one element are computed in row-major order of its declared dimensions.
+Since a formula cannot read its own element's current value, the order of cells changes
+no result; it fixes where an error is reported (the first failing cell in that order).
+
+## Results
+
+The command-line runner writes national values as in format 0. A dimensioned element is
+not written cell by cell; write a national var with `sum(...)` for any total a run should
+report. Its cells are part of the state hash, in row-major order, like a record-level
+column.
+
+## Weights that change (stage S4.4)
+
+An entity's weights may be a record-level state instead of a data column, so that they
+can change during a run: synthetic households kept in line with a population that ages.
+
+```toml
+[entity.household]
+data = "households.csv"
+id = "id"
+weight = { state = "household_weight" }
+
+[state.household_weight]
+entity = "household"
+type = "int"
+unit = "1"
+phase = "alignment"
+initial = { column = "weight" }
+
+[state.household_weight.rake]
+when = "month_of_year == 0"
+passes = 10
+
+[[state.household_weight.rake.margin]]
+target = "adults_in_households"   # dims = ["region", "sex", "adult_band"]
+slots = [
+  { count = "select(adults >= 1, 1, 0)", at = ["region_code", "sex1", "band_of_age[age: age1]"] },
+  { count = "select(adults >= 2, 1, 0)", at = ["region_code", "sex2", "band_of_age[age: age2]"] },
+]
+
+[[state.household_weight.rake.margin]]
+target = "households_by_region"   # dims = ["region"]
+slots = [{ count = "1", at = ["region_code"] }]
+```
+
+**The weight state.** `weight = { state = "s" }` names a state of that entity, of type
+`int`, unit `1` and no dimensions. Every value it holds, from its initial value on, must
+be a whole number of at least 1 (a run-time error otherwise). Wherever records are
+weighted (`wsum`, `wcount`, `wsum_by`, `wcount_by`, and the totals that explanations and
+results give for record-level values), the weight is the state's value as a formula
+would read it at that point: the start-of-step value until the phase that updates it has
+committed, the new value after. No sector may hold its accounts record by record in an
+entity whose weights change: a changed weight would create or destroy money. The state
+has either a `next` formula, like any state, or a `rake`, and only a weight state may
+have a `rake`.
+
+**`rake`** sets the weights so that weighted totals of the records meet targets, by
+iterative proportional updating. Its keys:
+
+| Key | Meaning |
+|---|---|
+| `when` | A national formula, `bool`: the weights change only in steps where it is true |
+| `passes` | A whole number from 1 to 1,000 |
+| `margin` | One or more tables, each with `target` and `slots` |
+| `target` | The name of a national param, var or state with dimensions, whole or real; a var must be computed in the state's phase or earlier |
+| `slots` | One or more tables, each with `count` and `at` |
+| `count` | A record formula, whole or real: how many of the target's units the record adds to one cell, per unit of weight |
+| `at` | A list of record formulas, one per dimension of the target in its declared order, each a whole number without a unit: the record's member along that dimension (a range's member, or a list's position), as `wsum_by`'s key |
+
+Every slot of a margin has counts of one unit `u`, and the target's unit is `u * entity`,
+as for `wsum` of the count.
+
+The rake is evaluated where the state's `next` formula would be (step 2.2 of the
+[engine contract](00-engine-contract.md)), sees what such a formula sees, and its result
+is committed with the phase's other states:
+
+1. `when` is evaluated. If it is false, every weight stays as it is and nothing else of
+   the rake is evaluated.
+2. For each margin in order: every cell of the target must be finite and not negative
+   (checked in row-major order); each slot's `count`, then its `at` formulas left to
+   right, are evaluated for every record, strictly as record formulas always are; then,
+   for each record in ascending order and each slot in order, the count must be finite
+   and not negative and, if it is not zero, each `at` value must be a member of its
+   dimension (left to right). The first failure is the error reported. A record and slot
+   with a count that is not zero form a **pair** in the cell its `at` values name; an
+   `at` value that goes with a zero count is not checked.
+3. Each record starts from `v`, its current weight as a real. Then `passes` times, for each
+   margin in order, for each cell of its target in row-major order: `S` is the sum,
+   starting at real 0.0, of `v * real(count)` over the cell's pairs, records ascending and
+   slots in order within a record, added one at a time; `T` is the target cell as a real.
+   If `S > 0` and `T > 0`, then `f = T / S`, and every record with a pair in the cell,
+   in ascending order, gets `v = v * f`, once however many of its slots are in the cell.
+   Otherwise the cell is left alone.
+4. The new weight of each record is `round(v)` (halves to the even neighbour), or 1 if
+   that is less than 1. A `v` that is not finite, or rounds outside 64 bits, is an error.
+
+Each pass brings each margin to its targets in turn, so after the last pass the last
+margin fits exactly (before rounding) and the others more closely the more passes there
+are; a cell with no pairs or a zero target cannot be met and is skipped. Only
+multiplications and divisions are used, so every machine gives the same weights.
+
+## Bills (stage S5.4)
+
+A model may have a legislature that votes on the player's policy changes:
+
+```toml
+[legislature]
+seats = "seats"            # a state of whole numbers with one dimension, the blocs
+governing = "governing"    # a true/false state over the same dimension
+position = "bloc_position" # a real parameter over the same dimension: left below zero
+
+[lever.basic_rate]
+leaning = "left"           # raising it moves policy to the left; "right" for the opposite
+```
+
+A lever's `leaning` is `"left"` or `"right"`; a true/false lever has none. In part 1 of a
+step (engine contract, section 3), each lever change scheduled for the step is taken in
+the order the commands list them (for one lever in one step the last command wins, in the
+place of the first). If the model has a legislature, the lever has a leaning, and the
+value the change would store differs from the lever's current value, the change is a
+**bill** and is voted on:
+
+1. The move is to the **left** if the value rises and the lever leans left, or falls and
+   it leans right; otherwise it is to the right.
+2. The **leader** is the governing bloc with the most seats (the first of the dimension on
+   a tie); with no governing bloc there is none.
+3. Policy is taken to stand at the leader's position (at zero with no leader). A bloc votes
+   for the bill if it is the leader, or if the move is towards it: to the left and its
+   position is lower than the leader's, or to the right and higher. The others vote
+   against. Seats, governing and positions are read at their start-of-step values.
+4. The bill **passes** if twice the seats of the blocs voting for it exceed the seats of
+   all blocs (whole numbers, exactly). A bill that passes is applied, and its value then
+   checked against the lever's range as any change is. A defeated bill changes nothing,
+   is not range-checked, and is not an error.
+
+Every vote is kept: the step, the lever, the value it would have stored, the seats for,
+the seats of all blocs, and whether it passed. A model with a legislature adds the
+result `bills_defeated` to each step's results: the number of bills defeated in it. A
+saved game (version 2) keeps each policy change's vote.
+
+So a government with a majority of its own passes every bill; without one, a move to
+the left needs enough seats to the leader's left, and a move to the right enough to its
+right.
+
+### Political capital (stage S12.4)
+
+A legislature may make bills cost political capital. The four names come together or not
+at all:
+
+```toml
+[legislature]
+seats = "seats"
+governing = "governing"
+position = "bloc_position"
+capital = "political_capital"  # a real state: what the government has to spend
+spent = "capital_spent"        # a real lever the engine sets: what the step's bills spent
+bill_cost = "capital_bill"     # a real parameter: what any bill costs
+swing_cost = "capital_swing"   # a real parameter: what moving a lever across its range costs
+
+[lever.vat_rate]
+leaning = "left"
+capital_weight = 1.5           # optional, a number of at least 0: scales swing_cost
+```
+
+All four are national (no dimension, no entity), real, not money, and in one unit;
+`spent` has no leaning. `capital_weight` is allowed only on a lever with a leaning.
+
+A bill's **cost** is `bill_cost + swing_cost * capital_weight * (abs(new - old) / (max - min))`,
+computed in real numbers in that order (the multiplications left to right), where `new`
+and `old` are the values the change would store and the lever holds (whole numbers are
+subtracted exactly, then made real), `max` and `min` its range as stored, and
+`capital_weight` 1 when not given. A lever without a range, or with `max` not above
+`min`, costs `bill_cost`.
+
+In part 1 of a step, the step's spending starts at 0. Before each bill is voted on, its
+cost is compared with what is left: the capital's start-of-step value less the step's
+spending so far. A bill that costs **more** than is left is **refused**: it is not voted
+on, changes nothing, is not range-checked, counts as no defeat, and is not an error; it is
+kept with the votes, with no seats for it, its cost and the mark that it was refused.
+Otherwise it is voted on as above, its cost kept with the vote; if it passes, its cost
+is added to the step's spending. After the last change, the engine stores the step's
+spending in `spent` (0 if there were no bills). A command that sets `spent` is an error.
+
+The model says how capital is earned and that spending reduces it, in the capital's own
+`next` formula, which reads `spent`; for example
+`clamp(political_capital - capital_spent + capital_earned, 0.0, 100.0)`.
+
+## Renames (stage S7.0)
+
+A model that renames an element says so, so that games saved before the rename carry the
+value across ([save format 1](04-save-format-v0.md#loading-into-a-changed-model)):
+
+```toml
+[renamed]
+employed = "in_work"
+```
+
+Each key is a name the model no longer has (neither an element nor a dimension); each
+value is the name the element has now, or a name that was itself renamed later, in which
+case the chain is followed to an element. Keep the entries for as long as old saves
+should load. Formulas never see old names. The section is accepted in format 0 models
+too, and checked there as in format 1.
+
+## Situations (stage S7.3)
+
+A situation is a condition the player is told about when it begins and ends, such as a
+recession. It is declared with its own section and becomes a true/false `state` of the
+same name, which formulas can read like any other:
+
+```toml
+[situation.recession]
+label = "Recession"
+doc = "Output is falling"
+start = "output_growth < -0.005"
+end = "output_growth > 0.005"
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `start` | A true/false formula: the situation comes on when it holds | required |
+| `end` | A true/false formula: once on, it goes off when this holds. The gap between `start` and `end` keeps it from flickering | `not (start)`: off as soon as `start` no longer holds |
+| `good` | `true` for a situation the player wants (a budget surplus) | `false` |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its state is updated in | the last phase |
+
+So `[situation.x]` is exactly `[state.x]` with `type = "bool"`, `unit = "1"`,
+`initial = false` and `next = "select(x, not (<end>), <start>)"` (or `next = "<start>"`
+without an end), plus `situation = "good"` or `"bad"`, which the catalogue passes on so a
+client can show it. The engine expands it after mods are
+applied (a mod may add situations); the shared cases are in
+`conformance/situation_cases.toml`. Any other key is an error. The section is accepted in
+format 0 models too.
+
+## Lags (stage S10.5)
+
+`prev(x)` reads a value as it was one step before. A lag reads it further back:
+
+```toml
+[lag.prices_a_year_ago]
+of = "price_index"
+steps = 12
+initial = 1.0
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `of` | The `var`, `flow`, `state` or `lever` followed | required |
+| `steps` | How many steps back, a whole number from 1 to 1,200 | required |
+| `initial` | What the lag holds until `steps` steps have passed, as a state's `initial` | `of`'s own `initial` (a lever's `default`), if it has one; else an error |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its states are updated in | the last phase |
+
+A lag is made by the loader, after situations and before dilemmas, from ordinary
+elements. For `[lag.x]` with `steps = n` it makes states `x__1` to `x__n` and a var `x`,
+each with `of`'s type, unit, dimensions and entity (a national flow's: money in its
+instrument's unit a step; a flow held record by record is an error), the lag's `initial`
+and `lag = "x"`. The states are updated in the lag's `phase`: `x__1` takes `next = "<of>"`
+and each later one the one before it. The var `x` is computed in the first phase, with
+`expr = "x__n"`, the label and doc, and the lag's `initial` (so `prev(x)` works).
+
+So, in step `t`, `x` holds what a formula in the lag's phase read as `of` in step `t - n`,
+and `initial` in the first `n` steps; in every phase, and in charts after the step. For a
+var, a flow or a lever that is simply its value then. For a state updated in an earlier
+phase than the lag's, it is its value after that step's update; for one updated in the
+lag's phase or later, before it, which is one step further back. A lag in a phase before
+the one its var or flow is computed in is an error, as for any formula. The states are
+ordinary states: a save keeps them, the state hash covers them, and formulas may read
+them. Any other key is an error, as is a name the lag would make that the model already
+has. The section is accepted in format 0 models and in mods; the shared cases are in
+`conformance/lag_cases.toml`.
+
+## Dilemmas (stage S9.1)
+
+A dilemma is a question put to the player when a condition first holds, with two to six
+answers. Each answer may change chosen formulas, for good or for some months. It is
+declared with its own section and becomes ordinary elements, so an answer's effects show
+in a trace, a chart and the icon web like any other change, and a mod may add dilemmas:
+
+```toml
+[dilemma.pay_claim]
+label = "Public sector pay claim"
+doc = "Unions in the NHS and schools ask for a rise that keeps up with prices"
+start = "inflation_annual > 0.04"
+again_after = 24
+
+[[dilemma.pay_claim.option]]
+name = "settle"
+label = "Meet the claim"
+doc = "Pay rises 3% for a year"
+months = 12
+effect = { public_pay_bill = "{base} * 1.03" }
+
+[[dilemma.pay_claim.option]]
+name = "hold"
+label = "Hold firm"
+effect = { health_service_strain = "{base} + 0.02" }
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `start` | A true/false formula: the dilemma opens when it holds | required |
+| `again_after` | A whole number of months, at least 1: after an answer, the dilemma may open again once this many months have passed (counting the month of the answer) and `start` holds | never again |
+| `option` | Two to six answers, in the order shown | required |
+| `label`, `doc` | As for any element | |
+| `phase` | The phase its states are updated in | the last phase |
+
+| Option key | Meaning | Default |
+|---|---|---|
+| `name` | The answer's name, a lowercase identifier, unique in the dilemma | required |
+| `label`, `doc` | Shown with the answer | |
+| `months` | A whole number, at least 1: how many months the effects last, counting the month of the answer | for good, until another answer |
+| `effect` | A table from the name of a `var`, `flow` or `state` (one the model declares itself, not one a dilemma makes) to a formula in which `{base}` stands for the element's own formula (a state's `next`), as in a [mod's patch](07-mods.md) | no effects |
+
+For a dilemma `d` with `n` answers the loader makes, after mods and situations, and in the
+order the dilemmas are declared:
+
+| Element | Kind | Definition |
+|---|---|---|
+| `d` | lever, `int`, unit `1`, `default = 0`, `range = [0, n]` | the answer given this month: `k` for the `k`th, 0 for none |
+| `d_choice` | var, `int`, unit `1`, the first phase | `select(d != 0, d, d_answer)`: the answer in force |
+| `d_age` | var, `int`, unit `1`, the first phase | `select(d != 0, 0, d_months)`: months since that answer |
+| `d_answer` | state, `int`, unit `1`, `initial = 0` | `next = "d_choice"` |
+| `d_months` | state, `int`, unit `1`, `initial = 0` | `next = "d_age + 1"` |
+| `d_open` | state, `bool`, unit `1`, `initial = false` | `next = "select(d_open, d == 0, (<start>) and d_choice == 0)"`, or with `again_after = a`, `... and (d_choice == 0 or d_age + 1 >= a))` |
+
+The states are updated in the dilemma's `phase`. The lever carries `label` and `doc` from
+the dilemma, and every element made carries `dilemma = "d"`, which the catalogue passes on.
+
+Then, dilemma by dilemma, each element `T` that any of `d`'s answers names (in the order
+first named) is rewritten. Its formula `F` as it stands (a state's `next`) moves into a new
+var `T_before_d`, with `T`'s type, unit, dimensions, entity and phase (for a flow: `money`,
+in its instrument's unit a step; an effect on a flow held record by record is an error),
+and `T`'s formula becomes, for the answers `k1, k2, …` that name it, in order,
+
+```text
+select(<when k1>, (E1), select(<when k2>, (E2), … T_before_d))
+```
+
+where `<when k>` is `d_choice == k`, or `d_choice == k and d_age < m` with `months = m`, and
+`Ek` is answer `k`'s effect with every `{base}` replaced by `T_before_d`. So a later
+dilemma's effects apply to the result of an earlier one's (`T_before_e` is the formula with
+`d`'s effects), formulas grow with the number of effects rather than doubling, and the
+chain shows in a trace: `T` reads `T_before_e`, which reads `T_before_d`. An effect may read
+the dilemma's own `d_age` to fade on its own clock, so one answer can change one thing for
+good and another for a few months.
+
+**Answering.** A dilemma's lever is set by a command, like any lever, but is never a bill.
+In part 1 of a step, a command to it is an error unless its dilemma is open (`d_open` is
+true at the start of the step) and the value is a whole number from 1 to `n`. At the end
+of the step, after the flows are posted, every dilemma's lever returns to 0, so between
+steps (in a save, and in the state hash) it is always 0, and `d_choice` and `d_answer`
+hold the answer. An open dilemma stays open until it is answered; a run with no answers
+is not an error.
+
+A dilemma with no `rand()` in `start` opens at the same point of every run; a model that
+wants chance writes a draw from a declared random stream into `start`. Any other key is an
+error, in the dilemma or an option, as are: an `option` that is not an array of two to six
+tables; a missing, repeated or non-identifier `name`; `months` or `again_after` that is
+not a whole number of at least 1; an effect naming anything but a declared `var`, `flow`
+or `state`, or one without a formula; an effect that is not a formula; and any name the
+dilemma would make (its own six, and each `T_before_d`) that the model already has. The shared cases of how dilemmas are expanded
+and answers checked are in `conformance/dilemma_cases.toml`.
+The section is accepted in format 0 models too.
+
+## Load-time checks
+
+Format 0's, plus: a dimension used but not declared; `dims` on an element that cannot
+have them, or with a repeat; a list member named like an element; a data file with a
+missing, repeated or unknown cell, or a missing column; a dimensioned value read with a
+dimension out of scope; `sum` over a dimension already in scope or not declared;
+`coord` or `cohort_shift` of a dimension not in scope; an index on something without
+that dimension, or the same dimension indexed twice. For weights that change: a weight
+state that is not an `int` state of unit `1`, without dimensions, of its own entity; a
+sector held record by record in that entity; a state with both `next` and `rake`, or a
+`rake` on a state that is not a weight state; a `rake` whose `passes` is not a whole
+number from 1 to 1,000, with no margin or a margin with no slot, whose target is not a
+national param, var or state with dimensions, or is a var computed in a later phase;
+`at` with the wrong number of formulas; counts of different units in one margin, or of
+a unit that does not match the target's. For bills: a `leaning` other than `"left"` or
+`"right"`, or on a true/false lever; a `[legislature]` in format 0, without exactly the
+keys `seats`, `governing` and `position`, naming something that is not a whole-number
+state, a true/false state and a real parameter respectively, each with one dimension, or
+with different dimensions. For political capital: some but not all of `capital`, `spent`,
+`bill_cost` and `swing_cost`; any of them not naming a national real state, lever,
+parameter and parameter respectively, or in money, or in another unit than the capital; a
+`spent` lever with a leaning; a `capital_weight` that is not a number of at least 0, or on
+a lever without a leaning. For renames: an old name that is still a name in the model; a
+new name that is not text, or that leads, through the chain, to no element or round in a
+circle.
+
+## Not in format 1
+
+Dimensioned levers, flows and accounts (a regional budget is a dimensioned var summed
+into a national flow); dimensions on record-level elements; random draws per cell; weights
+that are not whole numbers, and calibration methods other than the rake (such as
+exponential calibration, which needs `exp`); interpolation between members; reductions
+other than `sum`, `largest`, `smallest` and `sum_by` (means and shares are written with
+`sum` and `/`).
+
+## Test model
+
+`models/cohort/` (written by `tools/make_cohort.py`) uses every feature above: a
+population by region, sex and age with births, deaths, migration and monthly ageing; an
+integer state on a range starting at 16; a parameter with a column per preset; a
+dimensioned var read through `prev()`; and records that look a rate up by region.
+`tests/test_format1.py` and `crates/core/tests/format1.rs` test the rules;
+`models/cohort/golden/` holds the recorded state hashes, which the engine must reproduce.
+
+`models/raking/` (written by `tools/make_raking.py`) tests weights that change: 2,000
+invented households raked once a year to three margins (adults by region, sex and age
+band, three slots per household; children by region; households by size, a whole-number
+target on a range dimension), with aggregates before and after the rake. The hand-worked
+cases of `conformance/rake_cases.toml` (the rake's arithmetic, its skips and rounding, and
+every refusal and run-time error above) are run by `crates/core/tests/raking.rs`, and the
+test model's behaviour by `tests/test_raking.py`. Likewise `conformance/bill_cases.toml`
+for bills, run by `crates/core/tests/bills.rs`, and the UK's bills by `tests/test_bills.py`.

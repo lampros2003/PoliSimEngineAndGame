@@ -1,0 +1,16 @@
+[scenario]
+model = ".."
+seed = 7
+steps = 24
+preset = "central"
+
+[play]
+country = "Pensions island"
+currency_symbol = "€"
+start = "2030-01"
+term = 24
+government = "state"
+headline = ["state_balance", "-treasury"]
+
+[play.labels]
+"-treasury" = "Public debt"

@@ -1,14 +1,20 @@
-//! Command-line runner. Its CSV is byte for byte the Python oracle's:
+﻿//! Command-line runner:
 //!
 //! ```text
 //! polisim run models/toy/scenarios/baseline.toml --out run.csv
 //! ```
 //!
-//! Money columns are whole numbers of minor units (pence), so the file is exact.
+//! Money columns are whole numbers of minor units (pence), so the file is exact. Reals are
+//! written in the shortest form that reads back to the same value (Python's `repr`), the
+//! form the recorded hashes and fixtures were written in.
 //! Exit codes: 0 finished, 1 the model or scenario could not be loaded, 2 the run failed
 //! part-way (the rows completed before the failure are still written).
+//!
+//! `polisim serve` drives one run line by line for tests and tools (docs/spec/09-serve.md).
 
+mod json;
 mod play;
+mod serve;
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -18,9 +24,11 @@ use std::time::Instant;
 
 use polisim_core::{Error, Row, Simulation, Val, load_scenario, pyfmt};
 
-const USAGE: &str = "\
+pub(crate) const USAGE: &str = "\
 usage: polisim run <scenario.toml> [options]
        polisim play <scenario.toml> [--seed N] [--resume FILE]
+       polisim serve <scenario.toml | model folder> [--mod DIR]... [--seed N] [--preset P]
+       polisim text <scenario.toml> [LANGUAGE]
        polisim version
 
 options:
@@ -30,7 +38,22 @@ options:
   --columns A,B,C  write only these columns
   --save FILE      write a save file after the last step
   --resume FILE    continue from a save file; seed and parameters come from the save
-  --time           report milliseconds per step on standard error";
+  --time           report milliseconds per step on standard error
+  --profile N      report the N formulas that took longest, per step, on standard error
+
+polisim serve answers one request per line on standard input with one JSON line on
+standard output (the first line says whether the model loaded):
+  new {seed = N, preset = \"P\", params = {..}, levers = {..}}   start the run again
+  set NAME VALUE      change a lever, or answer a dilemma, in the next step
+  step [N]            run N steps (default 1); the rows: step, hash, every national value
+  get NAME            a value now: one number, or one per record or cell
+  evaluate {formula = \"..\", entity = \"..\", type = \"real\", unit = \"1\"}
+  votes | model | symbols | scenario | quit
+Values are TOML. An error is {\"error\": message, \"kind\": model|formula|run|request}.
+See docs/spec/09-serve.md.
+
+polisim text lists the languages a scenario's model and mods have text in, or, given one,
+what the model has words for that the language does not translate (exit 1 if anything).";
 
 #[derive(Default)]
 struct Options {
@@ -42,6 +65,8 @@ struct Options {
     save: Option<PathBuf>,
     resume: Option<PathBuf>,
     time: bool,
+    /// Stage S10: print the N formulas that took longest.
+    profile: Option<usize>,
 }
 
 fn parse_options(args: &[String]) -> Result<Options, String> {
@@ -53,7 +78,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--out" => options.out = Some(value("--out")?.into()),
             "--steps" => options.steps = Some(value("--steps")?.parse().map_err(|_| "--steps needs a whole number")?),
             "--seed" => {
-                // Any whole number; it is reduced to 64 bits as the oracle does.
+                // Any whole number; it is reduced to 64 bits.
                 let seed: i128 = value("--seed")?.parse().map_err(|_| "--seed needs a whole number")?;
                 options.seed = Some(seed as u64);
             }
@@ -61,6 +86,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--save" => options.save = Some(value("--save")?.into()),
             "--resume" => options.resume = Some(value("--resume")?.into()),
             "--time" => options.time = true,
+            "--profile" => {
+                options.profile = Some(value("--profile")?.parse().map_err(|_| "--profile needs a whole number")?)
+            }
             other if other.starts_with("--") => return Err(format!("unknown option {other}")),
             other if options.scenario.is_none() => options.scenario = Some(other.into()),
             other => return Err(format!("unexpected argument {other}")),
@@ -83,7 +111,7 @@ fn write_csv(out: &mut dyn Write, names: &[String], rows: &[Row], columns: Optio
     }
     let all: Vec<String> = ["step", "hash"].iter().map(|s| s.to_string()).chain(names.iter().cloned()).collect();
     let chosen: &[String] = columns.unwrap_or(&all);
-    // A requested column that does not exist is written empty, as the oracle writes it.
+    // A requested column that does not exist is written empty.
     let positions: Vec<Option<usize>> = chosen.iter().map(|c| all.iter().position(|n| n == c)).collect();
     writeln!(out, "{}", chosen.join(","))?;
     for row in rows {
@@ -124,6 +152,9 @@ fn run(options: Options) -> Result<ExitCode, String> {
         }
     };
 
+    if options.profile.is_some() {
+        sim.set_profiling(true);
+    }
     let steps = options.steps.unwrap_or(scenario.steps);
     let mut rows = Vec::with_capacity(steps as usize);
     let mut failure = None;
@@ -175,7 +206,27 @@ fn run(options: Options) -> Result<ExitCode, String> {
         }
     }
     if options.time && !rows.is_empty() {
-        eprintln!("{:.3} ms per step over {} steps", elapsed.as_secs_f64() * 1e3 / rows.len() as f64, rows.len());
+        let steps = rows.len() as f64;
+        eprintln!("{:.3} ms per step over {} steps", elapsed.as_secs_f64() * 1e3 / steps, rows.len());
+        for (phase, spent) in sim.phase_times() {
+            eprintln!("  {phase:<12} {:>9.3} ms per step", spent.as_secs_f64() * 1e3 / steps);
+        }
+    }
+    if let (Some(top), false) = (options.profile, rows.is_empty()) {
+        let steps = rows.len() as f64;
+        let times = sim.symbol_times();
+        let total: f64 = times.iter().map(|(_, t, _)| t.as_secs_f64()).sum();
+        eprintln!("formulas, slowest first ({:.3} ms per step in all):", total * 1e3 / steps);
+        for (name, spent, _) in times.iter().take(top) {
+            let d = sim.model().sym(name).expect("a symbol");
+            let phase = d.phase.map(|p| sim.model().phases[p].as_str()).unwrap_or("");
+            eprintln!(
+                "  {name:<36} {:>8.3} ms {:>5.1}%  {} {phase}",
+                spent.as_secs_f64() * 1e3 / steps,
+                spent.as_secs_f64() / total * 100.0,
+                d.kind.name()
+            );
+        }
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -190,11 +241,35 @@ fn play_session(options: Options) -> Result<(), String> {
     play::play(scenario, options.seed, resume)
 }
 
+/// Stage S7.4: the languages a model has text in, or what one of them leaves out.
+fn text_check(args: &[String]) -> Result<ExitCode, String> {
+    let Some(path) = args.first() else { return Err(USAGE.to_string()) };
+    let scenario = load_scenario(&PathBuf::from(path)).map_err(|e| e.to_string())?;
+    let model = &scenario.model;
+    let Some(language) = args.get(1) else {
+        for (code, name) in polisim_core::languages(model) {
+            println!("{code}\t{name}");
+        }
+        return Ok(ExitCode::SUCCESS);
+    };
+    let Some(text) = polisim_core::load_text(model, language).map_err(|e| e.to_string())? else {
+        return Err(format!("{} has no text in {language:?}", model.id));
+    };
+    let missing = text.missing(model);
+    for key in &missing {
+        println!("{key}");
+    }
+    eprintln!("{}: {} untranslated", text.name, missing.len());
+    Ok(if missing.is_empty() { ExitCode::SUCCESS } else { ExitCode::from(1) })
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.first().map(String::as_str) {
         Some("run") => parse_options(&args[1..]).and_then(run),
         Some("play") => parse_options(&args[1..]).and_then(play_session).map(|()| ExitCode::SUCCESS),
+        Some("serve") => serve::serve(&args[1..]),
+        Some("text") => text_check(&args[1..]),
         Some("version") => {
             println!("polisim {}", polisim_core::VERSION);
             Ok(ExitCode::SUCCESS)

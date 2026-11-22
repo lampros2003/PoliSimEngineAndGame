@@ -3,8 +3,7 @@
     python tools/gen_toy_households.py
 
 Writes models/toy/data/households.csv. The output is committed, so the generator's own
-floating-point behaviour never affects a simulation: the engine and the oracle only ever
-read the CSV. Nothing here is real data; the distributions are invented to look plausible.
+floating-point behaviour never affects a simulation: the engine only ever reads the CSV. Nothing here is real data; the distributions are invented to look plausible.
 """
 
 from __future__ import annotations

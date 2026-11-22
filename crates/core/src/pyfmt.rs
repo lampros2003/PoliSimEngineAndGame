@@ -1,8 +1,10 @@
-//! Text forms that match the oracle's output byte for byte.
+//! Python-style text forms, part of the file formats.
 //!
-//! The runner's CSV is compared with the Python oracle's as plain text, so reals are
-//! written the way Python's `repr` writes them: the shortest digits that read back to
-//! the same value, in positional notation unless the exponent is below -4 or at least 16.
+//! The runner's CSV, `polisim serve`'s JSON, the hex of hashes and parts of the model hash
+//! were first written to match the retired Python reference byte for byte, and the recorded
+//! files and the Python tools still read them so. Reals are written the way Python's `repr`
+//! writes them: the shortest digits that read back to the same value, in positional
+//! notation unless the exponent is below -4 or at least 16.
 
 /// Python's `repr(float)`.
 pub fn float_repr(x: f64) -> String {
@@ -12,8 +14,12 @@ pub fn float_repr(x: f64) -> String {
     if x.is_infinite() {
         return if x > 0.0 { "inf".to_string() } else { "-inf".to_string() };
     }
-    // Rust's `{:e}` gives the same shortest digits as Python, as `d[.ddd]e<exp>`.
-    let scientific = format!("{x:e}");
+    // Rust's `{:e}` gives the shortest digits that read back to `x`. When two strings of
+    // that length are equally close, Python picks the one whose last digit is even, so
+    // the digits are regenerated at that length with exact, ties-to-even rounding.
+    let shortest = format!("{x:e}");
+    let length = shortest.split('e').next().unwrap_or("").chars().filter(char::is_ascii_digit).count();
+    let scientific = format!("{x:.prec$e}", prec = length.saturating_sub(1));
     let (mantissa, exponent) = scientific.split_once('e').expect("exponent form");
     let exponent: i32 = exponent.parse().expect("exponent digits");
     let negative = mantissa.starts_with('-');
@@ -60,7 +66,7 @@ mod tests {
     #[test]
     fn matches_python_repr() {
         // Each pair was produced by Python's repr().
-        let cases: [(f64, &str); 22] = [
+        let cases: [(f64, &str); 24] = [
             (0.0, "0.0"),
             (-0.0, "-0.0"),
             (1.0, "1.0"),
@@ -83,6 +89,9 @@ mod tests {
             (2.5, "2.5"),
             (0.3, "0.3"),
             (9007199254740993.0, "9007199254740992.0"),
+            // Exactly halfway between ...812 and ...813: Python keeps the even digit.
+            (24364314563235.0 + 0.8125, "24364314563235.812"),
+            (28161555071692.0 + 0.0625, "28161555071692.062"),
         ];
         for (value, text) in cases {
             assert_eq!(float_repr(value), text);

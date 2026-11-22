@@ -1,0 +1,83 @@
+# Slumps that last (stage S14.5, docs/S14-PLAN.md, "The economy"). GENERATED: copied from
+# tools/uk/template/labour.toml by tools/uk/calibrate.py. Edit the template.
+#
+# Three things the labour market of model.toml did not do (models/uk/README.md, Known
+# weaknesses): firms hoard labour in a slump and shed it later; long unemployment leaves
+# people who no longer restrain pay; and pay is slow to fall, so a slump is not cured in
+# months by cheaper labour. A slump's unemployment so outlasts the slump. All are nil in the
+# base month (unemployment is below its natural rate and firms want the workers they have),
+# and none is in the hindcast model, which has no labour.toml.
+
+[param.firing_speed]
+doc = "Share of the gap firms close each month when they want fewer workers than they have: about a third of hiring_speed's quarter, so a slump's job losses come over about a year (a judgement: in 2008-09 output fell about 6% and employment 2%, and employment went on falling into 2010; ONS)"
+type = "real"
+unit = "1"
+value = 0.08
+
+[state.public_employment_held]
+doc = "Public employment at the end of last month: the state, too, lets staff go over months (at firing_speed) and hires them over months (at hiring_speed), as the pay bill moves"
+type = "real"
+unit = "person"
+phase = "labour"
+initial = 6899430.199430199
+next = "public_employment"
+
+[var.private_employment_wanted]
+label = "Private employment firms' sales justify"
+doc = "Firms' sales at their usual pay share, over pay per worker, as far as the workers not employed by the state allow"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "(labour_force - public_employment) * curve(wage_share * labour_share * private_demand / private_pay_per_worker / (labour_force - public_employment), labour_capacity)"
+
+[param.rehiring_drag]
+doc = "How much long unemployment slows hiring: firms hire at hiring_speed over one plus this times long unemployment, so each point of it slows hiring by about half (the long-term unemployed are slower to place: lost skills and contacts, and employers' wariness; a judgement)"
+type = "real"
+unit = "1"
+value = 100.0
+
+[param.hysteresis_effect]
+doc = "Points the natural rate of unemployment rises for each point of long unemployment: the long-term unemployed search less and restrain pay less (a judgement; Ball, 2009, finds the natural rate follows actual unemployment by a fifth to a half over a slump)"
+type = "real"
+unit = "1"
+value = 0.5
+
+[param.long_unemployment_months]
+doc = "Months over which unemployment above the natural rate becomes long unemployment, and over which it fades once jobs return, exponentially (a judgement: long-term unemployment is a year or more out of work)"
+type = "real"
+unit = "1"
+value = 12.0
+
+[param.long_unemployment_most]
+doc = "The most long unemployment counts, for the natural rate and for hiring: three points, so the natural rate rises at most a point and a half and hiring slows to at most a quarter of its speed (a judgement: the natural rate the OBR and the Bank estimated after the 1980s and 2008 slumps rose by one to two points)"
+type = "real"
+unit = "1"
+value = 0.03
+
+[state.long_unemployment]
+label = "Long unemployment"
+doc = "Unemployment above the natural rate, averaged over about a year: those out of work long enough to stop restraining pay"
+type = "real"
+unit = "1"
+phase = "accounts"
+initial = 0.0
+next = "long_unemployment + (max(unemployment_rate - natural_unemployment, 0.0) - long_unemployment) / long_unemployment_months"
+
+[var.natural_unemployment_now]
+label = "Natural rate of unemployment, after long unemployment"
+doc = "The rate at which inflation is on target, raised for a time by long unemployment: pay and prices read it, and so does the Bank"
+type = "real"
+unit = "1"
+phase = "labour"
+expr = "natural_unemployment + hysteresis_effect * min(long_unemployment, long_unemployment_most)"
+
+# Pay rises faster than prices and productivity when unemployment is below the (current)
+# natural rate, a point a year for each point (wage_curve), as before; when it is above, pay
+# falls behind by only a quarter as much: employers rarely cut pay, and in slack it is
+# frozen rather than cut (a judgement; Elsby, Shin and Solon, 2016, find most British pay
+# settlements bunch at no change rather than below it).
+[table.wage_shape]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = -0.10, y = -0.025 }, { x = 0.0, y = 0.0 }, { x = 0.10, y = 0.10 }]

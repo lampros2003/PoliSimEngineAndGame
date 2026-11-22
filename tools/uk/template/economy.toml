@@ -1,0 +1,460 @@
+# The United Kingdom's economy, version 0: how households, firms, financial corporations,
+# the public sector and the rest of the world pay each other each month.
+#
+# GENERATED from tools/uk/template/economy.toml by tools/uk/calibrate.py. Parameters and
+# lever settings are in calibration.toml, derived so the first month reproduces one
+# twelfth of {{base_year}}. Amounts set by policy are in {{base_year}} terms and grow automatically with
+# the economy's trend (2% inflation plus trend real growth); setting a lever above or below
+# its {{base_year}} value spends more or less than that.
+
+# ================================================================= phase: labour
+
+[var.public_employment]
+label = "Public sector employment"
+type = "real"
+unit = "person"
+phase = "labour"
+expr = "{{public_employment_expr}}"
+
+[var.unemployed]
+label = "Unemployed people"
+type = "real"
+unit = "person"
+phase = "labour"
+expr = "labour_force * (1.0 - curve((private_employment + public_employment) / labour_force, employment_capacity))"
+doc = "People in the labour force without a job. When the state and firms together want more workers than there are, some are still between jobs: unemployment cannot fall much below 2%"
+
+# Stage S11.3: the share of the labour force in work, given the jobs the state and firms
+# want filled as a share of it, a judgement (docs/S11-PLAN.md). Up to 96.2% (unemployment
+# of 3.8%, below 2024's 4.3%) it is the share wanted, as before; beyond, it rises ever more
+# slowly to at most 98%.
+[table.employment_capacity]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = 0.0, y = 0.0 }, { x = 0.962, y = 0.962 }, { x = 1.0, y = 0.975 }, { x = 1.1, y = 0.98 }]
+
+# ================================================================= phase: income
+
+[flow.wages]
+label = "Private sector pay"
+from = "firms"
+to = "households"
+phase = "income"
+expr = "round(private_employment * private_pay_per_worker)"
+
+[flow.public_pay]
+label = "Public sector pay"
+from = "government"
+to = "households"
+phase = "income"
+expr = "round(public_pay_bill * trend_index{{public_pay_policy}})"
+
+[flow.benefits]
+label = "Social benefits"
+from = "government"
+to = "households"
+phase = "income"
+expr = "{{benefits_expr}}"
+
+[var.payout_factor]
+label = "Firms' payout relative to {{base_year}}"
+type = "real"
+unit = "1"
+phase = "income"
+doc = "Firms pay out more when their cash is above its usual share of sales, less when below"
+expr = "clamp(1.0 + payout_sensitivity * (firm_money / (cash_target_months * prev(private_demand)) - 1.0), 0.25, 1.75)"
+
+[flow.other_income]
+label = "Self-employment, rent and dividends"
+from = "firms"
+to = "households"
+phase = "income"
+expr = "round(other_income_share * payout_factor * prev(private_demand))"
+
+[flow.pension_transfers]
+label = "Pension and capital transfers"
+from = "firms"
+to = "households"
+phase = "income"
+expr = "round(pension_transfer_share * prev(private_demand))"
+
+[flow.gilt_interest_banks]
+label = "Debt interest to UK holders"
+from = "government"
+to = "banks"
+phase = "income"
+expr = "round(effective_rate * bank_gilts / interest_months){{reserves_interest}}"
+
+[flow.gilt_interest_abroad]
+label = "Debt interest to holders abroad"
+from = "government"
+to = "rest_of_world"
+phase = "income"
+expr = "round(effective_rate * foreign_gilts / interest_months)"
+
+[flow.bank_payout]
+label = "Interest and pensions paid by financial corporations"
+from = "banks"
+to = "households"
+phase = "income"
+expr = "round(bank_payout_ratio * gilt_interest_banks)"
+
+[flow.income_tax]
+label = "Income tax"
+from = "households"
+to = "government"
+phase = "income"
+expr = "{{income_tax_expr}}"
+
+[flow.national_insurance]
+label = "National Insurance"
+from = "households"
+to = "government"
+phase = "income"
+expr = "{{nics_expr}}"
+
+[flow.council_tax]
+label = "Council tax"
+from = "households"
+to = "government"
+phase = "income"
+expr = "round(council_tax_bill * trend_index)"
+
+[var.disposable_income]
+label = "Household disposable income"
+type = "money"
+unit = "GBP/month"
+phase = "income"
+expr = "wages + public_pay + benefits + other_income + bank_payout - income_tax - national_insurance - council_tax{{mortgage_income}}"
+
+# ================================================================= phase: spending
+
+[flow.consumption]
+label = "Household spending"
+from = "households"
+to = "firms"
+phase = "spending"
+expr = "min(round((spend_out_of_income + spending_shift) * disposable_income + spend_out_of_savings * household_money), disposable_income + per_step(household_money))"
+
+[flow.dwellings]
+label = "Household investment in homes"
+from = "households"
+to = "firms"
+phase = "spending"
+expr = "round(dwellings_share * disposable_income{{dwellings_factor}})"
+
+[flow.procurement]
+label = "Public purchases"
+from = "government"
+to = "firms"
+phase = "spending"
+expr = "round(procurement_bill * trend_index){{policy_purchases}}"
+
+[flow.public_investment]
+label = "Public investment"
+from = "government"
+to = "firms"
+phase = "spending"
+expr = "round(public_investment_bill * trend_index){{policy_investment}}"
+
+[flow.subsidies]
+label = "Subsidies"
+from = "government"
+to = "firms"
+phase = "spending"
+expr = "round(subsidies_bill * trend_index){{policy_subsidies}}"
+
+[flow.transfers_abroad]
+label = "Aid and other transfers"
+from = "government"
+to = "rest_of_world"
+phase = "spending"
+expr = "round(transfers_abroad_bill * trend_index)"
+
+[flow.exports]
+label = "Exports"
+from = "rest_of_world"
+to = "firms"
+phase = "spending"
+expr = "{{exports_expr}}"
+
+[var.business_investment]
+label = "Business investment"
+type = "money"
+unit = "GBP/month"
+phase = "spending"
+expr = "round(investment_share * investment_demand * prev(private_demand){{investment_rates}})"
+
+[var.private_demand]
+label = "Sales by firms"
+type = "money"
+unit = "GBP/month"
+phase = "spending"
+initial = {{opening.private_demand}}
+expr = "consumption + dwellings + procurement + public_investment + business_investment + exports"
+
+[flow.imports]
+label = "Imports"
+from = "firms"
+to = "rest_of_world"
+phase = "spending"
+expr = "{{imports_expr}}"
+
+[flow.vat]
+label = "VAT"
+from = "firms"
+to = "government"
+phase = "spending"
+expr = "round(vat_rate * vat_base_share / (1.0 + vat_rate * vat_base_share) * consumption)"
+
+[flow.production_taxes]
+label = "Other taxes on production"
+from = "firms"
+to = "government"
+phase = "spending"
+doc = "Business rates, fuel duty, alcohol and tobacco duties, stamp duty and the like"
+expr = "round(production_tax_rate * private_demand){{policy_duties}}"
+
+[var.operating_profit]
+label = "Firms' operating profit"
+type = "money"
+unit = "GBP/month"
+phase = "spending"
+expr = "private_demand - imports - wages - vat - production_taxes - other_income"
+
+[flow.corporation_tax]
+label = "Corporation tax"
+from = "firms"
+to = "government"
+phase = "spending"
+expr = "round(corporation_tax_rate * profit_tax_base_share * max(operating_profit, 0))"
+
+[flow.other_receipts]
+label = "Other public receipts"
+from = "firms"
+to = "government"
+phase = "spending"
+doc = "Interest and dividends received, rents, other taxes and fees"
+expr = "round(other_receipts_share * private_demand){{policy_charges}}"
+
+# ================================================================= phase: finance
+
+[var.public_receipts]
+label = "Public sector receipts"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+expr = "income_tax + national_insurance + council_tax + vat + production_taxes + corporation_tax + other_receipts{{customs_receipts}}"
+
+[var.public_spending]
+label = "Public sector spending"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+expr = "public_pay + procurement + benefits + gilt_interest_banks + gilt_interest_abroad + subsidies + transfers_abroad + public_investment"
+
+[var.budget_balance]
+label = "Budget balance"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+doc = "Receipts less spending: public sector net borrowing with the sign reversed"
+expr = "public_receipts - public_spending"
+
+[var.borrowing]
+label = "Public sector net borrowing"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+expr = "max(0 - budget_balance, 0)"
+
+[var.repayment]
+label = "Debt repaid"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+expr = "min(max(budget_balance, 0), per_step(bank_gilts + foreign_gilts))"
+
+[flow.gilt_sales_abroad]
+label = "Gilts sold abroad"
+from = "government"
+to = "rest_of_world"
+instrument = "gilts"
+phase = "finance"
+expr = "round(gilts_abroad_share * borrowing)"
+
+[flow.gilt_sales_banks]
+label = "Gilts sold in the UK"
+from = "government"
+to = "banks"
+instrument = "gilts"
+phase = "finance"
+expr = "borrowing - gilt_sales_abroad"
+
+[flow.gilt_payment_abroad]
+financial = true
+label = "Payment for gilts from abroad"
+from = "rest_of_world"
+to = "government"
+phase = "finance"
+expr = "gilt_sales_abroad"
+
+[flow.gilt_payment_banks]
+financial = true
+label = "Payment for gilts in the UK"
+from = "banks"
+to = "government"
+phase = "finance"
+expr = "gilt_sales_banks"
+
+[flow.gilt_buyback_abroad]
+label = "Gilts bought back from abroad"
+from = "rest_of_world"
+to = "government"
+instrument = "gilts"
+phase = "finance"
+expr = "round(gilts_abroad_share * repayment)"
+
+[flow.gilt_buyback_banks]
+label = "Gilts bought back in the UK"
+from = "banks"
+to = "government"
+instrument = "gilts"
+phase = "finance"
+expr = "repayment - gilt_buyback_abroad"
+
+[flow.buyback_payment_abroad]
+financial = true
+label = "Payment for gilts bought back from abroad"
+from = "government"
+to = "rest_of_world"
+phase = "finance"
+expr = "gilt_buyback_abroad"
+
+[flow.buyback_payment_banks]
+financial = true
+label = "Payment for gilts bought back in the UK"
+from = "government"
+to = "banks"
+phase = "finance"
+expr = "gilt_buyback_banks"
+
+[var.cash_gap]
+label = "Firms' cash below its usual level"
+type = "money"
+unit = "GBP/month"
+phase = "finance"
+doc = "Positive when firms hold less cash than their usual months of sales, after this month's payments"
+expr = "per_step(round(cash_target_months * private_demand) - firm_money) + wages + other_income + pension_transfers + imports + vat + production_taxes + corporation_tax + other_receipts - consumption - dwellings - procurement - public_investment - subsidies - exports{{firm_interest}}"
+
+[flow.new_loans]
+label = "New bank loans to firms"
+from = "firms"
+to = "banks"
+instrument = "loans"
+phase = "finance"
+expr = "round(loan_adjustment * max(cash_gap, 0))"
+
+[flow.loan_drawdown]
+financial = true
+label = "Loan money paid to firms"
+from = "banks"
+to = "firms"
+phase = "finance"
+expr = "new_loans"
+
+[flow.loan_repayment]
+label = "Loans repaid by firms"
+from = "banks"
+to = "firms"
+instrument = "loans"
+phase = "finance"
+expr = "min(round(loan_adjustment * max(0 - cash_gap, 0)), per_step(bank_loans))"
+
+[flow.loan_repayment_money]
+financial = true
+label = "Money paid to repay loans"
+from = "firms"
+to = "banks"
+phase = "finance"
+expr = "loan_repayment"
+
+# ================================================================= phase: accounts
+
+[var.gdp]
+label = "Output (GDP)"
+type = "money"
+unit = "GBP/month"
+phase = "accounts"
+doc = "Gross domestic product at market prices, current prices"
+expr = "consumption + dwellings + business_investment + public_investment + procurement + public_pay + exports - imports + round(gdp_adjustment_share * private_demand)"
+
+[var.real_gdp]
+label = "Output at {{base_year}} prices"
+type = "real"
+unit = "GBP/month"
+phase = "accounts"
+expr = "gdp / price_index"
+
+[var.employment]
+label = "People in work"
+type = "real"
+unit = "person"
+phase = "accounts"
+expr = "private_employment + public_employment"
+
+[var.unemployment_rate]
+label = "Unemployment rate"
+type = "real"
+unit = "1"
+phase = "accounts"
+range = [0, 1]
+expr = "unemployed / labour_force"
+
+[var.inflation]
+label = "Inflation this month"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "inflation_target + phillips_slope * curve({{natural_rate}} - unemployment_rate, phillips_shape) + inflation_shock"
+
+# Stage S11.3: the Phillips curve's shape, a judgement (docs/S11-PLAN.md). Within a point of
+# the natural rate it is the straight line it was (phillips_slope times the gap); with the
+# labour market tighter it steepens, a point at a time, to two, three and four times that
+# slope, and with it slacker it flattens to half. Beyond 14.5% unemployment or 0.5% it is
+# level. The slope at the natural rate stays phillips_slope, with its presets.
+[table.phillips_shape]
+kind = "curve"
+x_unit = "1"
+unit = "1"
+points = [{ x = -0.10, y = -0.055 }, { x = -0.01, y = -0.01 }, { x = 0.0, y = 0.0 }, { x = 0.01, y = 0.01 },
+          { x = 0.02, y = 0.03 }, { x = 0.03, y = 0.06 }, { x = 0.04, y = 0.10 }]
+
+[var.inflation_annual]
+label = "Inflation, annual rate"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "inflation * 12.0"
+
+[var.public_debt]
+label = "Public sector net debt"
+type = "money"
+unit = "GBP"
+phase = "accounts"
+expr = "0 - gilts_issued + times_step(gilt_sales_banks + gilt_sales_abroad - gilt_buyback_banks - gilt_buyback_abroad)"
+
+[var.debt_to_gdp]
+label = "Debt as a share of GDP"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "public_debt / (gdp * interest_months)"
+
+[var.borrowing_to_gdp]
+label = "Borrowing as a share of GDP"
+type = "real"
+unit = "1"
+phase = "accounts"
+expr = "(0 - budget_balance) / gdp"

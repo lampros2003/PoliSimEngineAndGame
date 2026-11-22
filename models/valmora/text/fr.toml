@@ -1,0 +1,194 @@
+# Valmora in French: a test translation (stage S7.4). The model's words are in its own
+# files; these replace them when the game is played in French. `polisim text
+# models/valmora/scenarios/term.toml fr` lists anything left untranslated.
+
+[text]
+language = "fr"
+name = "Français"
+
+[play]
+currency_name = "couronnes"
+
+[scenario.term]
+title = "Valmora (un pays d'essai)"
+summary = "Un petit pays imaginaire de huit millions de ménages, où le jeu a d'abord été construit : une économie et un budget, sans parlement ni élections."
+
+[sector.households]
+label = "Ménages"
+
+[sector.firms]
+label = "Entreprises"
+
+[sector.government]
+label = "État"
+
+[element.wage]
+label = "Salaire en emploi"
+doc = "Salaire mensuel brut quand le ménage travaille"
+
+[element.equity_units]
+label = "Actions détenues"
+doc = "Actions des entreprises détenues par chaque ménage"
+
+[element.propensity_income]
+label = "Part du revenu dépensée"
+doc = "Part du revenu disponible du mois que les ménages dépensent"
+
+[element.propensity_wealth]
+label = "Part de l'épargne dépensée chaque mois"
+doc = "Part de leur argent que les ménages dépensent chaque mois"
+
+[element.wage_share]
+label = "Masse salariale en part des ventes"
+doc = "Masse salariale visée par les entreprises, en part des ventes hors TVA du mois précédent"
+
+[element.labour_adjust]
+label = "Vitesse des embauches et des licenciements"
+doc = "Part de l'écart à la masse salariale voulue que les entreprises comblent chaque mois"
+
+[element.separation_rate]
+label = "Taux mensuel de perte d'emploi"
+doc = "Probabilité mensuelle qu'un ménage en emploi perde son travail pour d'autres raisons"
+
+[element.payout_rate]
+label = "Part de la trésorerie distribuée"
+doc = "Part de leur argent que les entreprises versent chaque mois aux actionnaires"
+
+[element.higher_threshold]
+label = "Seuil du taux supérieur"
+doc = "Revenu mensuel au-dessus duquel s'applique le taux supérieur"
+
+[element.gov_purchases]
+label = "Achats de l'État"
+doc = "Achats de l'État aux entreprises"
+
+[element.benefit_rate]
+label = "Allocation chômage"
+doc = "Allocation versée à chaque ménage sans emploi"
+
+[element.personal_allowance]
+label = "Abattement personnel"
+doc = "Revenu mensuel exonéré d'impôt sur le revenu"
+
+[element.basic_rate]
+label = "Taux de base de l'impôt sur le revenu"
+doc = "Taux de l'impôt sur le revenu entre l'abattement et le seuil supérieur"
+
+[element.higher_rate]
+label = "Taux supérieur de l'impôt sur le revenu"
+doc = "Taux de l'impôt sur le revenu au-dessus du seuil supérieur"
+
+[element.vat_rate]
+label = "Taux de TVA"
+doc = "Taxe sur la valeur ajoutée sur la consommation des ménages"
+
+[element.wage_bill_start]
+label = "Masse salariale avant embauches"
+doc = "Masse salariale si personne ne changeait de situation ce mois-ci"
+
+[element.idle_wage_pool]
+label = "Salaires des chômeurs"
+doc = "Salaires des ménages actuellement sans emploi"
+
+[element.wage_bill_desired]
+label = "Masse salariale voulue par les entreprises"
+
+[element.wage_bill_target]
+label = "Masse salariale visée ce mois-ci"
+
+[element.leave_prob]
+label = "Probabilité de perdre son emploi"
+doc = "Probabilité qu'un ménage en emploi soit sans travail ce mois-ci"
+
+[element.hire_prob]
+label = "Probabilité d'être embauché"
+doc = "Probabilité qu'un ménage sans emploi soit embauché ce mois-ci"
+
+[element.dividend_pool]
+label = "Dividendes versés"
+
+[element.total_equity]
+label = "Actions émises"
+
+[element.market_income]
+label = "Revenu avant impôt"
+
+[element.disposable_income]
+label = "Revenu après impôts et prestations"
+
+[element.consumption_total]
+label = "Dépenses des ménages"
+
+[element.net_sales]
+label = "Ventes des entreprises hors TVA"
+doc = "Recettes des entreprises hors TVA. Les embauches du mois suivant en dépendent."
+
+[element.wage_bill]
+label = "Masse salariale"
+
+[element.firm_profit]
+label = "Bénéfice des entreprises"
+
+[element.gdp]
+label = "Production (PIB)"
+doc = "Mesure par les dépenses, aux prix du marché"
+
+[element.income_tax_total]
+label = "Recettes de l'impôt sur le revenu"
+
+[element.benefits_total]
+label = "Dépenses d'allocations"
+
+[element.gov_balance]
+label = "Solde budgétaire"
+doc = "Excédent s'il est positif, déficit s'il est négatif"
+
+[element.disposable_income_total]
+label = "Revenu des ménages après impôt"
+
+[element.households_total]
+label = "Ménages"
+
+[element.unemployed]
+label = "Ménages sans emploi"
+
+[element.unemployment_rate]
+label = "Taux de chômage"
+
+[element.employed]
+label = "En emploi"
+
+[element.hh_money]
+label = "Épargne des ménages"
+doc = "Argent détenu par chaque ménage"
+
+[element.firm_money]
+label = "Trésorerie des entreprises"
+doc = "Argent détenu par les entreprises : les bénéfices pas encore distribués"
+
+[element.gov_money]
+label = "Position monétaire de l'État"
+doc = "Position de l'État : moins l'argent qu'il a émis"
+
+[element.wages]
+label = "Salaires"
+
+[element.dividends]
+label = "Dividendes"
+doc = "Arrondis à l'unité inférieure par ménage ; les quelques centimes restants demeurent dans les entreprises"
+
+[element.benefits]
+label = "Allocations chômage"
+
+[element.income_tax]
+label = "Impôt sur le revenu"
+
+[element.consumption]
+label = "Dépenses des ménages"
+doc = "Dépenses TVA comprise, jamais plus que ce que le ménage peut payer"
+
+[element.vat]
+label = "TVA"
+
+[element.gov_spending]
+label = "Achats de l'État"
