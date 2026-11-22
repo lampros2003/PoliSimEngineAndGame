@@ -162,7 +162,7 @@ def main() -> int:
             return 1
         print(walk.stdout.strip().splitlines()[-1])
         # Stage S5.5: the politics panel, and losing an election.
-        for scenario, expect in (("2025", "office"), ("early_election", "lost")):
+        for scenario, expect in (("2025", "office"), ("early_election", "lost"), ("early_election", "run")):
             run = subprocess.run(
                 [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/politics_check.gd",
                  "--", f"--scenario=models/uk/scenarios/{scenario}.toml", f"--expect={expect}"],

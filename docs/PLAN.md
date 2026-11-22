@@ -207,4 +207,5 @@ roadmap; the notes here record what has changed since it was written.
 | Python module not built | S1 | Built in S3, when calibration needs it |
 | No overflow checks in the S0 benchmark | S0 | Done in S4.4: with overflow checks and the 2024-25 rules, 100,000 households take 68 ms a month (`models/uk/households/README.md`) |
 | Saves break when any model file changes | S1 | Done in S7.0: save format 1 follows the model when its files change (`docs/spec/04-save-format-v0.md`) |
+| A loaded game has no household figures for the month it was saved in: a group's Households fold is empty until a month has run (the save keeps the simulation's lasting values, not each month's per-household results) | S13, found in review of the pull request on 2026-11-22 | The client now says so in the fold. The fix is the engine's: keep or work out again the last month's per-record results on load. For its own stage, since it touches what a save holds |
 | Engine timings are for shallow rules only | S1 | Done in S4.4: the UK model with 20,000 households takes about 15 ms a month, with 100,000 about 68 ms, on a four-core server |

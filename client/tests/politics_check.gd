@@ -3,7 +3,10 @@ extends SceneTree
 ##   --expect=office  (models/uk/scenarios/2025.toml) after a month the panel shows the 2024
 ##                    House and the next election in July 2029;
 ##   --expect=lost    (models/uk/scenarios/early_election.toml) the election in the second
-##                    month is announced, the player has lost office, and time stops.
+##                    month is announced, the player has lost office, and time stops;
+##   --expect=run     (stage S17, the same scenario) a year asked for in one go runs across
+##                    that election: it is announced all the same, the player has lost
+##                    office, no question is put, and time stops.
 
 var main: Control
 
@@ -18,8 +21,10 @@ func _initialize() -> void:
 	await _settle()
 	if main.failed or main.politics.settings.is_empty():
 		return _fail("no politics panel")
-	main.advance(1 if expect == "office" else 2)
+	main.advance({"office": 1, "lost": 2}.get(expect, 12))
 	await _settle()
+	for i in 30:
+		await process_frame
 	var panel = main.politics
 	if expect == "office":
 		var seats := PackedStringArray()
@@ -51,12 +56,14 @@ func _initialize() -> void:
 			return _fail("election night was not announced")
 		if not main.lost or main.can_advance():
 			return _fail("the game did not stop when the player lost office")
+		if expect == "run" and (main.game.steps_done() <= 2 or main.dilemma_title() != ""):
+			return _fail("a year across the election: %d months run, a question %s" % [main.game.steps_done(), main.dilemma_title()])
 		var steps: int = main.game.steps_done()
 		main.advance(1)
 		await _settle()
 		if main.game.steps_done() != steps:
 			return _fail("time moved on after the game ended")
-		print("politics: election night announced, the player out of office, the game over")
+		print("politics: election night announced%s, the player out of office, the game over" % (" after a run of %d months across it" % steps if expect == "run" else ""))
 	quit(0)
 
 

@@ -262,12 +262,17 @@ func _draw_people() -> void:
 
 ## The sample households, each as a tile; `house` is [play.web] household, `words` the
 ## labels of the region and household-type dimensions: {column: PackedStringArray}.
+## What the fold says when no household comes back. Stage S17: after a game is loaded the
+## engine has no household figures until a month has run, and the screen says so.
+var none_found := "No households found."
+
+
 func show_households(found: Array, house: Dictionary, words: Dictionary) -> void:
 	records = found
 	for child in _homes.get_children():
 		child.queue_free()
 	_homes_note.text = "Eight of their households, chosen across the group. Open one for its year's account." if not found.is_empty() \
-		else "No households found."
+		else none_found
 	for record in found:
 		var tile := HouseholdTile.new()
 		tile.fmt = fmt

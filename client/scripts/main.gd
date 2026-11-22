@@ -629,6 +629,8 @@ func _fit_bar() -> void:
 	_place_results.call_deferred()
 
 
+## Stage S17: the month a game was loaded in (-1: not loaded, or a month has run since).
+var _loaded_at := -1
 var _fitting := false
 var _add_button: Button
 var _chips_rule: Control
@@ -2348,9 +2350,21 @@ func _player_lost() -> bool:
 
 
 ## Stage S5.5: election night. The results, and the end of the game if the player lost.
+## Stage S17: a run of months ("3 months", "Year") arrives as one event, so an election in any
+## of its months counts, not only one in its last: a year run across an election the player
+## lost used to pass it by, and left the player governing.
 func _announce_election() -> void:
 	var settings: Dictionary = play.get("politics", {})
-	if settings.is_empty() or game.latest(str(settings.get("election", ""))) != true:
+	if settings.is_empty():
+		return
+	var row := str(settings.get("election", ""))
+	var held: bool = game.latest(row) == true
+	if not held and row != "":
+		var run: int = game.steps_done() - int(_report_from.get("step", game.steps_done() - 1))
+		var series: PackedFloat64Array = game.series(row)
+		for i in range(maxi(0, series.size() - run), series.size()):
+			held = held or series[i] >= 0.5
+	if not held:
 		return
 	lost = _player_lost()
 	if lost:
@@ -2420,7 +2434,7 @@ func unanswered_dilemmas() -> Array:
 ## a button for each answer. Closing it leaves the question flagged on the board.
 func ask_dilemma() -> void:
 	var waiting := unanswered_dilemmas()
-	if waiting.is_empty():
+	if waiting.is_empty() or lost:  # no question is put to a government out of office
 		return
 	var d: Dictionary = waiting[0]
 	var name := str(d["name"])
@@ -2694,6 +2708,10 @@ func _process(_delta: float) -> void:
 			"records":
 				var group := group_card()
 				if group != null and str(event.get("tag", "")) == group.key:
+					# Stage S17: a saved game does not keep the households' own figures for the month it
+					# was saved in, so none come back until a month has run: said as it is.
+					if _loaded_at == game.steps_done():
+						group.none_found = "Their households show again once a month has run: a loaded game has none of this month's figures for them."
 					group.show_households(event.get("records", []), play.get("web", {}).get("household", {}), _household_words())
 					popup.relayout()
 			"effects_done":
@@ -2713,6 +2731,7 @@ func _process(_delta: float) -> void:
 				else:
 					failed = false
 					_report_from = {}
+					_loaded_at = game.steps_done()
 					term_announced = game.steps_done() >= term
 					_changes_seen = game.changes().size()
 					lost = _player_lost()
