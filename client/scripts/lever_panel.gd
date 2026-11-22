@@ -271,7 +271,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 		_controls.add_child(put_button)
 	elif off_stored != null and not levers.is_empty():
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 14)
+		row.add_theme_constant_override("separation", 16)
 		repeal_button = Button.new()
 		repeal_button.name = "repeal"
 		repeal_button.text = "Repeal"
@@ -290,7 +290,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	_controls.add_child(capital_note)
 	_year = VBoxContainer.new()
 	_year.name = "in_a_year"
-	_year.add_theme_constant_override("separation", 6)
+	_year.add_theme_constant_override("separation", 8)
 	_year.visible = false
 	add_child(_year)
 	_year_title = Palette.caps("In a year")
@@ -311,7 +311,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	if introducing or (_chart_lever != "" and _rows[_chart_lever]["entry"].has("levels")):
 		return
 	_history = VBoxContainer.new()
-	_history.add_theme_constant_override("separation", 6)
+	_history.add_theme_constant_override("separation", 8)
 	add_child(_history)
 	_history.add_child(Palette.caps("History" if levers.size() == 1 else "History: " + str(_rows[_chart_lever]["entry"].get("label", _chart_lever))))
 	chart = Chart.new()
@@ -331,7 +331,7 @@ func _table() -> GridContainer:
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 2)
+	grid.add_theme_constant_override("v_separation", 4)
 	return grid
 
 
@@ -359,7 +359,7 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 	rule.add_theme_stylebox_override("separator", _thin_rule())
 	box.add_child(rule)
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 10)
+	top.add_theme_constant_override("separation", 12)
 	box.add_child(top)
 	var label := Label.new()
 	label.text = str(entry["label"])
@@ -372,13 +372,13 @@ func _lever_row(entry: Dictionary, start: Variant) -> void:
 	now.theme_type_variation = "Muted"
 	top.add_child(now)
 	var controls := HBoxContainer.new()
-	controls.add_theme_constant_override("separation", 14)
+	controls.add_theme_constant_override("separation", 16)
 	box.add_child(controls)
 	var levels: Array = entry.get("levels", [])
 	if not levels.is_empty():
 		# Stage S13.5: a level policy's settings, each a labelled step; the one in force (or
 		# chosen) pressed.
-		controls.add_theme_constant_override("separation", 6)
+		controls.add_theme_constant_override("separation", 8)
 		var steps := []
 		var lowest := float(entry.get("min", 0.0))
 		for i in levels.size():
@@ -567,7 +567,7 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 			# A step chosen but not yet in force is ochre, the colour of what waits.
 			var waits: bool = chosen and (introducing or pending.has(name))
 			if waits:
-				step.add_theme_stylebox_override("pressed", Palette._flat(Palette.OCHRE, Palette.INK, 2, 8, 6, 0))
+				step.add_theme_stylebox_override("pressed", Palette._flat(Palette.OCHRE, Palette.INK, 2, 8, 4, 0))
 				step.add_theme_color_override("font_pressed_color", Palette.INK)
 			else:
 				step.remove_theme_stylebox_override("pressed")

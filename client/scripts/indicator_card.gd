@@ -65,7 +65,7 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	titles.add_child(title)
 	var figures := HBoxContainer.new()
-	figures.add_theme_constant_override("separation", 14)
+	figures.add_theme_constant_override("separation", 16)
 	add_child(figures)
 	_figure = Label.new()
 	_figure.theme_type_variation = "Figure"
@@ -120,7 +120,7 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 		(fold.get_meta("fold") as Callable).call(false)  # build shows the panel: shut again
 	if not movers.is_empty():
 		_movers = VBoxContainer.new()
-		_movers.add_theme_constant_override("separation", 2)
+		_movers.add_theme_constant_override("separation", 4)
 		add_child(Palette.fold("What moves it most", _movers))
 		for m in movers.slice(0, 6):
 			var button := Button.new()

@@ -12,11 +12,11 @@ const SAMPLE := Vector2(250, 84)
 
 ## `board` gives the scenario's thresholds for approval.
 func build(board: Web) -> void:
-	add_theme_constant_override("separation", 10)
+	add_theme_constant_override("separation", 12)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 24)
-	grid.add_theme_constant_override("v_separation", 14)
+	grid.add_theme_constant_override("v_separation", 16)
 	Palette.rule_rows(grid)
 	add_child(grid)
 	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; Add policy, on the top bar, lists those not in force.")
@@ -46,7 +46,7 @@ static func _families_word(board: Web) -> String:
 func _row(grid: GridContainer, sample: Control, heading: String, words: String) -> void:
 	grid.add_child(sample)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
+	box.add_theme_constant_override("separation", 4)
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	box.add_child(Palette.caps(heading))
 	var text := Label.new()
@@ -71,6 +71,9 @@ func _board(items: Array, height := SAMPLE.y) -> Web:
 	web.demo = true
 	web.custom_minimum_size = Vector2(SAMPLE.x, height)
 	web.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Stage S17.1: a picture, not a board: the keyboard passes it by (the board takes the
+	# keyboard as it enters the tree, so this is said after that).
+	web.ready.connect(func() -> void: web.focus_mode = Control.FOCUS_NONE)
 	for n in items:
 		web.nodes[n["key"]] = n
 		web.order.append(n["key"])
@@ -140,7 +143,7 @@ func _flags() -> Control:
 	row.custom_minimum_size = SAMPLE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 8)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(box)
 	for pair in [[["good", "Boom"], ["bad", "Recession"]], [["plain", "An answer"], ["ask", "Decide"]]]:

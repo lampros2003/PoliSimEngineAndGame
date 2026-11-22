@@ -12,9 +12,9 @@ Related: [model format 0](01-model-format-v0.md), [model format 1](06-model-form
 ## A mod is a folder
 
 ```text
-mods/wealth_tax/
+mods/dog_licence/
   mod.toml
-  wealth_tax.toml
+  dog_licence.toml
 ```
 
 `mod.toml` holds one table, `[mod]`, and nothing else:
@@ -36,14 +36,14 @@ example) and `[table]` (stage S11.1, so that a mod may bring its own curves), pl
 its own, `[patch]`:
 
 - **Adding.** Each element (and each dimension, and each old name in `[renamed]`) is named
-  after the mod: `wealth_tax_rate` in the mod `wealth_tax`. A name declared twice, by the
+  after the mod: `dog_licence_fee` in the mod `dog_licence`. A name declared twice, by the
   model or a mod, is an error. Mods cannot bring data files yet: an added element with
   `data`, or with an `initial` read from data, is an error.
 - **Patching.** `[patch.<kind>.<name>]`, where the kind is `param`, `lever`, `var`, `state`,
   `flow` or `account`, changes an element that exists by the time the mod is applied (the
   model's, an earlier mod's, or this mod's): each key given replaces the element's key of
   that name, or is added. In a text value, `{base}` stands for the value being replaced:
-  in `expr` and `next` it is put in brackets, so `expr = "{base} + wealth_tax_paid"` adds
+  in `expr` and `next` it is put in brackets, so `expr = "{base} + dog_licence_paid"` adds
   to the formula whatever it was; in other keys (a `label`, a `doc`) it is put in as it
   is. `{base}` in a key the element does not have is an error, as is a patch with `data`.
 
@@ -69,7 +69,7 @@ rest.
 
 ## Where mods come from
 
-- **A scenario** lists mods in `[scenario] mods = ["../../../mods/wealth_tax"]`, folders
+- **A scenario** lists mods in `[scenario] mods = ["../../../mods/dog_licence"]`, folders
   relative to the scenario file, applied in order.
 - **The player** picks mods on the client's start screen from the game's `mods` folder and
   their own (`user://mods`), shown when the mod is for the scenario's model or names none.

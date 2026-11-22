@@ -5,6 +5,7 @@ extends Control
 ## goes on. Shown on a player's first game (main.gd decides), and again from the menu.
 
 const Palette := preload("res://scripts/palette.gd")
+const Focus := preload("res://scripts/focus.gd")
 
 signal finished
 
@@ -28,7 +29,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", Palette.card(20, 6, 2))
+	card.add_theme_stylebox_override("panel", Palette.card(24, 6, 2))
 	card.custom_minimum_size.x = 380.0
 	add_child(card)
 	var box := VBoxContainer.new()
@@ -45,7 +46,7 @@ func _ready() -> void:
 	_text.custom_minimum_size.x = 340.0
 	box.add_child(_text)
 	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 14)
+	buttons.add_theme_constant_override("separation", 16)
 	box.add_child(buttons)
 	_next = Button.new()
 	_next.name = "next"
@@ -136,6 +137,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, t.position.y, t.position.x, t.size.y), dim)
 	draw_rect(Rect2(t.end.x, t.position.y, size.x - t.end.x, t.size.y), dim)
 	draw_rect(t, Palette.OCHRE, false, 3.0)
+	draw_rect(t.grow(2.5), Palette.INK, false, 1.0)  # stage S17.1: ochre alone is lost on the dimmed board
 	# The arrow from the card to its target.
 	var c := Rect2(card.position, card.size)
 	var a := Vector2(clampf(t.get_center().x, c.position.x, c.end.x), clampf(t.get_center().y, c.position.y, c.end.y))
@@ -156,3 +158,5 @@ func _input(event: InputEvent) -> void:
 	if visible and event.is_action_pressed("ui_cancel"):
 		finish()
 		get_viewport().set_input_as_handled()
+	elif visible:
+		Focus.kept_inside(card, event)  # stage S17.1: Tab stays on the guide's own buttons

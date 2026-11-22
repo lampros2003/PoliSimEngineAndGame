@@ -6,6 +6,7 @@ extends Control
 
 const Palette := preload("res://scripts/palette.gd")
 const Sound := preload("res://scripts/sound.gd")
+const Focus := preload("res://scripts/focus.gd")
 
 signal closed
 
@@ -24,6 +25,14 @@ var _holder: MarginContainer
 var _back: Button
 var _tween: Tween
 var _origin := Rect2()
+## Stage S17.1: what had the keyboard before the popup opened; it gets it back.
+var _focus_before: Control
+
+
+## Stage S17.1: Tab stays inside the popup while it is open.
+func _input(event: InputEvent) -> void:
+	if is_open():
+		Focus.kept_inside(card, event)
 
 
 func _ready() -> void:
@@ -48,7 +57,7 @@ func _ready() -> void:
 	var bar := HBoxContainer.new()
 	var bar_margin := MarginContainer.new()
 	for side in ["left", "right"]:
-		bar_margin.add_theme_constant_override("margin_" + side, 14)
+		bar_margin.add_theme_constant_override("margin_" + side, 16)
 	bar_margin.add_theme_constant_override("margin_top", 8)
 	bar_margin.add_child(bar)
 	column.add_child(bar_margin)
@@ -69,13 +78,14 @@ func _ready() -> void:
 	bar.add_child(close_button)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.follow_focus = true  # stage S17.1: what the keyboard reaches is scrolled into view
 	column.add_child(_scroll)
 	_holder = MarginContainer.new()
 	_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right"]:
-		_holder.add_theme_constant_override("margin_" + side, 28)
-	_holder.add_theme_constant_override("margin_top", 2)
-	_holder.add_theme_constant_override("margin_bottom", 26)
+		_holder.add_theme_constant_override("margin_" + side, 24)
+	_holder.add_theme_constant_override("margin_top", 4)
+	_holder.add_theme_constant_override("margin_bottom", 24)
 	_scroll.add_child(_holder)
 
 
@@ -87,7 +97,11 @@ func is_open() -> bool:
 func open(build: Callable, origin: Rect2) -> void:
 	Sound.play("open")
 	stack.clear()
+	var was_open := is_open()
 	_show(build, origin, true)
+	var before := Focus.enter(card)
+	if not was_open:
+		_focus_before = before
 
 
 ## Replaces the content, keeping the last for Back.
@@ -96,6 +110,7 @@ func push(build: Callable) -> void:
 		open(build, _origin)
 		return
 	_show(build, _origin, false)
+	Focus.enter(card)
 
 
 func back() -> void:
@@ -104,6 +119,7 @@ func back() -> void:
 	stack.pop_back()
 	var last: Array = stack.pop_back()
 	_show(last[0], last[1], false)
+	Focus.enter(card)
 
 
 func _show(build: Callable, origin: Rect2, grow: bool) -> void:
@@ -112,7 +128,7 @@ func _show(build: Callable, origin: Rect2, grow: bool) -> void:
 		content.queue_free()
 		content = null
 	content = build.call()
-	content.custom_minimum_size.x = _width() - 56.0
+	content.custom_minimum_size.x = _width() - 48.0
 	_holder.add_child(content)
 	stack.append([build, origin])
 	_origin = origin
@@ -191,6 +207,8 @@ func close() -> void:
 			visible = false
 		if gone != null:
 			gone.queue_free())
+	Focus.leave(card, _focus_before)
+	_focus_before = null
 	closed.emit()
 
 

@@ -42,7 +42,7 @@ class Order(unittest.TestCase):
 
 
 class ExampleMod(unittest.TestCase):
-    """mods/wealth_tax on the United Kingdom (models/uk/scenarios/wealth_tax.toml): a 1% tax
+    """tests/mods/wealth_tax on the United Kingdom (models/uk/scenarios/wealth_tax.toml): a 1% tax
     on households' savings above a threshold."""
 
     def test_the_wealth_tax_is_a_receipt_and_costs_the_government_votes(self):

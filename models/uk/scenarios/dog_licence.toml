@@ -1,0 +1,11 @@
+# A test of the example mod (mods/dog_licence): a £50 dog licence from the first month.
+
+[scenario]
+model = ".."
+seed = 2025
+steps = 12
+preset = "central"
+mods = ["../../../mods/dog_licence"]
+
+[levers]
+dog_licence_fee = 50.0

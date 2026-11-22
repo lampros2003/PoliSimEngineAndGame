@@ -37,8 +37,8 @@ func _ready() -> void:
 	add_child(column)
 	var bar_margin := MarginContainer.new()
 	for side in ["left", "right"]:
-		bar_margin.add_theme_constant_override("margin_" + side, 20)
-	bar_margin.add_theme_constant_override("margin_top", 14)
+		bar_margin.add_theme_constant_override("margin_" + side, 24)
+	bar_margin.add_theme_constant_override("margin_top", 16)
 	column.add_child(bar_margin)
 	var bar := HBoxContainer.new()
 	bar_margin.add_child(bar)
@@ -60,13 +60,13 @@ func _ready() -> void:
 	bar.add_child(close)
 	var margin := MarginContainer.new()
 	for side in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
+		margin.add_theme_constant_override("margin_" + side, 24)
 	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 18)
+	margin.add_theme_constant_override("margin_bottom", 16)
 	column.add_child(margin)
 	_box = VBoxContainer.new()
 	_box.add_theme_constant_override("separation", 4)
-	_box.custom_minimum_size.x = WIDTH - 40.0
+	_box.custom_minimum_size.x = WIDTH - 48.0
 	margin.add_child(_box)
 	get_viewport().size_changed.connect(_place)
 
@@ -146,7 +146,7 @@ func _build() -> void:
 			note.text = str(section[2])
 			note.theme_type_variation = "Muted"
 			note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			note.custom_minimum_size.x = WIDTH - 40.0
+			note.custom_minimum_size.x = WIDTH - 48.0
 			_box.add_child(note)
 	if not any:
 		var quiet := Label.new()
@@ -157,7 +157,7 @@ func _build() -> void:
 	hint.text = "Click a line to open it; click the date to see this again."
 	hint.theme_type_variation = "Muted"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(WIDTH - 40.0, 34.0)
+	hint.custom_minimum_size = Vector2(WIDTH - 48.0, 34.0)
 	hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_box.add_child(hint)
 
@@ -168,7 +168,7 @@ func _line(item: Dictionary) -> Button:
 	button.text = str(item["text"])
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button.custom_minimum_size.x = WIDTH - 40.0
+	button.custom_minimum_size.x = WIDTH - 48.0
 	var tone := str(item.get("tone", "plain"))
 	var colour: Color = {"good": Palette.GOOD, "bad": Palette.BAD, "notice": Palette.BAD}.get(tone, Palette.INK)
 	for key in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color", "font_disabled_color"]:

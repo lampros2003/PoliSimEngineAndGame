@@ -34,7 +34,7 @@ func _ready() -> void:
 	box.add_child(_summary)
 	_grid = GridContainer.new()
 	_grid.columns = 4
-	_grid.add_theme_constant_override("h_separation", 14)
+	_grid.add_theme_constant_override("h_separation", 16)
 	_grid.add_theme_constant_override("v_separation", 4)  # stage S14.1: the whole ledger on a 1080p screen
 	Palette.rule_rows(_grid)
 	box.add_child(_grid)
@@ -55,8 +55,19 @@ func _cell(text: String, color := Palette.TEXT, right := true, size := Palette.F
 	return label
 
 
+## Stage S17.1: a heading or a total in the names' column, its words starting where the lines'
+## do: a line is a link with 4 px inside its left edge, so these stand 4 px in, by the layout
+## (two spaces did it before, and put the totals 3 px off the lines).
+func _in_names(label: Label) -> MarginContainer:
+	var inset := MarginContainer.new()
+	inset.add_theme_constant_override("margin_left", 4)
+	inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inset.add_child(label)
+	return inset
+
+
 func _section(title: String) -> void:
-	_grid.add_child(_cell(title, Palette.MUTED, false, Palette.SMALL))
+	_grid.add_child(_in_names(_cell(title, Palette.MUTED, false, Palette.SMALL)))
 	for i in 3:
 		_grid.add_child(Control.new())
 
@@ -80,9 +91,10 @@ func _line(name: String, entry: Dictionary, sign: int) -> void:
 	_lines.append({"name": name, "row": row, "entry": entry, "cells": cells, "sign": sign, "button": label})
 
 func _total(key: String, title: String) -> void:
-	var total := _cell("  " + title if title != "" else title, Palette.TEXT, false, Palette.FONT_SIZE)
+	var total := _cell(title, Palette.TEXT, false, Palette.FONT_SIZE)
+	total.name = "total_" + key
 	total.add_theme_font_override("font", Palette.text(600))
-	_grid.add_child(total)
+	_grid.add_child(_in_names(total))
 	var cells := [_cell("–"), _cell("–", Palette.MUTED), _cell("–")]
 	for c in cells:
 		_grid.add_child(c)

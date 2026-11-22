@@ -48,8 +48,8 @@ func _init() -> void:
 	box.add_child(_note)
 	_grid = GridContainer.new()
 	_grid.columns = 5
-	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 9)
+	_grid.add_theme_constant_override("h_separation", 16)
+	_grid.add_theme_constant_override("v_separation", 8)
 	Palette.rule_rows(_grid)
 	box.add_child(_grid)
 

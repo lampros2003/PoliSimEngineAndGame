@@ -88,7 +88,7 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	title.theme_type_variation = "Title"
 	titles.add_child(title)
 	var figures := HBoxContainer.new()
-	figures.add_theme_constant_override("separation", 14)
+	figures.add_theme_constant_override("separation", 16)
 	add_child(figures)
 	_figure = Label.new()
 	_figure.name = "approval"
@@ -114,11 +114,11 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	chart.custom_minimum_size = Vector2(0, 180)
 	add_child(Palette.fold("History", chart, true))
 	var moving := VBoxContainer.new()
-	moving.add_theme_constant_override("separation", 6)
+	moving.add_theme_constant_override("separation", 8)
 	_drivers = GridContainer.new()
 	_drivers.columns = 3
 	_drivers.add_theme_constant_override("h_separation", 12)
-	_drivers.add_theme_constant_override("v_separation", 6)
+	_drivers.add_theme_constant_override("v_separation", 8)
 	moving.add_child(_drivers)
 	for d in drivers:
 		var name := Label.new()
@@ -144,7 +144,7 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	moving.add_child(_muted("Each is a pull on their vote, for the government (right) or against it (left), from where things stood at the last election."))
 	add_child(Palette.fold("What is moving them", moving))
 	var share := VBoxContainer.new()
-	share.add_theme_constant_override("separation", 6)
+	share.add_theme_constant_override("separation", 8)
 	_share_label = _muted("")
 	share.add_child(_share_label)
 	_people = Control.new()
@@ -154,7 +154,7 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	add_child(Palette.fold("Share of the electorate", share))
 	if not movers.is_empty():
 		var list := VBoxContainer.new()
-		list.add_theme_constant_override("separation", 2)
+		list.add_theme_constant_override("separation", 4)
 		for m in movers.slice(0, 5):
 			var button := Button.new()
 			button.theme_type_variation = "Link"
@@ -178,8 +178,8 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	_homes = GridContainer.new()
 	_homes.name = "households"
 	_homes.columns = 4
-	_homes.add_theme_constant_override("h_separation", 10)
-	_homes.add_theme_constant_override("v_separation", 10)
+	_homes.add_theme_constant_override("h_separation", 12)
+	_homes.add_theme_constant_override("v_separation", 12)
 	homes.add_child(_homes)
 	add_child(Palette.fold("Households", homes))
 

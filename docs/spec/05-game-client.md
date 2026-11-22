@@ -69,19 +69,34 @@ and the popups float over it (stage S14.1).
 **The top bar.** From left to right: the country (with the mods in play) and the month; a
 button for each of the first six values of `[play] headline` (or of `watch` when there is
 no `headline`), showing the value and its change on last month, which opens that value's
-popup; the search field (stage S15.1, [Search](#search); 190 pixels wide, 150 on a narrow
-bar); **Add policy** ([The Add policy sheet](#the-add-policy-sheet)); a status line; **Next
-month**, **3 months** and **Year** ("+3" and "+12" on a bar under 1,560 pixels);
-**Budget** and **Parliament**, which keep only their pictograms on such a bar; "?", which
-opens the key; and **Menu**. Search and Add policy keep their words on any bar: when the bar
-is still too wide, the headline figures give way from the right, as many as it needs (each
-is still on the board or in the Budget). Pressing the month opens the last month's report
+popup; the search field (stage S15.1, [Search](#search)); **Add policy** ([The Add policy
+sheet](#the-add-policy-sheet)); a status line; **Next month**, **3 months** and **Year**;
+**Budget** and **Parliament**; "?", which opens the key; and **Menu**.
+
+**What gives way on a narrow bar (stage S17.1).** The bar never needs more room than the
+window has, and what gives way as the window narrows does so in a stated order, each step
+only when the one before was not enough: first the words on **Budget** and **Parliament**
+(their pictograms stay) and on **3 months** and **Year** ("+3", "+12"); then the search
+field, from 190 pixels to 150 and then to its button, the magnifier alone (it opens to type
+in, with "/", Ctrl+F or a click, and shuts again when it loses the keyboard empty; while
+it is open the figures give way to it); then the headline figures, one at a time, least
+important first: in the order of `[play] give_way`, then any that names not, from the
+right (each is still on the board or in the Budget); last, Add policy's words. Approval and
+political capital never give way. On the UK three months in, the words go at about 2,130
+pixels, the search field shuts at about 1,900, and the figures go at about 1,790 (GDP),
+1,680 (debt), 1,570 (inflation), 1,480 (unemployment) and 1,340 (the budget balance): at
+1920 wide every headline figure shows. The smallest window is 1,200 pixels wide (1,100
+before: the bar's fixed parts alone need about 1,170). The country's name is cut short with
+an ellipsis at the width of the month under it (its tooltip has it whole, with the mods).
+`main.bar_state()` says how far the bar has given way. Pressing the month opens the last month's report
 again (or closes it). A `headline` name with a leading `-` is shown negated. A
 figure's label is `[play] labels[key]`, else the catalogue's. Approval and political
 capital lead the top bar (stage S16.1; S14.1 had taken them off as doubles of the centre,
-which the owner called a big error): capital with what the bills waiting will cost, red
-with "N short" when they cost more than there is. They are the last figures to give way on
-a narrow bar, and the bar is drawn above every popup's and sheet's veil. The centre of the
+which the owner called a big error): capital with what the bills waiting will cost ("bills
+waiting N"), or, in red, how far short it is when they cost more than there is ("N short",
+alone since stage S17.1: both figures together pushed a headline figure off a 1920-pixel
+bar; the tooltip has the rest). They never give way,
+and the bar is drawn above every popup's and sheet's veil. The centre of the
 board shows both as well.
 
 **The strip** (`strip.gd`). At its left, under the date, one line: a notice (6 s), an
@@ -115,6 +130,21 @@ else the month's report, else the topmost closable sheet. Ctrl+F focuses the sea
 too. In the search field the arrows move between matches, Enter
 opens the chosen one and Esc clears the search and leaves the field. No key moves the
 board.
+
+**The keyboard inside a popup or a sheet (stage S17.1, `focus.gd`).** Opening one takes the
+keyboard into it: to the card itself, so nothing wears the ring until Tab is pressed. Tab
+and Shift+Tab then go through its controls in the order the card is built (top to bottom,
+left to right) and round again, never out to the board or the top bar behind; what the
+keyboard reaches is scrolled into view. Esc closes the topmost thing (a popup over a sheet
+before the sheet) and the keyboard goes back to whatever had it: the button that opened
+the sheet, the Budget line that opened the popup. So a popup opened from the search
+closes first and leaves the search as it was; Esc there then clears it. Whatever holds the
+keyboard shows it: a ring 2 pixels wide, 3 clear of the control, in `Palette.FOCUS` (the
+dark ochre that text waiting is set in, 4.5 to 1 on card stock and on the paper; plain
+ochre was 2 to 1), the same on buttons, links, fields, sliders, menus and text that can be
+selected; a check box wears it as its own outline. The row chosen in a menu or among the
+search's matches has an ink edge down its left as well as its tint. The pictures on the key
+are not controls and the keyboard passes them by.
 
 **The month buttons** are off while the game is busy, while a dilemma waits (their tooltip
 then says to answer it first) and after the player has lost. Advancing asks the engine at
@@ -502,6 +532,7 @@ Presentation settings. The engine ignores them and they never affect a run.
 | `term` | Steps in a term; the end-of-term summary appears after this many | 60 |
 | `government` | The sector whose flows make up the Budget | `government` |
 | `headline` | Up to six result-row names for the top bar's figures; a leading `-` shows the value negated (an account held as a negative number, such as public debt) | `watch` |
+| `give_way` | Stage S17.1: the headline figures in the order they give way on a top bar short of room, the first first. The approval is never among them | from the right |
 | `watch` | Values `polisim play` prints after each step; the top bar's figures when there is no `headline`; with an automatic board, indicators beside the headline's | none |
 | `labels` | Overrides of labels by key, including negated keys such as `"-gov_money"`, for the top bar and the board. Stage S15.3: a `[play.web]` policy's `key` here gives that policy a shorter name on the board (the UK: `policing = "Police and courts"`); its popup keeps the whole `label`. A key that is also a result row's name is that row's label, not the policy's | none |
 | `breakdowns` | Names of values with one dimension, shown as tables in the popups of the values they break down (format 1; see below) | none |
@@ -749,7 +780,8 @@ refused for want of capital in the month's report.
 
 ## How the client is tested
 
-`tools/check_client.py` runs twenty-three scripts in twenty-five sessions in Godot without a
+`tools/check_client.py` first reads the scripts' source for the spacing scale (below), then
+runs twenty-seven scripts in twenty-nine sessions in Godot without a
 display (it needs the bridge copied into `client/bin` by `tools/build_client.py`, after
 `cargo build --release --workspace` has compiled it, and the release runner). The first two
 compare state hashes with the command-line runner's; the others check what the screen shows
@@ -769,7 +801,7 @@ screen through the methods of `main.gd` listed after the table, as a player woul
 | `tests/dilemma_check.gd` | Stage S9.1: Valmora with the dock strike mod: a year's run stops at the third month and asks; no month runs until answered; the answer shows as a pennant and raises the government's purchases by a fifth; then the same in French |
 | `tests/lag_check.gd` | Stage S10.5: Valmora with the year-on-year mod: the catalogue marks the lag and its twelve states; the board's search links the lag to output as one lagged input; after fourteen months the lag holds the second month's output; its popup's "why it moved" follows it to output's popup |
 | `tests/language_check.gd` | Stage S7.4: from the start screen, French is not offered for the UK; Valmora in French has a French Budget and policy popups, and so does a game saved and loaded |
-| `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/wealth_tax`) for the UK only; with it ticked, the game starts with the mod's lever on the board, its name in the title bar, and, once the rate is set, a wealth tax line in the Budget |
+| `tests/start_screen.gd` | Stage S7.1: started without a scenario, the start screen lists the United Kingdom and Valmora and offers the example mod (`mods/dog_licence`, stage S17.1: a mod that adds what the model lacks; the wealth tax that doubled the UK's own is no longer offered) for the UK only; with it ticked, the game starts with the mod's lever on the board, its name in the title bar, and, once the fee is set, a dog licences line in the Budget |
 | `tests/migrate_check.gd` | Stage S7.0, run twice on a copy of Valmora: a game saved after four months with the basic rate at 30%; then, with the model's files changed (a new state, the basic rate limited to 25%), the save loads, the rate is at 25%, the player is told, and the next month runs on the new model |
 | `tests/second_model.gd` | A model with different names (`models/mini`) gets a working Budget, an automatic board with two policies, two headline figures, and a lever change that reaches the Budget |
 | `tests/politics_check.gd` | Stage S5.5, run twice: in `2025.toml`, after a month Parliament shows the 2024 House (411 centre-left seats and the rest), the government's poll rating and the next election in July 2029, and (stage S15.3) as many stance scales and place rows as `[play.web] stances` and `places` give; in `early_election.toml`, the election in the second month is announced, the player has lost office, and advancing no longer moves time |
@@ -783,8 +815,29 @@ screen through the methods of `main.gd` listed after the table, as a player woul
 | `tests/add_search_check.gd` | Stage S15.1: after a month, no "New policy" node on the board; A opens the Add policy sheet, and every area lists exactly its policies not in force (an area with none greyed); choosing one closes the sheet and opens its popup at its first step, ready to put to the Commons; put, it waits on the board as a ghost, and after the month it is in force (or the report says why not). "/" focuses search; "strong growth" finds the situation and lights the Growth node; "fuel" finds Fuel duty first and Enter opens it; Esc clears; a situation's pennant lights its node and opens it with "Set off by"; a situation in force flags its node |
 | `tests/full_term.gd` | Stage S13.6: all sixty months of the UK's term played through `main.gd`'s methods with nineteen decisions (taxes, spending, three introductions, level policies, a repeal), every question answered, each kind of popup and both sheets opened; no month fails; each bill's fate is what the report said, a third bill in one month is refused for capital, and capital adds up and never goes below zero; the report after every month (open for a month with bills, else its line under the date); the election comes in July 2029 and its result is announced; a game saved in month 24 and loaded gives the same state hashes to month 36 |
 | `tests/feel_check.gd` | Stage S13.6, at 1366x768: at step 0 every figure shows the awaiting state, and every popup kind and both sheets open with no "nan"; no change too small to show reads as a signed nought; the guide is wanted on a first game from the start screen, never with `--scenario` or headless, and its five steps point at real things; Space and Enter run months; a bill refused for want of capital and one passed appear in the report with the figures that moved most, and the refusal is not also in a notice. Stage S14.1: the report floats (the board keeps its size and the centre its place), the date opens it again, it does not cover the centre, Esc closes it, and the next month asked for closes it at once and runs; the links of a node held under the pointer while the table arrives change at most once; B, P, K (the key, with at least four of the board's own drawings) and Esc do their jobs, and Space does nothing in a focused field. Stage S14.4: a game saved and loaded has measured links on the first hover, from the table in its save, and asks for no table. A game from the start screen opens with its first month played; the sound helper asks for its sounds and makes no player headless |
-| `tests/perf_check.gd` | Stage S14.1, the speed budget, at 1920x1080 on the UK after a month; it prints every figure and fails if one is over: a click to a popup fully open 120 ms and its close 80 ms (medians of five over two policies, two indicators and a group, measured again once if over); board redraws in an idle second with a popup open 0; "Next month" to the date and board showing it 150 ms (median of three, while the last table is measured); twelve months 1 s; pointing at a policy straight after to measured links 16 ms (one frame); and (stage S14.4) a basic rate typed to "In a year" filled 600 ms (median of three); and (stage S15.1) a key typed into search, its matches, list and the board's dimming, 4 ms on average over "unemployment" typed and deleted a letter at a time, with no engine call |
+| `tests/contrast_check.gd` | Stage S17.1, without a scenario: every pair of ink and ground in `contrast.gd`'s `pairs` (the words the scripts draw themselves, the inks text is set in on every ground, the theme's states under the pointer and pressed, and the marks that carry meaning) reaches its WCAG 2.1 ratio, 4.5 to 1 for text and 3 to 1 for text of 18 px or more and for marks; then the start screen, the top bar (at the start, after three months, with the capital short, while searching), the strip (with a problem announced), the search's matches and the guide are walked as they stand and every piece of text measured against what is under it |
+| `tests/folds_check.gd` | Stage S17.1: at 1366x768 and 1920x1080, a policy (at rest, with a change waiting and its year ahead, of levels, repealable, being introduced with and without a setting), five statistics on the board and one off it with each fold open, four groups of voters with each fold open and a household's account, a situation, and The Budget, Parliament with each fold, Add policy, the key, help and the month's report: each card inside the window and under the top bar, nothing in it poking out of its sides, no label or button narrower than its words, no text under 12 px, and every piece of text at its contrast ratio against the ground it stands on. `--shots=DIR` with a display also photographs each card and the whole screen |
+| `tests/focus_check.gd` | Stage S17.1: with Next month holding the keyboard, a policy, a statistic, a group of voters, a situation, The Budget, Parliament, Add policy, the key, help and a question are opened in turn and Tab pressed once for each control: the keyboard goes in, reaches each control once in the order the card is built (never up and to the left at once), each shows a ring (2 px, 3 to 1 against the ground round it), the press after the last returns to the first and Shift+Tab goes back; Esc closes the card and Next month has the keyboard again; a popup opened from a Budget line closes first, back to that line |
+| `tests/bar_check.gd` | Stage S17.1: three months in, at 2560 wide the top bar has every figure, the search field and every word; narrowed ten pixels at a time to 1200 it never needs more than the window, gives way in the stated order and never out of it, keeps every headline figure at 1920 and approval and capital throughout, also with the capital short; at 1366 "/" opens the search's button and Esc shuts it; widened, all comes back |
+| `tests/perf_check.gd` | Stage S14.1, the speed budget, at 1920x1080 on the UK after a month; it prints every figure and fails if one is over (stage S17: it first times the machine, on the engine's own twelve-month look ahead and a fixed loop of script, and where the machine takes k times the reference's time the budgets the processor bounds, every one but a popup's opening and closing and the idle count, are k times as long; a forecast over budget is measured once more): a click to a popup fully open 120 ms and its close 80 ms (medians of five over two policies, two indicators and a group, measured again once if over); board redraws in an idle second with a popup open 0; "Next month" to the date and board showing it 150 ms (median of three, while the last table is measured); twelve months 1 s; pointing at a policy straight after to measured links 16 ms (one frame); and (stage S14.4) a basic rate typed to "In a year" filled 600 ms (median of three); and (stage S15.1) a key typed into search, its matches, list and the board's dimming, 4 ms on average over "unemployment" typed and deleted a letter at a time, with no engine call |
 | `tests/budget_dump.gd` | The UK's Budget after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%), and no input marked `player = false` among a policy's controls. Then every breakdown, as shown in the popups of the figures they break down, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
+
+**Spacing, contrast and type, held by checks (stage S17.1).** Every margin, and every gap
+between one thing and the next, is nought or on one scale, 4, 8, 12, 16, 24, 32 pixels,
+named once (`Palette.SPACE`); a number off it has "off the scale:" and the reason on its
+line (the leading closed up between a caption and its figure on the top bar; the thickness
+of a slider's track and of a scroll bar, which are marks, not gaps). `check_client.py` reads
+this from the source (container separations and margins, style boxes' content margins, the
+margins handed to the palette's box makers), so it holds for screens no check opens; sizes
+of things and the coordinates of what the scripts draw themselves are not gaps and are not
+held to it. Text is set in inks that reach 4.5 to 1 on every ground it stands on (card
+stock, the top bar's band, a field, the paper to its darkest corner): `MUTED`, `GOOD`, `BAD`
+and `PENDING` are each a shade deeper than before, and `BAD` is no longer brick itself,
+which is kept with sage and ochre for fills. A mark that carries meaning reaches 3 to 1 or
+is keyed in ink: what is filled of a group's approval gauge (mustard was 1.5 to 1 against
+its track), the ring round the node whose popup is open, a guide's target; an unmeasured
+link is ink at 60%; three blocs' colours (gold, yellow, grey) are deeper; the search's
+placeholder is ink at 70%. No text is under 12 pixels.
 
 **What `main.gd` offers the checks.** Actions: `open_node(key)` (a board key, or the key
 of a policy not in force), `open_indicator(name, row, origin)`, `open_add_policy(key)`

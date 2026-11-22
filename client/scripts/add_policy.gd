@@ -36,7 +36,7 @@ func build(areas: Array, by_area: Dictionary) -> void:
 	items = by_area
 	_areas = VBoxContainer.new()
 	_areas.name = "areas"
-	_areas.add_theme_constant_override("separation", 2)
+	_areas.add_theme_constant_override("separation", 4)
 	_areas.custom_minimum_size.x = 230
 	add_child(_areas)
 	var group := ButtonGroup.new()
@@ -80,7 +80,7 @@ func build(areas: Array, by_area: Dictionary) -> void:
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(_scroll)
 	_list = VBoxContainer.new()
-	_list.add_theme_constant_override("separation", 6)
+	_list.add_theme_constant_override("separation", 8)
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_list)
 	# Rows settle their height once their words have wrapped: the list fits itself again then.
@@ -171,7 +171,7 @@ func _row(item: Dictionary) -> Button:
 	var key := str(item["key"])
 	button.pressed.connect(func() -> void: chosen.emit(key))
 	var box := HBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 16)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = 8
@@ -189,7 +189,7 @@ func _row(item: Dictionary) -> Button:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(icon)
 	var words := VBoxContainer.new()
-	words.add_theme_constant_override("separation", 2)
+	words.add_theme_constant_override("separation", 4)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(words)
@@ -227,7 +227,7 @@ func _row(item: Dictionary) -> Button:
 		wait.theme_type_variation = "Muted"
 		words.add_child(wait)
 	var side := VBoxContainer.new()
-	side.add_theme_constant_override("separation", 2)
+	side.add_theme_constant_override("separation", 4)
 	side.custom_minimum_size.x = 160
 	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(side)

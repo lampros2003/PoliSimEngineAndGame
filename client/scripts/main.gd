@@ -54,9 +54,9 @@ const HELP := """[b]The board[/b] is the country, and the whole screen. Round th
 
 [b]After each month[/b] a line under the date says what moved. When the month brought something to tell (a bill passed, voted down or refused, a situation begun or ended, an election, a question answered) the month's report opens over the board: click a line to open it; click the date to see it again.
 
-[b]Keys[/b]: Space or Enter, next month; A, Add policy; / or Ctrl+F, search; Esc clears the search, then closes the popup, the report, the sheet; B, The Budget; P, Parliament; K, the key.
+[b]Keys[/b]: Space or Enter, next month; A, Add policy; / or Ctrl+F, search (Esc in it clears it); Esc closes what is on top: the popup, the report, the sheet; Tab and Shift+Tab move through a popup's or a sheet's controls; B, The Budget; P, Parliament; K, the key.
 
-[color=#55606c]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
+[color=#505a66]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
 
 var game: PoliSim
 var fmt := Format.new()
@@ -420,23 +420,27 @@ func _build_bar() -> void:
 	band.bg_color = Palette.CARD_DEEP
 	band.border_color = Palette.INK
 	band.border_width_bottom = 3
-	band.content_margin_left = 18
-	band.content_margin_right = 10
-	band.content_margin_top = 6
+	band.content_margin_left = 16
+	band.content_margin_right = 8
+	band.content_margin_top = 4
 	band.content_margin_bottom = 8
 	_bar.add_theme_stylebox_override("panel", band)
 	add_child(_bar)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 4)
 	_bar.add_child(row)
 	var where := VBoxContainer.new()
-	where.add_theme_constant_override("separation", -4)
+	where.add_theme_constant_override("separation", -4)  # off the scale: closes up the leading between the country and the date
 	where.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(where)
 	_country = Label.new()
 	_country.theme_type_variation = "Heading"
 	_country.add_theme_color_override("font_color", Palette.INK)
 	_country.mouse_filter = Control.MOUSE_FILTER_PASS
+	# Stage S17.1: no wider than the month under it: a long name (a country with its mods) is
+	# cut short with an ellipsis, and whole in its tooltip.
+	_country.clip_text = true
+	_country.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	where.add_child(_country)
 	_date = Label.new()
 	_date.name = "date"
@@ -476,11 +480,13 @@ func _build_bar() -> void:
 	row.add_child(_rule())
 	# Stage S15.1: search and Add policy, kept with words on a narrow window too.
 	search = Search.new()
+	search.fitted.connect(func() -> void: _fit_bar.call_deferred())
 	search.searched.connect(_searched)
 	search.pointed.connect(func(result: Dictionary) -> void: board.light(str(result.get("node", ""))))
 	search.picked.connect(_open_result)
 	row.add_child(search)
 	var add := Button.new()
+	_add_button = add
 	add.name = "open_add_policy"
 	add.text = "Add policy"
 	add.icon = Palette.icon("policy")
@@ -539,6 +545,7 @@ func _build_bar() -> void:
 	row.add_child(_menu)
 	_parliament_button = row.get_node("open_parliament")
 	_bar.resized.connect(_fit_bar)
+	resized.connect(_fit_bar)
 	get_viewport().size_changed.connect(_fit_bar)
 	var menu := _menu.get_popup()
 	for item in [["Save", 0], ["Load", 1], ["Reload model", 2]]:
@@ -569,28 +576,82 @@ func _build_bar() -> void:
 	_update_menu()
 
 
-## On a narrow window the Budget and Parliament buttons show only their pictograms and the
-## capital stays at the centre of the board, so the bar never overflows.
+## Stage S17.1: the top bar never overflows the window, and what gives way as the window
+## narrows does so in a stated order, each step only when the one before was not enough:
+## first the words on the Budget and Parliament buttons (their pictograms stay) and on "3
+## months" and "Year" ("+3", "+12"); then the search field, to the narrower of its widths and
+## then to its button (it opens to type in, and the figures give way to it while it is
+## open); then the headline figures, one at a
+## time, least important first: in the order of `[play] give_way`, then any it does not name
+## from the right; last, on a window too narrow even then, Add policy's words (its pictogram
+## stays). Approval and political capital never give way. `bar_state()` says how far it went.
 func _fit_bar() -> void:
-	# Stage S16.1: judged by the window, not the bar (which grows to what it holds, so a bar laid
-	# out wide could never find itself narrow again).
-	var width := get_viewport_rect().size.x if DisplayServer.get_name() != "headless" else _bar.size.x
-	var narrow := width < 1560.0
-	for button in _wide:
-		button.text = "" if narrow else str(button.get_meta("words"))
-	_advance[1].text = "3 months" if not narrow else "+3"
-	_advance[2].text = "Year" if not narrow else "+12"
-	# Stage S15.1: search and Add policy stay; the headline figures give way from the right,
-	# as many as the bar needs (each still in the Budget or on the board).
-	search.custom_minimum_size.x = 190.0 if not narrow else 150.0
+	if _fitting:
+		return
+	_fitting = true
+	# Judged by the screen's own width, not the bar's (which grows to what it holds, so a bar
+	# laid out wide could never find itself narrow again).
+	var room := size.x
+	var row: Control = _bar.get_child(0)
+	var band := _bar.get_theme_stylebox("panel")
+	room -= band.get_margin(SIDE_LEFT) + band.get_margin(SIDE_RIGHT)
+	var fits := func() -> bool: return row.get_combined_minimum_size().x <= room
+	_words(true)
+	_add_button.text = "Add policy"
+	search.set_compact(false, false)
 	for chip in _chips.get_children():
 		(chip as Control).visible = true
-	var row: Control = _bar.get_child(0)
-	var chips := _chips.get_children()
-	var i := chips.size() - 1
-	while i >= 0 and row.get_combined_minimum_size().x > width - 30.0:
-		(chips[i] as Control).visible = false
-		i -= 1
+	_bar_state = {"words": true, "search": true, "hidden": PackedStringArray(), "add_words": true}
+	if not fits.call():
+		_words(false)
+		_bar_state["words"] = false
+	if not fits.call():
+		search.set_compact(false, true)  # the narrower of its two widths first
+	if not fits.call():
+		search.set_compact(true, true)
+		_bar_state["search"] = not search.is_button()
+	if not fits.call():
+		var hidden := PackedStringArray()
+		for key in _give_way():
+			(_chip[key]["button"] as Control).visible = false
+			hidden.append(key)
+			if fits.call():
+				break
+		_bar_state["hidden"] = hidden
+	if not fits.call():
+		_add_button.text = ""
+		_bar_state["add_words"] = false
+	_fitting = false
+
+
+var _fitting := false
+var _add_button: Button
+var _bar_state := {"words": true, "search": true, "hidden": PackedStringArray(), "add_words": true}
+
+
+## Stage S17.1: how the top bar stands: `words` (its buttons have theirs), `search` (the field
+## is open, not its button), `hidden` (the headline figures that gave way, in order),
+## `add_words` (Add policy has its words).
+func bar_state() -> Dictionary:
+	return _bar_state
+
+
+func _words(on: bool) -> void:
+	for button in _wide:
+		button.text = str(button.get_meta("words")) if on else ""
+	_advance[1].text = "3 months" if on else "+3"
+	_advance[2].text = "Year" if on else "+12"
+
+
+## The headline figures that may give way (every one but approval), least important first.
+func _give_way() -> Array:
+	var order := []
+	for key in play.get("give_way", []):
+		if _chip.has(str(key)) and str(key) != _approval_key() and not order.has(str(key)):
+			order.append(str(key))
+	var rest: Array = _chip.keys().filter(func(k): return k != _approval_key() and not order.has(k))
+	rest.reverse()
+	return order + rest
 
 
 func _rule() -> Control:
@@ -607,11 +668,11 @@ func _chip_button(caption: String) -> Button:
 	button.size_flags_vertical = Control.SIZE_FILL
 	button.custom_minimum_size = Vector2(0, BAR_HEIGHT - 14)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", -3)
+	box.add_theme_constant_override("separation", -3)  # off the scale: closes up the leading between a caption and its figure
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 7
-	box.offset_right = -7
+	box.offset_left = 8
+	box.offset_right = -8
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	button.add_child(box)
 	var label := Label.new()
@@ -620,7 +681,7 @@ func _chip_button(caption: String) -> Button:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(label)
 	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", 6)
+	line.add_theme_constant_override("separation", 8)
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(line)
 	var value := Label.new()
@@ -641,7 +702,7 @@ func _chip_button(caption: String) -> Button:
 	button.set_meta("label", label)
 	# The chip is as wide as its widest line.
 	box.minimum_size_changed.connect(func() -> void:
-		button.custom_minimum_size.x = box.get_combined_minimum_size().x + 14.0)
+		button.custom_minimum_size.x = box.get_combined_minimum_size().x + 16.0)
 	return button
 
 
@@ -847,6 +908,7 @@ func _build_headline() -> void:
 		else:
 			_chips.add_child(chip)
 		_chip[key] = {"button": chip, "entry": entry, "shown": null}
+	_fit_bar.call_deferred()
 
 
 # ---------------------------------------------------------------------------- reading
@@ -902,6 +964,7 @@ func _refresh(stepped := false) -> void:
 	board.node_flags = flags
 	_refresh_popup(pending, capital)
 	_set_controls(not failed and not lost)
+	_fit_bar()  # stage S17.1: the figures' widths move with their values
 
 
 ## The date on the top bar: the month shown and how far into the term.
@@ -1001,7 +1064,9 @@ func _show_capital() -> float:
 	# Stage S16.1: what the bills waiting will cost beside it; red, and saying so, when they
 	# cannot all be paid for.
 	var short := waiting > float(now) + 1e-9
-	change.text = ("bills waiting %.1f" % waiting) + (" · %.1f short" % (waiting - float(now)) if short else "") if waiting > 0.0 else ""
+	# Stage S17.1: short, the shortfall alone (the tooltip and the policy's popup have the rest):
+	# both figures together pushed a headline figure off a 1920-pixel bar.
+	change.text = ("%.1f short" % (waiting - float(now)) if short else "bills waiting %.1f" % waiting) if waiting > 0.0 else ""
 	change.add_theme_color_override("font_color", Palette.BAD if short else Palette.PENDING)
 	value.add_theme_color_override("font_color", Palette.BAD if short else Palette.INK)
 	var why := "\nThe bills waiting cost %.1f more than there is: those that come last are refused." % (waiting - float(now)) if short else ""
@@ -2357,7 +2422,7 @@ func ask_dilemma() -> void:
 		if str(option.get("doc", "")) != "":
 			line += ": " + str(option["doc"])
 		lines.append(line + ".\n")
-	lines.append("[color=#55606c]Your answer takes effect next month; no month runs until you give one.[/color]")
+	lines.append("[color=#505a66]Your answer takes effect next month; no month runs until you give one.[/color]")
 	sheet.add_text("\n".join(lines))
 	var options: Array = d.get("options", [])
 	for i in options.size():

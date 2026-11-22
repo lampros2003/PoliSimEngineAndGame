@@ -90,7 +90,7 @@ fn an_early_election_matches_the_recorded_hashes() {
 
 #[test]
 fn a_modded_uk_matches_the_recorded_hashes() {
-    // Stage S7.1: the UK with the example mod (mods/wealth_tax): an added lever, flow and
+    // Stage S7.1: the UK with the example mod (tests/mods/wealth_tax): an added lever, flow and
     // value, and two patched formulas, loaded the same way by both.
     let scenario = load_scenario(&root().join("models/uk/scenarios/wealth_tax.toml")).unwrap();
     assert_eq!(scenario.model.mods.len(), 1);

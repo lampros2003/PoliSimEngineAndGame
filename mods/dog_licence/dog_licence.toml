@@ -1,0 +1,52 @@
+# A dog licence for the United Kingdom. Every name this mod adds starts with its id,
+# "dog_licence_"; the [patch] tables change two of the model's own formulas.
+
+[lever.dog_licence_fee]
+label = "Dog licence"
+group = "Dog licence"
+type = "money"
+unit = "GBP/licence"
+default = 0.0
+range = [0, 200]
+leaning = "left"
+doc = "What a year's licence for one dog costs. Nought: no licence is needed"
+
+[param.dog_licence_bought]
+doc = "Licences bought a month: one a year for each of about ten million dogs (a round figure and a judgement: surveys of pet owners put the United Kingdom's dogs at ten to thirteen million)"
+type = "real"
+unit = "licence/month"
+value = 833333.33
+
+[param.dog_licence_owners]
+doc = "The share of voters who live with a dog (a judgement: about three households in ten)"
+type = "real"
+unit = "1"
+value = 0.3
+
+[param.dog_licence_dear]
+doc = "A fee a dog owner would call dear: the fee at which the licence weighs with an owner as much as `dog_licence_aversion` says"
+type = "money"
+unit = "GBP/licence"
+value = 100.00
+
+[param.dog_licence_aversion]
+doc = "How strongly a dog owner holds a dear licence against the government: utility lost at a fee of `dog_licence_dear` (a judgement: about as much as a 2% fall in income)"
+type = "real"
+unit = "1"
+value = 0.05
+
+[flow.dog_licence_paid]
+label = "Dog licences"
+from = "households"
+to = "government"
+phase = "spending"
+expr = "round(dog_licence_fee * dog_licence_bought)"
+
+# The fees are a public receipt, so the budget balance counts them.
+[patch.var.public_receipts]
+expr = "{base} + dog_licence_paid"
+
+# Dog owners think less of the government for it; the mod does not know which voters they
+# are, so every type of voter is taken to hold the average share of them.
+[patch.var.voter_fundamentals]
+expr = "{base} - dog_licence_aversion * dog_licence_owners * dog_licence_fee / dog_licence_dear"

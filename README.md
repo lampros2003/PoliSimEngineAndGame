@@ -33,7 +33,7 @@ a mod.
 | `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, pictograms, type and sounds, and its scripted tests |
 | `tests/` | The behaviour tests (Python, standard library only), run on the engine through `polisim serve`; `tests/README.md` says where each test of the retired Python reference implementation went |
 | `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and the policies, statistics and interest groups added since (`models/uk/POLICIES.md`, `models/uk/STATISTICS.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
-| `mods/` | Mods the game ships with: `wealth_tax`, the example in `docs/MODDING.md` |
+| `mods/` | Mods the game ships with: `dog_licence`, the example in `docs/MODDING.md`, for the UK; `dock_strike` and `year_on_year` for Valmora. The wealth tax that was the example until stage S17 is kept for the engine's tests in `tests/mods/` |
 | `models/toy/` | A three-sector economy with 1,000 household records, written in the model-file format |
 | `models/valmora/` | The same economy scaled to an invented country, where the client was first built |
 | `models/mini/` | A tiny model with different names, used to test that the client adapts to any model |

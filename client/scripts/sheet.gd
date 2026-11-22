@@ -5,6 +5,7 @@ extends Control
 
 const Palette := preload("res://scripts/palette.gd")
 const Sound := preload("res://scripts/sound.gd")
+const Focus := preload("res://scripts/focus.gd")
 
 signal closed
 
@@ -20,11 +21,19 @@ var _title: Label
 var _close: Button
 var _buttons: HBoxContainer
 var _tween: Tween
+## Stage S17.1: what had the keyboard before the sheet opened; it gets it back.
+var _focus_before: Control
 
 
 func _init(heading: String, card_width := 860.0) -> void:
 	title = heading
 	width = card_width
+
+
+## Stage S17.1: Tab stays inside the sheet while it is open.
+func _input(event: InputEvent) -> void:
+	if visible and card != null:
+		Focus.kept_inside(card, event)
 
 
 func _ready() -> void:
@@ -46,7 +55,7 @@ func _ready() -> void:
 	var head_margin := MarginContainer.new()
 	for side in ["left", "right"]:
 		head_margin.add_theme_constant_override("margin_" + side, 32)
-	head_margin.add_theme_constant_override("margin_top", 22)
+	head_margin.add_theme_constant_override("margin_top", 24)
 	head_margin.add_theme_constant_override("margin_bottom", 8)
 	column.add_child(head_margin)
 	var head := HBoxContainer.new()
@@ -74,16 +83,17 @@ func _ready() -> void:
 	column.add_child(rules)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.follow_focus = true  # stage S17.1: what the keyboard reaches is scrolled into view
 	column.add_child(_scroll)
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 32)
-	margin.add_theme_constant_override("margin_top", 14)
-	margin.add_theme_constant_override("margin_bottom", 26)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 24)
 	_scroll.add_child(margin)
 	body = VBoxContainer.new()
-	body.add_theme_constant_override("separation", 14)
+	body.add_theme_constant_override("separation", 16)
 	body.custom_minimum_size = Vector2(width - 64.0, 0)
 	margin.add_child(body)
 	_buttons = HBoxContainer.new()
@@ -91,7 +101,7 @@ func _ready() -> void:
 	var button_margin := MarginContainer.new()
 	for side in ["left", "right"]:
 		button_margin.add_theme_constant_override("margin_" + side, 32)
-	button_margin.add_theme_constant_override("margin_bottom", 26)
+	button_margin.add_theme_constant_override("margin_bottom", 24)
 	button_margin.add_child(_buttons)
 	button_margin.visible = false
 	column.add_child(button_margin)
@@ -129,9 +139,12 @@ func add_text(bbcode: String) -> RichTextLabel:
 
 
 func open() -> void:
+	var was_open := visible
 	if not visible:
 		Sound.play("open")
 	visible = true
+	if not was_open and card != null:
+		_focus_before = Focus.enter(card)
 	_place.call_deferred()
 	# Wrapped text settles its height a frame later: place the card again then.
 	_place_next_frame()
@@ -174,5 +187,7 @@ func close() -> void:
 	if not visible:
 		return
 	Sound.play("close")
+	Focus.leave(card, _focus_before)
+	_focus_before = null
 	visible = false
 	closed.emit()

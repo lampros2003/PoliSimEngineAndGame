@@ -45,7 +45,7 @@ func _ready() -> void:
 	add_child(_line)
 	_row = HBoxContainer.new()
 	_row.name = "flags"
-	_row.add_theme_constant_override("separation", 10)
+	_row.add_theme_constant_override("separation", 12)
 	_row.alignment = BoxContainer.ALIGNMENT_END
 	_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_row)

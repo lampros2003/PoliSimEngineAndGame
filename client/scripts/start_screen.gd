@@ -34,7 +34,7 @@ func _ready() -> void:
 	var center := CenterContainer.new()
 	add_child(center)
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", Palette.card(40, 10, 2))
+	card.add_theme_stylebox_override("panel", Palette.card(32, 10, 2))
 	card.custom_minimum_size = Vector2(700, 0)
 	center.add_child(card)
 	var box := VBoxContainer.new()
@@ -42,7 +42,7 @@ func _ready() -> void:
 	card.add_child(box)
 	# A row of pictograms, the areas of government, as on a public-information poster.
 	var band := HBoxContainer.new()
-	band.add_theme_constant_override("separation", 14)
+	band.add_theme_constant_override("separation", 16)
 	for name in ICONS:
 		var icon := TextureRect.new()
 		icon.texture = Palette.icon(name)
@@ -86,7 +86,7 @@ func _ready() -> void:
 	_mod_box.add_theme_constant_override("separation", 4)
 	box.add_child(_mod_box)
 	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 10)
+	buttons.add_theme_constant_override("separation", 12)
 	box.add_child(buttons)
 	_new = Button.new()
 	_new.name = "new_game"

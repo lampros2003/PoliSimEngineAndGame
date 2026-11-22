@@ -128,7 +128,7 @@ func show_explanation(e: Dictionary) -> void:
 			unchanged.append(part["label"] if symbol == "" else label_of(symbol))
 			continue
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 12)
 		var name_button := Button.new()
 		name_button.text = part["label"] if symbol == "" else label_of(symbol) + (" (last month)" if part["lagged"] else "")
 		# A lag's state is shown, and followed, as the value it holds from months back.

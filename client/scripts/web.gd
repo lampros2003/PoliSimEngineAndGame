@@ -1887,7 +1887,7 @@ static func state_colour(state: String) -> Color:
 		"none":
 			return Palette.NO_FIGURE
 		"plain":
-			return Color(Palette.INK, 0.55)
+			return Color(Palette.INK, 0.6)  # stage S17.1: 3 to 1 on the paper to its darkest corner
 	return Palette.STEADY
 
 
@@ -2092,7 +2092,7 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 	_node_layer.draw_circle(c, r, Color(Palette.CARD, a) if not waiting else Color(Palette.OCHRE.lerp(Palette.CARD, 0.55), a))
 	_node_layer.draw_arc(c, r, 0, TAU, 48, ink, maxf(2.0, 2.0 * _unit), true)
 	if n["key"] == selected:
-		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+		_selected_ring(c, r, a)
 	_icon(n["icon"], c, r * 0.6, ink)
 	# The gauge: where the setting sits in its range, round the outside from the lower left.
 	var gr := r + 6.0 * _unit
@@ -2114,6 +2114,13 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
 
 
+## The ring round the node whose popup is open: ochre, and (stage S17.1) an ink hairline
+## outside it, since ochre alone is 2 to 1 on the paper.
+func _selected_ring(c: Vector2, r: float, a: float) -> void:
+	_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+	_node_layer.draw_arc(c, r + 5.0 * _unit, 0, TAU, 48, Color(Palette.INK, a), maxf(1.0, _unit), true)
+
+
 ## An indicator: a ring on paper, its pictogram inside. Stage S14.1: the ring is green for a
 ## good thing, red for a bad thing, blue for the rest.
 func _draw_indicator(n: Dictionary, a: float) -> void:
@@ -2123,7 +2130,7 @@ func _draw_indicator(n: Dictionary, a: float) -> void:
 	var band := maxf(3.0, r * 0.22)
 	_node_layer.draw_arc(c, r - band / 2.0, 0, TAU, 48, Color(state_colour(str(n.get("state", "steady"))), a), band, true)
 	if n["key"] == selected:
-		_node_layer.draw_arc(c, r + 3.0 * _unit, 0, TAU, 48, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+		_selected_ring(c, r, a)
 	_icon(n["icon"], c, r * 0.5, Color(Palette.INK, a))
 	_badge(n, c, r, a)
 
@@ -2144,9 +2151,12 @@ func _draw_group(n: Dictionary, a: float) -> void:
 	_node_layer.draw_colored_polygon(poly, Color(Palette.CARD if not lit else Color("#fbf3dc"), a))
 	var edge := poly.duplicate()
 	edge.append(poly[0])
+	if n["key"] == selected:
+		# Stage S17.1: ochre under the ink edge, not in place of it.
+		_node_layer.draw_polyline(edge, Color(Palette.OCHRE, a), 6.0 * _unit, true)
 	_node_layer.draw_polyline(edge, Color(Palette.INK, a), maxf(1.5, 1.5 * _unit), true)
 	if n["key"] == selected:
-		_node_layer.draw_polyline(edge, Color(Palette.OCHRE, a), 3.0 * _unit, true)
+		pass
 	elif n["key"] == hover:
 		_node_layer.draw_polyline(edge, Color(Palette.INK, a), 2.5 * _unit, true)
 	var half := minf(_group_band * 0.36, float(n["seg_len"]) * 0.4)
@@ -2154,7 +2164,11 @@ func _draw_group(n: Dictionary, a: float) -> void:
 	var track: PackedVector2Array = n["track"]
 	var state := str(n.get("state", "none"))
 	var width := ARC_WIDTH * _unit
+	# Stage S17.1: what is filled is keyed in ink: mustard is 1.5 to 1 against its track and
+	# 2 to 1 against the paper, so how far a gauge has filled could not be told without it.
+	var key_line := width + 2.0 * maxf(1.0, _unit)
 	if state == "none":
+		_node_layer.draw_polyline(track, Color(Palette.INK, a), key_line, true)
 		_node_layer.draw_polyline(track, Color(Palette.NO_FIGURE, a), width, true)
 		return
 	_node_layer.draw_polyline(track, Color(Palette.INK, 0.15 * a), width, true)
@@ -2162,6 +2176,7 @@ func _draw_group(n: Dictionary, a: float) -> void:
 	var f := clampf(float(n["fraction"]) / APPROVAL_FULL, 0.0, 1.0)
 	if f > 0.0:
 		var upto := maxi(2, int(roundf((track.size() - 1) * f)) + 1)
+		_node_layer.draw_polyline(track.slice(0, upto), Color(Palette.INK, a), key_line, true)
 		_node_layer.draw_polyline(track.slice(0, upto), Color(state_colour(state), a), width, true)
 
 

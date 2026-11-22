@@ -7,7 +7,7 @@ from the published figures for 2024. The first general election is due in July 2
 office and the game is over.
 
 The test build also has Valmora, the small invented country the client was first built
-on, and two example mods: a wealth tax for the UK, and a dock strike for Valmora, which
+on, and two example mods: a dog licence for the UK, and a dock strike for Valmora, which
 puts a question to you in the third month.
 
 ## Starting
@@ -104,7 +104,9 @@ the words of their description: "growth" finds Growth and the situation Strong g
 best first, and the board dims to the nodes that match; the chosen match's node wears an
 ochre ring. The arrow keys move through the list, Enter opens the chosen match (a situation
 opens on its statistic; a policy not in force opens the Add policy sheet at it), and Esc
-clears the search.
+clears the search. On a window too narrow for everything on the top bar the field shuts to
+a button, a magnifying glass, before any of the figures gives way: click it, or press "/",
+and it opens to type in.
 
 ## Opening a policy
 
@@ -386,7 +388,8 @@ come in the same months each time.
 | / or Ctrl+F | Go to search |
 | Up, Down, Enter, Esc (in search) | Move through the matches, open the chosen one, clear the search |
 | K | Open or close the key |
-| Esc | Close the popup, then the month's report, then the sheet; skip the guide |
+| Tab, Shift+Tab | Inside a popup or a sheet: to the next control, or the one before; the one that has the keyboard wears a dark ochre ring. Space or Enter presses it |
+| Esc | Close what is on top: the popup, then the month's report, then the sheet; skip the guide. The keyboard goes back to where it was |
 
 The single-letter keys and Space do nothing while you are typing in a field.
 
@@ -461,13 +464,13 @@ game says what was carried over and what started again.
 
 ## Mods
 
-A mod adds to the model or changes it: the example, "A wealth tax", adds a lever in its
-own group, which stands on the board as a policy in an area of that name, a tax in the
-budget and a reaction among the richest voters. Mods live in the game's `mods` folder and
+A mod adds to the model or changes it: the example, "A dog licence", adds a lever in its
+own group, which stands on the board as a policy in an area of that name, a line in the
+budget and a reaction among voters. Mods live in the game's `mods` folder and
 in your own, which the start screen names. A saved game remembers its mods. To make one,
-see `docs/MODDING.md` in the repository: it builds the wealth tax step by step. (Since stage
-S15 the UK also has a wealth tax of its own, on the Add policy sheet under Tax; the mod is
-kept as the worked example and is separate from it.)
+see `docs/MODDING.md` in the repository: it builds the dog licence step by step. (Until stage
+S17 the example was a wealth tax; the UK has had a wealth tax of its own since stage S15, on
+the Add policy sheet under Tax, so the start screen no longer offers one as a mod.)
 
 ## Changing the model while playing
 

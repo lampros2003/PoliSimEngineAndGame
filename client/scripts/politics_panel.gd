@@ -11,8 +11,10 @@ extends PanelContainer
 const Palette := preload("res://scripts/palette.gd")
 
 ## One colour per bloc, in the dimension's order.
-const BLOC_COLOURS := [Color("#b0412c"), Color("#1f4e79"), Color("#d99a27"), Color("#3d8a8f"), Color("#5f7f55"),
-	Color("#c2b03a"), Color("#2e5e44"), Color("#76609a"), Color("#8a8f96"), Color("#a3586f")]
+## Stage S17.1: each at least 3 to 1 against card stock (the gold, the yellow and the grey were
+## under it), so a bloc's seats can be told from the sheet they are printed on.
+const BLOC_COLOURS := [Color("#b0412c"), Color("#1f4e79"), Color("#b58121"), Color("#3d8a8f"), Color("#5f7f55"),
+	Color("#9a8c2e"), Color("#2e5e44"), Color("#76609a"), Color("#878b92"), Color("#a3586f")]
 ## Seats per column of the House.
 const SEAT_ROWS := 10
 
@@ -74,8 +76,8 @@ func _ready() -> void:
 	box.add_child(_bar)
 	_grid = GridContainer.new()
 	_grid.columns = 5
-	_grid.add_theme_constant_override("h_separation", 14)
-	_grid.add_theme_constant_override("v_separation", 5)
+	_grid.add_theme_constant_override("h_separation", 16)
+	_grid.add_theme_constant_override("v_separation", 4)
 	Palette.rule_rows(_grid)
 	# Stage S14.1: the parties and the groups open one at a time, so the sheet fits the screen.
 	var folds := VBoxContainer.new()
@@ -84,14 +86,14 @@ func _ready() -> void:
 	folds.add_child(Palette.fold("The parties", _grid))
 	_stances = VBoxContainer.new()
 	_stances.name = "stances"
-	_stances.add_theme_constant_override("separation", 10)
+	_stances.add_theme_constant_override("separation", 12)
 	_stances_fold = Palette.fold("Where the government stands", _stances, true)
 	_stances_fold.visible = false
 	folds.add_child(_stances_fold)
 	_groups = GridContainer.new()
 	_groups.name = "groups"
 	_groups.columns = 5
-	_groups.add_theme_constant_override("h_separation", 14)
+	_groups.add_theme_constant_override("h_separation", 16)
 	_groups.add_theme_constant_override("v_separation", 4)
 	Palette.rule_rows(_groups)
 	_groups_fold = Palette.fold("The country by group", _groups)
@@ -99,7 +101,7 @@ func _ready() -> void:
 	_places = GridContainer.new()
 	_places.name = "places"
 	_places.columns = 5
-	_places.add_theme_constant_override("h_separation", 14)
+	_places.add_theme_constant_override("h_separation", 16)
 	_places.add_theme_constant_override("v_separation", 4)
 	Palette.rule_rows(_places)
 	_places_fold = Palette.fold("The country by place", _places)
@@ -322,7 +324,7 @@ func _ensure_rows(labels: PackedStringArray) -> void:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	for i in labels.size():
 		var swatch := HBoxContainer.new()
-		swatch.add_theme_constant_override("separation", 6)
+		swatch.add_theme_constant_override("separation", 8)
 		var dot := ColorRect.new()
 		dot.color = BLOC_COLOURS[i % BLOC_COLOURS.size()]
 		dot.custom_minimum_size = Vector2(10, 10)

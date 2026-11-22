@@ -9,6 +9,7 @@ with `cargo build --release`. Exits with status 1 if any step differs.
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,12 @@ def main() -> int:
     parser.add_argument("--runner", type=Path, default=ROOT / "target" / "release" / EXE)
     args = parser.parse_args()
 
+    # Stage S17.1: the spacing scale, read from the scripts' source.
+    problems = check_spacing()
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        return 1
+    print("spacing: every margin and gap in client/scripts on the scale, or its reason beside it")
     with tempfile.TemporaryDirectory() as folder:
         folder = Path(folder)
         client_out, runner_out = folder / "client.csv", folder / "runner.csv"
@@ -191,6 +198,23 @@ def main() -> int:
             print("res://tests/feel_check.gd failed", file=sys.stderr)
             return 1
         print(run.stdout.strip().splitlines()[-1])
+        # Stage S17.1: the second polish pass, each item with the check that keeps it fixed:
+        # contrast measured (the palette's pairs, and the screens as they stand); every fold
+        # of every popup and every sheet at two sizes, fitted and measured; the keyboard
+        # through every popup and sheet; the top bar's order of giving way. The contrast
+        # check starts from the start screen, so it takes no scenario.
+        for script, scenario in (("res://tests/contrast_check.gd", []),
+                                 ("res://tests/folds_check.gd", ["--scenario=models/uk/scenarios/2025.toml"]),
+                                 ("res://tests/focus_check.gd", ["--scenario=models/uk/scenarios/2025.toml"]),
+                                 ("res://tests/bar_check.gd", ["--scenario=models/uk/scenarios/2025.toml"])):
+            run = subprocess.run(
+                [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script, "--", *scenario],
+                capture_output=True, encoding="utf-8", timeout=900)
+            if run.returncode != 0 or "SCRIPT ERROR" in run.stderr:
+                print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+                print(f"{script} failed", file=sys.stderr)
+                return 1
+            print(run.stdout.strip().splitlines()[-1])
         # Stage S14.1: the speed budget (docs/S14-PLAN.md, "Speed"), measured and asserted.
         run = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/perf_check.gd",
@@ -223,6 +247,58 @@ def main() -> int:
         print("UK who gains, who loses: every group shown; a basic rate rise hits the upper deciles, not Scotland;"
               " jobs by industry start at 2024's")
         return 0
+
+
+def check_spacing() -> list[str]:
+    """Stage S17.1: every margin, and every gap between one thing and the next, that the
+    client's scripts set is nought or on the scale named once in palette.gd (`SPACE`), or
+    has "off the scale:" and the reason on its line. Read from the source, so it holds for
+    screens no check opens: container separations and margins, style boxes' content margins,
+    and the margins handed to the palette's own box makers."""
+    scripts = ROOT / "client" / "scripts"
+    named = re.search(r"^const SPACE := \[([^\]]+)\]", (scripts / "palette.gd").read_text(encoding="utf-8"), re.M)
+    if not named:
+        return ["spacing: palette.gd names no scale (const SPACE)"]
+    scale = {0.0} | {float(n) for n in named.group(1).split(",")}
+    number = r"(-?\d+(?:\.\d+)?)\s*[,)]"
+    plain = [re.compile(pattern) for pattern in (
+        r'add_theme_constant_override\(\s*"(?:h_|v_)?separation"\s*,\s*' + number,
+        r'add_theme_constant_override\(\s*"margin_(?:left|right|top|bottom)"\s*,\s*' + number,
+        r'add_theme_constant_override\(\s*"margin_"\s*\+\s*\w+\s*,\s*' + number,
+        r'set_constant\(\s*"(?:h_|v_)?separation"\s*,\s*"[^"]+"\s*,\s*' + number,
+        r"content_margin_(?:left|right|top|bottom)\s*=\s*(-?\d+(?:\.\d+)?)\s*(?:#|$)",
+        r"set_content_margin_all\(\s*" + number,
+    )]
+    # The palette's box makers: which of their arguments are margins.
+    makers = {"_flat": (3, 4), "_empty": (0, 1), "card": (0,), "panel_style": (2,), "chosen_row": (0, 1)}
+    call = re.compile(r"(?:(?<![\w.])|(?<=Palette\.))(" + "|".join(makers) + r")\(")
+    problems = []
+    for path in sorted(scripts.glob("*.gd")):
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if "off the scale:" in line or line.lstrip().startswith(("#", "static func ", "func ")):
+                continue
+            found = [float(m.group(1)) for pattern in plain for m in pattern.finditer(line)]
+            for m in call.finditer(line):
+                arguments, depth, start = [], 0, m.end()
+                for at in range(m.end(), len(line)):
+                    if line[at] in "([":
+                        depth += 1
+                    elif line[at] in ")]":
+                        if depth == 0:
+                            arguments.append(line[start:at].strip())
+                            break
+                        depth -= 1
+                    elif line[at] == "," and depth == 0:
+                        arguments.append(line[start:at].strip())
+                        start = at + 1
+                for index in makers[m.group(1)]:
+                    if index < len(arguments) and re.fullmatch(r"-?\d+(?:\.\d+)?", arguments[index]):
+                        found.append(float(arguments[index]))
+            for value in found:
+                if value not in scale:
+                    problems.append(f"spacing: client/scripts/{path.name}:{line_number}: {value:g} is off the scale "
+                                    f"{sorted(int(n) for n in scale)}: {line.strip()[:90]}")
+    return problems
 
 
 def check_migration(godot: str, folder: Path) -> str:

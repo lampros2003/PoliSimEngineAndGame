@@ -23,14 +23,22 @@ const SAGE := Color("#5f7f55")
 const BG := PAPER
 const PANEL := CARD
 const PANEL_RAISED := Color("#f1e9d6")
+const FIELD := Color("#fffaf0")  # a field to type in: a shade lighter than card stock
+const HOVER := Color("#fbf3dc")  # card stock under the pointer
+const PRIMARY_HOVER := Color("#e6ac43")  # the one main action under the pointer, and pressed
+const PRIMARY_PRESSED := Color("#c4871b")
+const LINK_HOVER := Color("#0f2f4d")  # a link under the pointer
 const LINE := Color("#7d8590")  # an ink rule, thinned
 const RULE := Color("#cdbf9f")  # rules between rows: ink on paper, light
 const TEXT := INK
-const MUTED := Color("#55606c")
+# Stage S17.1: the inks text is set in reach 4.5 to 1 on every ground it stands on: card
+# stock, the top bar's band and the paper to its darkest corner (tests/contrast_check.gd).
+# Each is the S13 ink a shade deeper; brick, sage and ochre themselves are kept for fills.
+const MUTED := Color("#505a66")
 const ACCENT := BLUE
-const PENDING := Color("#94600c")  # ochre dark enough to read as text
-const GOOD := Color("#4b6a42")
-const BAD := BRICK
+const PENDING := Color("#7b500a")  # ochre dark enough to read as text, and to ring what has the keyboard
+const GOOD := Color("#44603c")
+const BAD := Color("#9a3926")
 const SHADOW := Color("#1c2733")
 const SERIES := [BLUE, BRICK, Color("#b07a12"), SAGE]
 
@@ -40,11 +48,18 @@ const SERIES := [BLUE, BRICK, Color("#b07a12"), SAGE]
 # group's approval arc is green, mustard or red against the scenario's thresholds, grey
 # where there is no figure.
 const STEADY := BLUE
-const BETTER := Color("#4f7a45")  # a shade deeper than sage, to hold its own beside blue
+const BETTER := Color("#4d7743")  # a shade deeper than sage, to hold its own beside blue (and carry a pennant's words)
 const WORSE := BRICK
 const MIXED := Color("#c9a227")  # mustard: yellower than the ochre that means "act here"
 const NO_FIGURE := Color("#9b968a")
 const ASK := OCHRE
+
+## Stage S17.1: the spacing scale. Every margin, and every gap between one thing and the
+## next, is nought or one of these; a number off it has "off the scale:" and the reason beside
+## it. tools/check_client.py reads the scale from this line and holds the scripts to it.
+const SPACE := [4, 8, 12, 16, 24, 32]
+## The ring round whatever has the keyboard: 2 px of PENDING, 3 px clear of the control.
+const FOCUS := PENDING
 
 const FONT_SIZE := 15
 const SMALL := 14
@@ -103,7 +118,7 @@ static func display(weight := 500, spacing := 0) -> FontVariation:
 
 ## Card stock: a shade lighter than the paper, a firm ink edge and a hard shadow down and
 ## to the right, like a printed plate.
-static func card(margin := 20, shadow := 6, border := 2, colour := CARD) -> StyleBoxFlat:
+static func card(margin := 24, shadow := 6, border := 2, colour := CARD) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = colour
 	box.border_color = INK
@@ -124,7 +139,7 @@ static func panel_style(color: Color = PANEL, _radius: int = 0, margin: int = 16
 	return box
 
 
-static func _flat(bg: Color, border: Color, width := 2, margin_h := 14, margin_v := 6, shadow := 0) -> StyleBoxFlat:
+static func _flat(bg: Color, border: Color, width := 2, margin_h := 12, margin_v := 4, shadow := 0) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = bg
 	box.border_color = border
@@ -139,6 +154,25 @@ static func _flat(bg: Color, border: Color, width := 2, margin_h := 14, margin_v
 		box.shadow_size = 1
 		box.shadow_offset = Vector2(shadow, shadow)
 	return box
+
+
+## Stage S17.1: the ring round whatever has the keyboard, the same on every control.
+static func focus_ring() -> StyleBoxFlat:
+	var ring := StyleBoxFlat.new()
+	ring.draw_center = false
+	ring.set_border_width_all(2)
+	ring.border_color = FOCUS
+	ring.set_expand_margin_all(3)
+	ring.anti_aliasing = false
+	return ring
+
+
+## Stage S17.1: the row chosen in a list (a menu, the search's matches): the ochre tint, with
+## an ink edge down its left so it is told from its neighbours by more than a tint.
+static func chosen_row(margin_h := 8, margin_v := 4) -> StyleBoxFlat:
+	var row := _flat(Color(OCHRE, 0.35), INK, 0, margin_h, margin_v)
+	row.border_width_left = 3
+	return row
 
 
 static func _empty(margin_h := 4, margin_v := 4) -> StyleBoxEmpty:
@@ -209,64 +243,62 @@ static func make_theme() -> Theme:
 	theme.set_color("selection_color", "LineEdit", Color(OCHRE, 0.5))
 	theme.set_color("caret_color", "LineEdit", INK)
 
-	# Buttons: card stock with an ink edge; pressed sinks into its shadow.
-	var focus := StyleBoxFlat.new()
-	focus.draw_center = false
-	focus.set_border_width_all(2)
-	focus.border_color = OCHRE
-	focus.set_expand_margin_all(3)
-	theme.set_stylebox("focus", "Button", focus)
+	# Buttons: card stock with an ink edge; pressed sinks into its shadow. Stage S17.1: what
+	# has the keyboard wears a ring that can be seen on every ground (ochre was 2 to 1 on paper).
+	var focus := focus_ring()
+	for type in ["Button", "MenuButton", "OptionButton", "LinkButton", "RichTextLabel"]:
+		theme.set_stylebox("focus", type, focus)
 	theme.set_font("font", "Button", text(500))
-	_button_states(theme, "Button", _flat(CARD, INK, 2, 14, 6, 3), _flat(Color("#fbf3dc"), INK, 2, 14, 6, 3),
-		_flat(CARD_DEEP, INK, 2, 14, 6, 0), _flat(PAPER, LINE, 2, 14, 6, 0), INK, INK, LINE)
+	_button_states(theme, "Button", _flat(CARD, INK, 2, 12, 4, 3), _flat(HOVER, INK, 2, 12, 4, 3),
+		_flat(CARD_DEEP, INK, 2, 12, 4, 0), _flat(PAPER, LINE, 2, 12, 4, 0), INK, INK, LINE)
 	# Primary: the one main action (Next month); ochre, the colour of acting.
 	theme.set_type_variation("Primary", "Button")
-	_button_states(theme, "Primary", _flat(OCHRE, INK, 2, 18, 7, 4), _flat(Color("#e6ac43"), INK, 2, 18, 7, 4),
-		_flat(Color("#c4871b"), INK, 2, 18, 7, 0), _flat(Color(OCHRE, 0.35), Color(INK, 0.35), 2, 18, 7, 0), INK, INK, Color(INK, 0.45))
+	_button_states(theme, "Primary", _flat(OCHRE, INK, 2, 16, 8, 4), _flat(PRIMARY_HOVER, INK, 2, 16, 8, 4),
+		_flat(PRIMARY_PRESSED, INK, 2, 16, 8, 0), _flat(Color(OCHRE, 0.35), Color(INK, 0.35), 2, 16, 8, 0), INK, INK, Color(INK, 0.45))
 	theme.set_font("font", "Primary", display(600, 1))
 	theme.set_font_size("font_size", "Primary", 16)
 	# Quiet: secondary actions on the top bar, text with an ink edge only on hover.
 	theme.set_type_variation("Quiet", "Button")
-	_button_states(theme, "Quiet", _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 6), _flat(Color(INK, 0.06), INK, 2, 8, 6),
-		_flat(Color(INK, 0.12), INK, 2, 8, 6), _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 6), INK, INK, LINE)
+	_button_states(theme, "Quiet", _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 4), _flat(Color(INK, 0.06), INK, 2, 8, 4),
+		_flat(Color(INK, 0.12), INK, 2, 8, 4), _flat(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 2, 8, 4), INK, INK, LINE)
 	theme.set_font("font", "Quiet", display(500, 1))
 	theme.set_font_size("font_size", "Quiet", 15)
-	theme.set_constant("h_separation", "Quiet", 6)
+	theme.set_constant("h_separation", "Quiet", 8)
 	theme.set_constant("icon_max_width", "Quiet", 20)
 	# Link: an action inside a card ("Undo", "Back"): blue text.
 	theme.set_type_variation("Link", "Button")
 	# Stage S13.6: underlined on hover, so every link answers the pointer.
-	var underline := _flat(Color(0, 0, 0, 0), Color("#0f2f4d"), 0, 4, 4)
+	var underline := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 4, 4)
 	underline.border_width_bottom = 1
-	_button_states(theme, "Link", _empty(), underline, underline, _empty(), BLUE, Color("#0f2f4d"), LINE)
+	_button_states(theme, "Link", _empty(), underline, underline, _empty(), BLUE, LINK_HOVER, LINE)
 	theme.set_font("font", "Link", text(600))
 	theme.set_font_size("font_size", "Link", SMALL)
 	# Stage S14.1: a link in a table's row, with no more room above and below than its text.
 	theme.set_type_variation("LinkRow", "Link")
-	var row_line := _flat(Color(0, 0, 0, 0), Color("#0f2f4d"), 0, 4, 1)
+	var row_line := _flat(Color(0, 0, 0, 0), LINK_HOVER, 0, 4, 0)
 	row_line.border_width_bottom = 1
-	_button_states(theme, "LinkRow", _empty(4, 1), row_line, row_line, _empty(4, 1), BLUE, Color("#0f2f4d"), LINE)
+	_button_states(theme, "LinkRow", _empty(4, 0), row_line, row_line, _empty(4, 0), BLUE, LINK_HOVER, LINE)
 	# Stage S13.6: a line of the month's report, or a row in a sheet: a tint under the pointer.
 	theme.set_type_variation("ReportLine", "Button")
-	_button_states(theme, "ReportLine", _empty(6, 3), _flat(Color(INK, 0.07), Color(0, 0, 0, 0), 0, 6, 3),
-		_flat(Color(INK, 0.13), Color(0, 0, 0, 0), 0, 6, 3), _empty(6, 3), INK, INK, MUTED)
+	_button_states(theme, "ReportLine", _empty(8, 4), _flat(Color(INK, 0.07), Color(0, 0, 0, 0), 0, 8, 4),
+		_flat(Color(INK, 0.13), Color(0, 0, 0, 0), 0, 8, 4), _empty(8, 4), INK, INK, MUTED)
 	theme.set_font("font", "ReportLine", text(500))
 	# Chip: a figure on the top bar that opens its popup.
 	theme.set_type_variation("Chip", "Button")
-	_button_states(theme, "Chip", _empty(10, 2), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 10, 2),
-		_flat(Color(INK, 0.12), Color(INK, 0.0), 0, 10, 2), _empty(10, 2), INK, INK, INK)
+	_button_states(theme, "Chip", _empty(8, 4), _flat(Color(INK, 0.06), Color(INK, 0.0), 0, 8, 4),
+		_flat(Color(INK, 0.12), Color(INK, 0.0), 0, 8, 4), _empty(8, 4), INK, INK, INK)
 
 	# Stage S14.1: the heading of a section that opens and closes: tracked capitals in ink.
 	theme.set_type_variation("Fold", "Button")
-	var fold_hover := _flat(Color(INK, 0.06), Color(0, 0, 0, 0), 0, 4, 3)
-	_button_states(theme, "Fold", _empty(4, 3), fold_hover, fold_hover, _empty(4, 3), INK, INK, MUTED)
+	var fold_hover := _flat(Color(INK, 0.06), Color(0, 0, 0, 0), 0, 4, 4)
+	_button_states(theme, "Fold", _empty(4, 4), fold_hover, fold_hover, _empty(4, 4), INK, INK, MUTED)
 	theme.set_font("font", "Fold", display(600, 1))
 	theme.set_font_size("font_size", "Fold", CAPS)
 
 	# Stage S13.5: a step of a level policy's control: card stock, the step chosen in ink.
 	theme.set_type_variation("Step", "Button")
-	_button_states(theme, "Step", _flat(CARD, INK, 2, 8, 5, 2), _flat(Color("#fbf3dc"), INK, 2, 8, 5, 2),
-		_flat(INK, INK, 2, 8, 5, 0), _flat(PAPER, LINE, 2, 8, 5, 0), INK, INK, LINE)
+	_button_states(theme, "Step", _flat(CARD, INK, 2, 8, 4, 2), _flat(HOVER, INK, 2, 8, 4, 2),
+		_flat(INK, INK, 2, 8, 4, 0), _flat(PAPER, LINE, 2, 8, 4, 0), INK, INK, LINE)
 	for key in ["font_pressed_color", "font_hover_pressed_color"]:
 		theme.set_color(key, "Step", CARD)
 	theme.set_font("font", "Step", text(500))
@@ -291,38 +323,39 @@ static func make_theme() -> Theme:
 	theme.set_type_variation("Card", "PanelContainer")
 	theme.set_stylebox("panel", "Card", card())
 
-	# Fields: card stock, an ink edge; ochre when focused.
-	var field := _flat(Color("#fffaf0"), INK, 2, 8, 4)
-	var field_focus := _flat(Color("#fffaf0"), OCHRE, 2, 8, 4)
+	# Fields: card stock, an ink edge; with the keyboard, the ring every control wears.
+	var field := _flat(FIELD, INK, 2, 8, 4)
 	theme.set_stylebox("normal", "LineEdit", field)
-	theme.set_stylebox("focus", "LineEdit", field_focus)
+	theme.set_stylebox("focus", "LineEdit", focus)  # drawn over the field's own box
 	theme.set_stylebox("read_only", "LineEdit", _flat(PAPER, LINE, 2, 8, 4))
 	theme.set_font("font", "LineEdit", text(500))
 
 	# Sliders: an ink track, an ochre grabber.
 	var track := StyleBoxFlat.new()
 	track.bg_color = Color(INK, 0.25)
-	track.content_margin_top = 2
-	track.content_margin_bottom = 2
+	track.content_margin_top = 2  # off the scale: half the track's own thickness, not a gap
+	track.content_margin_bottom = 2  # off the scale: as above
 	var filled := StyleBoxFlat.new()
 	filled.bg_color = INK
-	filled.content_margin_top = 2
-	filled.content_margin_bottom = 2
+	filled.content_margin_top = 2  # off the scale: as the track
+	filled.content_margin_bottom = 2  # off the scale: as the track
 	theme.set_stylebox("slider", "HSlider", track)
 	theme.set_stylebox("grabber_area", "HSlider", filled)
 	theme.set_stylebox("grabber_area_highlight", "HSlider", filled)
 	theme.set_icon("grabber", "HSlider", _grabber(false))
 	theme.set_icon("grabber_highlight", "HSlider", _grabber(true))
-	theme.set_stylebox("focus", "HSlider", focus)  # stage S13.6: the keyboard's place, in ochre
+	theme.set_stylebox("focus", "HSlider", focus)  # stage S13.6: the keyboard's place
 
 	# Menus, tooltips, option buttons.
-	theme.set_stylebox("panel", "PopupMenu", card(6, 4))
-	theme.set_stylebox("hover", "PopupMenu", _flat(Color(OCHRE, 0.35), Color(0, 0, 0, 0), 0, 8, 4))
+	theme.set_stylebox("panel", "PopupMenu", card(8, 4))
+	# Stage S17.1: the row the pointer or the arrows are on: the ochre tint, edged so it can be
+	# told from its neighbours without the colour.
+	theme.set_stylebox("hover", "PopupMenu", chosen_row())
 	theme.set_constant("v_separation", "PopupMenu", 12)  # stage S16.1: rows of 32 px
 	theme.set_color("font_hover_color", "PopupMenu", INK)
 	theme.set_color("font_disabled_color", "PopupMenu", MUTED)
 	theme.set_color("font_separator_color", "PopupMenu", MUTED)
-	theme.set_stylebox("panel", "TooltipPanel", _flat(INK, INK, 0, 10, 6))
+	theme.set_stylebox("panel", "TooltipPanel", _flat(INK, INK, 0, 12, 8))
 	theme.set_color("font_color", "TooltipLabel", CARD)
 	theme.set_font_size("font_size", "TooltipLabel", SMALL)
 	theme.set_icon("arrow", "OptionButton", _triangle(12, false, INK))
@@ -332,9 +365,12 @@ static func make_theme() -> Theme:
 		theme.set_icon("unchecked", type, _box_icon(false))
 		theme.set_icon("radio_checked", type, _box_icon(true))
 		theme.set_icon("radio_unchecked", type, _box_icon(false))
-	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
-		theme.set_stylebox(state, "CheckBox", _empty(2, 4))
-	theme.set_constant("h_separation", "CheckBox", 10)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		theme.set_stylebox(state, "CheckBox", _empty(4, 4))
+	var box_focus := focus_ring()
+	box_focus.set_expand_margin_all(0)  # a check box's ring is its own outline: its row has no room round it
+	theme.set_stylebox("focus", "CheckBox", box_focus)
+	theme.set_constant("h_separation", "CheckBox", 8)
 
 	for type in ["HSeparator", "VSeparator"]:
 		var rule := StyleBoxLine.new()
@@ -345,10 +381,10 @@ static func make_theme() -> Theme:
 	for type in ["VScrollBar", "HScrollBar"]:
 		var lane := StyleBoxFlat.new()
 		lane.bg_color = Color(0, 0, 0, 0)
-		lane.set_content_margin_all(3)
+		lane.set_content_margin_all(3)  # off the scale: half the scroll bar's own thickness, not a gap
 		var grab := StyleBoxFlat.new()
 		grab.bg_color = Color(INK, 0.35)
-		grab.set_content_margin_all(3)
+		grab.set_content_margin_all(3)  # off the scale: as the lane
 		var grab_on := grab.duplicate()
 		grab_on.bg_color = INK
 		theme.set_stylebox("scroll", type, lane)
@@ -365,7 +401,7 @@ static func _grabber(hot: bool) -> Texture2D:
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	image.fill_rect(Rect2i(3, 0, size - 6, size), INK)
-	image.fill_rect(Rect2i(5, 2, size - 10, size - 4), Color("#e6ac43") if hot else OCHRE)
+	image.fill_rect(Rect2i(5, 2, size - 10, size - 4), PRIMARY_HOVER if hot else OCHRE)
 	return ImageTexture.create_from_image(image)
 
 
@@ -427,7 +463,7 @@ static func rule_rows(grid: GridContainer) -> void:
 static func fold(title: String, body: Control, open := false) -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.name = "fold_" + title.to_lower().replace(" ", "_").replace(",", "")
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 8)
 	var head := Button.new()
 	head.theme_type_variation = "Fold"
 	head.alignment = HORIZONTAL_ALIGNMENT_LEFT
