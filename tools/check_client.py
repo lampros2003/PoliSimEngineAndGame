@@ -215,6 +215,18 @@ def main() -> int:
                 print(f"{script} failed", file=sys.stderr)
                 return 1
             print(run.stdout.strip().splitlines()[-1])
+        # Stage S18 (docs/S18-PLAN.md): the country as a map on the Parliament sheet; the
+        # game's icon and opening picture, the pictograms' credits and the plates.
+        for script in ("res://tests/map_check.gd", "res://tests/plates_check.gd"):
+            run = subprocess.run(
+                [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", script,
+                 "--", "--scenario=models/uk/scenarios/2025.toml"],
+                capture_output=True, encoding="utf-8", timeout=900)
+            if run.returncode != 0 or "SCRIPT ERROR" in run.stderr:
+                print(run.stdout.strip()[-2000:], run.stderr.strip()[-3000:], sep="\n", file=sys.stderr)
+                print(f"{script} failed", file=sys.stderr)
+                return 1
+            print(run.stdout.strip().splitlines()[-1])
         # Stage S14.1: the speed budget (docs/S14-PLAN.md, "Speed"), measured and asserted.
         run = subprocess.run(
             [args.godot, "--headless", "--path", str(ROOT / "client"), "--script", "res://tests/perf_check.gd",

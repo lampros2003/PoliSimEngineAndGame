@@ -97,6 +97,9 @@ func _walk(what: String, under: Control) -> void:
 		await process_frame
 	for line in Contrast.faults(under):
 		_faults.append("%s: %s" % [what, line])
+	# Stage S18.1: and every pictogram in it made at the size it is shown at.
+	for line in Contrast.Palette.unsharp(under):
+		_faults.append("%s: %s" % [what, line])
 
 
 func _fail(message: String) -> void:

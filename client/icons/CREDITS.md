@@ -2,7 +2,12 @@
 
 Silhouette pictograms from game-icons.net, licensed under CC BY 3.0
 (https://creativecommons.org/licenses/by/3.0/). The black background square of each
-file was removed so the client can tint the white artwork. Stage S13.2; the groups' pictograms, stage S13.4; the real policies, their indicators and the estimated groups, stage S13.5.
+file was removed so the client can tint the white artwork. Stage S13.2; the groups' pictograms, stage S13.4; the real policies, their indicators and the estimated groups, stage S13.5; the plates' pictograms (the pictures at the head of a question, of election night and of the end of a term), stage S18.3.
+
+Since stage S18.1 the files are imported as drawings, not as pictures of one size
+(`importer="svg"` in each `.svg.import`), and the client has each made at the size it is
+shown (`Palette.icon(name, px)`), so a pictogram is sharp at 16 pixels and at 160.
+`client/tests/plates_check.gd` holds that every file here has its line below.
 
 | File | Icon | Author |
 |---|---|---|
@@ -151,6 +156,21 @@ above: white silhouettes on a 512 square), not from game-icons.net.
 | `congestion-charge.svg` | a car at a barrier | original to PoliSim |
 | `air-pollution.svg` | a smoking chimney | original to PoliSim |
 | `research.svg` | a flask | original to PoliSim |
+| `bank.svg` | bank | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `flood.svg` | flood | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `foundry.svg` | foundry-bucket | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `handcuffs.svg` | handcuffs | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `handshake.svg` | shaking-hands | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `laurels.svg` | laurels | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `lightning.svg` | power-lightning | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `megaphone.svg` | megaphone | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `money-stack.svg` | money-stack | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `podium.svg` | podium | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `processor.svg` | processor | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `sailboat.svg` | sailboat | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `snowflake.svg` | snowflake-1 | lorc, available on https://game-icons.net, CC BY 3.0 |
+| `tap.svg` | tap | delapouite, available on https://game-icons.net, CC BY 3.0 |
+| `thermometer.svg` | thermometer-hot | delapouite, available on https://game-icons.net, CC BY 3.0 |
 | `wealth-tax.svg` | coins and a percent badge | original to PoliSim |
 | `childcare.svg` | a pram | original to PoliSim |
 | `id-card.svg` | a card with a portrait | original to PoliSim |

@@ -80,6 +80,14 @@ func _initialize() -> void:
 
 func _popups() -> void:
 	await _screen("board")
+	# Stage S18.1: the board's own pictograms, and the top bar's, at the size they are shown.
+	main.board.icons_drawn.clear()
+	main.board.queue_layers()
+	await _frames(4)
+	if main.board.icons_drawn.is_empty() and DisplayServer.get_name() != "headless":
+		_faults.append("the board drew no pictogram at %dx%d" % [_view.x, _view.y])
+	for line in Contrast.Palette.unsharp(main._bar):
+		_faults.append("the top bar at %dx%d: %s" % [_view.x, _view.y, line])
 	# A policy in force: at rest, then with a change waiting and the year ahead.
 	main.open_node("policy:income_tax")
 	await _open()
@@ -303,6 +311,9 @@ func _state(name: String, card: Control) -> void:
 				_faults.append("%s: the button \"%s\" has %.0f px, its words need %.0f" % [tag, button.text.left(40), button.size.x, button.get_minimum_size().x])
 	# Stage S17.1: every piece of text in it against the ground it stands on.
 	for line in Contrast.faults(card):
+		_faults.append("%s: %s" % [tag, line])
+	# Stage S18.1: every pictogram in it made at the size it is shown at.
+	for line in Contrast.Palette.unsharp(card):
 		_faults.append("%s: %s" % [tag, line])
 	if shots == "" or DisplayServer.get_name() == "headless":
 		return

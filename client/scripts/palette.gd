@@ -116,6 +116,34 @@ static func display(weight := 500, spacing := 0) -> FontVariation:
 	return font(DISPLAY_FILE, weight, spacing)
 
 
+## Stage S18.1: the display face for words set along a curve. Each letter there is turned to
+## the curve, and a letter's ordinary picture, made for the pixel grid upright, goes soft when
+## turned; this copy of the face is drawn from distance fields, which stay sharp at any angle
+## and size. Upright text keeps the ordinary pictures, which are crisper at small sizes.
+static var _turned_file: FontFile
+
+
+static func display_turned(weight := 600, spacing := 2) -> FontVariation:
+	if _turned_file == null:
+		_turned_file = FontFile.new()
+		_turned_file.data = DISPLAY_FILE.data
+		_turned_file.multichannel_signed_distance_field = true
+		_turned_file.msdf_pixel_range = 10
+		_turned_file.msdf_size = 48
+		_turned_file.resource_path = ""
+	var key := "turned/%d/%d" % [weight, spacing]
+	if _fonts.has(key):
+		return _fonts[key]
+	var ts := TextServerManager.get_primary_interface()
+	var f := FontVariation.new()
+	f.base_font = _turned_file
+	f.variation_opentype = {ts.name_to_tag("wght"): weight}
+	if spacing != 0:
+		f.spacing_glyph = spacing
+	_fonts[key] = f
+	return f
+
+
 ## Card stock: a shade lighter than the paper, a firm ink edge and a hard shadow down and
 ## to the right, like a printed plate.
 static func card(margin := 24, shadow := 6, border := 2, colour := CARD) -> StyleBoxFlat:
@@ -455,10 +483,67 @@ static func paper() -> ColorRect:
 
 
 ## An icon from client/icons by name (game-icons.net silhouettes, drawn white so a colour
-## can tint them); the generic cog for a name that has none.
-static func icon(name: String) -> Texture2D:
+## can tint them); the generic cog for a name that has none. Stage S18.1: with `px`, made at
+## that many pixels across (see `sized`); without, the picture as its file has it, for a
+## caller that hands it on to be sized where it is drawn.
+static func icon(name: String, px := 0) -> Texture2D:
 	var path := "res://icons/%s.svg" % name
-	return load(path if name != "" and ResourceLoader.exists(path) else "res://icons/policy.svg")
+	var picture: Texture2D = load(path if name != "" and ResourceLoader.exists(path) else "res://icons/policy.svg")
+	return sized(picture, px) if px > 0 else picture
+
+
+## Stage S18.1: a pictogram at the size it is drawn. The files are vector drawings 512 units
+## across, imported as scalable textures; shown small they used to be one 512-pixel picture
+## squeezed to 16 or 20 on the way to the screen, which is why the smallest were ragged or
+## soft. One made here at `px` is drawn from the vectors at exactly `px` pixels, times the
+## screen's own scale, and kept: the same picture at the same size is made once.
+static var _sized := {}
+
+
+static func sized(picture: Texture2D, px: int) -> Texture2D:
+	if picture == null or px <= 0 or not picture is DPITexture:
+		return picture
+	var drawing: DPITexture = picture.get_meta("drawing") if picture.has_meta("drawing") else picture
+	var key := "%d/%d" % [drawing.get_instance_id(), px]
+	if _sized.has(key):
+		return _sized[key]
+	var across := float(drawing.get_width()) / maxf(drawing.base_scale, 0.001)
+	var made := DPITexture.create_from_string(drawing.get_source(), float(px) / maxf(across, 1.0))
+	made.set_meta("drawing", drawing)
+	_sized[key] = made
+	return made
+
+
+## For the checks: how many pixels across a picture `sized` made is drawn from, or 0 for one
+## that was not made by it.
+static func made_at(picture: Texture2D) -> int:
+	return picture.get_width() if picture is DPITexture and picture.has_meta("drawing") else 0
+
+
+## For the checks: every pictogram under `root` that is on screen at a size other than the
+## one it was made at (a 512-pixel drawing in a 20-pixel button, say), as lines of words.
+static func unsharp(root: Control) -> PackedStringArray:
+	var out := PackedStringArray()
+	var controls: Array = root.find_children("*", "Control", true, false)
+	controls.append(root)
+	for c in controls:
+		var control := c as Control
+		if not control.is_visible_in_tree():
+			continue
+		var picture: Texture2D = null
+		var shown := 0.0
+		if control is TextureRect:
+			picture = (control as TextureRect).texture
+			shown = minf(control.size.x, control.size.y)
+		elif control is Button:
+			picture = (control as Button).icon
+			var cap := control.get_theme_constant("icon_max_width")
+			shown = float(cap) if cap > 0 and picture != null else (float(picture.get_width()) if picture != null else 0.0)
+		if picture == null or not picture is DPITexture:
+			continue
+		if absf(float(picture.get_width()) - shown) > 1.0:
+			out.append("the pictogram of %s is made at %d px and shown at %.0f" % [control.name, picture.get_width(), shown])
+	return out
 
 
 ## Ink rules between the rows of a table laid out as a GridContainer.

@@ -180,6 +180,15 @@ func _initialize() -> void:
 	_key(KEY_ESCAPE)
 	if main._key_sheet.visible:
 		return _fail("Esc did not close the key")
+	# Stage S18.2: F11 takes the whole screen, and the menu shows it ticked; F11 again gives the
+	# window back (without a display there is no window to change: the setting is what is read).
+	var menu: PopupMenu = main._menu.get_popup()
+	_key(KEY_F11)
+	if not main.fullscreen or not menu.is_item_checked(menu.get_item_index(10)):
+		return _fail("F11 did not take the whole screen")
+	_key(KEY_F11)
+	if main.fullscreen or menu.is_item_checked(menu.get_item_index(10)):
+		return _fail("F11 did not give the window back")
 	main.open_node("policy:vat")
 	await _settle()
 	var field: LineEdit = main.policy_card().find_child("lever_vat_rate", true, false)

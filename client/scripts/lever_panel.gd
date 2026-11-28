@@ -202,7 +202,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	head.add_theme_constant_override("separation", 16)
 	add_child(head)
 	var badge := TextureRect.new()
-	badge.texture = node.get("icon")
+	badge.texture = Palette.sized(node.get("icon"), 56)
 	badge.custom_minimum_size = Vector2(56, 56)
 	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

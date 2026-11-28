@@ -9,6 +9,7 @@ extends PanelContainer
 ## group's popup.
 
 const Palette := preload("res://scripts/palette.gd")
+const CountryMap := preload("res://scripts/country_map.gd")
 
 ## One colour per bloc, in the dimension's order.
 ## Stage S17.1: each at least 3 to 1 against card stock (the gold, the yellow and the grey were
@@ -40,6 +41,10 @@ var _stances_fold: Control
 var _places: GridContainer
 var _places_fold: Control
 var _place_rows: Array = []
+## Stage S18.4: the country as a map beside the table of places (where the scenario names one:
+## [play.web] map), and the place marked out on both: under the pointer on either.
+var place_map: Control
+var place_chosen := -1
 ## Group key -> {label, row, approval}, for the ends of the stances' scales; and what moved a
 ## stance last: stance row -> words (set by the screen).
 var group_info := {}
@@ -50,9 +55,24 @@ var _group_rows: Array = []  # {key, row, share, note, cells: [share, bar, appro
 
 func _ready() -> void:
 	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	# Stage S18.4: two columns: the House and the sections on the left; on the right, where the
+	# scenario names a map, the country by place, in view whichever section is open.
+	var columns := HBoxContainer.new()
+	columns.name = "columns"
+	columns.add_theme_constant_override("separation", 24)
+	add_child(columns)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(box)
+	place_map = CountryMap.new()
+	place_map.visible = false
+	place_map.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	place_map.place_entered.connect(_choose_place)
+	place_map.place_pressed.connect(func(index: int) -> void:
+		_open_fold(_places_fold)
+		_choose_place(index))
+	columns.add_child(place_map)
 	var top := HBoxContainer.new()
 	box.add_child(top)
 	_election = Label.new()
@@ -104,6 +124,11 @@ func _ready() -> void:
 	_places.add_theme_constant_override("h_separation", 16)
 	_places.add_theme_constant_override("v_separation", 4)
 	Palette.rule_rows(_places)
+	_places.draw.connect(_draw_place_chosen)
+	_places.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseMotion:
+			_choose_place(_place_row_at((event as InputEventMouseMotion).position.y)))
+	_places.mouse_exited.connect(func() -> void: _choose_place(-1))
 	_places_fold = Palette.fold("The country by place", _places)
 	_places_fold.visible = false
 	folds.add_child(_places_fold)
@@ -135,8 +160,9 @@ func build(play: Dictionary) -> void:
 
 
 ## Stage S13.4: a row per interest group on the board. Stage S15.3: and the stances and the
-## places the scenario's [play.web] gives (`web`).
-func build_groups(board: Control, web := {}) -> void:
+## places the scenario's [play.web] gives (`web`). Stage S18.4: and the map it names, a path
+## from the scenario's folder (`folder`).
+func build_groups(board: Control, web := {}, folder := "") -> void:
 	_build_stances(web.get("stances", []))
 	# Stage S15.3: the stances open first where there are any (the House above shows the
 	# parties); else the parties' table.
@@ -146,6 +172,7 @@ func build_groups(board: Control, web := {}) -> void:
 			(parties.get_meta("fold") as Callable).call(true)
 		_stances_fold.get_meta("fold").call(false)
 	_build_places(web.get("places", []))
+	_build_map(str(web.get("map", "")), folder, web.get("places", []))
 	_build_ring_groups(board)
 
 
@@ -174,7 +201,7 @@ func _build_ring_groups(board: Control) -> void:
 		name.pressed.connect(func() -> void: group_pressed.emit(key, name.get_global_rect()))
 		_groups.add_child(name)
 		var bar := Control.new()
-		bar.custom_minimum_size = Vector2(200, 18)
+		bar.custom_minimum_size = Vector2(160, 18)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.draw.connect(func() -> void: _draw_approval(bar))
 		var cells := [_cell("–"), bar, _cell("–"), _cell("–", Palette.MUTED)]
@@ -264,13 +291,70 @@ func _build_places(list: Array) -> void:
 		name.custom_minimum_size = Vector2(190, 0)
 		_places.add_child(name)
 		var bar := Control.new()
-		bar.custom_minimum_size = Vector2(200, 18)
+		bar.custom_minimum_size = Vector2(160, 18)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.mouse_filter = Control.MOUSE_FILTER_PASS
 		bar.draw.connect(func() -> void: _draw_approval(bar))
 		var cells := [_cell("–"), bar, _cell("–"), _cell("–", Palette.MUTED)]
 		for c in cells:
 			_places.add_child(c)
-		_place_rows.append({"row": str(item.get("row", "")), "share": str(item.get("share", "")), "note": str(item.get("note", "")), "cells": cells})
+		_place_rows.append({"row": str(item.get("row", "")), "share": str(item.get("share", "")), "note": str(item.get("note", "")), "cells": cells,
+			"name": name, "label": str(item.get("label", "")), "regions": item.get("regions", [])})
+
+
+## Stage S18.4: the map beside the places' table: read from the file the scenario names, each
+## place the regions the scenario gives it. No map, or one that cannot be read, and the table
+## stands alone (`place_map.error` says why).
+func _build_map(file: String, folder: String, list: Array) -> void:
+	place_chosen = -1
+	place_map.visible = false
+	place_map.places = []
+	if file == "" or list.is_empty():
+		return
+	var path := file if file.is_absolute_path() else folder.path_join(file).simplify_path()
+	if place_map.read(path) != "":
+		push_warning("The map of the country: %s" % place_map.error)
+		return
+	for g in _place_rows:
+		place_map.places.append({"label": g["label"], "regions": g["regions"], "value": null, "silent": false, "note": g["note"]})
+	place_map.visible = true
+
+
+## Opens one of the sheet's sections and shuts the others, as pressing its heading does.
+func _open_fold(fold: Control) -> void:
+	for other in fold.get_parent().get_children():
+		if other.has_meta("fold"):
+			(other.get_meta("fold") as Callable).call(other == fold)
+	if is_inside_tree():
+		get_tree().call_group("popups", "relayout")
+
+
+## Marks a place out on the map and in the table (-1 for none).
+func _choose_place(index: int) -> void:
+	if index == place_chosen:
+		return
+	place_chosen = index
+	place_map.chosen = index
+	_places.queue_redraw()
+
+
+## The place whose row of the table is at height `y`, or -1.
+func _place_row_at(y: float) -> int:
+	for i in _place_rows.size():
+		var name: Control = _place_rows[i]["name"]
+		if y >= name.position.y - 2.0 and y <= name.position.y + name.size.y + 2.0:
+			return i
+	return -1
+
+
+## The row of the place marked out: the tint of a chosen row behind it, an ink edge at its left.
+func _draw_place_chosen() -> void:
+	if place_chosen < 0 or place_chosen >= _place_rows.size() or not place_map.visible:
+		return
+	var name: Control = _place_rows[place_chosen]["name"]
+	var row := Rect2(-8.0, name.position.y - 1.0, _places.size.x + 16.0, name.size.y + 2.0)
+	_places.draw_rect(row, Color(Palette.OCHRE, 0.35))
+	_places.draw_rect(Rect2(row.position, Vector2(3, row.size.y)), Palette.INK)
 
 
 ## A group's approval as a bar from nought to a half, with a tick at the national rating.
@@ -315,6 +399,13 @@ func _show_groups(latest: Callable, previous: Callable) -> void:
 			cells[3].text = "0.0" if absf(d) < 0.05 else ("▲ +%.1f" % d if d > 0.0 else "▼ −%.1f" % absf(d))
 			if absf(d) >= 0.05:
 				cells[3].add_theme_color_override("font_color", Palette.GOOD if d > 0.0 else Palette.BAD)
+	if place_map.visible:
+		for i in mini(_place_rows.size(), place_map.places.size()):
+			var now: Variant = latest.call(_place_rows[i]["row"])
+			var silent: bool = now != null and absf(float(now)) < 0.0005 and _place_rows[i]["note"] != ""
+			place_map.places[i]["value"] = now
+			place_map.places[i]["silent"] = silent
+		place_map.queue_redraw()
 
 
 func _ensure_rows(labels: PackedStringArray) -> void:
@@ -463,7 +554,7 @@ func _draw_bar() -> void:
 	for i in order:
 		for k in int(_seats[i]):
 			var p := Vector2((seat / SEAT_ROWS + 0.5) * cell, (seat % SEAT_ROWS + 0.5) * cell)
-			_bar.draw_circle(p, r, BLOC_COLOURS[i % BLOC_COLOURS.size()])
+			_bar.draw_circle(p, r, BLOC_COLOURS[i % BLOC_COLOURS.size()], true, -1.0, true)
 			seat += 1
 	var majority := float(_bar.get_meta("majority", total / 2.0))
 	var x := ceilf((majority - 1.0) / SEAT_ROWS) * cell

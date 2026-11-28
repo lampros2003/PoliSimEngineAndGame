@@ -207,7 +207,7 @@ func _draw() -> void:
 			var values: PackedFloat64Array = s["values"]
 			if hover < values.size() and is_finite(values[hover]):
 				lines.append("%s: %s" % [s["label"], _label(values[hover])])
-				draw_circle(Vector2(hx, _y(values[hover], rect, r)), 3.5, s["color"])
+				draw_circle(Vector2(hx, _y(values[hover], rect, r)), 3.5, s["color"], true, -1.0, true)
 		for m in markers:
 			if int(m["step"]) == int(steps[hover]):
 				lines.append(m["text"])
@@ -226,7 +226,7 @@ func _polyline(points: PackedVector2Array, color: Color) -> void:
 	if points.size() >= 2:
 		draw_polyline(points, color, 2.5, true)
 	elif points.size() == 1:
-		draw_circle(points[0], 4.0, color)  # a first month's one point: a mark that can be seen
+		draw_circle(points[0], 4.0, color, true, -1.0, true)  # a first month's one point: a mark that can be seen
 
 
 func _gui_input(event: InputEvent) -> void:

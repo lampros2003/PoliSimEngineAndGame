@@ -212,6 +212,41 @@ so on. A translation of a whole country is a mod too: a `mod.toml` with no files
 dilemma's words go in `[dilemma.<name>]`, with each answer's under `option.<answer>`, as
 `mods/dock_strike/text/fr.toml` shows.
 
+## A plate for a question, and a map of the country
+
+These two are a scenario's, not a mod's: they sit in the scenario's `[play]` table, which the
+engine does not read (`docs/spec/05-game-client.md`).
+
+A question's sheet opens under a **plate**, a poster-style picture made from the game's
+pictograms. Without a line a question has the plain one. To give it its own, name the
+question in the scenario's `[play.plates]`:
+
+```toml
+[play.plates]
+dock_strike_walkout = { icon = "megaphone", tone = "brick", beside = ["jobs", "jobs"] }
+```
+
+`icon` and `beside` are file names in `client/icons` (without `.svg`); `tone` is one of
+ochre, blue, brick, sage and ink. `election`, `election_lost` and `term` name the plates of
+election night and the end of a term.
+
+**A map of the country** stands on the Parliament sheet when the scenario names one:
+
+```toml
+[play.web]
+map = "../map/regions.geojson"   # from the scenario's own folder
+places = [
+  { label = "The North", row = "approval_north", share = "share_north", regions = ["TLC", "TLD", "TLE"] },
+]
+```
+
+The file is GeoJSON on a flat grid with north up: a polygon for each region with a `code`,
+and the lines between and around the regions with `a` and `b`, the codes either side (`b`
+empty on the coast). The open tool [mapshaper](https://github.com/mbloch/mapshaper) writes
+both from any boundary file; `tools/uk/map.py` holds the whole command for the United
+Kingdom's, and `models/uk/map/README.md` what the result holds. Keep the publisher's
+acknowledgement in the file's `attribution`: the game shows it in How to play.
+
 ## Limits for now
 
 A mod cannot bring data files, add households or other record sets, add sectors, or remove

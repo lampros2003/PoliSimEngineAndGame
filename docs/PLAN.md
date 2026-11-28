@@ -24,6 +24,7 @@ in `README.md`. Update the status column here as milestones close.
 | S15 After the second playtest | "Better by quite a bit" (2026-11-16, `docs/S15-PLAN.md`, done): groups by belief, work and place; an Add policy sheet in place of the bubbles; search; twelve policies and twelve statistics more |
 | S16 After the third playtest | 2026-11-16 (`docs/S16-PLAN.md`, done): political capital and approval back on the top bar; a first polish pass (24 faults listed, 20 fixed); belief groups sized from published segments |
 | S17 The second polish pass | Asked for by the owner on 2026-11-16, done on 2026-11-22 (`docs/S17-PLAN.md`): contrast measured, one spacing scale, the keyboard inside popups and sheets, the top bar's order of giving way, every fold photographed at two sizes, a mod that adds what the model lacks; each with a check that keeps it fixed. Before it, two checks that failed now and then in CI were traced to their causes (a real fault in the bridge, and a speed budget that took no account of the machine) |
+| S18 The look, to the genre's standard | Asked for by the owner on 2026-11-28, done the same day (`docs/S18-PLAN.md`): every pictogram made at the size it is shown, so sharp at any size and scale; a plate (a poster-style picture from the open pictograms) at the head of every question, of election night and of the end of a term; the country as a map on the Parliament sheet, from the ONS's open boundaries; the game's own icon and opening picture, and the whole screen on F11; each with a check that keeps it fixed. Two faults found on the way were fixed: the search's button lying over Add policy after a sheet opened, and the month's report drawn over the sheets |
 
 ## Decisions this plan rests on
 
@@ -161,11 +162,12 @@ therefore the first item of S4, when households make "who gains and who loses" v
 
 ## What I need from the owner
 
-As it stands on 2026-11-22, after S17:
+As it stands on 2026-11-28, after S18:
 
 | When | What | Why |
 |---|---|---|
-| Now | Play the newest Windows build (the `PoliSim-windows` download on the latest CI run) at the window size you use, and once with the keyboard: Tab through a popup, Esc out of it | S17's checks measure contrast, spacing, fit and focus. How it looks and feels on a real screen is yours to say |
+| Now | Play the newest Windows build (the `PoliSim-windows` download on the latest CI run) at the window size you use, once with the keyboard (Tab through a popup, Esc out of it) and once on the whole screen (F11). Open Parliament and a question, and say what you think of the map and the plates | S17's checks measure contrast, spacing, fit and focus, and S18's that pictures are sharp and the map is right. How it looks and feels on a real screen is yours to say |
+| Now | Say whether you want more of S18's kind: a paper texture under the board, motion when a month turns, music. Each was looked at and left for you to ask for (`docs/S18-PLAN.md`, Decisions) | They are matters of taste, and a texture sits under text whose contrast S17 measured |
 | Now | Say whether each new game should have a seed of its own | Today every game of a scenario meets its chance events in the same months |
 | Now | Say whether the dilemmas' political costs are the right size, and whether the S11 effect curves feel right in play | Open since S9 and S11 |
 | Before any release | Open the licence pages in `docs/data/first-country-licences.md` (the Open Parliament Licence among them) and confirm them | I could only read search summaries of those pages |

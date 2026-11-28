@@ -72,7 +72,7 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	head.add_theme_constant_override("separation", 16)
 	add_child(head)
 	var badge := TextureRect.new()
-	badge.texture = node.get("icon")
+	badge.texture = Palette.sized(node.get("icon"), 56)
 	badge.custom_minimum_size = Vector2(56, 56)
 	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -371,10 +371,10 @@ class GroupCardWords:
 
 	## A pictogram of a person about 3.5 times `s` tall, its head's top at `top`.
 	static func person(canvas: CanvasItem, top: Vector2, s: float, colour: Color) -> void:
-		canvas.draw_circle(top + Vector2(0, s * 0.75), s * 0.62, colour)
+		canvas.draw_circle(top + Vector2(0, s * 0.75), s * 0.62, colour, true, -1.0, true)
 		var body := Rect2(top + Vector2(-s * 0.85, s * 1.55), Vector2(s * 1.7, s * 1.9))
 		canvas.draw_rect(body, colour)
-		canvas.draw_circle(body.position + Vector2(s * 0.85, 0), s * 0.85, colour)
+		canvas.draw_circle(body.position + Vector2(s * 0.85, 0), s * 0.85, colour, true, -1.0, true)
 
 
 ## A household's account for the year: each line of `house.account` (a "-" in front is
