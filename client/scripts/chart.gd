@@ -123,7 +123,7 @@ func _draw() -> void:
 	var rect := _plot_rect()
 	_legend_boxes.clear()
 	if series.is_empty():
-		draw_string(font, Vector2(PAD_LEFT, size.y * 0.5), "Its history appears after the first month.",
+		draw_string(font, Vector2(PAD_LEFT, size.y * 0.5), "No history yet",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.FONT_SIZE, Palette.MUTED)
 		return
 	var r := _range()

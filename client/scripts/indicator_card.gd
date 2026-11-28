@@ -81,7 +81,7 @@ func build(name: String, row_key: String, the_entry: Dictionary, label: String, 
 	lift.add_child(_change)
 	figures.add_child(lift)
 	if str(entry.get("doc", "")) != "":
-		add_child(_muted(LeverPanel._sentence(str(entry["doc"]))))
+		add_child(Palette.content(_muted(Palette.lead(str(entry["doc"]))), str(entry["doc"])))
 	if situation:
 		return
 	if row != "":

@@ -58,11 +58,6 @@ func _ready() -> void:
 		rules.draw_line(Vector2(0, 1), Vector2(rules.size.x, 1), Palette.INK, 3.0)
 		rules.draw_line(Vector2(0, 7), Vector2(rules.size.x, 7), Palette.INK, 1.0))
 	box.add_child(rules)
-	var lead := Label.new()
-	lead.text = "You lead a government. Choose a country, and any mods to play it with."
-	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lead.add_theme_font_size_override("font_size", 18)
-	box.add_child(lead)
 	box.add_child(_muted("Country", true, true))
 	_choice = OptionButton.new()
 	_choice.name = "scenario_choice"
@@ -206,4 +201,4 @@ func _show_choice() -> void:
 			about.custom_minimum_size = Vector2(620, 0)
 			_mod_box.add_child(about)
 	if _ticks.is_empty():
-		_mod_box.add_child(_muted("No mods for this country yet. A mod is a folder with a mod.toml: put it in %s." % user_mods, true))
+		_mod_box.add_child(_muted("None yet. A mod's folder goes in %s." % user_mods, true))

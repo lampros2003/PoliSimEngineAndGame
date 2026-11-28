@@ -43,7 +43,6 @@ var key := ""  # the board's policy key
 var levers: PackedStringArray = []
 ## Stage S14.1: unused; a policy's popup is always one column.
 var wide := false
-var hint: Label
 var capital_note: Label
 var chart: Chart
 var _rows := {}  # name -> {entry, spin, slider, now, pending, cancel, vote}
@@ -218,7 +217,7 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 	title.theme_type_variation = "Title"
 	titles.add_child(title)
 	if entries.size() == 1 and str(entries[0].get("doc", "")) != "":
-		add_child(_muted(_sentence(str(entries[0]["doc"]))))
+		add_child(Palette.content(_muted(Palette.lead(str(entries[0]["doc"]))), str(entries[0]["doc"])))
 	_controls = VBoxContainer.new()
 	_controls.add_theme_constant_override("separation", 8)
 	add_child(_controls)
@@ -251,11 +250,6 @@ func build(node: Dictionary, entries: Array, legislature: bool, start_of: Callab
 		for entry in rest:
 			_holder = _more
 			_lever_row(entry, start_of.call(str(entry["name"])))
-	hint = _muted("Changes are bills: the Commons votes on them next month." if legislature else "Changes take effect from next month.")
-	if introducing:
-		hint.text = "Pick a setting to see what it would do in a year and how the Commons would vote; then put it to the Commons." if legislature \
-			else "Pick a setting to see what it would do in a year; then bring it in."
-	_controls.add_child(hint)
 	# Stage S13.5: the bill that brings the policy in, or the one that repeals it.
 	if introducing and not levers.is_empty():
 		put_button = Button.new()
@@ -522,8 +516,6 @@ func _typed(name: String, value: float) -> void:
 			draft[name] = [raw, stored]
 		if put_button != null:
 			put_button.disabled = draft.is_empty()
-		if hint != null:
-			hint.visible = draft.is_empty()  # "Pick a setting…" has been done
 		draft_changed.emit(name, raw)
 		return
 	lever_changed.emit(name, raw)
@@ -598,18 +590,12 @@ func refresh(current: Callable, pending: Dictionary, costs := {}, capital := -1.
 	if capital >= 0.0:
 		var spend := waiting_total + (maxf(draft_cost, 0.0) if introducing and not draft.is_empty() else 0.0)
 		var short := spend > capital + 1e-9
-		if spend <= 0.0:
-			capital_note.text = "Political capital: %.1f to spend; a bill costs more the further it moves a policy." % capital
-		else:
-			capital_note.text = "Political capital %.1f; %s %.1f, %s" % [capital, "with this bill, the bills waiting cost" if introducing else "the bills waiting cost",
-				spend, ("leaving %.1f." % (capital - spend)) if not short else "%.1f more than there is: the bills that come last are refused." % (spend - capital)]
+		# Stage S19: said only when bills are waiting (the top bar has the capital itself).
+		var whose := "With this bill, the bills waiting cost" if introducing else "The bills waiting cost"
+		capital_note.visible = short  # each bill's own line says its cost and what is left
+		capital_note.text = ("%s %.1f, %.1f more than there is: the bills that come last are refused." % [whose, spend, spend - capital]) if short \
+			else "%s %.1f of %.1f political capital." % [whose, spend, capital]
 		capital_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.MUTED)
-	if introducing:
-		return
-	var any := false
-	for name in _rows:
-		any = any or pending.has(name)
-	hint.visible = not any
 
 
 ## ", 54.1 of 67.7 left": what the capital would be after `spend`; "" without capital.
@@ -650,14 +636,14 @@ func show_repeal(cost: float, preview: Dictionary, left := -1.0) -> void:
 		return
 	var words := PackedStringArray()
 	if cost >= 0.0:
-		words.append("Repealing it costs %.1f political capital." % cost)
+		words.append("Costs %.1f political capital." % cost)
 	if preview.get("bill", false):
 		var votes := int(preview.get("votes_for", 0))
 		var against := int(preview.get("seats", 0)) - votes
 		words.append(("The Commons would pass it %d to %d." if preview.get("passes", false) else "The Commons would vote it down, %d to %d.") % [votes, against])
 	var short := cost >= 0.0 and left >= 0.0 and cost > left
 	if short:
-		words.append("Not enough political capital: %.1f left." % maxf(left, 0.0))
+		words.append("Only %.1f left." % maxf(left, 0.0))
 	repeal_note.text = " ".join(words)
 	# Stage S17.1: a repeal that cannot be paid for says so in the colour of a refusal.
 	repeal_note.add_theme_color_override("font_color", Palette.BAD if short else Palette.MUTED)
@@ -676,8 +662,7 @@ func show_year(rows: Dictionary, shown: Array, working := false, heading := "") 
 		measuring = true
 		var any := _year_rows.get_child_count() > 0
 		_year_title.text = (year_heading if any and year_heading != "" else "IN A YEAR") + "  ·  MEASURING…"
-		_year_note.text = "Working out what it would do in a year…"
-		_year_note.visible = not any
+		_year_note.visible = false  # stage S19: the heading says it is being measured
 		for grid in [_year_rows, _group_rows, _group_title]:
 			grid.modulate.a = 0.4
 		return

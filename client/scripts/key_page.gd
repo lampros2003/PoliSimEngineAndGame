@@ -19,19 +19,12 @@ func build(board: Web) -> void:
 	grid.add_theme_constant_override("v_separation", 16)
 	Palette.rule_rows(grid)
 	add_child(grid)
-	_row(grid, _policies(), "Policies", "Round the rim, by area. The arc round a disc is where the policy stands in its range; an ochre mark is a change waiting for next month. A dashed disc is a policy waiting to be introduced; Add policy, on the top bar, lists those not in force.")
-	_row(grid, _indicators(), "Statistics", "The figures you are judged by. Green: a good thing, the more the better; red: a bad thing, the less the better; blue: neither. The small triangle: last month's rise or fall, green when for the better, red when for the worse.")
-	_row(grid, _groups(board), "Groups of voters", "One circle round the centre, in %s, each named once inside it. An arc is as long as the group's share of its family. Outside it, its approval as a gauge, full at %d%%: green from %d%%, mustard between, red under %d%%; grey with no figure.%s" % [
-		_families_word(board), roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0),
-		" Groups of belief answer to where the government stands, not how they are doing: Parliament shows the stances." if not board.play_web.get("stances", []).is_empty() else ""])
-	_row(grid, _links(), "Links", "Point at a node for what it moves, or what moves it, in a year. Green: good for what it reaches; red: bad; blue: neither can be said; grey: not yet measured. Thicker is stronger; + it rises, − it falls.")
-	_row(grid, _flags(), "Situations", "On the strip under the top bar, and as a small flag on the statistic that set it off: green a good situation, red a bad one; blue an answer you gave, in force; ochre, a question waiting for your answer. Click one to light its statistic and see why.")
-	var last := Label.new()
-	last.text = "A bigger node matters more. At the centre: approval, the months to the election and your political capital."
-	last.theme_type_variation = "Muted"
-	last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	last.custom_minimum_size.x = 600.0
-	add_child(last)
+	_row(grid, _policies(), "Policies", "Arc: where it stands in its range\nOchre mark: a change waiting\nDashed: waiting to be introduced")
+	_row(grid, _indicators(), "Statistics", "Green: more is better\nRed: less is better\nBlue: neither\nTriangle: last month's move")
+	_row(grid, _groups(board), "Groups of voters", "Arc: its share of its family\nOuter gauge: approval, full at %d%%\nGreen from %d%%, red under %d%%\nGrey: no figure" % [
+		roundi(Web.APPROVAL_FULL * 100.0), roundi(board.approval_good * 100.0), roundi(board.approval_bad * 100.0)])
+	_row(grid, _links(), "Links", "Green: good for what it reaches\nRed: bad for it\nBlue: neither\nThicker: stronger\n+ rises, − falls")
+	_row(grid, _flags(), "Situations", "Green: good\nRed: bad\nBlue: an answer of yours\nOchre: a question waiting")
 
 
 ## "seven families", as many as the board has.

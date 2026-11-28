@@ -51,7 +51,7 @@ func _initialize() -> void:
 	main.open_indicator("gov_balance")
 	await _settle()
 	var trace = main.current_trace()
-	if trace == null or trace._summary.text.begins_with("Advance") or trace._rows.get_child_count() == 0:
+	if trace == null or trace._summary.text.begins_with("No history") or trace._rows.get_child_count() == 0:
 		_fail("the why panel shows nothing for the budget balance")
 		return
 	main._menu.get_popup().id_pressed.emit(1)

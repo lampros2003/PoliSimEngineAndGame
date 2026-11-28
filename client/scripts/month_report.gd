@@ -150,16 +150,9 @@ func _build() -> void:
 			_box.add_child(note)
 	if not any:
 		var quiet := Label.new()
-		quiet.text = "A quiet month: nothing moved out of the ordinary."
+		quiet.text = "A quiet month."
 		quiet.theme_type_variation = "Muted"
 		_box.add_child(quiet)
-	var hint := Label.new()
-	hint.text = "Click a line to open it; click the date to see this again."
-	hint.theme_type_variation = "Muted"
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(WIDTH - 48.0, 34.0)
-	hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_box.add_child(hint)
 
 
 func _line(item: Dictionary) -> Button:
@@ -179,4 +172,9 @@ func _line(item: Dictionary) -> Button:
 	button.pressed.connect(func() -> void:
 		dismiss()
 		line_pressed.emit(key))
+	# Stage S19: a line that opens something ends in a chevron (a sentence under the report
+	# used to say "click a line to open it").
+	if key != "":
+		button.draw.connect(func() -> void:
+			button.draw_string(Palette.text(600), Vector2(button.size.x - 10.0, button.size.y * 0.5 + 6.0), "›", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Palette.MUTED))
 	return button

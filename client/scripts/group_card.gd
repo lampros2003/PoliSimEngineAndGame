@@ -100,7 +100,10 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	side.add_theme_constant_override("separation", 0)
 	figures.add_child(side)
 	# Stage S13.5: approval counts only those who would vote, as a poll does.
-	side.add_child(_muted("of those who would vote back the government"))
+	var backing := _muted("back the government")
+	backing.tooltip_text = "Of those who would vote"
+	backing.mouse_filter = Control.MOUSE_FILTER_PASS
+	side.add_child(backing)
 	_change = Label.new()
 	_change.add_theme_font_override("font", Palette.text(600))
 	side.add_child(_change)
@@ -120,6 +123,18 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	_drivers.add_theme_constant_override("h_separation", 12)
 	_drivers.add_theme_constant_override("v_separation", 8)
 	moving.add_child(_drivers)
+	# Stage S19: the two ends of the bars are named over them (a sentence under them said so).
+	_drivers.add_child(Control.new())
+	var ends := Control.new()
+	ends.name = "ends"
+	ends.custom_minimum_size = Vector2(150, 16)
+	ends.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ends.draw.connect(func() -> void:
+		var caps := Palette.display(600, 1)
+		ends.draw_string(caps, Vector2(0, 12), "◀  AGAINST", HORIZONTAL_ALIGNMENT_LEFT, -1, Palette.CAPS, Palette.MUTED)
+		ends.draw_string(caps, Vector2(0, 12), "FOR  ▶", HORIZONTAL_ALIGNMENT_RIGHT, ends.size.x, Palette.CAPS, Palette.MUTED))
+	_drivers.add_child(ends)
+	_drivers.add_child(Control.new())
 	for d in drivers:
 		var name := Label.new()
 		name.text = str(d[0])
@@ -141,7 +156,6 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	_stance_note.add_theme_color_override("font_color", Palette.INK)
 	_stance_note.visible = false
 	moving.add_child(_stance_note)
-	moving.add_child(_muted("Each is a pull on their vote, for the government (right) or against it (left), from where things stood at the last election."))
 	add_child(Palette.fold("What is moving them", moving))
 	var share := VBoxContainer.new()
 	share.add_theme_constant_override("separation", 8)
@@ -173,7 +187,8 @@ func build(node: Dictionary, the_entry: Dictionary, drivers: Array, movers: Arra
 	estimate = str(node.get("estimate", ""))
 	if estimate != "":
 		_homes_note.name = "estimate_note"
-		_homes_note.text = "Who belongs to this group is an estimate, made from published shares (%s), not a fact recorded for any household. So it has no sample households to show." % estimate
+		_homes_note.set_meta("content", true)  # the model's own account of the estimate
+		_homes_note.text = "An estimate, from %s." % estimate
 	homes.add_child(_homes_note)
 	_homes = GridContainer.new()
 	_homes.name = "households"
@@ -232,12 +247,12 @@ func refresh(value_of: Callable, before_of: Callable, cells_of: Callable, driver
 	for v in values:
 		top = maxf(top, absf(v))
 	for i in values.size():
-		var bar: Bar = _drivers.get_child(i * 3 + 1)
+		var bar: Bar = _drivers.get_child((i + 1) * 3 + 1)
 		# Stage S17.1: no bar beside "0.00", and a true minus sign.
 		var nought: bool = absf(values[i]) < 0.005
 		bar.fraction = 0.0 if nought else values[i] / top
 		bar.queue_redraw()
-		var amount: Label = _drivers.get_child(i * 3 + 2)
+		var amount: Label = _drivers.get_child((i + 1) * 3 + 2)
 		amount.text = "–" if now == null else ("0.00" if nought else ("+" if values[i] > 0.0 else "−") + "%.2f" % absf(values[i]))
 		drivers_shown.append([str(drivers[i][0]), float(values[i])])
 
@@ -271,8 +286,8 @@ func show_households(found: Array, house: Dictionary, words: Dictionary) -> void
 	records = found
 	for child in _homes.get_children():
 		child.queue_free()
-	_homes_note.text = "Eight of their households, chosen across the group. Open one for its year's account." if not found.is_empty() \
-		else none_found
+	_homes_note.text = none_found
+	_homes_note.visible = found.is_empty()
 	for record in found:
 		var tile := HouseholdTile.new()
 		tile.fmt = fmt
@@ -317,7 +332,7 @@ class HouseholdTile extends Button:
 			# Stage S13.5: the chance an adult here votes for the government, counting those who
 			# would not vote, so it reads lower than the group's approval (of those who would).
 			lines.append(["%s likely to vote for you" % fmt.percent(float(support), 0), Palette.text(400), Palette.MUTED])
-			vote_note = "Each adult here has a %s chance of voting for you, counting those who would not vote at all; the group's approval counts only those who would." % fmt.percent(float(support), 0)
+			vote_note = "Counting those who would not vote"
 		tooltip_text = "%s, %s" % [kind, place] + ("\n" + vote_note if vote_note != "" else "")
 
 	func _draw() -> void:
@@ -420,7 +435,7 @@ class HouseholdAccount extends VBoxContainer:
 		note.theme_type_variation = "Muted"
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		note.custom_minimum_size = Vector2(300, 0)
-		note.text = "%s a month. Before housing costs; other income is not in the model." % fmt.money(monthly)
+		note.text = "%s a month, before housing costs" % fmt.money(monthly)
 		add_child(note)
 
 	func _line(grid: GridContainer, label: String, amount: float, fmt: RefCounted, strong: bool) -> void:

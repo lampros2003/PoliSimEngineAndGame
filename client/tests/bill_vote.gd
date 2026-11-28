@@ -16,8 +16,8 @@ func _initialize() -> void:
 	if main.failed or not main.catalogue.get("legislature", false):
 		return _fail("the game did not start with a legislature")
 	main.open_node(main.board.policy_of("basic_rate"))
-	if main.policy_card() == null or not main.policy_card().hint.text.begins_with("Changes are bills"):
-		return _fail("the policy panel does not say changes are bills")
+	if main.policy_card() == null:
+		return _fail("the policy's popup did not open")
 	main.advance(2)
 	await _settle()
 	if main.lost:

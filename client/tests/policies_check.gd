@@ -89,7 +89,7 @@ func _initialize() -> void:
 	main.open_node("policy:ev_grant")
 	await process_frame
 	var repeal_said: String = main.policy_card().repeal_note.text
-	if not repeal_said.contains("Repealing it costs") or not repeal_said.contains("The Commons would"):
+	if not repeal_said.contains("Costs ") or not repeal_said.contains("The Commons would"):
 		return _fail("the repeal reads: " + repeal_said)
 	main.close_popup()
 	main.repeal_policy("policy:ev_grant")
@@ -119,7 +119,7 @@ func _initialize() -> void:
 	# A level policy in force today can be repealed (the Winter Fuel Payment, to None).
 	main.open_node("policy:winter_fuel_payment")
 	await process_frame
-	if not main.policy_card().repeal_note.text.contains("Repealing it costs") or not main.policy_card().repeal_note.text.contains("The Commons would"):
+	if not main.policy_card().repeal_note.text.contains("Costs ") or not main.policy_card().repeal_note.text.contains("The Commons would"):
 		return _fail("the Winter Fuel Payment's repeal reads: " + main.policy_card().repeal_note.text)
 	main.close_popup()
 	await _settle()

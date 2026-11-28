@@ -34,14 +34,16 @@ func _initialize() -> void:
 			return _fail("the House is not 2024's: %s" % [seats])
 		if panel._election.text != "Next general election: July 2029, in 54 months":
 			return _fail("the next election reads: " + panel._election.text)
-		if not panel._summary.text.begins_with("Government: Centre-left, 411 of 650 seats"):
-			return _fail("the summary reads: " + panel._summary.text)
+		var figures: Dictionary = panel.figures_shown
+		if figures.get("government") != "Centre-left" or figures.get("seats") != "411 of 650" \
+				or not str(figures.get("polls", "")).ends_with("%") or not str(figures.get("turnout", "")).ends_with("%"):
+			return _fail("the figures read: %s" % [figures])
 		if main.lost or not main.can_advance():
 			return _fail("the game stopped")
 		# Stage S8.3: the issues, nothing changed yet since the stand-in election (stage S17.1: a
 		# nought without a sign; "+0.0%" was read here before).
-		if not panel._issues.visible or not panel._issues.text.begins_with("What voters weigh, against the last election: Health 0.0%"):
-			return _fail("the issues read: " + panel._issues.text)
+		if not panel._issues.visible or panel.issues_shown.get("Health") != "0.0%" or panel.issues_shown.size() != 4:
+			return _fail("the issues read: %s" % [panel.issues_shown])
 		main.open_overlay("parliament")
 		await _settle()
 		if main.overlay_open() != "parliament" or not panel.is_visible_in_tree():

@@ -88,7 +88,7 @@ func show_error(name: String, message: String) -> void:
 	_title.text = label_of(name)
 	_clear()
 	if message.contains("not enough history"):
-		_summary.text = "Advance at least two months to see why figures change."
+		_summary.text = "No history yet"
 	else:
 		_summary.text = message
 	_note.text = ""
@@ -185,9 +185,6 @@ func show_explanation(e: Dictionary) -> void:
 	if str(e.get("note", "")) != "":
 		notes.append("This is %s." % e["note"])
 	if shown > 0 or not unchanged.is_empty():
-		if e["exact"]:
-			notes.append("These parts add up exactly to the change.")
-		else:
-			notes.append("Not explained by any single input on its own (inputs acting together): %s." % fmt.change(entry, e["remainder"]))
-		notes.append("Each part is how far that input's own change moved the figure, everything else as it was this month.")
+		if not e["exact"]:
+			notes.append("Acting together: %s." % fmt.change(entry, e["remainder"]))
 	_note.text = "\n".join(notes)

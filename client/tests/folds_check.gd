@@ -14,16 +14,21 @@ extends SceneTree
 ## Parliament with each fold, Add policy, the key, help, a question put to the player and
 ## the month's report. Also: a popup opened in the moment another closes holds only its own
 ## content (the first one's stayed under it).
+## Stage S19: and no explainer notes: no piece of muted text on any card is longer than
+## LONGEST_NOTE characters, unless it is the model's own words (meta "content").
 
 const Contrast := preload("res://scripts/contrast.gd")
 
 const SIZES := [Vector2i(1366, 768), Vector2i(1920, 1080)]
 const SMALLEST_TEXT := 12
+## Stage S19: the longest a piece of muted text on a card may be, in characters.
+const LONGEST_NOTE := 72
 
 var main: Control
 var shots := ""
 var only := 0
 var _faults := PackedStringArray()
+var _notes := {}  # a note already reported -> the state it was first seen in
 var _states := 0
 var _view := Vector2i.ZERO
 
@@ -296,6 +301,16 @@ func _state(name: String, card: Control) -> void:
 			var label := control as Label
 			if label.text.strip_edges() == "":
 				continue
+			# Stage S19: no explainer notes. A piece of muted text is a caption, a unit or a
+			# state, a few words long; a sentence of instruction or explanation is not put on a
+			# card (the owner's rule, docs/PLAN.md). Words that are the model's own (a policy's or
+			# a mod's description) are content, and say so with the meta "content".
+			if label.get_theme_color("font_color").is_equal_approx(Contrast.Palette.MUTED) and not label.has_meta("content") \
+					and label.text.strip_edges().length() > LONGEST_NOTE:
+				var note := "a note of %d characters: \"%s…\"" % [label.text.strip_edges().length(), label.text.strip_edges().left(60)]
+				if not _notes.has(note):
+					_notes[note] = tag
+					_faults.append("%s: %s" % [tag, note])
 			var size_px := label.get_theme_font_size("font_size")
 			if size_px < SMALLEST_TEXT:
 				_faults.append("%s: \"%s\" is set at %d px" % [tag, label.text.left(40), size_px])

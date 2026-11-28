@@ -592,6 +592,27 @@ static func fold(title: String, body: Control, open := false) -> VBoxContainer:
 	return box
 
 
+## Stage S19: the head of one of the model's descriptions: what it says up to its first colon
+## or full stop ("Duty on petrol and diesel, in pence a litre", not the history after it).
+static func lead(words: String) -> String:
+	var cut := words.length()
+	for mark in [": ", ". "]:
+		var at := words.find(mark)
+		if at > 0:
+			cut = mini(cut, at)
+	return words.left(cut).trim_suffix(".")
+
+
+## Stage S19: marks a label as the model's own words (a description), not a note of the
+## client's: `whole` is said under the pointer when the label shows only its head.
+static func content(label: Control, whole := "") -> Control:
+	label.set_meta("content", true)
+	if whole != "" and label is Label and whole.trim_suffix(".") != (label as Label).text.trim_suffix("."):
+		label.tooltip_text = whole
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
+	return label
+
+
 ## A tracked-capitals label for a small heading.
 static func caps(words: String) -> Label:
 	var label := Label.new()

@@ -19,7 +19,6 @@ var _areas: VBoxContainer
 var _list: VBoxContainer
 var _scroll: ScrollContainer
 var _title: Label
-var _note: Label
 var _area_buttons := {}
 ## Set by the screen: area name -> [{key, label, icon, line, cost, vote, passes, cheer, boo}].
 var items := {}
@@ -69,12 +68,6 @@ func build(areas: Array, by_area: Dictionary) -> void:
 	_title.theme_type_variation = "Title"
 	_title.add_theme_font_size_override("font_size", 22)
 	right.add_child(_title)
-	_note = Label.new()
-	_note.theme_type_variation = "Muted"
-	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_note.custom_minimum_size.x = 520
-	_note.text = "Not in force. Choose one to set it, see what it would do in a year, and put it to the Commons."
-	right.add_child(_note)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -125,10 +118,9 @@ func show_area(name: String) -> void:
 		child.queue_free()
 	_title.text = name
 	var list: Array = items.get(name, [])
-	_note.visible = not list.is_empty()
 	if list.is_empty():
 		var none := Label.new()
-		none.text = "Every policy of this area is in force. To end one that can be ended, open it on the board and choose Repeal."
+		none.text = "All in force."
 		none.theme_type_variation = "Muted"
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		none.custom_minimum_size.x = 520
@@ -201,6 +193,7 @@ func _row(item: Dictionary) -> Button:
 	var line := Label.new()
 	line.text = str(item["line"])
 	line.theme_type_variation = "Muted"
+	line.set_meta("content", true)  # the model's own line on the policy
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	line.custom_minimum_size.x = 240
 	words.add_child(line)
@@ -223,7 +216,7 @@ func _row(item: Dictionary) -> Button:
 		words.add_child(who)
 	elif bool(item.get("pending", false)):
 		var wait := Label.new()
-		wait.text = "Who would cheer and who would boo: measuring…"
+		wait.text = "Measuring…"
 		wait.theme_type_variation = "Muted"
 		words.add_child(wait)
 	var side := VBoxContainer.new()

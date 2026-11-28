@@ -41,6 +41,8 @@ func _init() -> void:
 			refresh(_source[0], _source[1], _source[2]))
 	top.add_child(_choice)
 	_note = Label.new()
+	_note.set_meta("content", true)  # the model's description of the breakdown
+	_note.mouse_filter = Control.MOUSE_FILTER_PASS
 	_note.add_theme_color_override("font_color", Palette.MUTED)
 	_note.add_theme_font_size_override("font_size", Palette.SMALL)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -149,10 +151,11 @@ func _build_rows(name: String, entry: Dictionary, labels: PackedStringArray) -> 
 		rate = ", at an annual rate" if fmt.per_year else ", a month"
 	_total = _totals.get(name, {})
 	if _total.is_empty():
-		_note.text = "%s%s. Each group's average over the simulated households in it; the bar is its change on last month." % [head, rate]
+		_note.text = "%s%s" % [head, rate]
 	else:
 		var doc := str(entry.get("doc", ""))
-		_note.text = "%s%s. The bar is each group's change on last month." % [doc if doc != "" else head, rate]
+		_note.text = "%s%s" % [Palette.lead(doc) if doc != "" else head, rate]
+		_note.tooltip_text = doc if Palette.lead(doc) != doc.trim_suffix(".") else ""
 	for heading in ["", "This month", "Change", "", ""]:
 		_grid.add_child(_cell(heading, Palette.MUTED, heading != "", Palette.SMALL))
 	for member in labels:

@@ -24,8 +24,14 @@ signal group_pressed(key: String, origin: Rect2)
 
 var fmt: RefCounted
 var settings := {}
-var _summary: Label
-var _issues: Label
+var _figures: HBoxContainer
+## For the checks: the figures shown, by name ("government", "seats", "polls", "turnout"), as
+## the words on screen. The majority is marked on the House below.
+var figures_shown := {}
+var _issues: HBoxContainer
+## For the checks: what voters weigh beyond the economy, each against the last election, as
+## the words on screen, by name.
+var issues_shown := {}
 var _election: Label
 var _bar: Control
 var _grid: GridContainer
@@ -79,15 +85,14 @@ func _ready() -> void:
 	_election.add_theme_font_override("font", Palette.display(500))
 	_election.add_theme_font_size_override("font_size", 20)
 	top.add_child(_election)
-	_summary = Label.new()
-	_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary.custom_minimum_size = Vector2(560, 0)
-	box.add_child(_summary)
-	_issues = Label.new()
+	# Stage S19: the government's standing as figures, each under its name (it was a sentence).
+	_figures = HBoxContainer.new()
+	_figures.name = "figures"
+	_figures.add_theme_constant_override("separation", 32)
+	box.add_child(_figures)
+	_issues = HBoxContainer.new()
 	_issues.name = "issues"
-	_issues.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_issues.custom_minimum_size = Vector2(560, 0)
-	_issues.add_theme_color_override("font_color", Palette.MUTED)
+	_issues.add_theme_constant_override("separation", 24)
 	_issues.visible = false
 	box.add_child(_issues)
 	_bar = Control.new()
@@ -226,13 +231,6 @@ func _build_stances(list: Array) -> void:
 		scale.draw.connect(func() -> void: _draw_stance(scale, info))
 		_stances.add_child(scale)
 		stance_rows.append(info)
-	if not list.is_empty():
-		var note := Label.new()
-		note.text = "Each scale counts the government's clear moves of policy since 2024, net; the marker is where it stands now. The groups at its ends answer to it."
-		note.theme_type_variation = "Muted"
-		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		note.custom_minimum_size.x = 560
-		_stances.add_child(note)
 
 
 ## Stage S15.3: one stance: its name, and what moved it last, above; a line with ticks and
@@ -446,7 +444,7 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable, months_do
 		_election.text = "Next general election: %s, in %d months" % [fmt.month_name(when), int(months)] if int(months) > 0 \
 			else "A general election was held this month"
 	if labels.is_empty():
-		_summary.text = "The polls appear after the first month."
+		_show_figures([])
 		return
 	_ensure_rows(labels)
 	var now: PackedFloat64Array = intention.get("values", PackedFloat64Array())
@@ -485,17 +483,22 @@ func refresh(cells_of: Callable, latest: Callable, previous: Callable, months_do
 	var support: Variant = latest.call(str(settings.get("support", "")))
 	var support_before: Variant = previous.call(str(settings.get("support", "")))
 	var turnout: Variant = latest.call(str(settings.get("turnout", "")))
-	var text := "Government: %s, %d of %d seats (%d needed for a majority)." % [
-		_listed(government) if not government.is_empty() else "none", int(government_seats), int(total), majority]
+	var figures := [
+		["government", "Government", _listed(government) if not government.is_empty() else "None", "", Palette.MUTED, ""],
+		["seats", "Seats", "%d of %d" % [int(government_seats), int(total)], "", Palette.MUTED, ""],
+	]
 	if support != null:
-		text += " Its poll rating: %s" % fmt.percent(float(support))
+		var moved := ""
+		var tone := Palette.MUTED
 		if support_before != null:
 			var d := (float(support) - float(support_before)) * 100.0
-			text += " (%s%.1f points on last month)" % ["+" if d >= 0.0 else "−", absf(d)]
-		text += "."
+			if absf(d) >= 0.05:
+				moved = ("▲ +%.1f" if d > 0.0 else "▼ −%.1f") % absf(d)
+				tone = Palette.GOOD if d > 0.0 else Palette.BAD
+		figures.append(["polls", "Polls", fmt.percent(float(support)), moved, tone, "The government's poll rating, and its change on last month in points"])
 	if turnout != null:
-		text += " Turnout if an election were held now: %s." % fmt.percent(float(turnout))
-	_summary.text = text
+		figures.append(["turnout", "Turnout", fmt.percent(float(turnout)), "", Palette.MUTED, "If an election were held now"])
+	_show_figures(figures)
 	_show_issues(cells_of)
 	_show_groups(latest, previous)
 	_bar.set_meta("majority", majority)
@@ -513,16 +516,77 @@ func _show_issues(cells_of: Callable) -> void:
 	_issues.visible = not labels.is_empty() and values.size() == labels.size() and before.size() == labels.size()
 	if not _issues.visible:
 		return
-	var parts := PackedStringArray()
+	# Stage S19: figures under their names, after the words they are measured from (it was a
+	# sentence in grey).
+	for child in _issues.get_children():
+		_issues.remove_child(child)
+		child.queue_free()
+	issues_shown.clear()
+	var since := Palette.caps("Since the\nelection")
+	since.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_issues.add_child(since)
 	for i in labels.size():
-		if before[i] <= 0.0:
-			parts.append("%s –" % labels[i])
-			continue
-		var d := (values[i] / before[i] - 1.0) * 100.0
-		# Stage S17.1: no signed noughts ("Health −0.0%").
-		parts.append("%s %s%.1f%%" % [labels[i], "" if absf(d) < 0.05 else ("+" if d > 0.0 else "−"), absf(d)])
-	_issues.text = "What voters weigh, against the last election: " + ", ".join(parts) + "."
+		var words := "–"
+		var tone := Palette.INK
+		if before[i] > 0.0:
+			var d := (values[i] / before[i] - 1.0) * 100.0
+			# Stage S17.1: no signed noughts ("Health −0.0%").
+			words = "%s%.1f%%" % ["" if absf(d) < 0.05 else ("+" if d > 0.0 else "−"), absf(d)]
+			if absf(d) >= 0.05:
+				tone = Palette.GOOD if d > 0.0 else Palette.BAD
+		_issues.add_child(_tile(labels[i], labels[i], words, "", Palette.MUTED, "", 16, tone))
+		issues_shown[labels[i]] = words
 	_issues.tooltip_text = "Health, education and policing: real spending per person served. The environment: the path to net zero over actual emissions. A fall costs the government votes, most among the age groups that care most."
+
+
+## Stage S19: the figures at the head of the sheet: each [key, name, figure, change, the
+## change's colour, tooltip], the name in small capitals over the figure.
+func _show_figures(list: Array) -> void:
+	for child in _figures.get_children():
+		_figures.remove_child(child)
+		child.queue_free()
+	figures_shown.clear()
+	for item in list:
+		var tile := _tile(str(item[0]), str(item[1]), str(item[2]), str(item[3]), item[4], str(item[5]))
+		if str(item[0]) == "government":
+			# A coalition's names can be long: they take the room left and are cut with an ellipsis.
+			var figure: Label = tile.get_meta("figure")
+			tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			figure.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			figure.clip_text = true
+			figure.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			figure.custom_minimum_size.x = 110
+			tile.tooltip_text = str(item[2])
+		_figures.add_child(tile)
+		figures_shown[str(item[0])] = str(item[2])
+
+
+## A figure under its name in small capitals, with its change beside it where it has one.
+func _tile(key: String, heading: String, words: String, moved: String, moved_tone: Color, tip: String, size := 22, tone := Palette.INK) -> VBoxContainer:
+	var tile := VBoxContainer.new()
+	tile.name = key
+	tile.add_theme_constant_override("separation", 0)
+	tile.tooltip_text = tip
+	tile.add_child(Palette.caps(heading))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 8)
+	tile.add_child(line)
+	var figure := Label.new()
+	figure.text = words
+	figure.add_theme_font_override("font", Palette.display(500))
+	figure.add_theme_font_size_override("font_size", size)
+	figure.add_theme_color_override("font_color", tone)
+	line.add_child(figure)
+	tile.set_meta("figure", figure)
+	if moved != "":
+		var change := Label.new()
+		change.text = moved
+		change.add_theme_font_override("font", Palette.text(600))
+		change.add_theme_font_size_override("font_size", Palette.SMALL)
+		change.add_theme_color_override("font_color", moved_tone)
+		change.size_flags_vertical = Control.SIZE_SHRINK_END
+		line.add_child(change)
+	return tile
 
 
 ## "A", "A and B", "A, B and C".

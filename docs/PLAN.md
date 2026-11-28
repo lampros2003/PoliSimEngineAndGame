@@ -28,6 +28,13 @@ in `README.md`. Update the status column here as milestones close.
 
 ## Decisions this plan rests on
 
+**Standing rules of the owner's**, to be kept in every stage:
+
+| Rule | Said |
+|---|---|
+| **Show, don't tell.** The interface is to be understood by using it, not by reading about it: no explainer notes on things, no instructions under controls, no sentences where a figure, a label, a state or a shape would do. A thing that needs a note to be understood is to be redesigned, not annotated. What stays in words is content (the model's own descriptions, a question's choices, a consequence about to happen) and what is asked for (a tooltip, the key, the keys) | 2026-11-28: "show dont tell, you should not have explainer notes on everything always remember this, ui should be intuitive not patronisingly explained". Held by `client/tests/folds_check.gd` (no muted text over 72 characters on any card, the model's own words apart) |
+| **Open material before our own.** Use what is openly licensed and credited before making something from scratch | 2026-11-28 (`docs/S18-PLAN.md`) |
+
 Taken by the owner on 2026-11-14:
 
 | Question | Decision |

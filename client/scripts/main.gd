@@ -39,25 +39,19 @@ const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
 ## Stage S14.1: the strip under the top bar (situations, the one-line notices).
 const STRIP_HEIGHT := Strip.HEIGHT
-const HELP := """[b]The board[/b] is the country, and the whole screen. Round the rim are your [b]policies[/b] (discs), grouped by area; inside them the [b]statistics[/b] they move (rings); round the centre the [b]groups of voters[/b], one ring of arcs in families, each arc's outer edge a gauge of how many of them back you; at the centre the government's approval, the months to the election and its political capital. A bigger node matters more. Point at anything to see what it is linked to: arrows run from cause to effect, green where the effect is good for what it reaches and red where it is bad, with + or − for a rise or a fall. "?" on the top bar is the key to every shape and colour.
+## Stage S19: the keys, and the credits the open material asks for. (It was nine paragraphs
+## on how to play: the board is to be understood by using it, and "?" is its key.)
+const HELP := """[table=2][cell][b]Space, Enter[/b]      [/cell][cell]Next month[/cell]
+[cell][b]A[/b][/cell][cell]Add policy[/cell]
+[cell][b]/, Ctrl+F[/b][/cell][cell]Search[/cell]
+[cell][b]B[/b][/cell][cell]The Budget[/cell]
+[cell][b]P[/b][/cell][cell]Parliament[/cell]
+[cell][b]K[/b][/cell][cell]The key[/cell]
+[cell][b]Tab, Shift+Tab[/b][/cell][cell]The next control, the one before[/cell]
+[cell][b]Esc[/b][/cell][cell]Close what is on top[/cell]
+[cell][b]F11[/b][/cell][cell]The whole screen, or a window[/cell][/table]
 
-[b]Change policy[/b] by clicking a policy: set it with the slider or type the exact figure. A change waits (ochre) and takes effect from next month; Undo removes it before then. Each change is a bill: it costs political capital, and a government without a majority of its own can lose the vote. "In a year" shows what the change would do.
-
-[b]New policies[/b]: Add policy on the top bar (or A) lists the policies not in force, area by area, with what each would cost, how the Commons would vote and who would cheer and who would boo. Choose one: its popup opens at its first step; see what it would do in a year, and put it to the Commons. It waits on the board, faint, until the vote. A policy that can be ended has Repeal in its popup.
-
-[b]Find anything[/b] with the search field on the top bar (/ or Ctrl+F): policies, statistics, groups, situations, policies not in force, and the statistics kept off the board. The board dims to what matches; Enter opens the first; the arrows move between them.
-
-[b]See why[/b]: click a statistic for its history, what moved it last month (click a cause to follow it, Back to return), who gains and who loses, and the policies that move it most; "See also" opens the statistics behind it that are not on the board.
-
-[b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers; a situation also flags the statistic that set it off, and clicking its pennant lights that statistic and says why.
-
-[b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). Parliament shows the parties, where the government stands on four scales (the state against the market, liberty against order, green, the nation) with the groups of belief at their ends, and the country by group and by place, the places on a map: point at one for its figure, click it for the table. The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
-
-[b]After each month[/b] a line under the date says what moved. When the month brought something to tell (a bill passed, voted down or refused, a situation begun or ended, an election, a question answered) the month's report opens over the board: click a line to open it; click the date to see it again.
-
-[b]Keys[/b]: F11, the whole screen or a window; Space or Enter, next month; A, Add policy; / or Ctrl+F, search (Esc in it clears it); Esc closes what is on top: the popup, the report, the sheet; Tab and Shift+Tab move through a popup's or a sheet's controls; B, The Budget; P, Parliament; K, the key.
-
-[color=#505a66]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
+[color=#505a66]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0. Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0.[/color]"""
 
 var game: PoliSim
 var fmt := Format.new()
@@ -580,7 +574,7 @@ func _build_bar() -> void:
 	menu.add_separator()
 	menu.add_item("Show the guide again", 9)
 	menu.add_item("The key", 4)
-	menu.add_item("Help", 6)
+	menu.add_item("Keys", 6)
 	menu.id_pressed.connect(func(id: int) -> void:
 		menu_action(["save", "load", "reload", "per_year", "key", "", "help", "sound", "", "guide", "fullscreen"][id]))
 	_update_menu()
@@ -763,7 +757,7 @@ func menu_action(action: String) -> void:
 		"key":
 			show_key()
 		"help":
-			_show_dialog("How to play", HELP + map_credit())
+			_show_dialog("Keys", HELP + map_credit())
 		"sound":
 			Sound.enabled = not Sound.enabled
 			Sound.save_settings()
@@ -839,21 +833,21 @@ func guide_steps() -> Array:
 				return k
 		return keys[0] if not keys.is_empty() else ""
 	steps.append({"title": "Your government", "target": func() -> Rect2: return _node_rect("centre"),
-		"text": "In the middle: how many people approve of your government, the months to the next election, and your political capital, which you spend to pass laws."})
+		"text": "Approval, the months to the election, political capital."})
 	var policy: String = first.call("policy")
 	if policy != "":
 		steps.append({"title": "Your policies", "target": func() -> Rect2: return _node_rect(policy),
-			"text": "Round the edge are your policies. Point at one to see what it moves; click it to change it. Add policy, on the top bar, lists the ones not yet in force."})
+			"text": "Click one to change it."})
 	var indicator: String = first.call("indicator")
 	if indicator != "":
 		steps.append({"title": "The country", "target": func() -> Rect2: return _node_rect(indicator),
-			"text": "Inside them are the figures you will be judged by: jobs, prices, health, the budget. Point at one to see what moves it; click it to see why it moved."})
+			"text": "What you are judged by. Click one to see why it moved."})
 	var group: String = first.call("group")
 	if group != "":
 		steps.append({"title": "The people", "target": func() -> Rect2: return _ring_rect(),
-			"text": "Round the middle are groups of voters in families, each arc's outer edge showing how many of them back you. Click one to see what moves them; some answer to where the government stands, which Parliament shows."})
+			"text": "The voters, by group. The outer edge is how many back you."})
 	steps.append({"title": "Next month", "target": func() -> Rect2: return _advance[0].get_global_rect(),
-		"text": "When you are ready, press Next month (or Space). Your changes take effect, and a short report says what happened."})
+		"text": "Or press Space."})
 	return steps
 
 
@@ -2509,7 +2503,6 @@ func ask_dilemma() -> void:
 		if str(option.get("doc", "")) != "":
 			line += ": " + str(option["doc"])
 		lines.append(line + ".\n")
-	lines.append("[color=#505a66]Your answer takes effect next month; no month runs until you give one.[/color]")
 	sheet.add_text("\n".join(lines))
 	var options: Array = d.get("options", [])
 	for i in options.size():
@@ -2654,20 +2647,17 @@ func _build_report() -> void:
 		if held[i] >= 0.5:
 			elections.append({"text": "The general election: the results", "tone": "plain", "key": "election"})
 			break
-	var notes := PackedStringArray()
-	if bills.any(func(b): return str(b["text"]).contains(": voted down")):
-		notes.append("Your government lacks a majority of its own; its partners and the opposition vote by their side of politics.")
-	if bills.any(func(b): return str(b["text"]).contains(": refused")):
-		notes.append("Capital comes back each month, faster while the government is popular.")
 	var last := game.steps_done() - 1
 	var heading := fmt.month_name(last) if months == 1 else "%s to %s" % [fmt.month_name(int(from["step"]), true), fmt.month_name(last, true)]
 	var top: Array = moves.slice(0, 4).map(func(m): return m[1])
-	report.set_report(heading, [["Bills", bills, " ".join(notes)], ["Situations", sits], ["Election", elections], ["Decisions", decisions], ["Moved most", top]])
+	report.set_report(heading, [["Bills", bills], ["Situations", sits], ["Election", elections], ["Decisions", decisions], ["Moved most", top]])
 	# Stage S14.1: the report opens only when the months have something to tell; an ordinary
 	# month is one line under the date.
 	if not (bills.is_empty() and sits.is_empty() and elections.is_empty() and decisions.is_empty()):
 		report.reopen()
-		Sound.play("notice" if not notes.is_empty() else "month")
+		# A bill voted down or refused sounds a notice (the report's own lines say which).
+		var setback: bool = bills.any(func(b): return str(b["text"]).contains(": voted down") or str(b["text"]).contains(": refused"))
+		Sound.play("notice" if setback else "month")
 	else:
 		Sound.play("month")
 		var said := top.slice(0, 2).map(func(m): return str(m["text"]).replace("  ", " "))
