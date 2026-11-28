@@ -6,6 +6,8 @@ extends PanelContainer
 ## card of the board's stock on the paper, with a row of the areas' pictograms over the title.
 
 const Palette := preload("res://scripts/palette.gd")
+const Plate := preload("res://scripts/plate.gd")
+## Stage S18.3: the pictograms either side of the plate's roundel: the areas of government.
 const ICONS := ["economy", "tax", "welfare", "health", "education", "law", "transport", "environment", "housing", "trade"]
 
 ## A new game (`resume` false) or the saved one (`resume` true), with the game's words in
@@ -40,18 +42,11 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	card.add_child(box)
-	# A row of pictograms, the areas of government, as on a public-information poster.
-	var band := HBoxContainer.new()
-	band.add_theme_constant_override("separation", 16)
-	for name in ICONS:
-		var icon := TextureRect.new()
-		icon.texture = Palette.icon(name)
-		icon.custom_minimum_size = Vector2(40, 40)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.self_modulate = Palette.INK
-		band.add_child(icon)
-	box.add_child(band)
+	# Stage S18.3: a plate at the head: the seat of government in the roundel, the areas of
+	# government either side of it, as on a public-information poster.
+	var plate := Plate.from({"icon": "parliament", "tone": "blue", "beside": ICONS}, "parliament", "blue")
+	plate.custom_minimum_size = Vector2(0, 148)
+	box.add_child(plate)
 	var title := Label.new()
 	title.text = "PoliSim"
 	title.add_theme_font_override("font", Palette.display(500))

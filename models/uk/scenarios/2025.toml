@@ -49,6 +49,28 @@ breakdowns = ["net_income_by_decile", "net_income_by_household_type", "net_incom
 breakdown_all = "net_income_average"
 breakdown_totals = { poverty_by_group = "poverty_rate", industry_jobs = "workforce_jobs", industry_pay_per_employee = "pay_per_employee_job", service_level = "service_level_overall", spending_by_function = "public_services_spending", industry_emissions = "firm_emissions" }
 
+# Stage S18.3: the plate at the head of each question put to the player, of election night
+# and of the end of the term: a pictogram's name (client/icons), or { icon, tone, beside }.
+[play.plates]
+pay_claim = { icon = "money-stack", beside = ["hospital", "school", "police"] }
+nhs_winter = { icon = "hospital", tone = "blue", beside = ["snowflake", "snowflake"] }
+bank_rescue = { icon = "bank", tone = "brick" }
+steelworks = { icon = "foundry", tone = "brick", beside = ["jobs", "jobs"] }
+investor = { icon = "processor", tone = "sage" }
+energy_shock = { icon = "lightning", tone = "brick", beside = ["energy-bills", "energy-bills"] }
+water_company = { icon = "tap", tone = "blue" }
+defence_summit = { icon = "handshake", tone = "blue", beside = ["defence", "defence"] }
+prisons_full = { icon = "handcuffs", tone = "ink", beside = ["prison", "prison"] }
+universities = { icon = "education", tone = "sage" }
+floods = { icon = "flood", tone = "blue", beside = ["homes", "homes"] }
+net_zero_warning = { icon = "thermometer", tone = "brick", beside = ["wind", "emissions"] }
+fuel_protest = { icon = "megaphone", beside = ["fuel-duty", "fuel-duty"] }
+small_boats = { icon = "sailboat", tone = "blue" }
+gilt_crisis = { icon = "debt", tone = "brick", beside = ["bank-rate", "bank-rate"] }
+election = { icon = "vote", tone = "blue", beside = ["parliament", "parliament"] }
+election_lost = { icon = "vote", tone = "brick" }
+term = { icon = "laurels", tone = "sage" }
+
 # Stage S5.5: the politics panel and election night.
 [play.politics]
 intention = "vote_intention"
@@ -128,7 +150,9 @@ issues_at_election = "issue_at_election"
 #   stances = [{ row, label, low, high, low_group, high_group }]
 #                                  Parliament's scales of where the government stands, the
 #                                  belief groups (by key) at their ends
-#   places = [{ label, row, share, note }]  Parliament's table of the country by place
+#   places = [{ label, row, share, note, regions }]  Parliament's table of the country by
+#                                  place; `regions` are the place's on the map
+#   map = "path"                   a map of the country beside that table (stage S18.4)
 #   shelf = [{ row, see }]         statistics off the board: found by search, and linked
 #                                  under "See also" from the popup of `see` (a row on the board)
 #   [play] `labels` by a policy's key  a shorter name for it on the board (its popup keeps
@@ -205,14 +229,17 @@ shelf = [
   { row = "treatments", see = "waiting_list" },
   { row = "household_emissions", see = "emissions" },
 ]
+# Stage S18.4: the map beside that table (a path from this file's folder), and the regions of
+# it each place is made of, by the codes the map gives them (models/uk/map/README.md).
+map = "../map/regions.geojson"
 places = [
-  { label = "Scotland", row = "approval_scotland", share = "share_scotland" },
-  { label = "Wales", row = "approval_wales", share = "share_wales" },
-  { label = "Northern Ireland", row = "approval_northern_ireland", share = "share_northern_ireland", note = "The governing party does not stand in Northern Ireland, so none of its voters back it." },
-  { label = "London", row = "approval_london", share = "share_london" },
-  { label = "The North", row = "approval_north", share = "share_north" },
-  { label = "The Midlands", row = "approval_midlands", share = "share_midlands" },
-  { label = "The South", row = "approval_south", share = "share_south" },
+  { label = "Scotland", row = "approval_scotland", share = "share_scotland", regions = ["TLM"] },
+  { label = "Wales", row = "approval_wales", share = "share_wales", regions = ["TLL"] },
+  { label = "Northern Ireland", row = "approval_northern_ireland", share = "share_northern_ireland", regions = ["TLN"], note = "The governing party does not stand in Northern Ireland, so none of its voters back it." },
+  { label = "London", row = "approval_london", share = "share_london", regions = ["TLI"] },
+  { label = "The North", row = "approval_north", share = "share_north", regions = ["TLC", "TLD", "TLE"] },
+  { label = "The Midlands", row = "approval_midlands", share = "share_midlands", regions = ["TLF", "TLG"] },
+  { label = "The South", row = "approval_south", share = "share_south", regions = ["TLH", "TLJ", "TLK"] },
 ]
 
 [[play.web.areas]]

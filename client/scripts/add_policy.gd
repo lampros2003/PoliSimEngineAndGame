@@ -180,7 +180,7 @@ func _row(item: Dictionary) -> Button:
 	box.offset_bottom = -8
 	button.add_child(box)
 	var icon := TextureRect.new()
-	icon.texture = item["icon"]
+	icon.texture = Palette.sized(item["icon"], 44)
 	icon.custom_minimum_size = Vector2(44, 44)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

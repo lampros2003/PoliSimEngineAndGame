@@ -110,6 +110,20 @@ func _initialize() -> void:
 	await _frames(6)
 	if main.search.has_focus() or not main.search.is_button() or main.bar_state()["hidden"].size() != shown_before:
 		return _fail("Esc did not shut the search field to its button: %s" % [main.bar_state()])
+	# Stage S18: a sheet opened and shut fits the bar afresh with nothing on it changed, and
+	# every piece of the bar keeps its own place (the search's button was left as wide as its
+	# field, lying over Add policy).
+	for sheet in ["parliament", "budget"]:
+		main.open_overlay(sheet)
+		await _frames(8)
+		var over := _overlapping()
+		if over != "":
+			return _fail("with the %s sheet open at 1366 wide %s" % [sheet, over])
+		main.close_overlay()
+		await _frames(8)
+		over = _overlapping()
+		if over != "":
+			return _fail("with the %s sheet shut again at 1366 wide %s" % [sheet, over])
 	# Widened again: everything back.
 	await _width(WIDEST)
 	state = main.bar_state()
@@ -117,9 +131,26 @@ func _initialize() -> void:
 		return _fail("widened to %d the bar has not come back: %s" % [WIDEST, state])
 	while main.effects_running:
 		await process_frame
-	print("top bar: at %d wide every headline figure, the search field and every button's words; narrowed to %d in the stated order and never out of it (%s), every headline figure still there at %d, the bar inside the window at every width, also with the capital short; approval and capital on it throughout; \"/\" opens the search's button (%d figure%s giving way to it at 1366) and Esc shuts it; all back at %d" % [
+	print("top bar: at %d wide every headline figure, the search field and every button's words; narrowed to %d in the stated order and never out of it (%s), every headline figure still there at %d, the bar inside the window at every width, also with the capital short; approval and capital on it throughout; \"/\" opens the search's button (%d figure%s giving way to it at 1366) and Esc shuts it; no piece over another with a sheet opened and shut; all back at %d" % [
 		WIDEST, NARROWEST, ", ".join(steps), ALL_FIGURES, gave, "" if gave == 1 else "s", WIDEST])
 	quit(0)
+
+
+## Two pieces of the bar that lie over one another, in words, or "": each piece that shows
+## must end where the next begins, and the search's button be no wider than a button.
+func _overlapping() -> String:
+	var row: Control = main._bar.get_child(0)
+	var before: Control = null
+	for child in row.get_children():
+		var piece := child as Control
+		if piece == null or not piece.is_visible_in_tree():
+			continue
+		if before != null and before.get_global_rect().end.x > piece.get_global_rect().position.x + 0.5:
+			return "%s (to %.0f) lies over %s (from %.0f)" % [before.name, before.get_global_rect().end.x, piece.name, piece.get_global_rect().position.x]
+		before = piece
+	if main.search.is_button() and main.search.size.x > main.search.BUTTON + 0.5:
+		return "the search's button is %.0f wide" % main.search.size.x
+	return ""
 
 
 func _width(width: int) -> void:

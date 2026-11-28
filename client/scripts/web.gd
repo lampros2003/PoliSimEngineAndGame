@@ -626,7 +626,7 @@ func _layout_from(turn: float) -> void:
 		var m := area_gap
 		for key in a["indicators"]:
 			m += (2.0 * RADIUS[nodes[key]["tier"]] + 20.0) * u
-		var name_font := Palette.display(600, 2)
+		var name_font := Palette.display_turned(600, 2)
 		var name_w := name_font.get_string_size(str(a["name"]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, int(roundf(14.0 * u))).x
 		p_need.append(maxf(p, name_w * 1.15 + area_gap))
 		i_need.append(m)
@@ -802,7 +802,7 @@ func _place_groups(keys: Array) -> void:
 	var f := 0.0
 	var names: Array = []  # [text, centre (fraction of the text ring), width (fraction)]
 	var name_px := int(roundf(clampf(12.0 * u, 12.0, 17.0)))
-	var name_font := Palette.display(600, 2)
+	var name_font := Palette.display_turned(600, 2)
 	for i in families.size():
 		var members: Array = families[i][1]
 		var room := usable * members.size() / keys.size()
@@ -935,7 +935,7 @@ func _outline(ring: Ring) -> PackedVector2Array:
 ## Sets an area's name along the rim, centred on its sector, upright everywhere: letters
 ## run clockwise over the top half and anticlockwise along the bottom.
 func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
-	var font := Palette.display(600, 2)
+	var font := Palette.display_turned(600, 2)
 	var size_px := int(roundf(14.0 * _unit))
 	var text := str(a["name"]).to_upper()
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
@@ -977,7 +977,7 @@ func _rim_name(a: Dictionary, ring: Ring, middle: float, share: float) -> void:
 ## [glyph, position, angle, width, size] appended to `out`; nothing when wider than `room`
 ## pixels. Returns the width set.
 func _curved_text(text: String, ring: Ring, f_mid: float, room: float, size_px: int, out: Array) -> float:
-	var font := Palette.display(600, 2)
+	var font := Palette.display_turned(600, 2)
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
 	if width > room:
 		return 0.0
@@ -1937,7 +1937,7 @@ func _draw_base() -> void:
 			var end := 0 if _arc_ends[k] == 0 else pts.size() - 1
 			var n := (pts[end] - _c).normalized()
 			_base.draw_line(pts[end] - n * 4.0, pts[end] + n * 4.0, Color(Palette.INK, 0.55), 1.5)
-	var font := Palette.display(600, 2)
+	var font := Palette.display_turned(600, 2)
 	for list in [_rim, _families]:
 		for g in list:
 			_base.draw_set_transform(g[1], g[2], Vector2.ONE)
@@ -2077,8 +2077,16 @@ func _radius(n: Dictionary) -> float:
 	return n["r"] * (1.0 + 0.06 * _lift.get(n["key"], 0.0)) * _appear.get(n["key"], 1.0)
 
 
+## Stage S18.1: a pictogram drawn from its vectors at the size it has here, on whole pixels.
 func _icon(texture: Texture2D, c: Vector2, half: float, colour: Color) -> void:
-	_node_layer.draw_texture_rect(texture, Rect2(c - Vector2(half, half), Vector2(half, half) * 2.0), false, colour)
+	var px := maxi(2, int(roundf(half * 2.0)))
+	var at := (c - Vector2(px, px) * 0.5).round()
+	_node_layer.draw_texture_rect(Palette.sized(texture, px), Rect2(at, Vector2(px, px)), false, colour)
+	icons_drawn[px] = int(icons_drawn.get(px, 0)) + 1
+
+
+## For the checks: the sizes pictograms were drawn at since the last count, each with how many.
+var icons_drawn := {}
 
 
 func _draw_policy(n: Dictionary, a: float) -> void:
@@ -2089,16 +2097,16 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 	if n.get("ghost", false):
 		# Stage S13.5: a policy whose bill to introduce waits: a dashed outline on paper, its
 		# pictogram faint, the setting proposed on the gauge and the waiting mark.
-		_node_layer.draw_circle(c, r, Color(Palette.OCHRE.lerp(Palette.PAPER, 0.75), 0.85 * a))
+		_node_layer.draw_circle(c, r, Color(Palette.OCHRE.lerp(Palette.PAPER, 0.75), 0.85 * a), true, -1.0, true)
 		for k in 16:
 			_node_layer.draw_arc(c, r, TAU * k / 16.0, TAU * (k + 0.55) / 16.0, 6, ink, maxf(2.0, 2.0 * _unit), true)
 		_icon(n["icon"], c, r * 0.6, Color(Palette.INK, 0.45 * a))
 		var m := c + Vector2(r * 0.72, -r * 0.72)
-		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a))
+		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a), true, -1.0, true)
 		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
 		return
-	_node_layer.draw_circle(c + Vector2(3, 3) * _unit, r, Color(Palette.SHADOW, 0.9 * a))
-	_node_layer.draw_circle(c, r, Color(Palette.CARD, a) if not waiting else Color(Palette.OCHRE.lerp(Palette.CARD, 0.55), a))
+	_node_layer.draw_circle(c + Vector2(3, 3) * _unit, r, Color(Palette.SHADOW, 0.9 * a), true, -1.0, true)
+	_node_layer.draw_circle(c, r, Color(Palette.CARD, a) if not waiting else Color(Palette.OCHRE.lerp(Palette.CARD, 0.55), a), true, -1.0, true)
 	_node_layer.draw_arc(c, r, 0, TAU, 48, ink, maxf(2.0, 2.0 * _unit), true)
 	if n["key"] == selected:
 		_selected_ring(c, r, a)
@@ -2119,7 +2127,7 @@ func _draw_policy(n: Dictionary, a: float) -> void:
 	if waiting:
 		# A change waiting: an ochre mark at the top right.
 		var m := c + Vector2(r * 0.72, -r * 0.72)
-		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a))
+		_node_layer.draw_circle(m, 6.0 * _unit, Color(Palette.OCHRE, a), true, -1.0, true)
 		_node_layer.draw_arc(m, 6.0 * _unit, 0, TAU, 16, ink, 1.5, true)
 
 
@@ -2135,7 +2143,7 @@ func _selected_ring(c: Vector2, r: float, a: float) -> void:
 func _draw_indicator(n: Dictionary, a: float) -> void:
 	var c: Vector2 = n["pos"]
 	var r := _radius(n)
-	_node_layer.draw_circle(c, r, Color(Palette.PAPER.lerp(Palette.CARD, 0.6), a))
+	_node_layer.draw_circle(c, r, Color(Palette.PAPER.lerp(Palette.CARD, 0.6), a), true, -1.0, true)
 	var band := maxf(3.0, r * 0.22)
 	_node_layer.draw_arc(c, r - band / 2.0, 0, TAU, 48, Color(state_colour(str(n.get("state", "steady"))), a), band, true)
 	if n["key"] == selected:
@@ -2201,7 +2209,7 @@ func _badge(n: Dictionary, c: Vector2, r: float, a: float) -> void:
 		tone = Palette.GOOD if (trend > 0) == (better == "high") else Palette.BAD
 	var m := c + Vector2(r * 0.74, -r * 0.74)
 	var s := maxf(6.0, r * 0.3)
-	_node_layer.draw_circle(m, s, Color(tone, a))
+	_node_layer.draw_circle(m, s, Color(tone, a), true, -1.0, true)
 	var up := trend > 0
 	var tri := PackedVector2Array([m + Vector2(0, -s * 0.55 if up else s * 0.55), m + Vector2(-s * 0.5, s * 0.35 if up else -s * 0.35),
 		m + Vector2(s * 0.5, s * 0.35 if up else -s * 0.35)])
@@ -2211,8 +2219,8 @@ func _badge(n: Dictionary, c: Vector2, r: float, a: float) -> void:
 func _draw_centre(n: Dictionary) -> void:
 	var c: Vector2 = n["pos"]
 	var r: float = n["r"] * (1.0 + 0.03 * _lift.get("centre", 0.0))
-	_node_layer.draw_circle(c + Vector2(5, 5) * _unit, r, Palette.SHADOW)
-	_node_layer.draw_circle(c, r, Palette.CARD)
+	_node_layer.draw_circle(c + Vector2(5, 5) * _unit, r, Palette.SHADOW, true, -1.0, true)
+	_node_layer.draw_circle(c, r, Palette.CARD, true, -1.0, true)
 	_node_layer.draw_arc(c, r, 0, TAU, 72, Palette.INK, 3.0 * _unit, true)
 	_node_layer.draw_arc(c, r - 6.0 * _unit, 0, TAU, 72, Palette.INK, 1.0 * _unit, true)
 	var display := Palette.display(500)

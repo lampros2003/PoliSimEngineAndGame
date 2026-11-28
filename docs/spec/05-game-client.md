@@ -1,4 +1,4 @@
-# The game client (stages S2 to S15)
+# The game client (stages S2 to S18)
 
 How the Godot client, the engine and the model files fit together. The client is written
 for no particular model: everything on screen comes from the model's catalogue and the
@@ -518,6 +518,50 @@ for good. A dilemma's lever is not a policy on the board (its catalogue entry ha
 false and `dilemma` set). `polisim play` asks a dilemma the same way, as numbered answers
 for `set <name> N`.
 
+## Plates (stage S18.3)
+
+`plate.gd` is the picture at the head of a question's sheet, of election night's, of the end
+of a term's and of the start screen: a field of one flat ink with rays behind a roundel of
+card stock, one large pictogram in the roundel and smaller ones either side, under the same
+hard shadow as a card. Nothing is drawn for one event: a plate is a pictogram's name (the
+open set in `client/icons`), a tone and the pictograms beside it, so `[play] plates` gives a
+question its plate in one line, and a question with no line (a mod's) has the plain one, a
+podium on ochre. The game's icon (`client/icon.png`) and its opening picture
+(`client/splash.png`) are painted by the same code (`tests/make_art.gd`, run with a display).
+
+## The country as a map (stage S18.4)
+
+`country_map.gd` draws the file `[play.web] map` names, on the right of the Parliament sheet
+beside the House, in view whichever section is open: the land in five bands of one hue by the
+government's backing in each place (nought to a half in tens, the scale of the bars in the
+table), an ink coast, a fine line between two places and none between two regions of one, a
+hard shadow under the land, and a key beneath. A place whose figure is silent (its `note`
+shown instead: Northern Ireland, where the governing party does not stand) is hatched. The
+pointer on a place marks it out, names it under the key with its figure, and tints its row
+of "The country by place" when that section is open; the pointer on a row marks the place on
+the map; a press on a place opens the section. The file's `attribution` is shown at the foot
+of How to play.
+
+The file is GeoJSON on a flat grid with north up, in any unit: polygons with a `code` (and a
+`name`), and lines with `a` and `b`, the codes either side (`b` empty on the coast). Only a
+polygon's outer ring is drawn. A file that is missing or cannot be read leaves the table
+alone and warns in the log. The United Kingdom's is `models/uk/map/regions.geojson`, made by
+`tools/uk/map.py` from the Office for National Statistics' open boundaries
+(`models/uk/map/README.md`).
+
+**Sharp at every size (stage S18.1).** The pictograms are imported as drawings, not pictures
+(`importer="svg"`, Godot's `DPITexture`). `Palette.icon(name, px)` and `Palette.sized(picture,
+px)` hand back one made at `px` pixels, kept by drawing and size, and the engine makes it
+again at the screen's scale; the board asks at each node's own size and snaps the picture to
+the pixel grid. `Palette.unsharp(root)` lists every picture under `root` whose made size is
+not the size it is shown at. Discs and dots are drawn anti-aliased. Words set along a curve
+use `Palette.display_turned`, a distance-field copy of the display face, which stays sharp
+turned; upright words keep the ordinary face.
+
+**The whole screen (stage S18.2).** F11, or Menu, "Full screen", switches between the whole
+screen and a window; the choice is kept in the settings file, and the automatic size of the
+interface is worked out again for the new height.
+
 ## The scenario's `[play]` table
 
 Presentation settings. The engine ignores them and they never affect a run.
@@ -540,6 +584,7 @@ Presentation settings. The engine ignores them and they never affect a run.
 | `breakdown_totals` | A table from breakdown names to the national value shown as their last line instead, under its own label (stage S6.4: jobs by industry and their total); the breakdown appears in that value's popup | none |
 | `politics` | A table naming the model's politics for Parliament and election night (stage S5.5): `intention`, `seats`, `projected` (values over one dimension of blocs: voting intention, seats held, seats if an election were held now), `governing` (true/false by bloc), `support` and `turnout` (national: the government's poll rating, turnout), `election` (true in a month with a general election), `months_to_election`, `player` (true while the player's bloc governs) and `majority` (seats); and (stage S8.3) `issues` and `issues_at_election` (values over one dimension of issues, 1 where things stood). `support` is also the centre's approval | none: no Parliament sheet |
 | `web` | The board: see below | an automatic board |
+| `plates` | Stage S18.3: a table from a question's name, or `election`, `election_lost`, `term`, to the plate at the head of its sheet: a pictogram's name, or `{ icon, tone, beside }` (`tone` one of ochre, blue, brick, sage, ink; `beside` smaller pictograms either side) ([Plates](#plates-stage-s183)) | a plain plate |
 
 Any model element may carry `label` (a short name) and `doc` (a sentence) for the
 client's labels and tooltips. A `real` whose unit starts with the currency (an average
@@ -560,6 +605,7 @@ noted; an item whose name the model lacks is skipped.
 | `also` | Stage S15.1: a table from any name (a situation's, a policy's key, a row) to a list of other words search finds it by; `also = [...]` on a policy, an indicator or a group entry does the same for that item (by its key, row and levers). The UK gives none | none |
 | `stances` | Stage S15.3: Parliament's scales, a list of tables: `row` (a national value, nought at the start), `label`, `low` and `high` (the ends' words), and optionally `low_group` and `high_group` (the keys of the groups at each end, which the scales name with their approval and whose popups say they read this stance) | none: no scales |
 | `places` | Stage S15.3: Parliament's "The country by place", a list of tables: `label`, `row` (approval), `share`, and optionally `note` (said in place of an approval of nought). The UK lists the seven regions that left the ring | none |
+| `map` | Stage S18.4: a map of the country, a path to a GeoJSON file from the scenario's own folder; each of `places` then carries `regions`, the codes of the map's regions it is made of ([The country as a map](#the-country-as-a-map-stage-s184)) | no map: the table alone |
 | `shelf` | Stage S15: statistics kept off the board but still reachable, a list of tables: `row`, and `see`, the statistic on the board that stands for it. Search lists them under "Not on the board" and Enter opens the indicator popup; the popup of `see` links to them under "See also". The UK shelves the nine statistics the S15.2 audit took off the board | none |
 | `balance` | The result row a policy's links always include when it moves it | `budget_balance` |
 | `group_share` | The value over the group dimension that gives each group's share, from which a group's place in the dimension is found | `group_share` |
@@ -818,7 +864,9 @@ screen through the methods of `main.gd` listed after the table, as a player woul
 | `tests/contrast_check.gd` | Stage S17.1, without a scenario: every pair of ink and ground in `contrast.gd`'s `pairs` (the words the scripts draw themselves, the inks text is set in on every ground, the theme's states under the pointer and pressed, and the marks that carry meaning) reaches its WCAG 2.1 ratio, 4.5 to 1 for text and 3 to 1 for text of 18 px or more and for marks; then the start screen, the top bar (at the start, after three months, with the capital short, while searching), the strip (with a problem announced), the search's matches and the guide are walked as they stand and every piece of text measured against what is under it |
 | `tests/folds_check.gd` | Stage S17.1: at 1366x768 and 1920x1080, a policy (at rest, with a change waiting and its year ahead, of levels, repealable, being introduced with and without a setting), five statistics on the board and one off it with each fold open, four groups of voters with each fold open and a household's account, a situation, and The Budget, Parliament with each fold, Add policy, the key, help and the month's report: each card inside the window and under the top bar, nothing in it poking out of its sides, no label or button narrower than its words, no text under 12 px, and every piece of text at its contrast ratio against the ground it stands on. `--shots=DIR` with a display also photographs each card and the whole screen |
 | `tests/focus_check.gd` | Stage S17.1: with Next month holding the keyboard, a policy, a statistic, a group of voters, a situation, The Budget, Parliament, Add policy, the key, help and a question are opened in turn and Tab pressed once for each control: the keyboard goes in, reaches each control once in the order the card is built (never up and to the left at once), each shows a ring (2 px, 3 to 1 against the ground round it), the press after the last returns to the first and Shift+Tab goes back; Esc closes the card and Next month has the keyboard again; a popup opened from a Budget line closes first, back to that line |
-| `tests/bar_check.gd` | Stage S17.1: three months in, at 2560 wide the top bar has every figure, the search field and every word; narrowed ten pixels at a time to 1200 it never needs more than the window, gives way in the stated order and never out of it, keeps every headline figure at 1920 and approval and capital throughout, also with the capital short; at 1366 "/" opens the search's button and Esc shuts it; widened, all comes back |
+| `tests/bar_check.gd` | Stage S17.1: three months in, at 2560 wide the top bar has every figure, the search field and every word; narrowed ten pixels at a time to 1200 it never needs more than the window, gives way in the stated order and never out of it, keeps every headline figure at 1920 and approval and capital throughout, also with the capital short; at 1366 "/" opens the search's button and Esc shuts it; widened, all comes back. Stage S18: at 1366 The Budget and Parliament are opened and shut, and no piece of the bar lies over another (the search's button used to be left as wide as its field, over Add policy) |
+| `tests/map_check.gd` | Stage S18.4: the scenario's map reads, twelve regions each of which can be filled, with its publisher's acknowledgement; every place is made of regions the map has and every region is in exactly one place; the key's bands are each at least 1.3 to 1 darker than the last; at 1366x768 and 1920x1080 the land and its key are inside the Parliament sheet, a point in each place is found to be that place, each place is in the band of its own figure and one is hatched; the pointer on a place marks it on the map and in the table, a press opens "The country by place", the pointer off the land marks nothing, the pointer on a row marks the map; How to play carries the acknowledgement; a map that is not there leaves the table alone and says why |
+| `tests/plates_check.gd` | Stages S18.2 and S18.3: the project names an icon and an opening picture that exist and are of a size to be seen; every pictogram in `client/icons` has its line in `CREDITS.md` and the credits name no file that is gone; every question of the model, `election`, `election_lost` and `term` has a plate in `[play] plates`, the table names no question the model lacks, every pictogram named is in `client/icons` and every tone is one a plate is printed in; a question with no plate gets the plain one; the first question put has its plate at the head of its sheet, the sheet's width across, with every pictogram made at the size shown; and the month's report is drawn under the sheets |
 | `tests/perf_check.gd` | Stage S14.1, the speed budget, at 1920x1080 on the UK after a month; it prints every figure and fails if one is over (stage S17: it first times the machine, on the engine's own twelve-month look ahead and a fixed loop of script, and where the machine takes k times the reference's time the budgets the processor bounds, every one but a popup's opening and closing and the idle count, are k times as long; a forecast over budget is measured once more): a click to a popup fully open 120 ms and its close 80 ms (medians of five over two policies, two indicators and a group, measured again once if over); board redraws in an idle second with a popup open 0; "Next month" to the date and board showing it 150 ms (median of three, while the last table is measured); twelve months 1 s; pointing at a policy straight after to measured links 16 ms (one frame); and (stage S14.4) a basic rate typed to "In a year" filled 600 ms (median of three); and (stage S15.1) a key typed into search, its matches, list and the board's dimming, 4 ms on average over "unemployment" typed and deleted a letter at a time, with no engine call |
 | `tests/budget_dump.gd` | The UK's Budget after one month, read as text and parsed back: every line within 1% of the 2024 public finances in `models/uk/data/annual.csv` (totals, shown to three figures, within 0.6%), and no input marked `player = false` among a policy's controls. Then every breakdown, as shown in the popups of the figures they break down, after that month and after a second with the basic rate one point higher: every group shown with its label; all households' net income equal to the runner's to the pound; the rise taking from the fifth decile up, from each of the top three at least £100 a year more than from the poorest, and from every region but Scotland, which sets its own rates |
 

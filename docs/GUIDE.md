@@ -299,7 +299,10 @@ with its marker where the government stands now, its ends named with their belie
 their approval, and what moved it last ("last moved by Sentencing, March 2025"). **The country
 by place** lists the seven regions with their share of adults, their backing for the
 government and last month's change (for Northern Ireland, where the governing party does
-not stand, a note in place of the figure). In a month with an election a sheet gives the results and the new
+not stand, a note in place of the figure). On the right of the sheet is **the map**: the country
+printed darker where more back the government, in five bands from nought to a half, with
+Northern Ireland hatched. Point at a place for its name and figure; click it to open the
+table at that place. In a month with an election a sheet gives the results and the new
 government. If your bloc is out of government the game is over: time stops, and a saved game
 can still be loaded.
 
@@ -388,6 +391,7 @@ come in the same months each time.
 | / or Ctrl+F | Go to search |
 | Up, Down, Enter, Esc (in search) | Move through the matches, open the chosen one, clear the search |
 | K | Open or close the key |
+| F11 | The whole screen, or back to a window (also Menu, Full screen); the game remembers which |
 | Tab, Shift+Tab | Inside a popup or a sheet: to the next control, or the one before; the one that has the keyboard wears a dark ochre ring. Space or Enter presses it |
 | Esc | Close what is on top: the popup, then the month's report, then the sheet; skip the guide. The keyboard goes back to where it was |
 

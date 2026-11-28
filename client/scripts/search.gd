@@ -238,7 +238,7 @@ func _row(item: Dictionary, _at: int) -> Button:
 	var button := Button.new()
 	button.theme_type_variation = "ReportLine"
 	button.text = str(item["label"])
-	button.icon = item["icon"]
+	button.icon = Palette.sized(item["icon"], 20)
 	button.expand_icon = false
 	button.add_theme_constant_override("icon_max_width", 20)
 	button.add_theme_color_override("icon_normal_color", Palette.INK)

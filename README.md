@@ -30,7 +30,7 @@ a mod.
 | `crates/core/` | The engine (Rust): model loader, type and unit checker, bytecode compiler, block-wise interpreter, step loop, saves |
 | `crates/cli/` | `polisim`, the command-line runner and interactive session |
 | `crates/godot/` | The bridge that runs the engine inside the Godot client |
-| `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, pictograms, type and sounds, and its scripted tests |
+| `client/` | The Godot 4.7 game client (GDScript): the board, its popups and sheets, the map of the country, pictograms, plates, type and sounds, and its scripted tests |
 | `tests/` | The behaviour tests (Python, standard library only), run on the engine through `polisim serve`; `tests/README.md` says where each test of the retired Python reference implementation went |
 | `models/uk/` | The United Kingdom: national accounts, population, industries, households, voters, trade, generated from published data by `tools/uk/` (`models/uk/README.md`), and the policies, statistics and interest groups added since (`models/uk/POLICIES.md`, `models/uk/STATISTICS.md`, `models/uk/politics/README.md`); `scenarios/2025.toml` also describes the board in `[play.web]` |
 | `mods/` | Mods the game ships with: `dog_licence`, the example in `docs/MODDING.md`, for the UK; `dock_strike` and `year_on_year` for Valmora. The wealth tax that was the example until stage S17 is kept for the engine's tests in `tests/mods/` |
@@ -142,10 +142,14 @@ What it recorded (the state hashes, `conformance/`) now pins the engine
 
 The roadmap is in `reports/PoliSim engine architecture pathways.md`.
 
-Stages S0 to S17 are done, except what waits for the owner (the business decisions of S7,
+Stages S0 to S18 are done, except what waits for the owner (the business decisions of S7,
 the licence pages, and three questions from his play tests): `docs/PLAN.md` says where each
-stage stands and what is needed from him, and `docs/S3-PLAN.md` to `docs/S17-PLAN.md` hold
-their milestones. The last, S17 (2026-11-22), was a second polish pass of the client, each
+stage stands and what is needed from him, and `docs/S3-PLAN.md` to `docs/S18-PLAN.md` hold
+their milestones. The last, S18 (2026-11-28), raised the look to the standard of the genre
+with open material only: pictograms made sharp at every size, a poster-style plate at the
+head of every question and of election night, the country as a map from the Office for
+National Statistics' open boundaries, the game's own icon and opening picture, and the whole
+screen on F11. Before it, S17 (2026-11-22) was a second polish pass of the client, each
 item with a check that keeps it fixed: contrast measured to WCAG 2.1, one spacing scale, the
 keyboard kept inside an open popup or sheet, the top bar's order of giving way, and every
 fold of every popup fitted and measured at two window sizes. The tables below are the first

@@ -33,6 +33,7 @@ const AddPolicy := preload("res://scripts/add_policy.gd")
 const Search := preload("res://scripts/search.gd")
 const Strip := preload("res://scripts/strip.gd")
 const KeyPage := preload("res://scripts/key_page.gd")
+const Plate := preload("res://scripts/plate.gd")
 
 const SETTINGS := "user://settings.cfg"
 const BAR_HEIGHT := 64.0
@@ -50,11 +51,11 @@ const HELP := """[b]The board[/b] is the country, and the whole screen. Round th
 
 [b]Advance time[/b] with Next month, 3 months or Year. When a question is put to you, answer it: no month runs until you do. The strip under the top bar shows the situations in force and your answers; a situation also flags the statistic that set it off, and clicking its pennant lights that statistic and says why.
 
-[b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). Parliament shows the parties, where the government stands on four scales (the state against the market, liberty against order, green, the nation) with the groups of belief at their ends, and the country by group and by place. The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
+[b]The Budget[/b] and [b]Parliament[/b] open from the top bar (Parliament also from the centre). Parliament shows the parties, where the government stands on four scales (the state against the market, liberty against order, green, the nation) with the groups of belief at their ends, and the country by group and by place, the places on a map: point at one for its figure, click it for the table. The menu saves and loads your game, reloads the model files, shows amounts a year or a month, and sets the size of the screen.
 
 [b]After each month[/b] a line under the date says what moved. When the month brought something to tell (a bill passed, voted down or refused, a situation begun or ended, an election, a question answered) the month's report opens over the board: click a line to open it; click the date to see it again.
 
-[b]Keys[/b]: Space or Enter, next month; A, Add policy; / or Ctrl+F, search (Esc in it clears it); Esc closes what is on top: the popup, the report, the sheet; Tab and Shift+Tab move through a popup's or a sheet's controls; B, The Budget; P, Parliament; K, the key.
+[b]Keys[/b]: F11, the whole screen or a window; Space or Enter, next month; A, Add policy; / or Ctrl+F, search (Esc in it clears it); Esc closes what is on top: the popup, the report, the sheet; Tab and Shift+Tab move through a popup's or a sheet's controls; B, The Budget; P, Parliament; K, the key.
 
 [color=#505a66]Pictograms from game-icons.net by Lorc, Delapouite and others, CC BY 3.0 (client/icons/CREDITS.md). Type: Jost and IBM Plex Sans, SIL Open Font License. Sounds: Kenney's Interface Sounds, CC0 (client/sounds/CREDITS.md).[/color]"""
 
@@ -145,6 +146,10 @@ func _ready() -> void:
 	theme = Palette.make_theme()
 	Sound.load_settings()
 	_apply_scale(_saved_scale())
+	var kept := ConfigFile.new()
+	if kept.load(SETTINGS) == OK and bool(kept.get_value("ui", "fullscreen", false)) and DisplayServer.get_name() != "headless":
+		fullscreen = true
+		get_window().mode = Window.MODE_FULLSCREEN
 	_build_layout()
 	game = PoliSim.new()
 	var given := _argument("scenario", "")
@@ -324,7 +329,7 @@ func _build_layout() -> void:
 	politics = PoliticsPanel.new()
 	politics.fmt = fmt
 	politics.group_pressed.connect(open_node)
-	_parliament_sheet = _new_sheet("Parliament", 900.0)
+	_parliament_sheet = _new_sheet("Parliament", 1000.0)
 	_parliament_sheet.body.add_child(politics)
 	popup = PopupCard.new()
 	popup.name = "popup"
@@ -362,7 +367,10 @@ func _build_layout() -> void:
 		else:
 			open_node(key))
 	add_child(report)
-	move_child(report, popup.get_index())  # under popups and sheets
+	# Under the popups and the sheets. Stage S18: it stood above the sheets (they are added
+	# before the popup), so the report of a month with an election or a question lay over the
+	# left of election night's sheet or the question's (tests/plates_check.gd).
+	move_child(report, _sheets.get_index())
 	_date.mouse_filter = Control.MOUSE_FILTER_STOP
 	_date.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_date.tooltip_text = "The month's report"
@@ -461,7 +469,7 @@ func _build_bar() -> void:
 	_capital.pressed.connect(func() -> void: open_overlay("parliament"))
 	var line: HBoxContainer = _capital.get_meta("value").get_parent()
 	var coin := TextureRect.new()
-	coin.texture = Palette.icon("capital")
+	coin.texture = Palette.icon("capital", 22)
 	coin.custom_minimum_size = Vector2(22, 22)
 	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -490,7 +498,7 @@ func _build_bar() -> void:
 	_add_button = add
 	add.name = "open_add_policy"
 	add.text = "Add policy"
-	add.icon = Palette.icon("policy")
+	add.icon = Palette.icon("policy", 20)
 	add.theme_type_variation = "Quiet"
 	add.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	add.tooltip_text = "The policies not in force, by area (A)"
@@ -517,7 +525,7 @@ func _build_bar() -> void:
 		var button := Button.new()
 		button.text = spec[0]
 		button.name = "open_" + spec[2]
-		button.icon = Palette.icon(spec[1])
+		button.icon = Palette.icon(spec[1], 20)
 		button.theme_type_variation = "Quiet"
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var which: String = spec[2]
@@ -560,6 +568,7 @@ func _build_bar() -> void:
 		scales.add_radio_check_item("%d%%" % s, s + 1000)
 	scales.id_pressed.connect(func(id: int) -> void: set_ui_scale(0.0 if id == 100 else (id - 1000) / 100.0))
 	menu.add_submenu_node_item("Size of the screen", scales, 5)
+	menu.add_check_item("Full screen    F11", 10)  # stage S18.2
 	# Stage S13.6: sound on or off and its volume, kept with the screen size.
 	menu.add_check_item("Sound", 7)
 	var volumes := PopupMenu.new()
@@ -573,7 +582,7 @@ func _build_bar() -> void:
 	menu.add_item("The key", 4)
 	menu.add_item("Help", 6)
 	menu.id_pressed.connect(func(id: int) -> void:
-		menu_action(["save", "load", "reload", "per_year", "key", "", "help", "sound", "", "guide"][id]))
+		menu_action(["save", "load", "reload", "per_year", "key", "", "help", "sound", "", "guide", "fullscreen"][id]))
 	_update_menu()
 
 
@@ -625,6 +634,11 @@ func _fit_bar() -> void:
 		_bar_state["add_words"] = false
 	# No rule before the figures when every one of them has given way.
 	_chips_rule.visible = _chips.get_children().any(func(c): return (c as Control).visible)
+	# Stage S18: the row is laid out afresh after every fit. The search field grows at once
+	# when it is tried at its wider sizes, and a fit that ends where it began changes no
+	# least size, so nothing else would bring the field back to its button (it lay over Add
+	# policy after a sheet opened: tests/bar_check.gd).
+	(row as Container).queue_sort()
 	_fitting = false
 	_place_results.call_deferred()
 
@@ -728,6 +742,7 @@ func _update_menu() -> void:
 		var id := scales.get_item_id(i)
 		scales.set_item_checked(i, (id == 100 and _scale_choice <= 0.0) or (id >= 1000 and is_equal_approx((id - 1000) / 100.0, _scale_choice)))
 	menu.set_item_checked(menu.get_item_index(7), Sound.enabled)
+	menu.set_item_checked(menu.get_item_index(10), fullscreen)
 	var volumes: PopupMenu = menu.get_node("volume")
 	for i in volumes.item_count:
 		volumes.set_item_checked(i, is_equal_approx(volumes.get_item_id(i) / 100.0, Sound.volume))
@@ -748,13 +763,30 @@ func menu_action(action: String) -> void:
 		"key":
 			show_key()
 		"help":
-			_show_dialog("How to play", HELP)
+			_show_dialog("How to play", HELP + map_credit())
 		"sound":
 			Sound.enabled = not Sound.enabled
 			Sound.save_settings()
 			_update_menu()
 		"guide":
 			show_guide()
+		"fullscreen":
+			set_fullscreen(not fullscreen)
+
+
+## Stage S18.2: the whole screen, or a window (F11, or the menu), kept with the
+## other settings. With the size of the screen on Automatic, the size follows the new height.
+var fullscreen := false
+
+
+func set_fullscreen(on: bool) -> void:
+	fullscreen = on
+	if DisplayServer.get_name() != "headless":
+		get_window().mode = Window.MODE_FULLSCREEN if on else Window.MODE_WINDOWED
+		if _scale_choice <= 0.0:
+			get_tree().create_timer(0.25).timeout.connect(func() -> void: _apply_scale(0.0))
+	_save_setting("ui", "fullscreen", on)
+	_update_menu()
 
 
 func set_volume(volume: float) -> void:
@@ -842,7 +874,7 @@ func _model_changed() -> void:
 	budget.build(catalogue, entries, str(play.get("government", "government")))
 	politics.build(play)
 	board.build(entries, play, lever_entries, _key_label, func(l: String) -> Variant: return game.latest(l), game.pending())
-	politics.build_groups(board, play.get("web", {}))
+	politics.build_groups(board, play.get("web", {}), scenario_path.get_base_dir())
 	_build_headline()
 	# Stage S7.3: the situations, as they stand now (nothing is announced for a game just
 	# opened, loaded or reloaded).
@@ -1518,7 +1550,7 @@ func open_add_policy(key := "") -> void:
 	var areas := []
 	var by_area := {}
 	for a in board.areas:
-		areas.append([str(a["name"]), Palette.icon(str(a.get("icon", "policy")))])
+		areas.append([str(a["name"]), Palette.icon(str(a.get("icon", "policy")), 22)])
 		var list := []
 		for k in board.available_in(str(a["name"])):
 			list.append(_add_item(k))
@@ -2015,6 +2047,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_key_sheet.close()
 				else:
 					show_key()
+			KEY_F11:
+				set_fullscreen(not fullscreen)
 			_:
 				handled = false
 		if handled:
@@ -2034,10 +2068,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _show_dialog(title: String, bbcode: String) -> void:
+## Stage S18.3: the plate at the head of a sheet: the scenario's own for `name` (`[play.plates]`:
+## a pictogram's name, or {icon, tone, beside}), else one of `icon` in `tone`.
+## Stage S18.4: the acknowledgement the scenario's map of the country asks for (the file's
+## own `attribution`), for the foot of How to play; "" where there is no map.
+func map_credit() -> String:
+	if politics == null or politics.place_map == null or not politics.place_map.visible or politics.place_map.source == "":
+		return ""
+	return "\n[color=#505a66]The map of the country. %s[/color]" % politics.place_map.source
+
+
+func plate_for(name: String, icon: String, tone: String) -> Control:
+	var plates: Dictionary = play.get("plates", {})
+	return Plate.from(plates.get(name), icon, tone)
+
+
+func _show_dialog(title: String, bbcode: String, plate: Control = null) -> void:
 	if _dialog != null and is_instance_valid(_dialog):
 		_dialog.queue_free()
 	_dialog = _new_sheet(title, 720.0)
+	if plate != null:
+		_dialog.body.add_child(plate)
 	_dialog.add_text(bbcode)
 	_dialog.closed.connect(func() -> void: _dialog.queue_free.call_deferred())
 	_dialog.open()
@@ -2338,7 +2389,7 @@ func _announce_term() -> void:
 	lines.append("[/table]\n")
 	var passed := game.changes().filter(func(c): return c.get("passed", true)).size()
 	lines.append("You changed policy %d times. You can keep governing, or load your save to try again." % passed)
-	_show_dialog("End of term", "\n".join(lines))
+	_show_dialog("End of term", "\n".join(lines), plate_for("term", "laurels", "sage"))
 
 
 # ---------------------------------------------------------------------------- events
@@ -2371,7 +2422,8 @@ func _announce_election() -> void:
 		strip.show_line("You lost the election: the game is over. Load a save from the menu to play on.", true, 0.0)
 	Sound.play("election")
 	_show_dialog("Election night" if not lost else "Election night: you have lost office",
-		politics.election_report(func(name: String) -> Dictionary: return game.cells(name), not lost))
+		politics.election_report(func(name: String) -> Dictionary: return game.cells(name), not lost),
+		plate_for("election_lost" if lost else "election", "vote", "brick" if lost else "blue"))
 
 
 ## Stage S7.3 and S9.1: the flags under the centre: each situation in force with the month
@@ -2447,6 +2499,7 @@ func ask_dilemma() -> void:
 	var sheet := _new_sheet(str(d.get("label", name)), 720.0)
 	sheet.name = "dilemma_dialog"
 	dilemma_dialog = sheet
+	sheet.body.add_child(plate_for(name, "podium", "ochre"))  # stage S18.3
 	sheet.body.add_child(Palette.caps("A question for the government"))
 	var lines := PackedStringArray()
 	if str(d.get("doc", "")) != "":
